@@ -1,0 +1,46 @@
+app:
+  name: qcat
+  version: 1.0.0
+  env: development
+
+server:
+  host: localhost
+  port: 8080
+
+database:
+  driver: postgres
+  host: localhost
+  port: 5432
+  name: qcat
+  user: postgres
+  password: ""
+  sslmode: disable
+  max_open_conns: 10
+  max_idle_conns: 5
+  conn_max_lifetime: 1h
+
+redis:
+  enabled: true
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+  pool_size: 10
+
+exchange:
+  binance:
+    api_key: ""
+    api_secret: ""
+    testnet: true
+    rate_limit: 1200
+
+risk:
+  max_leverage: 10
+  max_position_size: 100000
+  max_drawdown: 0.1
+  circuit_breaker_threshold: 0.05
+
+logging:
+  level: info
+  format: json
+  output: stdout
