@@ -1,0 +1,356 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Play, Pause, Settings, BarChart3, History, Download, Upload } from "lucide-react"
+
+interface Strategy {
+  id: string
+  name: string
+  description: string
+  status: "running" | "stopped" | "error"
+  version: string
+  performance: {
+    pnl: number
+    pnlPercent: number
+    sharpe: number
+    maxDrawdown: number
+    winRate: number
+    totalTrades: number
+  }
+  risk: {
+    exposure: number
+    limit: number
+    violations: number
+  }
+  lastUpdate: string
+  symbols: string[]
+}
+
+export default function StrategiesPage() {
+  const [strategies, setStrategies] = useState<Strategy[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null)
+
+  useEffect(() => {
+    const fetchStrategies = async () => {
+      try {
+        // 模拟数据
+        const mockStrategies: Strategy[] = [
+          {
+            id: "strategy_1",
+            name: "趋势跟踪策略",
+            description: "基于移动平均线的趋势跟踪策略",
+            status: "running",
+            version: "v2.1.0",
+            performance: {
+              pnl: 2500.75,
+              pnlPercent: 12.5,
+              sharpe: 1.85,
+              maxDrawdown: -1500.25,
+              winRate: 0.68,
+              totalTrades: 156
+            },
+            risk: {
+              exposure: 25000,
+              limit: 50000,
+              violations: 0
+            },
+            lastUpdate: "2024-01-15 14:30:00",
+            symbols: ["BTCUSDT", "ETHUSDT"]
+          },
+          {
+            id: "strategy_2",
+            name: "均值回归策略",
+            description: "基于布林带的均值回归策略",
+            status: "running",
+            version: "v1.8.2",
+            performance: {
+              pnl: 1800.50,
+              pnlPercent: 9.2,
+              sharpe: 1.45,
+              maxDrawdown: -2200.00,
+              winRate: 0.72,
+              totalTrades: 89
+            },
+            risk: {
+              exposure: 18000,
+              limit: 40000,
+              violations: 1
+            },
+            lastUpdate: "2024-01-15 14:25:00",
+            symbols: ["ADAUSDT", "DOTUSDT"]
+          },
+          {
+            id: "strategy_3",
+            name: "套利策略",
+            description: "跨交易所套利策略",
+            status: "stopped",
+            version: "v1.5.0",
+            performance: {
+              pnl: 950.25,
+              pnlPercent: 4.8,
+              sharpe: 0.95,
+              maxDrawdown: -800.50,
+              winRate: 0.85,
+              totalTrades: 45
+            },
+            risk: {
+              exposure: 0,
+              limit: 30000,
+              violations: 0
+            },
+            lastUpdate: "2024-01-15 10:15:00",
+            symbols: ["BTCUSDT", "ETHUSDT"]
+          }
+        ]
+        setStrategies(mockStrategies)
+      } catch (error) {
+        console.error("Failed to fetch strategies:", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchStrategies()
+  }, [])
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "running": return "text-green-600 bg-green-100"
+      case "stopped": return "text-yellow-600 bg-yellow-100"
+      case "error": return "text-red-600 bg-red-100"
+      default: return "text-gray-600 bg-gray-100"
+    }
+  }
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "running": return <Play className="h-4 w-4" />
+      case "stopped": return <Pause className="h-4 w-4" />
+      case "error": return <Settings className="h-4 w-4" />
+      default: return <Pause className="h-4 w-4" />
+    }
+  }
+
+  const handleStrategyAction = (strategyId: string, action: string) => {
+    console.log(`Action ${action} for strategy ${strategyId}`)
+    // 实际项目中这里会调用API
+  }
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-64">Loading...</div>
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">策略库管理</h1>
+        <Button>
+          <Upload className="h-4 w-4 mr-2" />
+          导入策略
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {strategies.map((strategy) => (
+          <Card key={strategy.id} className="hover:shadow-lg transition-shadow">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">{strategy.name}</CardTitle>
+                <Badge variant="outline" className={getStatusColor(strategy.status)}>
+                  {getStatusIcon(strategy.status)}
+                  <span className="ml-1">{strategy.status}</span>
+                </Badge>
+              </div>
+              <CardDescription>{strategy.description}</CardDescription>
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>版本: {strategy.version}</span>
+                <span>更新: {strategy.lastUpdate}</span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* 绩效指标 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <div className="text-2xl font-bold text-green-600">
+                    +${strategy.performance.pnl.toFixed(2)}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {strategy.performance.pnlPercent >= 0 ? "+" : ""}{strategy.performance.pnlPercent.toFixed(2)}%
+                  </div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{strategy.performance.sharpe.toFixed(2)}</div>
+                  <div className="text-sm text-muted-foreground">夏普比率</div>
+                </div>
+              </div>
+
+              {/* 风险指标 */}
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span>风险敞口</span>
+                  <span>${strategy.risk.exposure.toLocaleString()} / ${strategy.risk.limit.toLocaleString()}</span>
+                </div>
+                <Progress value={(strategy.risk.exposure / strategy.risk.limit) * 100} className="h-2" />
+              </div>
+
+              {/* 交易统计 */}
+              <div className="grid grid-cols-3 gap-2 text-center text-sm">
+                <div>
+                  <div className="font-bold">{strategy.performance.totalTrades}</div>
+                  <div className="text-muted-foreground">总交易</div>
+                </div>
+                <div>
+                  <div className="font-bold">{(strategy.performance.winRate * 100).toFixed(1)}%</div>
+                  <div className="text-muted-foreground">胜率</div>
+                </div>
+                <div>
+                  <div className="font-bold text-red-600">${Math.abs(strategy.performance.maxDrawdown).toFixed(0)}</div>
+                  <div className="text-muted-foreground">最大回撤</div>
+                </div>
+              </div>
+
+              {/* 交易对 */}
+              <div>
+                <div className="text-sm text-muted-foreground mb-1">交易对:</div>
+                <div className="flex flex-wrap gap-1">
+                  {strategy.symbols.map((symbol) => (
+                    <Badge key={symbol} variant="secondary" className="text-xs">
+                      {symbol}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* 操作按钮 */}
+              <div className="flex gap-2">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="flex-1">
+                      <BarChart3 className="h-4 w-4 mr-1" />
+                      详情
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                      <DialogTitle>{strategy.name} - 详细信息</DialogTitle>
+                      <DialogDescription>{strategy.description}</DialogDescription>
+                    </DialogHeader>
+                    <Tabs defaultValue="performance" className="w-full">
+                      <TabsList>
+                        <TabsTrigger value="performance">绩效分析</TabsTrigger>
+                        <TabsTrigger value="risk">风险管理</TabsTrigger>
+                        <TabsTrigger value="trades">交易记录</TabsTrigger>
+                        <TabsTrigger value="settings">参数设置</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="performance" className="space-y-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <Card>
+                            <CardContent className="p-4">
+                              <div className="text-2xl font-bold text-green-600">+${strategy.performance.pnl.toFixed(2)}</div>
+                              <div className="text-sm text-muted-foreground">总收益</div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardContent className="p-4">
+                              <div className="text-2xl font-bold">{strategy.performance.sharpe.toFixed(2)}</div>
+                              <div className="text-sm text-muted-foreground">夏普比率</div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardContent className="p-4">
+                              <div className="text-2xl font-bold">{(strategy.performance.winRate * 100).toFixed(1)}%</div>
+                              <div className="text-sm text-muted-foreground">胜率</div>
+                            </CardContent>
+                          </Card>
+                          <Card>
+                            <CardContent className="p-4">
+                              <div className="text-2xl font-bold text-red-600">${Math.abs(strategy.performance.maxDrawdown).toFixed(0)}</div>
+                              <div className="text-sm text-muted-foreground">最大回撤</div>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </TabsContent>
+                      <TabsContent value="risk" className="space-y-4">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>风险指标</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-4">
+                            <div className="flex justify-between">
+                              <span>风险敞口</span>
+                              <span className="font-bold">${strategy.risk.exposure.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>风险限额</span>
+                              <span className="font-bold">${strategy.risk.limit.toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span>违规次数</span>
+                              <span className={`font-bold ${strategy.risk.violations > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                {strategy.risk.violations}
+                              </span>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </TabsContent>
+                      <TabsContent value="trades" className="space-y-4">
+                        <div className="text-center text-muted-foreground py-8">
+                          交易记录功能开发中...
+                        </div>
+                      </TabsContent>
+                      <TabsContent value="settings" className="space-y-4">
+                        <div className="text-center text-muted-foreground py-8">
+                          参数设置功能开发中...
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </DialogContent>
+                </Dialog>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleStrategyAction(strategy.id, strategy.status === "running" ? "stop" : "start")}
+                >
+                  {strategy.status === "running" ? (
+                    <>
+                      <Pause className="h-4 w-4 mr-1" />
+                      停止
+                    </>
+                  ) : (
+                    <>
+                      <Play className="h-4 w-4 mr-1" />
+                      启动
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* 快速操作 */}
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => handleStrategyAction(strategy.id, "backtest")}>
+                  <BarChart3 className="h-4 w-4 mr-1" />
+                  回测
+                </Button>
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => handleStrategyAction(strategy.id, "optimize")}>
+                  <Settings className="h-4 w-4 mr-1" />
+                  优化
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleStrategyAction(strategy.id, "export")}>
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  )
+}
