@@ -526,7 +526,7 @@ func (nrm *NetworkReconnectManager) GetAllConnectionStatus() map[string]*Connect
 	defer nrm.mu.RUnlock()
 
 	status := make(map[string]*ConnectionState)
-	for id, connState := range nrm.connections {
+	for id := range nrm.connections {
 		status[id] = nrm.GetConnectionStatus(id)
 	}
 

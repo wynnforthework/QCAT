@@ -15,8 +15,8 @@ import (
 type Auditor struct {
 	// Prometheus metrics
 	auditEventsTotal  prometheus.Counter
-	auditEventsByType prometheus.CounterVec
-	auditEventsByUser prometheus.CounterVec
+	auditEventsByType *prometheus.CounterVec
+	auditEventsByUser *prometheus.CounterVec
 	auditLatency      prometheus.Histogram
 
 	// Configuration

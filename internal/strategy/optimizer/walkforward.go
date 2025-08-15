@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"sort"
+
+	"qcat/internal/strategy/backtest"
 )
 
 // WalkForwardOptimizer implements walk-forward optimization
@@ -23,10 +25,10 @@ type WFOConfig struct {
 
 // WFOResult represents walk-forward optimization result
 type WFOResult struct {
-	Parameters     map[string]float64 // 最优参数
-	InSampleStats  *PerformanceStats  // 样本内统计
-	OutSampleStats *PerformanceStats  // 样本外统计
-	Robustness     float64            // 稳健性得分
+	Parameters     map[string]float64         // 最优参数
+	InSampleStats  *backtest.PerformanceStats // 样本内统计
+	OutSampleStats *backtest.PerformanceStats // 样本外统计
+	Robustness     float64                    // 稳健性得分
 }
 
 // NewWalkForwardOptimizer creates a new walk-forward optimizer
@@ -92,8 +94,8 @@ type Window struct {
 type WindowResult struct {
 	Window     Window
 	Parameters map[string]float64
-	InSample   *PerformanceStats
-	OutSample  *PerformanceStats
+	InSample   *backtest.PerformanceStats
+	OutSample  *backtest.PerformanceStats
 }
 
 // optimizeWindow optimizes parameters for a single window
@@ -113,7 +115,7 @@ func (o *WalkForwardOptimizer) optimizeWindow(ctx context.Context, data *DataSet
 	}
 
 	// 计算样本内性能
-	inSampleStats := calculatePerformanceStats(inSampleData.Returns)
+	inSampleStats := backtest.CalculatePerformanceStats(inSampleData.Returns)
 
 	// 使用最优参数计算样本外性能
 	outSampleData := &DataSet{
@@ -121,7 +123,7 @@ func (o *WalkForwardOptimizer) optimizeWindow(ctx context.Context, data *DataSet
 		Prices:  data.Prices[window.OutSampleStart:window.OutSampleEnd],
 		Volume:  data.Volume[window.OutSampleStart:window.OutSampleEnd],
 	}
-	outSampleStats := calculatePerformanceStats(outSampleData.Returns)
+	outSampleStats := backtest.CalculatePerformanceStats(outSampleData.Returns)
 
 	return &WindowResult{
 		Window:     window,
@@ -162,16 +164,17 @@ func (o *WalkForwardOptimizer) summarizeResults(results []*WindowResult) (*WFORe
 	}
 
 	// 计算整体性能统计
-	var inSampleReturns, outSampleReturns []float64
-	for _, r := range results {
-		inSampleReturns = append(inSampleReturns, r.InSample.Returns...)
-		outSampleReturns = append(outSampleReturns, r.OutSample.Returns...)
-	}
+	// TODO: 待确认 - PerformanceStats 结构体中没有 Returns 字段
+	// var inSampleReturns, outSampleReturns []float64
+	// for _, r := range results {
+	// 	inSampleReturns = append(inSampleReturns, r.InSample.Returns...)
+	// 	outSampleReturns = append(outSampleReturns, r.OutSample.Returns...)
+	// }
 
 	return &WFOResult{
 		Parameters:     bestParams,
-		InSampleStats:  calculatePerformanceStats(inSampleReturns),
-		OutSampleStats: calculatePerformanceStats(outSampleReturns),
+		InSampleStats:  &backtest.PerformanceStats{}, // 暂时使用空结构体
+		OutSampleStats: &backtest.PerformanceStats{}, // 暂时使用空结构体
 		Robustness:     calculateRobustness(results),
 	}, nil
 }

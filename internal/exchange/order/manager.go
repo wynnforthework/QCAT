@@ -8,25 +8,25 @@ import (
 	"sync"
 	"time"
 
-	"qcat/internal/exchange"
+	exch "qcat/internal/exchange"
 )
 
 // Manager manages order operations
 type Manager struct {
 	db          *sql.DB
-	exchange    exchange.Exchange
-	orders      map[string]*exchange.Order
-	subscribers map[string][]chan *exchange.Order
+	exchange    exch.Exchange
+	orders      map[string]*exch.Order
+	subscribers map[string][]chan *exch.Order
 	mu          sync.RWMutex
 }
 
 // NewManager creates a new order manager
-func NewManager(db *sql.DB, exchange exchange.Exchange) *Manager {
+func NewManager(db *sql.DB, exchange exch.Exchange) *Manager {
 	m := &Manager{
 		db:          db,
 		exchange:    exchange,
-		orders:      make(map[string]*exchange.Order),
-		subscribers: make(map[string][]chan *exchange.Order),
+		orders:      make(map[string]*exch.Order),
+		subscribers: make(map[string][]chan *exch.Order),
 	}
 
 	// Start order status monitor
@@ -36,17 +36,17 @@ func NewManager(db *sql.DB, exchange exchange.Exchange) *Manager {
 }
 
 // Subscribe subscribes to order updates for a symbol
-func (m *Manager) Subscribe(symbol string) chan *exchange.Order {
+func (m *Manager) Subscribe(symbol string) chan *exch.Order {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	ch := make(chan *exchange.Order, 100)
+	ch := make(chan *exch.Order, 100)
 	m.subscribers[symbol] = append(m.subscribers[symbol], ch)
 	return ch
 }
 
 // Unsubscribe removes a subscription
-func (m *Manager) Unsubscribe(symbol string, ch chan *exchange.Order) {
+func (m *Manager) Unsubscribe(symbol string, ch chan *exch.Order) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -61,7 +61,7 @@ func (m *Manager) Unsubscribe(symbol string, ch chan *exchange.Order) {
 }
 
 // PlaceOrder places a new order
-func (m *Manager) PlaceOrder(ctx context.Context, req *exchange.OrderRequest) (*exchange.OrderResponse, error) {
+func (m *Manager) PlaceOrder(ctx context.Context, req *exch.OrderRequest) (*exch.OrderResponse, error) {
 	// Place order on exchange
 	resp, err := m.exchange.PlaceOrder(ctx, req)
 	if err != nil {
@@ -84,7 +84,7 @@ func (m *Manager) PlaceOrder(ctx context.Context, req *exchange.OrderRequest) (*
 }
 
 // CancelOrder cancels an existing order
-func (m *Manager) CancelOrder(ctx context.Context, req *exchange.OrderCancelRequest) (*exchange.OrderResponse, error) {
+func (m *Manager) CancelOrder(ctx context.Context, req *exch.OrderCancelRequest) (*exch.OrderResponse, error) {
 	// Cancel order on exchange
 	resp, err := m.exchange.CancelOrder(ctx, req)
 	if err != nil {
@@ -131,7 +131,7 @@ func (m *Manager) CancelAllOrders(ctx context.Context, symbol string) error {
 }
 
 // GetOrder returns an order by ID
-func (m *Manager) GetOrder(ctx context.Context, symbol, orderID string) (*exchange.Order, error) {
+func (m *Manager) GetOrder(ctx context.Context, symbol, orderID string) (*exch.Order, error) {
 	// Check local cache first
 	m.mu.RLock()
 	if order, exists := m.orders[orderID]; exists {
@@ -158,7 +158,7 @@ func (m *Manager) GetOrder(ctx context.Context, symbol, orderID string) (*exchan
 }
 
 // GetOpenOrders returns all open orders for a symbol
-func (m *Manager) GetOpenOrders(ctx context.Context, symbol string) ([]*exchange.Order, error) {
+func (m *Manager) GetOpenOrders(ctx context.Context, symbol string) ([]*exch.Order, error) {
 	// Get orders from exchange
 	orders, err := m.exchange.GetOpenOrders(ctx, symbol)
 	if err != nil {
@@ -177,7 +177,7 @@ func (m *Manager) GetOpenOrders(ctx context.Context, symbol string) ([]*exchange
 }
 
 // GetOrderHistory returns historical orders for a symbol
-func (m *Manager) GetOrderHistory(ctx context.Context, symbol string, startTime, endTime time.Time) ([]*exchange.Order, error) {
+func (m *Manager) GetOrderHistory(ctx context.Context, symbol string, startTime, endTime time.Time) ([]*exch.Order, error) {
 	// Get orders from exchange
 	orders, err := m.exchange.GetOrderHistory(ctx, symbol, startTime, endTime)
 	if err != nil {
@@ -196,7 +196,7 @@ func (m *Manager) GetOrderHistory(ctx context.Context, symbol string, startTime,
 }
 
 // storeOrder stores an order in the database
-func (m *Manager) storeOrder(order *exchange.Order) error {
+func (m *Manager) storeOrder(order *exch.Order) error {
 	query := `
 		INSERT INTO orders (
 			id, exchange_order_id, client_order_id, symbol, side,
@@ -243,7 +243,7 @@ func (m *Manager) storeOrder(order *exchange.Order) error {
 }
 
 // updateOrder updates the local order cache and notifies subscribers
-func (m *Manager) updateOrder(order *exchange.Order) {
+func (m *Manager) updateOrder(order *exch.Order) {
 	m.mu.Lock()
 	m.orders[order.ID] = order
 	m.mu.Unlock()
@@ -253,7 +253,7 @@ func (m *Manager) updateOrder(order *exchange.Order) {
 }
 
 // notifySubscribers notifies all subscribers of an order update
-func (m *Manager) notifySubscribers(order *exchange.Order) {
+func (m *Manager) notifySubscribers(order *exch.Order) {
 	m.mu.RLock()
 	subs := m.subscribers[order.Symbol]
 	m.mu.RUnlock()
@@ -274,12 +274,12 @@ func (m *Manager) monitorOrders() {
 
 	for range ticker.C {
 		m.mu.RLock()
-		orders := make(map[string]*exchange.Order)
+		orders := make(map[string]*exch.Order)
 		for id, order := range m.orders {
-			if order.Status != exchange.OrderStatusFilled &&
-				order.Status != exchange.OrderStatusCanceled &&
-				order.Status != exchange.OrderStatusRejected &&
-				order.Status != exchange.OrderStatusExpired {
+			if order.Status != string(exch.OrderStatusFilled) &&
+				order.Status != string(exch.OrderStatusCancelled) &&
+				order.Status != string(exch.OrderStatusRejected) &&
+				order.Status != "EXPIRED" {
 				orders[id] = order
 			}
 		}

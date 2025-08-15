@@ -58,10 +58,18 @@ func (l *DataLoader) LoadData(ctx context.Context, symbol string, start, end tim
 	if err != nil {
 		return nil, fmt.Errorf("failed to load orderbooks: %w", err)
 	}
-	data.Orderbooks = orderbooks
+	// Convert OrderBook to Depth
+	for _, ob := range orderbooks {
+		data.Orderbooks = append(data.Orderbooks, &orderbook.Depth{
+			Symbol:    ob.Symbol,
+			Bids:      ob.Bids.GetLevels(10),
+			Asks:      ob.Asks.GetLevels(10),
+			Timestamp: ob.Timestamp,
+		})
+	}
 
 	// 加载成交数据
-	trades, err := l.tradeManager.GetHistory(ctx, symbol, start, end)
+	trades, err := l.tradeManager.GetTradeHistory(ctx, symbol, 1000)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load trades: %w", err)
 	}
@@ -129,7 +137,7 @@ func (d *HistoricalData) GetKlineAt(t time.Time) *kline.Kline {
 // GetOrderbookAt returns the orderbook at the specified time
 func (d *HistoricalData) GetOrderbookAt(t time.Time) *orderbook.Depth {
 	for _, ob := range d.Orderbooks {
-		if ob.Time.Equal(t) {
+		if ob.Timestamp.Equal(t) {
 			return ob
 		}
 	}
@@ -140,7 +148,7 @@ func (d *HistoricalData) GetOrderbookAt(t time.Time) *orderbook.Depth {
 func (d *HistoricalData) GetTradesAt(t time.Time) []*trade.Trade {
 	var trades []*trade.Trade
 	for _, tr := range d.Trades {
-		if tr.Time.Equal(t) {
+		if tr.Timestamp.Equal(t) {
 			trades = append(trades, tr)
 		}
 	}
@@ -150,7 +158,7 @@ func (d *HistoricalData) GetTradesAt(t time.Time) []*trade.Trade {
 // GetFundingRateAt returns the funding rate at the specified time
 func (d *HistoricalData) GetFundingRateAt(t time.Time) *funding.Rate {
 	for _, fr := range d.FundingRates {
-		if fr.Time.Equal(t) {
+		if fr.LastUpdated.Equal(t) {
 			return fr
 		}
 	}
@@ -160,7 +168,7 @@ func (d *HistoricalData) GetFundingRateAt(t time.Time) *funding.Rate {
 // GetIndexPriceAt returns the index price at the specified time
 func (d *HistoricalData) GetIndexPriceAt(t time.Time) *index.Price {
 	for _, ip := range d.IndexPrices {
-		if ip.Time.Equal(t) {
+		if ip.Timestamp.Equal(t) {
 			return ip
 		}
 	}

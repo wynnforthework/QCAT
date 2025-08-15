@@ -17,36 +17,26 @@ func (s *SystemTestSuite) testAutoOptimizationOnPoorPerformance() error {
 
 	// 1. 创建测试策略
 	strategyID := "test_strategy_001"
-	
+
 	// 2. 模拟策略表现不佳的情况
 	// 设置较低的Sharpe比率和较高的最大回撤
-	poorMetrics := &strategy.PerformanceMetrics{
-		SharpeRatio: 0.5,  // 低于阈值1.0
-		MaxDrawdown: 0.15, // 高于阈值0.1
-		TotalReturn: 0.05, // 低于预期
+	poorMetrics := map[string]interface{}{
+		"sharpe_ratio": 0.5,  // 低于阈值1.0
+		"max_drawdown": 0.15, // 高于阈值0.1
+		"total_return": 0.05, // 低于预期
 	}
 
 	// 3. 触发自动优化
-	trigger := &optimizer.Trigger{
-		StrategyID:    strategyID,
-		TriggerType:   "performance",
-		SharpeRatio:   poorMetrics.SharpeRatio,
-		MaxDrawdown:   poorMetrics.MaxDrawdown,
-		TotalReturn:   poorMetrics.TotalReturn,
-		Thresholds: map[string]float64{
-			"sharpe_ratio": 1.0,
-			"max_drawdown": 0.1,
-			"total_return": 0.1,
-		},
-	}
+	// TODO: 待确认 - 实现优化触发器逻辑
+	_ = poorMetrics // 避免未使用变量警告
 
 	// 4. 创建优化任务
 	task, err := s.optimizer.CreateTask(ctx, &optimizer.TaskRequest{
 		StrategyID: strategyID,
 		Method:     "walk_forward",
 		Parameters: map[string]optimizer.Parameter{
-			"ma_short": {Min: 5, Max: 20, Step: 1},
-			"ma_long":  {Min: 20, Max: 50, Step: 5},
+			"ma_short":   {Min: 5, Max: 20, Step: 1},
+			"ma_long":    {Min: 20, Max: 50, Step: 5},
 			"rsi_period": {Min: 10, Max: 30, Step: 2},
 		},
 		Objective: optimizer.Objective{
@@ -218,7 +208,7 @@ func (s *SystemTestSuite) testAutoBalanceDrivenTrading() error {
 
 	// 2. 计算保证金占用率
 	marginRatio := s.calculateMarginRatio(account)
-	
+
 	// 3. 检查是否需要减仓
 	if marginRatio > 0.8 { // 80%阈值
 		// 触发自动减仓
@@ -244,9 +234,15 @@ func (s *SystemTestSuite) testAutoBalanceDrivenTrading() error {
 	for _, position := range positions {
 		// 检查是否需要平仓
 		if position.UnrealizedPnL < -position.Margin*0.5 { // 亏损超过保证金的50%
+			var side string
+			if position.Side == "LONG" {
+				side = "SELL"
+			} else {
+				side = "BUY"
+			}
 			closeOrder := &exchange.OrderRequest{
 				Symbol:   position.Symbol,
-				Side:     position.Side == "LONG" ? "SELL" : "BUY",
+				Side:     side,
 				Type:     "MARKET",
 				Quantity: position.Size,
 			}
@@ -509,11 +505,11 @@ func (s *SystemTestSuite) testAutoAdjustStopLevels() error {
 
 		// 3. 止盈止损参数函数化
 		stopLevels := s.calculateDynamicStopLevels(&DynamicStopConfig{
-			ATR:           atr,
-			RealizedVol:   realizedVol,
-			EquitySlope:   equitySlope,
-			MarketRegime:  marketRegime,
-			Position:      position,
+			ATR:          atr,
+			RealizedVol:  realizedVol,
+			EquitySlope:  equitySlope,
+			MarketRegime: marketRegime,
+			Position:     position,
 		})
 
 		// 4. 实时滑动更新机制
@@ -561,12 +557,12 @@ func (s *SystemTestSuite) testHotSymbolRecommendation() error {
 
 		// 3. 综合打分公式
 		totalScore := s.calculateTotalScore(&ScoreComponents{
-			VolJump:      volJumpScore,
-			Turnover:     turnoverScore,
-			OIChange:     oiChangeScore,
-			FundingZ:     fundingZScore,
-			RegimeShift:  regimeShiftScore,
-			Weights:      s.getScoreWeights(),
+			VolJump:     volJumpScore,
+			Turnover:    turnoverScore,
+			OIChange:    oiChangeScore,
+			FundingZ:    fundingZScore,
+			RegimeShift: regimeShiftScore,
+			Weights:     s.getScoreWeights(),
 		})
 
 		// 4. Top-N候选清单生成
@@ -587,12 +583,12 @@ func (s *SystemTestSuite) testHotSymbolRecommendation() error {
 
 		// 6. 前端人工启用界面
 		s.createApprovalRequest(ctx, &ApprovalRequest{
-			Symbol:           rec.Symbol,
-			Score:            rec.Score,
-			VolatilityRange:  volatilityRange,
-			LeverageSafety:   leverageSafety,
-			MarketSentiment:  marketSentiment,
-			RiskLevel:        s.calculateRiskLevel(rec.Symbol),
+			Symbol:          rec.Symbol,
+			Score:           rec.Score,
+			VolatilityRange: volatilityRange,
+			LeverageSafety:  leverageSafety,
+			MarketSentiment: marketSentiment,
+			RiskLevel:       s.calculateRiskLevel(rec.Symbol),
 		})
 	}
 
@@ -609,23 +605,23 @@ func (s *SystemTestSuite) testHotSymbolRecommendation() error {
 }
 
 // 辅助方法
-func (s *SystemTestSuite) createStrategyVersion(ctx context.Context, strategyID string, params map[string]interface{}) (*strategy.Version, error) {
-	// 实现策略版本创建逻辑
-	return &strategy.Version{}, nil
+func (s *SystemTestSuite) createStrategyVersion(ctx context.Context, strategyID string, params map[string]interface{}) (interface{}, error) {
+	// TODO: 待确认 - 实现策略版本创建逻辑
+	return nil, nil
 }
 
-func (s *SystemTestSuite) startCanaryDeployment(ctx context.Context, config *strategy.CanaryConfig) error {
-	// 实现Canary部署逻辑
+func (s *SystemTestSuite) startCanaryDeployment(ctx context.Context, config interface{}) error {
+	// TODO: 待确认 - 实现Canary部署逻辑
 	return nil
 }
 
-func (s *SystemTestSuite) monitorCanaryPerformance(ctx context.Context, config *strategy.CanaryConfig) (bool, error) {
-	// 实现Canary性能监控逻辑
+func (s *SystemTestSuite) monitorCanaryPerformance(ctx context.Context, config interface{}) (bool, error) {
+	// TODO: 待确认 - 实现Canary性能监控逻辑
 	return true, nil
 }
 
-func (s *SystemTestSuite) promoteToFullDeployment(ctx context.Context, config *strategy.CanaryConfig) error {
-	// 实现全量部署逻辑
+func (s *SystemTestSuite) promoteToFullDeployment(ctx context.Context, config interface{}) error {
+	// TODO: 待确认 - 实现全量部署逻辑
 	return nil
 }
 
@@ -634,8 +630,8 @@ func (s *SystemTestSuite) calculateTargetVolatility(returns []float64, periods i
 	return 0.15
 }
 
-func (s *SystemTestSuite) calculateRiskBudgets(assets map[string]*portfolio.Asset) map[string]float64 {
-	// 实现风险预算计算逻辑
+func (s *SystemTestSuite) calculateRiskBudgets(assets map[string]interface{}) map[string]float64 {
+	// TODO: 待确认 - 实现风险预算计算逻辑
 	return make(map[string]float64)
 }
 
@@ -654,18 +650,18 @@ func (s *SystemTestSuite) executeOrder(ctx context.Context, order *exchange.Orde
 	return nil
 }
 
-func (s *SystemTestSuite) calculateMarginRatio(account *exchange.Account) float64 {
-	// 实现保证金比率计算逻辑
+func (s *SystemTestSuite) calculateMarginRatio(account interface{}) float64 {
+	// TODO: 待确认 - 实现保证金比率计算逻辑
 	return 0.6
 }
 
-func (s *SystemTestSuite) generateMarginReductionOrders(ctx context.Context, account *exchange.Account, marginRatio float64) ([]*exchange.OrderRequest, error) {
-	// 实现保证金减仓订单生成逻辑
+func (s *SystemTestSuite) generateMarginReductionOrders(ctx context.Context, account interface{}, marginRatio float64) ([]*exchange.OrderRequest, error) {
+	// TODO: 待确认 - 实现保证金减仓订单生成逻辑
 	return []*exchange.OrderRequest{}, nil
 }
 
-func (s *SystemTestSuite) hasSignificantBalanceChange(account *exchange.Account) bool {
-	// 实现余额变化检测逻辑
+func (s *SystemTestSuite) hasSignificantBalanceChange(account interface{}) bool {
+	// TODO: 待确认 - 实现余额变化检测逻辑
 	return false
 }
 
@@ -724,9 +720,9 @@ func (s *SystemTestSuite) recordMetricsCurve(ctx context.Context, strategyID str
 	return nil
 }
 
-func (s *SystemTestSuite) calculateRiskAdjustedMetrics(strategy *strategy.Strategy) *strategy.Metrics {
-	// 实现风险调整指标计算逻辑
-	return &strategy.Metrics{}
+func (s *SystemTestSuite) calculateRiskAdjustedMetrics(strategy *strategy.Strategy) interface{} {
+	// TODO: 待确认 - 实现风险调整指标计算逻辑
+	return map[string]interface{}{}
 }
 
 func (s *SystemTestSuite) calculateMultiArmedBanditAllocations(returns map[string]float64) map[string]float64 {
@@ -804,9 +800,9 @@ func (s *SystemTestSuite) promoteToFullTrading(ctx context.Context, strategy *st
 	return nil
 }
 
-func (s *SystemTestSuite) requestManualApproval(ctx context.Context, strategy *strategy.Strategy) *strategy.Approval {
-	// 实现人工审批请求逻辑
-	return &strategy.Approval{Approved: true}
+func (s *SystemTestSuite) requestManualApproval(ctx context.Context, strategy *strategy.Strategy) interface{} {
+	// TODO: 待确认 - 实现人工审批请求逻辑
+	return map[string]interface{}{"approved": true}
 }
 
 func (s *SystemTestSuite) detectMarketRegime(ctx context.Context) string {

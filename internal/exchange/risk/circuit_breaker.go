@@ -147,7 +147,7 @@ func (cb *CircuitBreaker) CheckPrice(ctx context.Context, symbol string, price f
 			Symbol:    symbol,
 			Type:      EventTypeResumed,
 			Message:   "Circuit breaker resumed",
-			UpdatedAt: time.Now(),
+			TriggeredAt: time.Now(), // 使用 TriggeredAt 字段替代 UpdatedAt
 		})
 	}
 

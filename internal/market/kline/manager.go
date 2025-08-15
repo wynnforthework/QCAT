@@ -171,6 +171,12 @@ func (m *Manager) LoadHistoricalKlines(ctx context.Context, symbol string, inter
 	return klines, nil
 }
 
+// GetHistory returns historical klines for a symbol within a time range
+func (m *Manager) GetHistory(ctx context.Context, symbol string, start, end time.Time) ([]*Kline, error) {
+	// Use 1-hour interval as default for historical data
+	return m.LoadHistoricalKlines(ctx, symbol, Interval1h, start, end)
+}
+
 // storeBatch adds a kline to the batch buffer
 func (m *Manager) storeBatch(kline *Kline) error {
 	m.bufferMu.Lock()

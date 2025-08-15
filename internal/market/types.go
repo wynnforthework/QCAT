@@ -65,3 +65,46 @@ type IndexPrice struct {
 	Price     float64   `json:"price"`
 	Timestamp time.Time `json:"timestamp"`
 }
+
+// MarketDataHandler represents a handler for market data messages
+type MarketDataHandler func(interface{}) error
+
+// MarketType represents the type of market
+type MarketType string
+
+const (
+	MarketTypeSpot    MarketType = "SPOT"
+	MarketTypeFutures MarketType = "FUTURES"
+	MarketTypeOptions MarketType = "OPTIONS"
+)
+
+// WSSubscription represents a WebSocket market data subscription
+type WSSubscription struct {
+	Symbol     string                 `json:"symbol"`
+	MarketType MarketType             `json:"market_type"`
+	Channels   []string               `json:"channels"`
+	Parameters map[string]interface{} `json:"parameters"`
+}
+
+// Ticker represents a ticker update
+type Ticker struct {
+	Symbol             string    `json:"symbol"`
+	PriceChange        float64   `json:"price_change"`
+	PriceChangePercent float64   `json:"price_change_percent"`
+	WeightedAvgPrice   float64   `json:"weighted_avg_price"`
+	PrevClosePrice     float64   `json:"prev_close_price"`
+	LastPrice          float64   `json:"last_price"`
+	LastQty            float64   `json:"last_qty"`
+	BidPrice           float64   `json:"bid_price"`
+	BidQty             float64   `json:"bid_qty"`
+	AskPrice           float64   `json:"ask_price"`
+	AskQty             float64   `json:"ask_qty"`
+	OpenPrice          float64   `json:"open_price"`
+	HighPrice          float64   `json:"high_price"`
+	LowPrice           float64   `json:"low_price"`
+	Volume             float64   `json:"volume"`
+	QuoteVolume        float64   `json:"quote_volume"`
+	OpenTime           time.Time `json:"open_time"`
+	CloseTime          time.Time `json:"close_time"`
+	Count              int64     `json:"count"`
+}

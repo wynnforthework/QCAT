@@ -2,6 +2,7 @@ package security
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"sync"
 	"time"
@@ -11,21 +12,21 @@ import (
 type ApprovalType string
 
 const (
-	ApprovalTypeStrategy    ApprovalType = "strategy"    // 策略审批
-	ApprovalTypeRiskLimit   ApprovalType = "risk_limit"  // 风控限额审批
-	ApprovalTypeHotlist     ApprovalType = "hotlist"     // 热门币种审批
-	ApprovalTypeAPIKey      ApprovalType = "api_key"     // API密钥审批
-	ApprovalTypeSystem      ApprovalType = "system"      // 系统设置审批
+	ApprovalTypeStrategy  ApprovalType = "strategy"   // 策略审批
+	ApprovalTypeRiskLimit ApprovalType = "risk_limit" // 风控限额审批
+	ApprovalTypeHotlist   ApprovalType = "hotlist"    // 热门币种审批
+	ApprovalTypeAPIKey    ApprovalType = "api_key"    // API密钥审批
+	ApprovalTypeSystem    ApprovalType = "system"     // 系统设置审批
 )
 
 // ApprovalStatus 审批状态
 type ApprovalStatus string
 
 const (
-	ApprovalStatusPending   ApprovalStatus = "pending"   // 待审批
-	ApprovalStatusApproved  ApprovalStatus = "approved"  // 已批准
-	ApprovalStatusRejected  ApprovalStatus = "rejected"  // 已拒绝
-	ApprovalStatusExpired   ApprovalStatus = "expired"   // 已过期
+	ApprovalStatusPending  ApprovalStatus = "pending"  // 待审批
+	ApprovalStatusApproved ApprovalStatus = "approved" // 已批准
+	ApprovalStatusRejected ApprovalStatus = "rejected" // 已拒绝
+	ApprovalStatusExpired  ApprovalStatus = "expired"  // 已过期
 )
 
 // ApprovalRequest 审批请求
@@ -47,19 +48,19 @@ type ApprovalRequest struct {
 
 // Approval 审批记录
 type Approval struct {
-	ID        string         `json:"id"`
-	RequestID string         `json:"request_id"`
-	ApproverID string        `json:"approver_id"`
-	Status    ApprovalStatus `json:"status"`
-	Comment   string         `json:"comment"`
-	CreatedAt time.Time      `json:"created_at"`
+	ID         string         `json:"id"`
+	RequestID  string         `json:"request_id"`
+	ApproverID string         `json:"approver_id"`
+	Status     ApprovalStatus `json:"status"`
+	Comment    string         `json:"comment"`
+	CreatedAt  time.Time      `json:"created_at"`
 }
 
 // ApprovalWorkflow 审批工作流
 type ApprovalWorkflow struct {
-	mu      sync.RWMutex
+	mu       sync.RWMutex
 	requests map[string]*ApprovalRequest
-	rbac    *RBAC
+	rbac     *RBAC
 }
 
 // NewApprovalWorkflow 创建审批工作流
@@ -74,25 +75,25 @@ func NewApprovalWorkflow(rbac *RBAC) *ApprovalWorkflow {
 func (w *ApprovalWorkflow) CreateApprovalRequest(ctx context.Context, req *ApprovalRequest) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	
+
 	// 生成唯一ID
 	req.ID = generateApprovalID()
 	req.Status = ApprovalStatusPending
 	req.CreatedAt = time.Now()
 	req.UpdatedAt = time.Now()
-	
+
 	// 设置默认过期时间（7天）
 	if req.ExpiresAt.IsZero() {
 		req.ExpiresAt = time.Now().AddDate(0, 0, 7)
 	}
-	
+
 	// 根据审批类型确定审批人
 	approvers, err := w.determineApprovers(ctx, req.Type, req.RequesterID)
 	if err != nil {
 		return fmt.Errorf("failed to determine approvers: %w", err)
 	}
 	req.Approvers = approvers
-	
+
 	w.requests[req.ID] = req
 	return nil
 }
@@ -101,17 +102,17 @@ func (w *ApprovalWorkflow) CreateApprovalRequest(ctx context.Context, req *Appro
 func (w *ApprovalWorkflow) GetApprovalRequest(ctx context.Context, id string) (*ApprovalRequest, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	
+
 	req, exists := w.requests[id]
 	if !exists {
 		return nil, fmt.Errorf("approval request not found: %s", id)
 	}
-	
+
 	// 检查是否过期
 	if time.Now().After(req.ExpiresAt) && req.Status == ApprovalStatusPending {
 		req.Status = ApprovalStatusExpired
 	}
-	
+
 	return req, nil
 }
 
@@ -119,28 +120,28 @@ func (w *ApprovalWorkflow) GetApprovalRequest(ctx context.Context, id string) (*
 func (w *ApprovalWorkflow) Approve(ctx context.Context, requestID, approverID, comment string) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	
+
 	req, exists := w.requests[requestID]
 	if !exists {
 		return fmt.Errorf("approval request not found: %s", requestID)
 	}
-	
+
 	// 检查审批人是否有权限
 	if !w.isApprover(req, approverID) {
 		return fmt.Errorf("user %s is not an approver for request %s", approverID, requestID)
 	}
-	
+
 	// 检查是否已经审批过
 	if w.hasApproved(req, approverID) {
 		return fmt.Errorf("user %s has already approved request %s", approverID, requestID)
 	}
-	
+
 	// 检查是否过期
 	if time.Now().After(req.ExpiresAt) {
 		req.Status = ApprovalStatusExpired
 		return fmt.Errorf("approval request %s has expired", requestID)
 	}
-	
+
 	// 创建审批记录
 	approval := &Approval{
 		ID:         generateApprovalID(),
@@ -150,15 +151,15 @@ func (w *ApprovalWorkflow) Approve(ctx context.Context, requestID, approverID, c
 		Comment:    comment,
 		CreatedAt:  time.Now(),
 	}
-	
+
 	req.Approvals = append(req.Approvals, approval)
 	req.UpdatedAt = time.Now()
-	
+
 	// 检查是否所有审批人都已审批
 	if w.allApproversApproved(req) {
 		req.Status = ApprovalStatusApproved
 	}
-	
+
 	return nil
 }
 
@@ -166,28 +167,28 @@ func (w *ApprovalWorkflow) Approve(ctx context.Context, requestID, approverID, c
 func (w *ApprovalWorkflow) Reject(ctx context.Context, requestID, approverID, comment string) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	
+
 	req, exists := w.requests[requestID]
 	if !exists {
 		return fmt.Errorf("approval request not found: %s", requestID)
 	}
-	
+
 	// 检查审批人是否有权限
 	if !w.isApprover(req, approverID) {
 		return fmt.Errorf("user %s is not an approver for request %s", approverID, requestID)
 	}
-	
+
 	// 检查是否已经审批过
 	if w.hasApproved(req, approverID) {
 		return fmt.Errorf("user %s has already approved request %s", approverID, requestID)
 	}
-	
+
 	// 检查是否过期
 	if time.Now().After(req.ExpiresAt) {
 		req.Status = ApprovalStatusExpired
 		return fmt.Errorf("approval request %s has expired", requestID)
 	}
-	
+
 	// 创建审批记录
 	approval := &Approval{
 		ID:         generateApprovalID(),
@@ -197,11 +198,11 @@ func (w *ApprovalWorkflow) Reject(ctx context.Context, requestID, approverID, co
 		Comment:    comment,
 		CreatedAt:  time.Now(),
 	}
-	
+
 	req.Approvals = append(req.Approvals, approval)
 	req.Status = ApprovalStatusRejected
 	req.UpdatedAt = time.Now()
-	
+
 	return nil
 }
 
@@ -209,26 +210,26 @@ func (w *ApprovalWorkflow) Reject(ctx context.Context, requestID, approverID, co
 func (w *ApprovalWorkflow) ListApprovalRequests(ctx context.Context, userID string, status ApprovalStatus) ([]*ApprovalRequest, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
-	
+
 	var requests []*ApprovalRequest
-	
+
 	for _, req := range w.requests {
 		// 检查是否过期
 		if time.Now().After(req.ExpiresAt) && req.Status == ApprovalStatusPending {
 			req.Status = ApprovalStatusExpired
 		}
-		
+
 		// 过滤状态
 		if status != "" && req.Status != status {
 			continue
 		}
-		
+
 		// 过滤用户相关的请求（申请人或审批人）
 		if req.RequesterID == userID || w.isApprover(req, userID) {
 			requests = append(requests, req)
 		}
 	}
-	
+
 	return requests, nil
 }
 
@@ -241,22 +242,22 @@ func (w *ApprovalWorkflow) GetPendingApprovals(ctx context.Context, userID strin
 func (w *ApprovalWorkflow) CancelApprovalRequest(ctx context.Context, requestID, userID string) error {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	
+
 	req, exists := w.requests[requestID]
 	if !exists {
 		return fmt.Errorf("approval request not found: %s", requestID)
 	}
-	
+
 	// 只有申请人可以取消
 	if req.RequesterID != userID {
 		return fmt.Errorf("only the requester can cancel the approval request")
 	}
-	
+
 	// 只有待审批状态可以取消
 	if req.Status != ApprovalStatusPending {
 		return fmt.Errorf("cannot cancel approval request with status: %s", req.Status)
 	}
-	
+
 	delete(w.requests, requestID)
 	return nil
 }
@@ -264,38 +265,38 @@ func (w *ApprovalWorkflow) CancelApprovalRequest(ctx context.Context, requestID,
 // 确定审批人
 func (w *ApprovalWorkflow) determineApprovers(ctx context.Context, approvalType ApprovalType, requesterID string) ([]string, error) {
 	var approvers []string
-	
+
 	switch approvalType {
 	case ApprovalTypeStrategy:
 		// 策略审批：需要交易员和风控人员
 		approvers = w.findUsersWithPermission(ctx, "strategy:execute")
 		approvers = append(approvers, w.findUsersWithPermission(ctx, "risk:write")...)
-		
+
 	case ApprovalTypeRiskLimit:
 		// 风控限额审批：需要风控人员和系统管理员
 		approvers = w.findUsersWithPermission(ctx, "risk:write")
 		approvers = append(approvers, w.findUsersWithPermission(ctx, "system:admin")...)
-		
+
 	case ApprovalTypeHotlist:
 		// 热门币种审批：需要分析师和风控人员
 		approvers = w.findUsersWithPermission(ctx, "hotlist:approve")
 		approvers = append(approvers, w.findUsersWithPermission(ctx, "risk:write")...)
-		
+
 	case ApprovalTypeAPIKey:
 		// API密钥审批：需要系统管理员
 		approvers = w.findUsersWithPermission(ctx, "apikey:write")
-		
+
 	case ApprovalTypeSystem:
 		// 系统设置审批：需要系统管理员
 		approvers = w.findUsersWithPermission(ctx, "system:admin")
-		
+
 	default:
 		return nil, fmt.Errorf("unknown approval type: %s", approvalType)
 	}
-	
+
 	// 移除申请人自己
 	approvers = w.removeUser(approvers, requesterID)
-	
+
 	// 确保至少有两个审批人（4-eyes原则）
 	if len(approvers) < 2 {
 		// 如果没有足够的审批人，添加系统管理员
@@ -306,35 +307,35 @@ func (w *ApprovalWorkflow) determineApprovers(ctx context.Context, approvalType 
 			}
 		}
 	}
-	
+
 	// 如果仍然没有足够的审批人，返回错误
 	if len(approvers) < 2 {
 		return nil, fmt.Errorf("insufficient approvers for approval type: %s", approvalType)
 	}
-	
+
 	return approvers, nil
 }
 
 // 查找具有特定权限的用户
 func (w *ApprovalWorkflow) findUsersWithPermission(ctx context.Context, permission string) []string {
 	var users []string
-	
+
 	allUsers, err := w.rbac.ListUsers(ctx)
 	if err != nil {
 		return users
 	}
-	
+
 	for _, user := range allUsers {
 		if !user.IsActive {
 			continue
 		}
-		
+
 		hasPermission, err := w.rbac.CheckPermission(ctx, user.ID, permission, "")
 		if err == nil && hasPermission {
 			users = append(users, user.ID)
 		}
 	}
-	
+
 	return users
 }
 

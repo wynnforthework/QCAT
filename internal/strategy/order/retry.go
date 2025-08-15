@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"qcat/internal/exchange"
+	exch "qcat/internal/exchange"
 )
 
 // RetryConfig represents order retry configuration
@@ -155,9 +155,10 @@ func (m *RetryManager) retryOrders(ctx context.Context) {
 // shouldRetry checks if an order should be retried
 func (m *RetryManager) shouldRetry(order *Order) bool {
 	// Don't retry if order is not in a final state
-	if order.Status != exchange.OrderStatusRejected &&
-		order.Status != exchange.OrderStatusCancelled &&
-		order.Status != exchange.OrderStatusExpired {
+	if string(order.Order.Status) != string(exch.OrderStatusRejected) &&
+		string(order.Order.Status) != string(exch.OrderStatusCancelled) {
+		// TODO: 待确认 - OrderStatusExpired 不存在，暂时注释掉
+		// string(order.Order.Status) != string(exch.OrderStatusExpired) {
 		return false
 	}
 

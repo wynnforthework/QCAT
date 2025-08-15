@@ -12,6 +12,14 @@ type Level struct {
 	Quantity float64
 }
 
+// Depth represents a simplified order book depth for backtesting
+type Depth struct {
+	Symbol    string
+	Bids      []Level
+	Asks      []Level
+	Timestamp time.Time
+}
+
 // Side represents a side of the order book (bids or asks)
 type Side struct {
 	levels    []Level

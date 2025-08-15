@@ -154,7 +154,7 @@ func (m *RankingManager) IsInCooldown(strategyID string) bool {
 	if !exists {
 		return false
 	}
-	return time.Now().Sub(cooldownTime) <= m.config.CooldownPeriod
+	return time.Since(cooldownTime) <= m.config.CooldownPeriod
 }
 
 // GetScore gets a strategy's score

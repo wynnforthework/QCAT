@@ -9,27 +9,27 @@ import (
 	"time"
 
 	"qcat/internal/cache"
-	"qcat/internal/exchange"
+	exch "qcat/internal/exchange"
 )
 
 // Manager manages account information
 type Manager struct {
 	db          *sql.DB
 	cache       cache.Cacher
-	exchange    exchange.Exchange
-	balances    map[string]*exchange.AccountBalance
-	subscribers map[string][]chan *exchange.AccountBalance
+	exchange    exch.Exchange
+	balances    map[string]*exch.AccountBalance
+	subscribers map[string][]chan *exch.AccountBalance
 	mu          sync.RWMutex
 }
 
 // NewManager creates a new account manager
-func NewManager(db *sql.DB, cache cache.Cacher, exchange exchange.Exchange) *Manager {
+func NewManager(db *sql.DB, cache cache.Cacher, exchange exch.Exchange) *Manager {
 	m := &Manager{
 		db:          db,
 		cache:       cache,
 		exchange:    exchange,
-		balances:    make(map[string]*exchange.AccountBalance),
-		subscribers: make(map[string][]chan *exchange.AccountBalance),
+		balances:    make(map[string]*exch.AccountBalance),
+		subscribers: make(map[string][]chan *exch.AccountBalance),
 	}
 
 	// Start balance monitor
@@ -39,17 +39,17 @@ func NewManager(db *sql.DB, cache cache.Cacher, exchange exchange.Exchange) *Man
 }
 
 // Subscribe subscribes to balance updates for an asset
-func (m *Manager) Subscribe(asset string) chan *exchange.AccountBalance {
+func (m *Manager) Subscribe(asset string) chan *exch.AccountBalance {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	ch := make(chan *exchange.AccountBalance, 100)
+	ch := make(chan *exch.AccountBalance, 100)
 	m.subscribers[asset] = append(m.subscribers[asset], ch)
 	return ch
 }
 
 // Unsubscribe removes a subscription
-func (m *Manager) Unsubscribe(asset string, ch chan *exchange.AccountBalance) {
+func (m *Manager) Unsubscribe(asset string, ch chan *exch.AccountBalance) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -64,9 +64,9 @@ func (m *Manager) Unsubscribe(asset string, ch chan *exchange.AccountBalance) {
 }
 
 // GetBalance returns the current balance for an asset
-func (m *Manager) GetBalance(ctx context.Context, asset string) (*exchange.AccountBalance, error) {
+func (m *Manager) GetBalance(ctx context.Context, asset string) (*exch.AccountBalance, error) {
 	// Check cache first
-	var balance exchange.AccountBalance
+	var balance exch.AccountBalance
 	err := m.cache.Get(ctx, fmt.Sprintf("balance:%s", asset), &balance)
 	if err == nil {
 		return &balance, nil
@@ -78,24 +78,24 @@ func (m *Manager) GetBalance(ctx context.Context, asset string) (*exchange.Accou
 		return nil, fmt.Errorf("failed to get balance: %w", err)
 	}
 
-	balance, exists := balances[asset]
+	balancePtr, exists := balances[asset]
 	if !exists {
 		return nil, fmt.Errorf("balance not found for asset: %s", asset)
 	}
 
 	// Cache the balance
-	if err := m.cache.Set(ctx, fmt.Sprintf("balance:%s", asset), balance, time.Minute); err != nil {
+	if err := m.cache.Set(ctx, fmt.Sprintf("balance:%s", asset), balancePtr, time.Minute); err != nil {
 		log.Printf("Failed to cache balance: %v", err)
 	}
 
 	// Update local cache and notify subscribers
-	m.updateBalance(balance)
+	m.updateBalance(balancePtr)
 
-	return balance, nil
+	return balancePtr, nil
 }
 
 // GetAllBalances returns all account balances
-func (m *Manager) GetAllBalances(ctx context.Context) (map[string]*exchange.AccountBalance, error) {
+func (m *Manager) GetAllBalances(ctx context.Context) (map[string]*exch.AccountBalance, error) {
 	// Get from exchange
 	balances, err := m.exchange.GetAccountBalance(ctx)
 	if err != nil {
@@ -117,7 +117,7 @@ func (m *Manager) GetAllBalances(ctx context.Context) (map[string]*exchange.Acco
 }
 
 // GetBalanceHistory returns historical balance data
-func (m *Manager) GetBalanceHistory(ctx context.Context, asset string, startTime, endTime time.Time) ([]*exchange.AccountBalance, error) {
+func (m *Manager) GetBalanceHistory(ctx context.Context, asset string, startTime, endTime time.Time) ([]*exch.AccountBalance, error) {
 	query := `
 		SELECT asset, total, available, locked, cross_margin,
 			   isolated_margin, unrealized_pnl, realized_pnl, updated_at
@@ -132,9 +132,9 @@ func (m *Manager) GetBalanceHistory(ctx context.Context, asset string, startTime
 	}
 	defer rows.Close()
 
-	var history []*exchange.AccountBalance
+	var history []*exch.AccountBalance
 	for rows.Next() {
-		var balance exchange.AccountBalance
+		var balance exch.AccountBalance
 		if err := rows.Scan(
 			&balance.Asset,
 			&balance.Total,
@@ -159,7 +159,7 @@ func (m *Manager) GetBalanceHistory(ctx context.Context, asset string, startTime
 }
 
 // storeBalance stores a balance in the database
-func (m *Manager) storeBalance(balance *exchange.AccountBalance) error {
+func (m *Manager) storeBalance(balance *exch.AccountBalance) error {
 	query := `
 		INSERT INTO account_balances (
 			asset, total, available, locked, cross_margin,
@@ -189,7 +189,7 @@ func (m *Manager) storeBalance(balance *exchange.AccountBalance) error {
 }
 
 // updateBalance updates the local balance cache and notifies subscribers
-func (m *Manager) updateBalance(balance *exchange.AccountBalance) {
+func (m *Manager) updateBalance(balance *exch.AccountBalance) {
 	m.mu.Lock()
 	m.balances[balance.Asset] = balance
 	m.mu.Unlock()
@@ -199,7 +199,7 @@ func (m *Manager) updateBalance(balance *exchange.AccountBalance) {
 }
 
 // notifySubscribers notifies all subscribers of a balance update
-func (m *Manager) notifySubscribers(balance *exchange.AccountBalance) {
+func (m *Manager) notifySubscribers(balance *exch.AccountBalance) {
 	m.mu.RLock()
 	subs := m.subscribers[balance.Asset]
 	m.mu.RUnlock()

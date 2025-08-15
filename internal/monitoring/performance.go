@@ -31,24 +31,24 @@ type PerformanceMonitor struct {
 
 // PerformanceConfig represents performance monitoring configuration
 type PerformanceConfig struct {
-	BaselineWindow    time.Duration
-	AlertThreshold    float64
-	P95Threshold      time.Duration
-	P99Threshold      time.Duration
-	ErrorRateThreshold float64
+	BaselineWindow      time.Duration
+	AlertThreshold      float64
+	P95Threshold        time.Duration
+	P99Threshold        time.Duration
+	ErrorRateThreshold  float64
 	ThroughputThreshold float64
 }
 
 // PerformanceBaseline represents a performance baseline
 type PerformanceBaseline struct {
-	MetricName    string
-	AverageValue  float64
-	P95Value      float64
-	P99Value      float64
-	MinValue      float64
-	MaxValue      float64
-	SampleCount   int64
-	LastUpdated   time.Time
+	MetricName     string
+	AverageValue   float64
+	P95Value       float64
+	P99Value       float64
+	MinValue       float64
+	MaxValue       float64
+	SampleCount    int64
+	LastUpdated    time.Time
 	AlertThreshold float64
 }
 
@@ -266,7 +266,7 @@ func (pm *PerformanceMonitor) MonitorFunction(ctx context.Context, functionName 
 }
 
 // MonitorFunctionWithResult monitors the performance of a function with result
-func (pm *PerformanceMonitor) MonitorFunctionWithResult[T any](ctx context.Context, functionName string, fn func() (T, error)) (T, error) {
+func (pm *PerformanceMonitor) MonitorFunctionWithResult(ctx context.Context, functionName string, fn func() (interface{}, error)) (interface{}, error) {
 	start := time.Now()
 	pm.RecordConcurrentRequests(1)
 	defer pm.RecordConcurrentRequests(-1)

@@ -197,3 +197,53 @@ func (m *StatsManager) calculateAvgHoldingTime() time.Duration {
 
 	return totalDuration / time.Duration(len(m.trades))
 }
+
+// CalculatePerformanceStats calculates performance statistics from returns
+func CalculatePerformanceStats(returns []float64) *PerformanceStats {
+	if len(returns) == 0 {
+		return &PerformanceStats{}
+	}
+
+	// Calculate basic statistics
+	totalReturn := 0.0
+	for _, ret := range returns {
+		totalReturn += ret
+	}
+
+	// Calculate volatility
+	mean := totalReturn / float64(len(returns))
+	variance := 0.0
+	for _, ret := range returns {
+		diff := ret - mean
+		variance += diff * diff
+	}
+	variance /= float64(len(returns))
+	volatility := math.Sqrt(variance)
+
+	// Calculate Sharpe ratio (assuming risk-free rate of 0)
+	sharpeRatio := 0.0
+	if volatility > 0 {
+		sharpeRatio = mean / volatility
+	}
+
+	// Calculate max drawdown
+	maxDrawdown := 0.0
+	peak := 1.0
+	equity := 1.0
+	for _, ret := range returns {
+		equity *= (1 + ret)
+		if equity > peak {
+			peak = equity
+		}
+		drawdown := (peak - equity) / peak
+		if drawdown > maxDrawdown {
+			maxDrawdown = drawdown
+		}
+	}
+
+	return &PerformanceStats{
+		TotalReturn:  totalReturn,
+		SharpeRatio:  sharpeRatio,
+		MaxDrawdown:  maxDrawdown,
+	}
+}

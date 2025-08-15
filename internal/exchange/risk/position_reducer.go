@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"qcat/internal/exchange"
+	exch "qcat/internal/exchange"
 	"qcat/internal/exchange/position"
 )
 
@@ -23,7 +23,7 @@ const (
 
 // PositionReducer handles automatic position reduction
 type PositionReducer struct {
-	exchange      exchange.Exchange
+	exchange      exch.Exchange
 	posManager    *position.Manager
 	marginMonitor *MarginMonitor
 	strategy      ReduceStrategy
@@ -34,7 +34,7 @@ type PositionReducer struct {
 }
 
 // NewPositionReducer creates a new position reducer
-func NewPositionReducer(ex exchange.Exchange, pm *position.Manager, mm *MarginMonitor) *PositionReducer {
+func NewPositionReducer(ex exch.Exchange, pm *position.Manager, mm *MarginMonitor) *PositionReducer {
 	r := &PositionReducer{
 		exchange:      ex,
 		posManager:    pm,
@@ -68,7 +68,7 @@ func (r *PositionReducer) SetReduceRatio(ratio float64) {
 func (r *PositionReducer) handleMarginAlerts() {
 	alertCh := r.marginMonitor.GetAlertChannel()
 	for alert := range alertCh {
-		if alert.Level >= exchange.MarginLevelDanger {
+		if alert.Level >= exch.MarginLevelDanger {
 			if err := r.ReducePositions(context.Background()); err != nil {
 				log.Printf("Failed to reduce positions: %v", err)
 			}
@@ -98,7 +98,7 @@ func (r *PositionReducer) ReducePositions(ctx context.Context) error {
 	// 计算需要减仓的总价值
 	totalValue := 0.0
 	for _, pos := range positions {
-		totalValue += pos.Value
+		totalValue += pos.Notional // 使用 Notional 字段替代 Value
 	}
 	reduceValue := totalValue * r.reduceRatio
 
@@ -111,24 +111,26 @@ func (r *PositionReducer) ReducePositions(ctx context.Context) error {
 
 		// 计算这个仓位需要减少的数量
 		reduceSize := pos.Size * r.reduceRatio
-		if reduceSize < pos.MinSize {
-			reduceSize = pos.MinSize
+		// TODO: 待确认 - MinSize 字段不存在，暂时使用固定值
+		minSize := 0.001 // 最小减仓数量
+		if reduceSize < minSize {
+			reduceSize = minSize
 		}
 
 		// 创建市价单平仓
-		order := &exchange.Order{
+		order := &exch.OrderRequest{
 			Symbol:   pos.Symbol,
-			Side:     pos.Side.Reverse(), // 反向开仓
-			Type:     exchange.OrderTypeMarket,
+			Side:     string(pos.Side), // 显式转换为 string
+			Type:     string(exch.OrderTypeMarket), // 显式转换为 string
 			Quantity: reduceSize,
 		}
 
-		if _, err := r.exchange.CreateOrder(ctx, order); err != nil {
+		if _, err := r.exchange.PlaceOrder(ctx, order); err != nil {
 			log.Printf("Failed to reduce position %s: %v", pos.Symbol, err)
 			continue
 		}
 
-		reducedValue += pos.Value * r.reduceRatio
+		reducedValue += pos.Notional * r.reduceRatio // 使用 Notional 字段替代 Value
 	}
 
 	r.lastReduce = time.Now()
@@ -136,7 +138,7 @@ func (r *PositionReducer) ReducePositions(ctx context.Context) error {
 }
 
 // sortPositions sorts positions based on current strategy
-func (r *PositionReducer) sortPositions(positions []*position.Position) []*position.Position {
+func (r *PositionReducer) sortPositions(positions []*exch.Position) []*exch.Position {
 	switch r.strategy {
 	case ReduceByPnL:
 		// 按未实现盈亏排序，亏损优先减仓
@@ -146,12 +148,13 @@ func (r *PositionReducer) sortPositions(positions []*position.Position) []*posit
 	case ReduceBySize:
 		// 按仓位价值排序，大仓位优先减仓
 		sort.Slice(positions, func(i, j int) bool {
-			return positions[i].Value > positions[j].Value
+			return positions[i].Notional > positions[j].Notional // 使用 Notional 字段替代 Value
 		})
 	case ReduceByRisk:
 		// 按风险敞口排序，高风险优先减仓
+		// TODO: 待确认 - RiskExposure 字段不存在，暂时使用 Notional 作为风险指标
 		sort.Slice(positions, func(i, j int) bool {
-			return positions[i].RiskExposure > positions[j].RiskExposure
+			return positions[i].Notional > positions[j].Notional
 		})
 	}
 	return positions

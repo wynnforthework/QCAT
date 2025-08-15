@@ -414,7 +414,8 @@ func (o *Optimizer) optimize(ctx context.Context, task *Task) {
 
 		// Run backtest
 		result := &backtest.Result{}
-		if err := engine.Run(ctx); err != nil {
+		result, err := engine.Run(ctx)
+		if err != nil {
 			task.Status = TaskStatusFailed
 			task.Error = fmt.Sprintf("failed to run backtest: %v", err)
 			task.UpdatedAt = time.Now()
@@ -507,16 +508,17 @@ func (o *Optimizer) calculateMetrics(result *backtest.Result) map[string]float64
 	metrics := make(map[string]float64)
 
 	// Calculate PnL metrics
-	metrics["pnl"] = result.PnL
-	metrics["pnl_percent"] = result.PnLPercent
+	// TODO: 待确认 - Result 结构体中没有 PnL 和 PnLPercent 字段
+	// metrics["pnl"] = result.PnL
+	// metrics["pnl_percent"] = result.PnLPercent
 
 	// Calculate risk metrics
-	metrics["max_drawdown"] = result.MaxDrawdown
-	metrics["sharpe_ratio"] = result.SharpeRatio
-
-	// Calculate trade metrics
-	metrics["win_rate"] = result.WinRate
-	metrics["num_trades"] = float64(result.NumTrades)
+	if result.PerformanceStats != nil {
+		metrics["max_drawdown"] = result.PerformanceStats.MaxDrawdown
+		metrics["sharpe_ratio"] = result.PerformanceStats.SharpeRatio
+		metrics["win_rate"] = result.PerformanceStats.WinRate
+		metrics["num_trades"] = float64(result.PerformanceStats.TradeCount)
+	}
 
 	return metrics
 }

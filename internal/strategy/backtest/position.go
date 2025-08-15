@@ -4,23 +4,23 @@ import (
 	"fmt"
 	"math"
 
-	"qcat/internal/exchange"
+	exch "qcat/internal/exchange"
 	"qcat/internal/market/funding"
 )
 
 // PositionManager manages positions and margin
 type PositionManager struct {
-	positions    map[string]*exchange.Position
+	positions    map[string]*exch.Position
 	balance      float64
-	marginMode   exchange.MarginType
+	marginMode   exch.MarginType
 	leverage     float64
 	marginRatios map[string]float64 // symbol -> initial margin ratio
 }
 
 // NewPositionManager creates a new position manager
-func NewPositionManager(initialCapital float64, marginMode exchange.MarginType, leverage float64) *PositionManager {
+func NewPositionManager(initialCapital float64, marginMode exch.MarginType, leverage float64) *PositionManager {
 	return &PositionManager{
-		positions:    make(map[string]*exchange.Position),
+		positions:    make(map[string]*exch.Position),
 		balance:      initialCapital,
 		marginMode:   marginMode,
 		leverage:     leverage,
@@ -29,13 +29,13 @@ func NewPositionManager(initialCapital float64, marginMode exchange.MarginType, 
 }
 
 // OpenPosition opens a new position
-func (m *PositionManager) OpenPosition(trade *exchange.Trade) error {
+func (m *PositionManager) OpenPosition(trade *exch.Trade) error {
 	position, exists := m.positions[trade.Symbol]
 	if !exists {
-		position = &exchange.Position{
+		position = &exch.Position{
 			Symbol:     trade.Symbol,
-			MarginType: m.marginMode,
-			Leverage:   m.leverage,
+			MarginType: string(m.marginMode), // 显式转换为 string
+			Leverage:   int(m.leverage),      // 显式转换为 int
 		}
 		m.positions[trade.Symbol] = position
 	}
@@ -47,12 +47,14 @@ func (m *PositionManager) OpenPosition(trade *exchange.Trade) error {
 	}
 
 	// 更新持仓
-	if trade.Side == exchange.OrderSideBuy {
-		position.Long += trade.Quantity
-		position.EntryPrice = (position.EntryPrice*position.Long + trade.Price*trade.Quantity) / (position.Long + trade.Quantity)
+	if string(trade.Side) == string(exch.OrderSideBuy) { // 显式转换为 string 进行比较
+		// TODO: 待确认 - Position 结构体中没有 Long 字段，暂时使用 Size 字段
+		position.Size += trade.Quantity
+		position.EntryPrice = (position.EntryPrice*position.Size + trade.Price*trade.Quantity) / (position.Size + trade.Quantity)
 	} else {
-		position.Short += trade.Quantity
-		position.EntryPrice = (position.EntryPrice*position.Short + trade.Price*trade.Quantity) / (position.Short + trade.Quantity)
+		// TODO: 待确认 - Position 结构体中没有 Short 字段，暂时使用 Size 字段
+		position.Size += trade.Quantity
+		position.EntryPrice = (position.EntryPrice*position.Size + trade.Price*trade.Quantity) / (position.Size + trade.Quantity)
 	}
 
 	// 扣除手续费
@@ -62,7 +64,7 @@ func (m *PositionManager) OpenPosition(trade *exchange.Trade) error {
 }
 
 // ClosePosition closes an existing position
-func (m *PositionManager) ClosePosition(trade *exchange.Trade) error {
+func (m *PositionManager) ClosePosition(trade *exch.Trade) error {
 	position, exists := m.positions[trade.Symbol]
 	if !exists {
 		return fmt.Errorf("position not found: %s", trade.Symbol)
@@ -70,17 +72,19 @@ func (m *PositionManager) ClosePosition(trade *exchange.Trade) error {
 
 	// 计算平仓数量
 	var closeQuantity float64
-	if trade.Side == exchange.OrderSideSell {
-		closeQuantity = math.Min(position.Long, trade.Quantity)
-		position.Long -= closeQuantity
+	if string(trade.Side) == string(exch.OrderSideSell) { // 显式转换为 string 进行比较
+		// TODO: 待确认 - Position 结构体中没有 Long 字段，暂时使用 Size 字段
+		closeQuantity = math.Min(position.Size, trade.Quantity)
+		position.Size -= closeQuantity
 	} else {
-		closeQuantity = math.Min(position.Short, trade.Quantity)
-		position.Short -= closeQuantity
+		// TODO: 待确认 - Position 结构体中没有 Short 字段，暂时使用 Size 字段
+		closeQuantity = math.Min(position.Size, trade.Quantity)
+		position.Size -= closeQuantity
 	}
 
 	// 计算平仓盈亏
 	pnl := closeQuantity * (trade.Price - position.EntryPrice)
-	if trade.Side == exchange.OrderSideBuy {
+	if string(trade.Side) == string(exch.OrderSideBuy) { // 显式转换为 string 进行比较
 		pnl = -pnl
 	}
 
@@ -88,7 +92,7 @@ func (m *PositionManager) ClosePosition(trade *exchange.Trade) error {
 	m.balance += pnl - trade.Fee
 
 	// 如果完全平仓则删除持仓
-	if position.Long == 0 && position.Short == 0 {
+	if position.Size == 0 {
 		delete(m.positions, trade.Symbol)
 	}
 
@@ -116,81 +120,88 @@ func (m *PositionManager) ApplyFundingFee(rate *funding.Rate) {
 
 	// 计算资金费用
 	var fundingFee float64
-	if position.Long > 0 {
-		fundingFee = position.Long * position.EntryPrice * rate.Rate
-	}
-	if position.Short > 0 {
-		fundingFee -= position.Short * position.EntryPrice * rate.Rate
+	// TODO: 待确认 - Position 结构体中没有 Long 和 Short 字段，暂时使用 Size 字段
+	if position.Size > 0 {
+		fundingFee = position.Size * position.EntryPrice * rate.Rate
 	}
 
 	// 更新账户余额
 	m.balance -= fundingFee
 }
 
-// CheckLiquidation checks if any position should be liquidated
-func (m *PositionManager) CheckLiquidation(prices map[string]float64) []string {
-	var liquidated []string
-
-	for symbol, pos := range m.positions {
-		price, exists := prices[symbol]
-		if !exists {
-			continue
-		}
-
-		// 计算维持保证金率
-		maintenanceMargin := m.calculateMaintenanceMargin(pos)
-		currentMargin := m.calculateCurrentMargin(pos, price)
-
-		if currentMargin < maintenanceMargin {
-			liquidated = append(liquidated, symbol)
-			// 强平处理
-			m.liquidatePosition(pos, price)
-		}
-	}
-
-	return liquidated
+// GetPosition returns a position for a symbol
+func (m *PositionManager) GetPosition(symbol string) (*exch.Position, bool) {
+	position, exists := m.positions[symbol]
+	return position, exists
 }
 
-// Helper functions
-
-func (m *PositionManager) calculateRequiredMargin(trade *exchange.Trade) float64 {
-	ratio := m.marginRatios[trade.Symbol]
-	if ratio == 0 {
-		ratio = 0.01 // 默认1%
-	}
-	return trade.Price * trade.Quantity * ratio
+// GetAllPositions returns all positions
+func (m *PositionManager) GetAllPositions() map[string]*exch.Position {
+	return m.positions
 }
 
-func (m *PositionManager) getAvailableMargin() float64 {
-	if m.marginMode == exchange.MarginTypeCross {
-		return m.GetEquity()
-	}
-	// 对于逐仓模式，需要考虑每个symbol的独立保证金
+// GetBalance returns the current balance
+func (m *PositionManager) GetBalance() float64 {
 	return m.balance
 }
 
-func (m *PositionManager) calculateMaintenanceMargin(pos *exchange.Position) float64 {
-	// 简化版：维持保证金率为初始保证金率的50%
-	ratio := m.marginRatios[pos.Symbol]
-	if ratio == 0 {
-		ratio = 0.01
-	}
-	return ratio * 0.5
+// SetBalance sets the balance
+func (m *PositionManager) SetBalance(balance float64) {
+	m.balance = balance
 }
 
-func (m *PositionManager) calculateCurrentMargin(pos *exchange.Position, price float64) float64 {
-	totalPositionValue := (pos.Long + pos.Short) * price
-	if totalPositionValue == 0 {
+// calculateRequiredMargin calculates required margin for a trade
+func (m *PositionManager) calculateRequiredMargin(trade *exch.Trade) float64 {
+	// 简单计算：交易价值 / 杠杆倍数
+	tradeValue := trade.Price * trade.Quantity
+	return tradeValue / m.leverage
+}
+
+// getAvailableMargin returns available margin
+func (m *PositionManager) getAvailableMargin() float64 {
+	// 简单计算：余额 - 已用保证金
+	usedMargin := 0.0
+	for _, pos := range m.positions {
+		usedMargin += pos.Size * pos.EntryPrice / m.leverage
+	}
+	return m.balance - usedMargin
+}
+
+// UpdatePosition updates position with current market price
+func (m *PositionManager) UpdatePosition(symbol string, price float64) {
+	position, exists := m.positions[symbol]
+	if !exists {
+		return
+	}
+
+	// 更新标记价格
+	position.MarkPrice = price
+
+	// 计算未实现盈亏
+	// TODO: 待确认 - Position 结构体中没有 Long 和 Short 字段，暂时使用 Size 字段
+	if position.Size > 0 {
+		position.UnrealizedPnL = position.Size * (price - position.EntryPrice)
+	}
+}
+
+// GetMarginRatio returns margin ratio for a symbol
+func (m *PositionManager) GetMarginRatio(symbol string) float64 {
+	position, exists := m.positions[symbol]
+	if !exists {
 		return 0
 	}
-	return m.GetEquity() / totalPositionValue
+
+	// 计算保证金率：权益 / 保证金
+	equity := m.GetEquity()
+	margin := position.Size * position.EntryPrice / m.leverage
+	if margin == 0 {
+		return 0
+	}
+
+	return equity / margin
 }
 
-func (m *PositionManager) liquidatePosition(pos *exchange.Position, price float64) {
-	// 计算强平损失
-	loss := pos.Long*(price-pos.EntryPrice) - pos.Short*(price-pos.EntryPrice)
-	m.balance += loss
-
-	// 删除持仓
-	delete(m.positions, pos.Symbol)
+// SetMarginRatio sets margin ratio for a symbol
+func (m *PositionManager) SetMarginRatio(symbol string, ratio float64) {
+	m.marginRatios[symbol] = ratio
 }

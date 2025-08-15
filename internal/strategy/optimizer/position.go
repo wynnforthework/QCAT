@@ -48,9 +48,9 @@ func (o *PositionOptimizer) OptimizePosition(ctx context.Context, cfg *PositionC
 	targetValue := cfg.AccountValue * weight
 
 	// 计算合约张数
-	contractValue := symbolInfo.ContractValue
+	contractValue := symbolInfo.ContractSize // 使用 ContractSize 字段替代 ContractValue
 	if contractValue <= 0 {
-		return nil, fmt.Errorf("invalid contract value")
+		return nil, fmt.Errorf("invalid contract size")
 	}
 
 	rawQuantity := targetValue / contractValue

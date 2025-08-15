@@ -167,7 +167,7 @@ func (m *Manager) Rebalance(ctx context.Context, threshold float64) error {
 		var currentSize float64
 		for _, pos := range currentPositions {
 			if pos.Symbol == symbol {
-				currentSize = pos.Value
+				currentSize = pos.Notional // 使用 Notional 字段替代 Value
 				break
 			}
 		}
@@ -184,8 +184,8 @@ func (m *Manager) Rebalance(ctx context.Context, threshold float64) error {
 			quantity := math.Abs(targetSize - currentSize)
 			req := &exchange.OrderRequest{
 				Symbol:   symbol,
-				Side:     side,
-				Type:     exchange.OrderTypeMarket,
+				Side:     string(side), // 显式转换为 string
+				Type:     string(exchange.OrderTypeMarket), // 显式转换为 string
 				Quantity: quantity,
 			}
 

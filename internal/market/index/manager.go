@@ -134,7 +134,7 @@ func (m *Manager) GetComponents(symbol string) []Component {
 }
 
 // GetHistory returns historical index price data for a symbol
-func (m *Manager) GetHistory(ctx context.Context, symbol string, start, end time.Time) ([]*History, error) {
+func (m *Manager) GetHistory(ctx context.Context, symbol string, start, end time.Time) ([]*Price, error) {
 	query := `
 		SELECT symbol, price, timestamp
 		FROM index_prices
@@ -148,9 +148,9 @@ func (m *Manager) GetHistory(ctx context.Context, symbol string, start, end time
 	}
 	defer rows.Close()
 
-	var history []*History
+	var history []*Price
 	for rows.Next() {
-		var h History
+		var h Price
 		if err := rows.Scan(&h.Symbol, &h.Price, &h.Timestamp); err != nil {
 			return nil, fmt.Errorf("failed to scan index price: %w", err)
 		}

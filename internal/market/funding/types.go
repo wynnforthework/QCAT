@@ -1,8 +1,6 @@
 package funding
 
-import (
-	"time"
-)
+import "time"
 
 // Rate represents a funding rate
 type Rate struct {
@@ -11,13 +9,6 @@ type Rate struct {
 	NextRate    float64   `json:"next_rate"`
 	NextTime    time.Time `json:"next_time"`
 	LastUpdated time.Time `json:"last_updated"`
-}
-
-// History represents historical funding rates
-type History struct {
-	Symbol    string    `json:"symbol"`
-	Rate      float64   `json:"rate"`
-	Timestamp time.Time `json:"timestamp"`
 }
 
 // Stats represents funding rate statistics

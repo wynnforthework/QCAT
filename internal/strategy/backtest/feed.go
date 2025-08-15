@@ -28,9 +28,10 @@ func NewDBDataFeed(db *sql.DB, config *Config) (*DBDataFeed, error) {
 
 	// Create data type map
 	dataTypes := make(map[string]bool)
-	for _, dt := range config.DataTypes {
-		dataTypes[dt] = true
-	}
+	// TODO: Add DataTypes field to Config or use default data types
+	dataTypes["kline"] = true
+	dataTypes["trade"] = true
+	dataTypes["funding"] = true
 
 	return &DBDataFeed{
 		db:        db,

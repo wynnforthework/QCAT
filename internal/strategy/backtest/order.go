@@ -30,7 +30,7 @@ func NewOrderManager(sm SlippageModel, fm FeeModel, lm LatencyModel) *OrderManag
 func (m *OrderManager) PlaceOrder(order *exchange.Order) {
 	// 应用延迟模型
 	latency := m.latencyModel.GetLatency()
-	order.CreateTime = order.CreateTime.Add(latency)
+	order.CreatedAt = order.CreatedAt.Add(latency)
 
 	m.orders[order.ID] = order
 }
@@ -38,7 +38,7 @@ func (m *OrderManager) PlaceOrder(order *exchange.Order) {
 // CancelOrder cancels an existing order
 func (m *OrderManager) CancelOrder(orderID string) bool {
 	if order, exists := m.orders[orderID]; exists {
-		order.Status = exchange.OrderStatusCancelled
+		order.Status = string(exchange.OrderStatusCancelled)
 		delete(m.orders, orderID)
 		return true
 	}
@@ -51,11 +51,11 @@ func (m *OrderManager) Match(ob *orderbook.Depth) []*exchange.Trade {
 
 	// 处理限价单
 	for _, order := range m.orders {
-		if order.Type != exchange.OrderTypeLimit {
+		if exchange.OrderType(order.Type) != exchange.OrderTypeLimit {
 			continue
 		}
 
-		switch order.Side {
+		switch exchange.OrderSide(order.Side) {
 		case exchange.OrderSideBuy:
 			// 检查卖单簿
 			for _, ask := range ob.Asks {
@@ -81,11 +81,11 @@ func (m *OrderManager) Match(ob *orderbook.Depth) []*exchange.Trade {
 
 	// 处理市价单
 	for _, order := range m.orders {
-		if order.Type != exchange.OrderTypeMarket {
+		if exchange.OrderType(order.Type) != exchange.OrderTypeMarket {
 			continue
 		}
 
-		switch order.Side {
+		switch exchange.OrderSide(order.Side) {
 		case exchange.OrderSideBuy:
 			// 使用最优卖价
 			if len(ob.Asks) > 0 {
@@ -109,14 +109,13 @@ func (m *OrderManager) Match(ob *orderbook.Depth) []*exchange.Trade {
 // matchOrder matches a single order and creates a trade
 func (m *OrderManager) matchOrder(order *exchange.Order, price, quantity float64) *exchange.Trade {
 	// 应用滑点模型
-	executionPrice := price + m.slippageModel.CalculateSlippage(price, quantity, order.Side)
+	executionPrice := price + m.slippageModel.CalculateSlippage(price, quantity, exchange.OrderSide(order.Side))
 
 	// 计算手续费
 	fee := m.feeModel.CalculateFee(executionPrice, quantity)
 
 	trade := &exchange.Trade{
 		ID:       generateTradeID(),
-		OrderID:  order.ID,
 		Symbol:   order.Symbol,
 		Side:     order.Side,
 		Price:    executionPrice,
@@ -126,12 +125,12 @@ func (m *OrderManager) matchOrder(order *exchange.Order, price, quantity float64
 	}
 
 	// 更新订单状态
-	order.ExecutedQuantity += quantity
-	if order.ExecutedQuantity >= order.Quantity {
-		order.Status = exchange.OrderStatusFilled
+	order.FilledQty += quantity
+	if order.FilledQty >= order.Quantity {
+		order.Status = string(exchange.OrderStatusFilled)
 		delete(m.orders, order.ID)
 	} else {
-		order.Status = exchange.OrderStatusPartiallyFilled
+		order.Status = string(exchange.OrderStatusPartiallyFilled)
 	}
 
 	return trade

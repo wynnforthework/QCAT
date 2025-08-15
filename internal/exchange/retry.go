@@ -3,7 +3,7 @@ package exchange
 import (
 	"context"
 	"fmt"
-	"math"
+	"math/rand"
 	"time"
 )
 
@@ -27,6 +27,16 @@ func DefaultRetryConfig() *RetryConfig {
 	}
 }
 
+// Error represents an exchange error
+type Error struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprintf("exchange error %d: %s", e.Code, e.Message)
+}
+
 // RetryableFunc represents a function that can be retried
 type RetryableFunc func(ctx context.Context) error
 
@@ -37,9 +47,7 @@ func IsRetryableError(err error) bool {
 	}
 
 	// Add specific error type checks here
-	switch err.(type) {
-	case *Error:
-		e := err.(*Error)
+	if e, ok := err.(*Error); ok {
 		// Common HTTP errors that should be retried
 		switch e.Code {
 		case 429, // Too Many Requests
@@ -79,7 +87,7 @@ func WithRetry(ctx context.Context, fn RetryableFunc, config *RetryConfig) error
 		}
 
 		// Calculate next wait duration with exponential backoff and jitter
-		jitter := 1.0 + (config.Jitter * (2*math.Random() - 1))
+		jitter := 1.0 + (config.Jitter * (2*rand.Float64() - 1))
 		wait = time.Duration(float64(wait) * config.Factor * jitter)
 
 		if wait > config.MaxWait {
@@ -125,7 +133,7 @@ func RetryWithResult[T any](ctx context.Context, fn func(context.Context) (T, er
 		}
 
 		// Calculate next wait duration with exponential backoff and jitter
-		jitter := 1.0 + (config.Jitter * (2*math.Random() - 1))
+		jitter := 1.0 + (config.Jitter * (2*rand.Float64() - 1))
 		wait = time.Duration(float64(wait) * config.Factor * jitter)
 
 		if wait > config.MaxWait {

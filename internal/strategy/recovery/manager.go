@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"qcat/internal/exchange"
+	exch "qcat/internal/exchange"
 	"qcat/internal/strategy/order"
 	"qcat/internal/strategy/state"
 )
@@ -15,7 +15,7 @@ import (
 type Manager struct {
 	stateManager *state.Manager
 	orderManager *order.Manager
-	exchange     exchange.Exchange
+	exchange     exch.Exchange
 	recoveryLogs map[string][]*RecoveryLog
 	mu           sync.RWMutex
 }
@@ -56,7 +56,7 @@ const (
 )
 
 // NewManager creates a new recovery manager
-func NewManager(stateManager *state.Manager, orderManager *order.Manager, exchange exchange.Exchange) *Manager {
+func NewManager(stateManager *state.Manager, orderManager *order.Manager, exchange exch.Exchange) *Manager {
 	return &Manager{
 		stateManager: stateManager,
 		orderManager: orderManager,
@@ -68,9 +68,9 @@ func NewManager(stateManager *state.Manager, orderManager *order.Manager, exchan
 // HandleError handles a strategy error
 func (m *Manager) HandleError(ctx context.Context, strategyID string, err error) error {
 	// Get strategy state
-	state, err := m.stateManager.GetState(ctx, strategyID)
-	if err != nil {
-		return fmt.Errorf("failed to get strategy state: %w", err)
+	state, getErr := m.stateManager.GetState(ctx, strategyID)
+	if getErr != nil {
+		return fmt.Errorf("failed to get strategy state: %w", getErr)
 	}
 
 	// Create recovery log
@@ -235,10 +235,10 @@ func (m *Manager) recover(ctx context.Context, log *RecoveryLog) {
 
 		if position != nil && position.Quantity > 0 {
 			// Create close order
-			req := &exchange.OrderRequest{
+			req := &exch.OrderRequest{
 				Symbol:     log.Symbol,
-				Side:       exchange.OrderSideSell,
-				Type:       exchange.OrderTypeMarket,
+				Side:       string(exch.OrderSideSell),   // 显式转换为 string
+				Type:       string(exch.OrderTypeMarket), // 显式转换为 string
 				Quantity:   position.Quantity,
 				ReduceOnly: true,
 			}

@@ -6,8 +6,8 @@ import (
 	"qcat/internal/exchange"
 )
 
-// Config represents backtest configuration
-type Config struct {
+// BacktestConfig represents backtest configuration
+type BacktestConfig struct {
 	StartTime time.Time
 	EndTime   time.Time
 	Symbols   []string
@@ -20,8 +20,8 @@ type Config struct {
 	DataTypes []string // "kline", "trade", "funding", "oi", etc.
 }
 
-// Result represents backtest results
-type Result struct {
+// BacktestResult represents backtest results
+type BacktestResult struct {
 	StartTime     time.Time
 	EndTime       time.Time
 	InitialValue  float64

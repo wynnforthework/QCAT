@@ -143,11 +143,8 @@ func (db *DB) monitorPoolStats() {
 	ticker := time.NewTicker(30 * time.Second) // 每30秒更新一次统计信息
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			db.updatePoolStats()
-		}
+	for range ticker.C {
+		db.updatePoolStats()
 	}
 }
 

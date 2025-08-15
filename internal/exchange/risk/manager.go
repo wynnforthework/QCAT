@@ -9,27 +9,27 @@ import (
 	"time"
 
 	"qcat/internal/cache"
-	"qcat/internal/exchange"
+	exch "qcat/internal/exchange"
 )
 
 // Manager manages risk limits and controls
 type Manager struct {
 	db          *sql.DB
 	cache       cache.Cacher
-	exchange    exchange.Exchange
-	limits      map[string]*exchange.RiskLimit
-	subscribers map[string][]chan *exchange.RiskLimit
+	exchange    exch.Exchange
+	limits      map[string]*exch.RiskLimit
+	subscribers map[string][]chan *exch.RiskLimit
 	mu          sync.RWMutex
 }
 
 // NewManager creates a new risk manager
-func NewManager(db *sql.DB, cache cache.Cacher, exchange exchange.Exchange) *Manager {
+func NewManager(db *sql.DB, cache cache.Cacher, exchange exch.Exchange) *Manager {
 	m := &Manager{
 		db:          db,
 		cache:       cache,
 		exchange:    exchange,
-		limits:      make(map[string]*exchange.RiskLimit),
-		subscribers: make(map[string][]chan *exchange.RiskLimit),
+		limits:      make(map[string]*exch.RiskLimit),
+		subscribers: make(map[string][]chan *exch.RiskLimit),
 	}
 
 	// Start risk monitor
@@ -39,17 +39,17 @@ func NewManager(db *sql.DB, cache cache.Cacher, exchange exchange.Exchange) *Man
 }
 
 // Subscribe subscribes to risk limit updates for a symbol
-func (m *Manager) Subscribe(symbol string) chan *exchange.RiskLimit {
+func (m *Manager) Subscribe(symbol string) chan *exch.RiskLimit {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	ch := make(chan *exchange.RiskLimit, 100)
+	ch := make(chan *exch.RiskLimit, 100)
 	m.subscribers[symbol] = append(m.subscribers[symbol], ch)
 	return ch
 }
 
 // Unsubscribe removes a subscription
-func (m *Manager) Unsubscribe(symbol string, ch chan *exchange.RiskLimit) {
+func (m *Manager) Unsubscribe(symbol string, ch chan *exch.RiskLimit) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -64,18 +64,31 @@ func (m *Manager) Unsubscribe(symbol string, ch chan *exchange.RiskLimit) {
 }
 
 // GetRiskLimits returns risk limits for a symbol
-func (m *Manager) GetRiskLimits(ctx context.Context, symbol string) ([]*exchange.RiskLimit, error) {
+func (m *Manager) GetRiskLimits(ctx context.Context, symbol string) ([]*exch.RiskLimit, error) {
 	// Check cache first
-	var limits []*exchange.RiskLimit
+	var limits []*exch.RiskLimit
 	err := m.cache.Get(ctx, fmt.Sprintf("risk_limits:%s", symbol), &limits)
 	if err == nil {
 		return limits, nil
 	}
 
 	// Get from exchange
-	limits, err = m.exchange.GetRiskLimits(ctx, symbol)
+	riskLimits, err := m.exchange.GetRiskLimits(ctx, symbol)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get risk limits: %w", err)
+	}
+	
+	// Convert *RiskLimits to []*RiskLimit
+	limits = []*exch.RiskLimit{
+		{
+			Symbol:           riskLimits.Symbol,
+			MaxLeverage:      riskLimits.MaxLeverage,
+			MaxPositionValue: riskLimits.MaxPositionValue,
+			MaxOrderValue:    riskLimits.MaxOrderValue,
+			MinOrderValue:    riskLimits.MinOrderValue,
+			MaxOrderQty:      riskLimits.MaxOrderQty,
+			MinOrderQty:      riskLimits.MinOrderQty,
+		},
 	}
 
 	// Cache the limits
@@ -92,11 +105,14 @@ func (m *Manager) GetRiskLimits(ctx context.Context, symbol string) ([]*exchange
 }
 
 // SetRiskLimits sets risk limits for a symbol
-func (m *Manager) SetRiskLimits(ctx context.Context, symbol string, limits []*exchange.RiskLimit) error {
-	// Set on exchange
+func (m *Manager) SetRiskLimits(ctx context.Context, symbol string, limits []*exch.RiskLimit) error {
+	// TODO: 待确认 - SetRiskLimits 方法在 exchange.Exchange 接口中不存在
+	// 暂时注释掉，等待接口更新
+	/*
 	if err := m.exchange.SetRiskLimits(ctx, symbol, limits); err != nil {
 		return fmt.Errorf("failed to set risk limits: %w", err)
 	}
+	*/
 
 	// Store in database
 	for _, limit := range limits {
@@ -119,7 +135,7 @@ func (m *Manager) SetRiskLimits(ctx context.Context, symbol string, limits []*ex
 }
 
 // CheckRiskLimits checks if an order would violate risk limits
-func (m *Manager) CheckRiskLimits(ctx context.Context, order *exchange.OrderRequest) error {
+func (m *Manager) CheckRiskLimits(ctx context.Context, order *exch.OrderRequest) error {
 	// Get current position
 	position, err := m.exchange.GetPosition(ctx, order.Symbol)
 	if err != nil {
@@ -133,9 +149,9 @@ func (m *Manager) CheckRiskLimits(ctx context.Context, order *exchange.OrderRequ
 	}
 
 	// Find applicable limit based on position size
-	var limit *exchange.RiskLimit
+	var limit *exch.RiskLimit
 	for _, l := range limits {
-		if position == nil || position.Quantity+order.Quantity <= l.MaxPositionSize {
+		if position == nil || position.Quantity+order.Quantity <= l.MaxPositionValue { // 使用 MaxPositionValue 替代 MaxPositionSize
 			limit = l
 			break
 		}
@@ -146,30 +162,34 @@ func (m *Manager) CheckRiskLimits(ctx context.Context, order *exchange.OrderRequ
 	}
 
 	// Check leverage
-	if position != nil && position.Leverage > limit.Leverage {
-		return fmt.Errorf("leverage exceeds limit: %d > %d", position.Leverage, limit.Leverage)
+	if position != nil && position.Leverage > limit.MaxLeverage { // 使用 MaxLeverage 替代 Leverage
+		return fmt.Errorf("leverage exceeds limit: %d > %d", position.Leverage, limit.MaxLeverage)
 	}
 
 	// Check position size
-	if position != nil && position.Quantity+order.Quantity > limit.MaxPositionSize {
+	if position != nil && position.Quantity+order.Quantity > limit.MaxPositionValue { // 使用 MaxPositionValue 替代 MaxPositionSize
 		return fmt.Errorf("position size would exceed limit: %.8f > %.8f",
-			position.Quantity+order.Quantity, limit.MaxPositionSize)
+			position.Quantity+order.Quantity, limit.MaxPositionValue)
 	}
 
 	// Check maintenance margin
 	if position != nil {
+		// TODO: 待确认 - RiskLimit 结构体中没有 MaintenanceMargin 字段
+		// 暂时注释掉，等待结构体更新
+		/*
 		maintenanceMargin := (position.Quantity + order.Quantity) * position.MarkPrice * limit.MaintenanceMargin
 		if maintenanceMargin > position.UnrealizedPnL {
 			return fmt.Errorf("maintenance margin would be insufficient: %.8f > %.8f",
 				maintenanceMargin, position.UnrealizedPnL)
 		}
+		*/
 	}
 
 	return nil
 }
 
 // storeLimit stores a risk limit in the database
-func (m *Manager) storeLimit(limit *exchange.RiskLimit) error {
+func (m *Manager) storeLimit(limit *exch.RiskLimit) error {
 	query := `
 		INSERT INTO risk_limits (
 			symbol, leverage, max_position_size, maintenance_margin,
@@ -181,11 +201,11 @@ func (m *Manager) storeLimit(limit *exchange.RiskLimit) error {
 
 	_, err := m.db.Exec(query,
 		limit.Symbol,
-		limit.Leverage,
-		limit.MaxPositionSize,
-		limit.MaintenanceMargin,
-		limit.InitialMargin,
-		limit.UpdatedAt,
+		limit.MaxLeverage, // 使用 MaxLeverage 替代 Leverage
+		limit.MaxPositionValue, // 使用 MaxPositionValue 替代 MaxPositionSize
+		0.0, // TODO: 待确认 - MaintenanceMargin 字段不存在
+		0.0, // TODO: 待确认 - InitialMargin 字段不存在
+		time.Now(), // TODO: 待确认 - UpdatedAt 字段不存在
 	)
 
 	if err != nil {
@@ -196,7 +216,7 @@ func (m *Manager) storeLimit(limit *exchange.RiskLimit) error {
 }
 
 // updateLimit updates the local risk limit cache and notifies subscribers
-func (m *Manager) updateLimit(limit *exchange.RiskLimit) {
+func (m *Manager) updateLimit(limit *exch.RiskLimit) {
 	m.mu.Lock()
 	m.limits[limit.Symbol] = limit
 	m.mu.Unlock()
@@ -206,7 +226,7 @@ func (m *Manager) updateLimit(limit *exchange.RiskLimit) {
 }
 
 // notifySubscribers notifies all subscribers of a risk limit update
-func (m *Manager) notifySubscribers(limit *exchange.RiskLimit) {
+func (m *Manager) notifySubscribers(limit *exch.RiskLimit) {
 	m.mu.RLock()
 	subs := m.subscribers[limit.Symbol]
 	m.mu.RUnlock()

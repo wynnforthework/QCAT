@@ -104,12 +104,12 @@ func (m *Manager) GetStats(symbol string) *Stats {
 }
 
 // GetHistory returns historical funding rates for a symbol
-func (m *Manager) GetHistory(ctx context.Context, symbol string, start, end time.Time) ([]*History, error) {
+func (m *Manager) GetHistory(ctx context.Context, symbol string, start, end time.Time) ([]*Rate, error) {
 	query := `
-		SELECT symbol, rate, timestamp
+		SELECT symbol, rate, next_rate, next_time, last_updated
 		FROM funding_rates
-		WHERE symbol = $1 AND timestamp BETWEEN $2 AND $3
-		ORDER BY timestamp DESC
+		WHERE symbol = $1 AND last_updated BETWEEN $2 AND $3
+		ORDER BY last_updated DESC
 	`
 
 	rows, err := m.db.QueryContext(ctx, query, symbol, start, end)
@@ -118,10 +118,10 @@ func (m *Manager) GetHistory(ctx context.Context, symbol string, start, end time
 	}
 	defer rows.Close()
 
-	var history []*History
+	var history []*Rate
 	for rows.Next() {
-		var h History
-		if err := rows.Scan(&h.Symbol, &h.Rate, &h.Timestamp); err != nil {
+		var h Rate
+		if err := rows.Scan(&h.Symbol, &h.Rate, &h.NextRate, &h.NextTime, &h.LastUpdated); err != nil {
 			return nil, fmt.Errorf("failed to scan funding rate: %w", err)
 		}
 		history = append(history, &h)

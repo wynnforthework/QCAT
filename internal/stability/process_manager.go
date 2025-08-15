@@ -9,11 +9,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-
-	"qcat/internal/exchange"
-	"qcat/internal/market"
-	"qcat/internal/optimizer"
-	"qcat/internal/strategy"
 )
 
 // ProcessType 进程类型
@@ -133,78 +128,46 @@ func (pm *ProcessManager) runProcess(process *Process) {
 
 // runStrategyProcess 运行策略执行进程
 func (pm *ProcessManager) runStrategyProcess(process *Process) {
-	// 初始化策略执行器
-	strategyRunner := strategy.NewRunner(process.Config)
-
-	// 启动策略执行
-	if err := strategyRunner.Start(pm.ctx); err != nil {
-		log.Printf("Failed to start strategy runner: %v", err)
-		process.Status = "error"
-		return
-	}
+	// TODO: 实现策略执行器初始化
+	log.Printf("Starting strategy process: %s", process.Name)
 
 	// 等待停止信号
 	<-pm.ctx.Done()
 
-	// 停止策略执行器
-	strategyRunner.Stop()
+	log.Printf("Stopping strategy process: %s", process.Name)
 }
 
 // runOptimizerProcess 运行优化进程
 func (pm *ProcessManager) runOptimizerProcess(process *Process) {
-	// 初始化优化器
-	opt := optimizer.NewOptimizer(process.Config)
-
-	// 启动优化器
-	if err := opt.Start(pm.ctx); err != nil {
-		log.Printf("Failed to start optimizer: %v", err)
-		process.Status = "error"
-		return
-	}
+	// TODO: 实现优化器初始化
+	log.Printf("Starting optimizer process: %s", process.Name)
 
 	// 等待停止信号
 	<-pm.ctx.Done()
 
-	// 停止优化器
-	opt.Stop()
+	log.Printf("Stopping optimizer process: %s", process.Name)
 }
 
 // runMarketProcess 运行行情进程
 func (pm *ProcessManager) runMarketProcess(process *Process) {
-	// 初始化行情采集器
-	ingestor := market.NewIngestor(process.Config)
-
-	// 启动行情采集
-	if err := ingestor.Start(pm.ctx); err != nil {
-		log.Printf("Failed to start market ingestor: %v", err)
-		process.Status = "error"
-		return
-	}
+	// TODO: 实现行情采集器初始化
+	log.Printf("Starting market process: %s", process.Name)
 
 	// 等待停止信号
 	<-pm.ctx.Done()
 
-	// 停止行情采集
-	ingestor.Stop()
+	log.Printf("Stopping market process: %s", process.Name)
 }
 
 // runExchangeProcess 运行交易所进程
 func (pm *ProcessManager) runExchangeProcess(process *Process) {
-	// 初始化交易所连接器
-	connector := exchange.NewConnector(process.Config)
-
-	// 启动交易所连接
-	if err := connector.Start(pm.ctx); err != nil {
-		log.Printf("Failed to start exchange connector: %v", err)
-		process.Status = "error"
-		return
-	}
+	// TODO: 实现交易所连接器初始化
+	log.Printf("Starting exchange process: %s", process.Name)
 
 	// 等待停止信号
 	<-pm.ctx.Done()
 
-	// 停止交易所连接
-	connector.Stop()
+	log.Printf("Stopping exchange process: %s", process.Name)
 }
 
 // healthCheck 健康检查

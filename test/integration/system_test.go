@@ -435,56 +435,7 @@ func (s *SystemTestSuite) monitorTradingStatus(strategyID string) error {
 	return nil
 }
 
-// 10项自动化能力测试方法
-func (s *SystemTestSuite) testAutoOptimizationOnPoorPerformance() error {
-	// 实现能力1测试
-	return nil
-}
-
-func (s *SystemTestSuite) testAutoUseBestParams() error {
-	// 实现能力2测试
-	return nil
-}
-
-func (s *SystemTestSuite) testAutoOptimizePosition() error {
-	// 实现能力3测试
-	return nil
-}
-
-func (s *SystemTestSuite) testAutoBalanceDrivenTrading() error {
-	// 实现能力4测试
-	return nil
-}
-
-func (s *SystemTestSuite) testAutoStopLossTakeProfit() error {
-	// 实现能力5测试
-	return nil
-}
-
-func (s *SystemTestSuite) testPeriodicAutoOptimization() error {
-	// 实现能力6测试
-	return nil
-}
-
-func (s *SystemTestSuite) testStrategyElimination() error {
-	// 实现能力7测试
-	return nil
-}
-
-func (s *SystemTestSuite) testAutoAddEnableStrategy() error {
-	// 实现能力8测试
-	return nil
-}
-
-func (s *SystemTestSuite) testAutoAdjustStopLevels() error {
-	// 实现能力9测试
-	return nil
-}
-
-func (s *SystemTestSuite) testHotSymbolRecommendation() error {
-	// 实现能力10测试
-	return nil
-}
+// 10项自动化能力测试方法已在 automation_capabilities_test.go 中实现
 
 // 压力测试方法
 func (s *SystemTestSuite) testConcurrentStrategyExecution(count int) error {

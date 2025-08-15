@@ -14,6 +14,7 @@ type Subscription interface {
 }
 
 // channelSubscription implements Subscription
+// TODO: 待确认 - 当前未使用，保留以备将来实现
 type channelSubscription struct {
 	ch     interface{}
 	cancel context.CancelFunc
@@ -26,6 +27,7 @@ func (s *channelSubscription) Close() {
 // Ingestor manages market data collection
 type Ingestor struct {
 	db *sql.DB
+	// TODO: 待确认 - 当前未使用，保留以备将来实现
 	mu sync.RWMutex
 }
 
@@ -66,6 +68,24 @@ func (i *Ingestor) SubscribeFundingRates(ctx context.Context, symbol string) (<-
 	// TODO: Implement funding rate subscription
 
 	return ch, nil
+}
+
+// GetDataLatency returns the current data latency
+func (i *Ingestor) GetDataLatency() time.Duration {
+	// TODO: Implement actual latency calculation
+	return 100 * time.Millisecond
+}
+
+// GetDataGaps returns data gaps
+func (i *Ingestor) GetDataGaps() []time.Time {
+	// TODO: Implement actual gap detection
+	return []time.Time{}
+}
+
+// GetOutliers returns data outliers
+func (i *Ingestor) GetOutliers() []interface{} {
+	// TODO: Implement actual outlier detection
+	return []interface{}{}
 }
 
 // GetTradeHistory returns historical trades

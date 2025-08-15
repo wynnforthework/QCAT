@@ -7,13 +7,13 @@ import (
 	"sync"
 	"time"
 
-	"qcat/internal/exchange"
+	exch "qcat/internal/exchange"
 	"qcat/internal/exchange/position"
 )
 
 // Rebalancer handles portfolio rebalancing
 type Rebalancer struct {
-	exchange      exchange.Exchange
+	exchange      exch.Exchange
 	posManager    *position.Manager
 	targetRatios  map[string]float64 // 目标资产配比
 	tolerance     float64            // 允许的偏差范围
@@ -23,7 +23,7 @@ type Rebalancer struct {
 }
 
 // NewRebalancer creates a new rebalancer
-func NewRebalancer(ex exchange.Exchange, pm *position.Manager) *Rebalancer {
+func NewRebalancer(ex exch.Exchange, pm *position.Manager) *Rebalancer {
 	return &Rebalancer{
 		exchange:     ex,
 		posManager:   pm,
@@ -67,10 +67,10 @@ func (r *Rebalancer) CheckAndRebalance(ctx context.Context) error {
 	totalValue := 0.0
 	currentRatios := make(map[string]float64)
 	for _, pos := range positions {
-		totalValue += pos.Value
+		totalValue += pos.Notional // 使用 Notional 字段替代 Value
 	}
 	for _, pos := range positions {
-		currentRatios[pos.Symbol] = pos.Value / totalValue
+		currentRatios[pos.Symbol] = pos.Notional / totalValue // 使用 Notional 字段替代 Value
 	}
 
 	// 检查是否需要再平衡
@@ -95,7 +95,7 @@ func (r *Rebalancer) CheckAndRebalance(ctx context.Context) error {
 		}
 
 		// 找到对应的持仓
-		var pos *position.Position
+		var pos *exch.Position
 		for _, p := range positions {
 			if p.Symbol == asset {
 				pos = p
@@ -109,23 +109,23 @@ func (r *Rebalancer) CheckAndRebalance(ctx context.Context) error {
 
 		// 计算需要调整的数量
 		targetValue := totalValue * targetRatio
-		valueDiff := targetValue - pos.Value
-		sizeDiff := valueDiff / pos.Price
+		valueDiff := targetValue - pos.Notional // 使用 Notional 字段替代 Value
+		sizeDiff := valueDiff / pos.MarkPrice   // 使用 MarkPrice 字段替代 Price
 
 		// 创建市价单调整仓位
-		order := &exchange.Order{
+		order := &exch.OrderRequest{
 			Symbol:   pos.Symbol,
-			Type:     exchange.OrderTypeMarket,
+			Type:     string(exch.OrderTypeMarket), // 显式转换为 string
 			Quantity: abs(sizeDiff),
 		}
 
 		if sizeDiff > 0 {
-			order.Side = exchange.OrderSideBuy
+			order.Side = string(exch.OrderSideBuy) // 显式转换为 string
 		} else {
-			order.Side = exchange.OrderSideSell
+			order.Side = string(exch.OrderSideSell) // 显式转换为 string
 		}
 
-		if _, err := r.exchange.CreateOrder(ctx, order); err != nil {
+		if _, err := r.exchange.PlaceOrder(ctx, order); err != nil {
 			log.Printf("Failed to rebalance %s: %v", pos.Symbol, err)
 			continue
 		}
@@ -136,9 +136,10 @@ func (r *Rebalancer) CheckAndRebalance(ctx context.Context) error {
 }
 
 // abs returns the absolute value of x
-func abs(x float64) float64 {
-	if x < 0 {
-		return -x
-	}
-	return x
-}
+// TODO: Use math.Abs instead
+// func abs(x float64) float64 {
+// 	if x < 0 {
+// 		return -x
+// 	}
+// 	return x
+// }

@@ -36,8 +36,8 @@ func (e *Exchange) GetExchangeInfo(ctx context.Context) (*exchange.ExchangeInfo,
 	return &exchange.ExchangeInfo{
 		Name:       "paper",
 		ServerTime: time.Now(),
-		RateLimits: []int{},
-		Symbols:    []string{},
+		RateLimits: []exchange.RateLimit{},
+		Symbols:    []exchange.SymbolInfo{},
 	}, nil
 }
 
@@ -83,11 +83,11 @@ func (e *Exchange) GetPositions(ctx context.Context) ([]*exchange.Position, erro
 	for _, pos := range e.account.Positions {
 		positions = append(positions, &exchange.Position{
 			Symbol:        pos.Symbol,
-			Side:          pos.Side,
+			Side:          string(pos.Side),
 			Quantity:      pos.Quantity,
 			EntryPrice:    pos.EntryPrice,
 			Leverage:      pos.Leverage,
-			MarginType:    pos.MarginType,
+			MarginType:    string(pos.MarginType),
 			UnrealizedPnL: pos.UnrealizedPnL,
 			UpdatedAt:     pos.UpdatedAt,
 		})
@@ -107,11 +107,11 @@ func (e *Exchange) GetPosition(ctx context.Context, symbol string) (*exchange.Po
 
 	return &exchange.Position{
 		Symbol:        pos.Symbol,
-		Side:          pos.Side,
+		Side:          string(pos.Side),
 		Quantity:      pos.Quantity,
 		EntryPrice:    pos.EntryPrice,
 		Leverage:      pos.Leverage,
-		MarginType:    pos.MarginType,
+		MarginType:    string(pos.MarginType),
 		UnrealizedPnL: pos.UnrealizedPnL,
 		UpdatedAt:     pos.UpdatedAt,
 	}, nil
@@ -174,10 +174,7 @@ func (e *Exchange) PlaceOrder(ctx context.Context, req *exchange.OrderRequest) (
 	if err := e.validateOrder(req); err != nil {
 		return &exchange.OrderResponse{
 			Success: false,
-			Error: &exchange.Error{
-				Code:    -1,
-				Message: err.Error(),
-			},
+			Error:   err.Error(),
 		}, nil
 	}
 
@@ -186,8 +183,8 @@ func (e *Exchange) PlaceOrder(ctx context.Context, req *exchange.OrderRequest) (
 		ID:            fmt.Sprintf("paper-%d", time.Now().UnixNano()),
 		ClientOrderID: req.ClientOrderID,
 		Symbol:        req.Symbol,
-		Side:          req.Side,
-		Type:          req.Type,
+		Side:          exchange.OrderSide(req.Side),
+		Type:          exchange.OrderType(req.Type),
 		Price:         req.Price,
 		StopPrice:     req.StopPrice,
 		Quantity:      req.Quantity,
@@ -207,10 +204,7 @@ func (e *Exchange) PlaceOrder(ctx context.Context, req *exchange.OrderRequest) (
 	if err := e.matchOrder(order); err != nil {
 		return &exchange.OrderResponse{
 			Success: false,
-			Error: &exchange.Error{
-				Code:    -1,
-				Message: err.Error(),
-			},
+			Error:   err.Error(),
 		}, nil
 	}
 
@@ -220,13 +214,13 @@ func (e *Exchange) PlaceOrder(ctx context.Context, req *exchange.OrderRequest) (
 			ID:            order.ID,
 			ClientOrderID: order.ClientOrderID,
 			Symbol:        order.Symbol,
-			Side:          order.Side,
-			Type:          order.Type,
+			Side:          string(order.Side),
+			Type:          string(order.Type),
 			Price:         order.Price,
 			Quantity:      order.Quantity,
 			FilledQty:     order.FilledQty,
 			RemainingQty:  order.RemainingQty,
-			Status:        order.Status,
+			Status:        string(order.Status),
 			UpdatedAt:     order.UpdatedAt,
 		},
 	}, nil
@@ -252,20 +246,14 @@ func (e *Exchange) CancelOrder(ctx context.Context, req *exchange.OrderCancelReq
 	if order == nil {
 		return &exchange.OrderResponse{
 			Success: false,
-			Error: &exchange.Error{
-				Code:    -1,
-				Message: "order not found",
-			},
+			Error:   "order not found",
 		}, nil
 	}
 
 	if order.Status != exchange.OrderStatusNew && order.Status != exchange.OrderStatusPartiallyFilled {
 		return &exchange.OrderResponse{
 			Success: false,
-			Error: &exchange.Error{
-				Code:    -1,
-				Message: "order cannot be cancelled",
-			},
+			Error:   "order cannot be cancelled",
 		}, nil
 	}
 
@@ -278,13 +266,13 @@ func (e *Exchange) CancelOrder(ctx context.Context, req *exchange.OrderCancelReq
 			ID:            order.ID,
 			ClientOrderID: order.ClientOrderID,
 			Symbol:        order.Symbol,
-			Side:          order.Side,
-			Type:          order.Type,
+			Side:          string(order.Side),
+			Type:          string(order.Type),
 			Price:         order.Price,
 			Quantity:      order.Quantity,
 			FilledQty:     order.FilledQty,
 			RemainingQty:  order.RemainingQty,
-			Status:        order.Status,
+			Status:        string(order.Status),
 			UpdatedAt:     order.UpdatedAt,
 		},
 	}, nil
@@ -318,13 +306,13 @@ func (e *Exchange) GetOrder(ctx context.Context, symbol, orderID string) (*excha
 		ID:            order.ID,
 		ClientOrderID: order.ClientOrderID,
 		Symbol:        order.Symbol,
-		Side:          order.Side,
-		Type:          order.Type,
+		Side:          string(order.Side),
+		Type:          string(order.Type),
 		Price:         order.Price,
 		Quantity:      order.Quantity,
 		FilledQty:     order.FilledQty,
 		RemainingQty:  order.RemainingQty,
-		Status:        order.Status,
+		Status:        string(order.Status),
 		UpdatedAt:     order.UpdatedAt,
 	}, nil
 }
@@ -341,13 +329,13 @@ func (e *Exchange) GetOpenOrders(ctx context.Context, symbol string) ([]*exchang
 				ID:            order.ID,
 				ClientOrderID: order.ClientOrderID,
 				Symbol:        order.Symbol,
-				Side:          order.Side,
-				Type:          order.Type,
+				Side:          string(order.Side),
+				Type:          string(order.Type),
 				Price:         order.Price,
 				Quantity:      order.Quantity,
 				FilledQty:     order.FilledQty,
 				RemainingQty:  order.RemainingQty,
-				Status:        order.Status,
+				Status:        string(order.Status),
 				UpdatedAt:     order.UpdatedAt,
 			})
 		}
@@ -358,11 +346,13 @@ func (e *Exchange) GetOpenOrders(ctx context.Context, symbol string) ([]*exchang
 // GetRiskLimits implements exchange.Exchange
 func (e *Exchange) GetRiskLimits(ctx context.Context, symbol string) (*exchange.RiskLimits, error) {
 	return &exchange.RiskLimits{
-		Symbol:          symbol,
-		MaxExposure:     1000000,
-		MaxDailyLossUSD: 10000,
-		MaxDrawdown:     50,
-		MaxLeverage:     100,
+		Symbol:           symbol,
+		MaxLeverage:      100,
+		MaxPositionValue: 1000000,
+		MaxOrderValue:    100000,
+		MinOrderValue:    10,
+		MaxOrderQty:      1000,
+		MinOrderQty:      0.001,
 	}, nil
 }
 
@@ -380,13 +370,13 @@ func (e *Exchange) GetOrderHistory(ctx context.Context, symbol string, startTime
 				ID:            order.ID,
 				ClientOrderID: order.ClientOrderID,
 				Symbol:        order.Symbol,
-				Side:          order.Side,
-				Type:          order.Type,
+				Side:          string(order.Side),
+				Type:          string(order.Type),
 				Price:         order.Price,
 				Quantity:      order.Quantity,
 				FilledQty:     order.FilledQty,
 				RemainingQty:  order.RemainingQty,
-				Status:        order.Status,
+				Status:        string(order.Status),
 				UpdatedAt:     order.UpdatedAt,
 			})
 		}
@@ -402,7 +392,7 @@ func (e *Exchange) validateOrder(req *exchange.OrderRequest) error {
 	if req.Quantity <= 0 {
 		return &ErrInvalidOrder{Message: "quantity must be positive"}
 	}
-	if req.Type == exchange.OrderTypeLimit && req.Price <= 0 {
+	if exchange.OrderType(req.Type) == exchange.OrderTypeLimit && req.Price <= 0 {
 		return &ErrInvalidOrder{Message: "price must be positive for limit orders"}
 	}
 	return nil

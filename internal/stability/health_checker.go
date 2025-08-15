@@ -405,7 +405,7 @@ func (hc *HealthChecker) GetAllHealthStatus() map[string]*ServiceHealthCheck {
 	defer hc.mu.RUnlock()
 
 	status := make(map[string]*ServiceHealthCheck)
-	for name, check := range hc.checks {
+	for name := range hc.checks {
 		status[name] = hc.GetHealthStatus(name)
 	}
 

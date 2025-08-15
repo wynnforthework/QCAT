@@ -15,7 +15,7 @@ import (
 type WSClient struct {
 	url            string
 	conn           *websocket.Conn
-	subscriptions  map[string]Subscription
+	subscriptions  map[string]WSSubscription
 	handlers       map[string]MarketDataHandler
 	reconnectDelay time.Duration
 	maxRetries     int
@@ -31,7 +31,7 @@ type WSClient struct {
 func NewWSClient(url string) *WSClient {
 	return &WSClient{
 		url:            url,
-		subscriptions:  make(map[string]Subscription),
+		subscriptions:  make(map[string]WSSubscription),
 		handlers:       make(map[string]MarketDataHandler),
 		reconnectDelay: 5 * time.Second,
 		maxRetries:     3,
@@ -72,7 +72,7 @@ func (c *WSClient) Connect(ctx context.Context) error {
 }
 
 // Subscribe adds a new subscription
-func (c *WSClient) Subscribe(sub Subscription, handler MarketDataHandler) error {
+func (c *WSClient) Subscribe(sub WSSubscription, handler MarketDataHandler) error {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 
@@ -268,7 +268,7 @@ func (c *WSClient) reconnect() {
 
 		// Resubscribe to all channels
 		c.mutex.RLock()
-		subs := make([]Subscription, 0, len(c.subscriptions))
+		subs := make([]WSSubscription, 0, len(c.subscriptions))
 		for _, sub := range c.subscriptions {
 			subs = append(subs, sub)
 		}

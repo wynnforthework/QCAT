@@ -19,14 +19,14 @@ type MABScheduler struct {
 // Arm represents a MAB arm (strategy)
 type Arm struct {
 	ID           string
-	Rewards      []float64  // 收益序列
-	TotalReward  float64    // 总收益
-	TotalTrials  int        // 总尝试次数
-	UCB          float64    // UCB值
-	Thompson     float64    // Thompson采样值
-	Alpha        float64    // Beta分布参数α
-	Beta         float64    // Beta分布参数β
-	LastSelected time.Time  // 最后选择时间
+	Rewards      []float64 // 收益序列
+	TotalReward  float64   // 总收益
+	TotalTrials  int       // 总尝试次数
+	UCB          float64   // UCB值
+	Thompson     float64   // Thompson采样值
+	Alpha        float64   // Beta分布参数α
+	Beta         float64   // Beta分布参数β
+	LastSelected time.Time // 最后选择时间
 }
 
 // NewMABScheduler creates a new MAB scheduler
@@ -46,9 +46,9 @@ func (s *MABScheduler) AddArm(id string) error {
 	}
 
 	s.arms[id] = &Arm{
-		ID:     id,
-		Alpha:  1, // 初始Beta分布参数
-		Beta:   1,
+		ID:      id,
+		Alpha:   1, // 初始Beta分布参数
+		Beta:    1,
 		Rewards: make([]float64, 0),
 	}
 
@@ -86,7 +86,7 @@ func (s *MABScheduler) UpdateReward(id string, reward float64) error {
 	}
 
 	// Update Thompson sampling value
-	arm.Thompson = rand.Beta(arm.Alpha, arm.Beta)
+	arm.Thompson = Beta(arm.Alpha, arm.Beta)
 
 	return nil
 }
@@ -134,7 +134,7 @@ func (s *MABScheduler) SelectArmThompson(ctx context.Context) (string, error) {
 
 	for _, arm := range s.arms {
 		// Sample from Beta distribution
-		sample := rand.Beta(arm.Alpha, arm.Beta)
+		sample := Beta(arm.Alpha, arm.Beta)
 		if sample > maxThompson {
 			maxThompson = sample
 			bestArm = arm
@@ -180,24 +180,29 @@ func (s *MABScheduler) GetAllArms() []*Arm {
 	}
 
 	// Sort by UCB value
-	sort.Slice(arms, func(i, j int) bool {
-		return arms[i].UCB > arms[j].UCB
-	})
+	// TODO: Implement sorting or use slices.Sort
+	for i := 0; i < len(arms)-1; i++ {
+		for j := i + 1; j < len(arms); j++ {
+			if arms[i].UCB < arms[j].UCB {
+				arms[i], arms[j] = arms[j], arms[i]
+			}
+		}
+	}
 
 	return arms
 }
 
-// rand.Beta generates a random number from Beta distribution
-func rand.Beta(alpha, beta float64) float64 {
-	x := rand.Gamma(alpha, 1)
-	y := rand.Gamma(beta, 1)
+// Beta generates a random number from Beta distribution
+func Beta(alpha, beta float64) float64 {
+	x := Gamma(alpha, 1)
+	y := Gamma(beta, 1)
 	return x / (x + y)
 }
 
-// rand.Gamma generates a random number from Gamma distribution
-func rand.Gamma(alpha, beta float64) float64 {
+// Gamma generates a random number from Gamma distribution
+func Gamma(alpha, beta float64) float64 {
 	if alpha < 1 {
-		return rand.Gamma(1+alpha, beta) * math.Pow(rand.Float64(), 1/alpha)
+		return Gamma(1+alpha, beta) * math.Pow(rand.Float64(), 1.0/alpha)
 	}
 
 	d := alpha - 1/3

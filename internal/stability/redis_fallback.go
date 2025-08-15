@@ -24,9 +24,9 @@ const (
 type RedisFallback struct {
 	mu           sync.RWMutex
 	mode         FallbackMode
-	redisCache   cache.Cache
+	redisCache   cache.Cacher
 	memoryCache  *MemoryCache
-	db           *database.Database
+	db           *database.DB
 	healthCheck  *RedisHealthCheck
 	fallbackChan chan FallbackMode
 }
@@ -56,7 +56,7 @@ type RedisHealthCheck struct {
 }
 
 // NewRedisFallback 创建Redis降级管理器
-func NewRedisFallback(redisCache cache.Cache, db *database.Database) *RedisFallback {
+func NewRedisFallback(redisCache cache.Cacher, db *database.DB) *RedisFallback {
 	rf := &RedisFallback{
 		redisCache:   redisCache,
 		memoryCache:  NewMemoryCache(),
@@ -145,7 +145,8 @@ func (rf *RedisFallback) Delete(ctx context.Context, key string) error {
 // getFromRedis 从Redis获取
 func (rf *RedisFallback) getFromRedis(ctx context.Context, key string) (interface{}, error) {
 	start := time.Now()
-	value, err := rf.redisCache.Get(ctx, key)
+	var value interface{}
+	err := rf.redisCache.Get(ctx, key, &value)
 	rf.healthCheck.ResponseTime = time.Since(start)
 
 	if err != nil {
@@ -286,11 +287,8 @@ func (rf *RedisFallback) startHealthCheck() {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			rf.checkRedisHealth()
-		}
+	for range ticker.C {
+		rf.checkRedisHealth()
 	}
 }
 
@@ -372,19 +370,16 @@ func (mc *MemoryCache) cleanupTTL() {
 	ticker := time.NewTicker(time.Minute)
 	defer ticker.Stop()
 
-	for {
-		select {
-		case <-ticker.C:
-			mc.mu.Lock()
-			now := time.Now()
-			for key, ttl := range mc.ttl {
-				if now.After(ttl) {
-					delete(mc.data, key)
-					delete(mc.ttl, key)
-				}
+	for range ticker.C {
+		mc.mu.Lock()
+		now := time.Now()
+		for key, ttl := range mc.ttl {
+			if now.After(ttl) {
+				delete(mc.data, key)
+				delete(mc.ttl, key)
 			}
-			mc.mu.Unlock()
 		}
+		mc.mu.Unlock()
 	}
 }
 

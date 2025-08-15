@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"qcat/internal/exchange"
+	exch "qcat/internal/exchange"
 	"qcat/internal/exchange/order"
 	"qcat/internal/exchange/position"
 	"qcat/internal/exchange/risk"
@@ -21,8 +21,9 @@ type Runner struct {
 	order      *order.Manager
 	position   *position.Manager
 	risk       *risk.Manager
-	marketSubs []market.Subscription
-	mu         sync.RWMutex
+	marketSubs []interface{} // 暂时使用 interface{} 替代 market.Subscription
+	// TODO: 待确认 - 当前未使用，保留以备将来实现
+	mu sync.RWMutex
 }
 
 // NewRunner creates a new real-time strategy runner
@@ -49,11 +50,16 @@ func (r *Runner) Start(ctx context.Context) error {
 	}
 
 	// Subscribe to order updates
-	orderCh := r.order.Subscribe(r.sandbox.GetConfig().Symbol)
+	config := r.sandbox.GetConfig()
+	symbol := "BTCUSDT" // TODO: 待确认 - 从配置中获取交易对
+	if s, ok := config["symbol"].(string); ok {
+		symbol = s
+	}
+	orderCh := r.order.Subscribe(symbol)
 	go r.handleOrders(ctx, orderCh)
 
 	// Subscribe to position updates
-	positionCh := r.position.Subscribe(r.sandbox.GetConfig().Symbol)
+	positionCh := r.position.Subscribe(symbol)
 	go r.handlePositions(ctx, positionCh)
 
 	// Start sandbox
@@ -70,10 +76,15 @@ func (r *Runner) Stop(ctx context.Context) error {
 	r.unsubscribeMarketData()
 
 	// Unsubscribe from order updates
-	r.order.Unsubscribe(r.sandbox.GetConfig().Symbol, nil)
+	config := r.sandbox.GetConfig()
+	symbol := "BTCUSDT" // TODO: 待确认 - 从配置中获取交易对
+	if s, ok := config["symbol"].(string); ok {
+		symbol = s
+	}
+	r.order.Unsubscribe(symbol, nil)
 
 	// Unsubscribe from position updates
-	r.position.Unsubscribe(r.sandbox.GetConfig().Symbol, nil)
+	r.position.Unsubscribe(symbol, nil)
 
 	// Stop sandbox
 	if err := r.sandbox.Stop(ctx); err != nil {
@@ -85,7 +96,11 @@ func (r *Runner) Stop(ctx context.Context) error {
 
 // subscribeMarketData subscribes to required market data
 func (r *Runner) subscribeMarketData(ctx context.Context) error {
-	symbol := r.sandbox.GetConfig().Symbol
+	config := r.sandbox.GetConfig()
+	symbol := "BTCUSDT" // TODO: 待确认 - 从配置中获取交易对
+	if s, ok := config["symbol"].(string); ok {
+		symbol = s
+	}
 
 	// Subscribe to order book updates
 	bookCh, err := r.market.SubscribeOrderBook(ctx, symbol)
@@ -124,9 +139,8 @@ func (r *Runner) subscribeMarketData(ctx context.Context) error {
 
 // unsubscribeMarketData unsubscribes from all market data
 func (r *Runner) unsubscribeMarketData() {
-	for _, sub := range r.marketSubs {
-		sub.Close()
-	}
+	// TODO: 待确认 - market.Ingestor 的订阅方法返回的是 channel，不是 Subscription 接口
+	// 暂时清空订阅列表
 	r.marketSubs = nil
 }
 
@@ -179,7 +193,7 @@ func (r *Runner) handleFundingRates(ctx context.Context, ch <-chan *market.Fundi
 }
 
 // handleOrders handles order updates
-func (r *Runner) handleOrders(ctx context.Context, ch <-chan *exchange.Order) {
+func (r *Runner) handleOrders(ctx context.Context, ch <-chan *exch.Order) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -191,7 +205,7 @@ func (r *Runner) handleOrders(ctx context.Context, ch <-chan *exchange.Order) {
 }
 
 // handlePositions handles position updates
-func (r *Runner) handlePositions(ctx context.Context, ch <-chan *exchange.Position) {
+func (r *Runner) handlePositions(ctx context.Context, ch <-chan *exch.Position) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -210,10 +224,10 @@ func (r *Runner) OnSignal(signal *strategy.Signal) error {
 	}
 
 	// Create order request
-	req := &exchange.OrderRequest{
+	req := &exch.OrderRequest{
 		Symbol:        signal.Symbol,
-		Side:          signal.Side,
-		Type:          signal.Type,
+		Side:          string(signal.Side), // 显式转换为 string
+		Type:          string(signal.Type), // 显式转换为 string
 		Price:         signal.Price,
 		Quantity:      signal.Quantity,
 		ClientOrderID: signal.ID,
@@ -235,10 +249,10 @@ func (r *Runner) OnSignal(signal *strategy.Signal) error {
 // checkRiskLimits checks if a signal would violate risk limits
 func (r *Runner) checkRiskLimits(signal *strategy.Signal) error {
 	// Create order request for risk check
-	req := &exchange.OrderRequest{
+	req := &exch.OrderRequest{
 		Symbol:   signal.Symbol,
-		Side:     signal.Side,
-		Type:     signal.Type,
+		Side:     string(signal.Side), // 显式转换为 string
+		Type:     string(signal.Type), // 显式转换为 string
 		Price:    signal.Price,
 		Quantity: signal.Quantity,
 	}
@@ -252,7 +266,7 @@ func (r *Runner) checkRiskLimits(signal *strategy.Signal) error {
 }
 
 // GetState returns the current strategy state
-func (r *Runner) GetState() strategy.State {
+func (r *Runner) GetState() string {
 	return r.sandbox.GetState()
 }
 

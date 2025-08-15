@@ -281,3 +281,25 @@ func calculateVolatilityPenalty(state *StrategyState) float64 {
 	}
 	return state.RollingVol[len(state.RollingVol)-1]
 }
+
+// calculateVolatility calculates volatility of returns
+func calculateVolatility(returns []float64) float64 {
+	if len(returns) < 2 {
+		return 0
+	}
+
+	mean := 0.0
+	for _, r := range returns {
+		mean += r
+	}
+	mean /= float64(len(returns))
+
+	variance := 0.0
+	for _, r := range returns {
+		diff := r - mean
+		variance += diff * diff
+	}
+	variance /= float64(len(returns) - 1)
+
+	return math.Sqrt(variance)
+}

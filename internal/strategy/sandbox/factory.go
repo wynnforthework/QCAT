@@ -23,7 +23,7 @@ func NewFactory() *Factory {
 }
 
 // CreateSandbox creates a new strategy sandbox
-func (f *Factory) CreateSandbox(strategy strategy.Strategy, config *strategy.Config, exchange exchange.Exchange) (*Sandbox, error) {
+func (f *Factory) CreateSandbox(strategy strategy.Strategy, config map[string]interface{}, exchange exchange.Exchange) (*Sandbox, error) {
 	// Create sandbox
 	sandbox := NewSandbox(strategy, config, exchange)
 
@@ -34,7 +34,12 @@ func (f *Factory) CreateSandbox(strategy strategy.Strategy, config *strategy.Con
 
 	// Store sandbox
 	f.mu.Lock()
-	f.sandboxes[config.Name] = sandbox
+	// TODO: 待确认 - 从配置中获取策略名
+	strategyName := "sandbox-strategy"
+	if name, ok := config["name"].(string); ok {
+		strategyName = name
+	}
+	f.sandboxes[strategyName] = sandbox
 	f.mu.Unlock()
 
 	return sandbox, nil
@@ -72,7 +77,7 @@ func (f *Factory) DeleteSandbox(name string) error {
 	}
 
 	// Stop sandbox if running
-	if sandbox.GetState() == strategy.StateRunning {
+	if sandbox.GetState() == "running" {
 		if err := sandbox.Stop(context.Background()); err != nil {
 			return fmt.Errorf("failed to stop sandbox: %w", err)
 		}

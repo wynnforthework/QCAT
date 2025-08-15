@@ -1,8 +1,6 @@
 package monitor
 
 import (
-	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -13,39 +11,40 @@ import (
 // MetricsCollector collects system metrics
 type MetricsCollector struct {
 	// 策略相关指标
-	strategyPnL           *prometheus.GaugeVec
-	strategyDrawdown      *prometheus.GaugeVec
-	strategySharpe        *prometheus.GaugeVec
-	strategyPositions     *prometheus.GaugeVec
-	strategyOrders        *prometheus.CounterVec
+	strategyPnL       *prometheus.GaugeVec
+	strategyDrawdown  *prometheus.GaugeVec
+	strategySharpe    *prometheus.GaugeVec
+	strategyPositions *prometheus.GaugeVec
+	strategyOrders    *prometheus.CounterVec
 
 	// 市场数据指标
-	marketDataLatency     *prometheus.HistogramVec
-	marketDataGaps        *prometheus.CounterVec
-	marketDataOutliers    *prometheus.CounterVec
+	marketDataLatency  *prometheus.HistogramVec
+	marketDataGaps     *prometheus.CounterVec
+	marketDataOutliers *prometheus.CounterVec
 
 	// 系统性能指标
-	systemCPUUsage        prometheus.Gauge
-	systemMemoryUsage     prometheus.Gauge
-	systemDiskUsage       prometheus.Gauge
-	systemGoroutines      prometheus.Gauge
+	systemCPUUsage    prometheus.Gauge
+	systemMemoryUsage prometheus.Gauge
+	systemDiskUsage   prometheus.Gauge
+	systemGoroutines  prometheus.Gauge
 
 	// 交易相关指标
-	tradeVolume           *prometheus.CounterVec
-	tradeCount            *prometheus.CounterVec
-	tradeLatency          *prometheus.HistogramVec
-	orderSuccessRate      *prometheus.GaugeVec
+	tradeVolume      *prometheus.CounterVec
+	tradeCount       *prometheus.CounterVec
+	tradeLatency     *prometheus.HistogramVec
+	orderSuccessRate *prometheus.GaugeVec
 
 	// 风控指标
-	riskExposure          *prometheus.GaugeVec
-	riskLimits            *prometheus.GaugeVec
-	riskViolations        *prometheus.CounterVec
+	riskExposure   *prometheus.GaugeVec
+	riskLimits     *prometheus.GaugeVec
+	riskViolations *prometheus.CounterVec
 
 	// 优化相关指标
-	optimizationDuration  *prometheus.HistogramVec
-	optimizationSuccess   *prometheus.CounterVec
+	optimizationDuration    *prometheus.HistogramVec
+	optimizationSuccess     *prometheus.CounterVec
 	optimizationImprovement *prometheus.GaugeVec
 
+	// TODO: 待确认 - 当前未使用，保留以备将来实现
 	mu sync.RWMutex
 }
 
@@ -241,7 +240,7 @@ func (mc *MetricsCollector) RecordRiskViolation(riskType string) {
 // RecordOptimization records optimization metrics
 func (mc *MetricsCollector) RecordOptimization(strategyID, optimizationType string, duration time.Duration, success bool, improvement float64) {
 	mc.optimizationDuration.WithLabelValues(strategyID, optimizationType).Observe(duration.Seconds())
-	
+
 	if success {
 		mc.optimizationSuccess.WithLabelValues(strategyID, optimizationType).Inc()
 		mc.optimizationImprovement.WithLabelValues(strategyID, optimizationType).Set(improvement)

@@ -144,3 +144,11 @@ func (m *Manager) GetSnapshot(symbol string, depth int) map[string]interface{} {
 	}
 	return book.GetSnapshot(depth)
 }
+
+// GetHistory returns historical order book snapshots for a symbol within a time range
+func (m *Manager) GetHistory(ctx context.Context, symbol string, start, end time.Time) ([]*OrderBook, error) {
+	// TODO: 实现历史订单簿数据查询
+	// 这里需要从数据库或缓存中获取历史快照
+	// 暂时返回空切片，避免编译错误
+	return []*OrderBook{}, nil
+}

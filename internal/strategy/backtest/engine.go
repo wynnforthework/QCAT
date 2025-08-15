@@ -28,6 +28,12 @@ type Config struct {
 	SlippageModel  SlippageModel
 	FeeModel       FeeModel
 	LatencyModel   LatencyModel
+	// TODO: Add missing fields for data feed
+	Symbols   []string
+	StartTime time.Time
+	EndTime   time.Time
+	DataTypes []string
+	Capital   float64
 }
 
 // NewEngine creates a new backtesting engine

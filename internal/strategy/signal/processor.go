@@ -52,8 +52,8 @@ func (p *DefaultProcessor) Process(signal *Signal) error {
 	// Create order request
 	req := &exchange.OrderRequest{
 		Symbol:        signal.Symbol,
-		Side:          signal.Side,
-		Type:          signal.OrderType,
+		Side:          string(signal.Side),
+		Type:          string(signal.OrderType),
 		Price:         signal.Price,
 		StopPrice:     signal.StopPrice,
 		Quantity:      signal.Quantity,
@@ -91,7 +91,7 @@ func (p *DefaultProcessor) Process(signal *Signal) error {
 		signal.Status = StatusRejected
 		signal.Reason = fmt.Sprintf("order rejected: %v", resp.Error)
 		signal.UpdatedAt = time.Now()
-		return &ErrSignalProcessing{Message: "order rejected", Err: resp.Error}
+		return &ErrSignalProcessing{Message: "order rejected", Err: fmt.Errorf(resp.Error)}
 	}
 
 	// Update signal
@@ -135,7 +135,7 @@ func (p *DefaultProcessor) OnOrder(order *exchange.Order) {
 	}
 
 	// Update signal status
-	switch order.Status {
+	switch exchange.OrderStatus(order.Status) {
 	case exchange.OrderStatusFilled:
 		signal.Status = StatusExecuted
 	case exchange.OrderStatusCancelled:

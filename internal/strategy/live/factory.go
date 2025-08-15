@@ -38,8 +38,18 @@ func NewFactory(sandboxFactory *sandbox.Factory, market *market.Ingestor, order 
 
 // CreateRunner creates a new real-time strategy runner
 func (f *Factory) CreateRunner(strategy strategy.Strategy, config *strategy.Config) (*Runner, error) {
+	// Convert config to map[string]interface{}
+	configMap := make(map[string]interface{})
+	// TODO: 待确认 - 转换配置结构
+	if config != nil {
+		configMap["name"] = config.Name
+		configMap["symbol"] = config.Symbol
+		configMap["mode"] = config.Mode
+		configMap["params"] = config.Params
+	}
+
 	// Create sandbox
-	sandbox, err := f.sandboxFactory.CreateSandbox(strategy, config, nil)
+	sandbox, err := f.sandboxFactory.CreateSandbox(strategy, configMap, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sandbox: %w", err)
 	}
@@ -87,7 +97,7 @@ func (f *Factory) DeleteRunner(name string) error {
 	}
 
 	// Stop runner if running
-	if runner.GetState() == strategy.StateRunning {
+	if runner.GetState() == "running" {
 		if err := runner.Stop(context.Background()); err != nil {
 			return fmt.Errorf("failed to stop runner: %w", err)
 		}

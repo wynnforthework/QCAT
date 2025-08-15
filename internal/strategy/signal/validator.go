@@ -1,6 +1,7 @@
 package signal
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -70,7 +71,7 @@ func (v *DefaultValidator) Validate(signal *Signal) error {
 	}
 
 	// Validate symbol info
-	symbolInfo, err := v.exchange.GetSymbolInfo(nil, signal.Symbol)
+	symbolInfo, err := v.exchange.GetSymbolInfo(context.TODO(), signal.Symbol)
 	if err != nil {
 		return &ErrSignalValidation{Message: "failed to get symbol info", Err: err}
 	}
@@ -90,7 +91,7 @@ func (v *DefaultValidator) Validate(signal *Signal) error {
 	}
 
 	// Validate risk limits
-	riskLimits, err := v.exchange.GetRiskLimits(nil, signal.Symbol)
+	riskLimits, err := v.exchange.GetRiskLimits(context.TODO(), signal.Symbol)
 	if err != nil {
 		return &ErrSignalValidation{Message: "failed to get risk limits", Err: err}
 	}
@@ -100,7 +101,7 @@ func (v *DefaultValidator) Validate(signal *Signal) error {
 	}
 
 	// Validate position
-	position, err := v.exchange.GetPosition(nil, signal.Symbol)
+	position, err := v.exchange.GetPosition(context.TODO(), signal.Symbol)
 	if err != nil && err.Error() != "position not found" {
 		return &ErrSignalValidation{Message: "failed to get position", Err: err}
 	}
@@ -108,22 +109,22 @@ func (v *DefaultValidator) Validate(signal *Signal) error {
 	if position != nil {
 		// Validate reduce only
 		if signal.ReduceOnly {
-			if signal.Side == exchange.OrderSideBuy && position.Side != exchange.PositionSideShort {
+			if signal.Side == exchange.OrderSideBuy && position.Side != string(exchange.PositionSideShort) {
 				return &ErrInvalidSignal{Field: "side", Message: "reduce only buy order requires short position"}
 			}
-			if signal.Side == exchange.OrderSideSell && position.Side != exchange.PositionSideLong {
+			if signal.Side == exchange.OrderSideSell && position.Side != string(exchange.PositionSideLong) {
 				return &ErrInvalidSignal{Field: "side", Message: "reduce only sell order requires long position"}
 			}
 		}
 
 		// Validate exposure
 		exposure := position.Quantity * position.EntryPrice
-		if (signal.Side == exchange.OrderSideBuy && position.Side == exchange.PositionSideLong) ||
-			(signal.Side == exchange.OrderSideSell && position.Side == exchange.PositionSideShort) {
+		if (signal.Side == exchange.OrderSideBuy && position.Side == string(exchange.PositionSideLong)) ||
+			(signal.Side == exchange.OrderSideSell && position.Side == string(exchange.PositionSideShort)) {
 			exposure += signal.Quantity * signal.Price
 		}
-		if exposure > riskLimits.MaxExposure {
-			return &ErrInvalidSignal{Field: "quantity", Message: fmt.Sprintf("total exposure cannot exceed %f", riskLimits.MaxExposure)}
+		if exposure > riskLimits.MaxPositionValue {
+			return &ErrInvalidSignal{Field: "quantity", Message: fmt.Sprintf("total exposure cannot exceed %f", riskLimits.MaxPositionValue)}
 		}
 	}
 

@@ -37,6 +37,11 @@ type Kline struct {
 	Close     float64   `json:"close"`
 	Volume    float64   `json:"volume"`
 	Complete  bool      `json:"complete"`
+	
+	// Aliases for backward compatibility
+	ClosePrice float64 `json:"close_price"`
+	HighPrice  float64 `json:"high_price"`
+	LowPrice   float64 `json:"low_price"`
 }
 
 // NewKline creates a new kline
@@ -57,11 +62,14 @@ func (k *Kline) Update(price, volume float64, timestamp time.Time) {
 	}
 	if k.High == 0 || price > k.High {
 		k.High = price
+		k.HighPrice = price
 	}
 	if k.Low == 0 || price < k.Low {
 		k.Low = price
+		k.LowPrice = price
 	}
 	k.Close = price
+	k.ClosePrice = price
 	k.Volume += volume
 
 	if timestamp.After(k.CloseTime) {

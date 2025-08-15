@@ -9,27 +9,27 @@ import (
 	"time"
 
 	"qcat/internal/cache"
-	"qcat/internal/exchange"
+	exch "qcat/internal/exchange"
 )
 
 // Manager manages position information
 type Manager struct {
 	db          *sql.DB
 	cache       cache.Cacher
-	exchange    exchange.Exchange
-	positions   map[string]*exchange.Position
-	subscribers map[string][]chan *exchange.Position
+	exchange    exch.Exchange
+	positions   map[string]*exch.Position
+	subscribers map[string][]chan *exch.Position
 	mu          sync.RWMutex
 }
 
 // NewManager creates a new position manager
-func NewManager(db *sql.DB, cache cache.Cacher, exchange exchange.Exchange) *Manager {
+func NewManager(db *sql.DB, cache cache.Cacher, exchange exch.Exchange) *Manager {
 	m := &Manager{
 		db:          db,
 		cache:       cache,
 		exchange:    exchange,
-		positions:   make(map[string]*exchange.Position),
-		subscribers: make(map[string][]chan *exchange.Position),
+		positions:   make(map[string]*exch.Position),
+		subscribers: make(map[string][]chan *exch.Position),
 	}
 
 	// Start position monitor
@@ -39,17 +39,17 @@ func NewManager(db *sql.DB, cache cache.Cacher, exchange exchange.Exchange) *Man
 }
 
 // Subscribe subscribes to position updates for a symbol
-func (m *Manager) Subscribe(symbol string) chan *exchange.Position {
+func (m *Manager) Subscribe(symbol string) chan *exch.Position {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	ch := make(chan *exchange.Position, 100)
+	ch := make(chan *exch.Position, 100)
 	m.subscribers[symbol] = append(m.subscribers[symbol], ch)
 	return ch
 }
 
 // Unsubscribe removes a subscription
-func (m *Manager) Unsubscribe(symbol string, ch chan *exchange.Position) {
+func (m *Manager) Unsubscribe(symbol string, ch chan *exch.Position) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -64,33 +64,33 @@ func (m *Manager) Unsubscribe(symbol string, ch chan *exchange.Position) {
 }
 
 // GetPosition returns the current position for a symbol
-func (m *Manager) GetPosition(ctx context.Context, symbol string) (*exchange.Position, error) {
+func (m *Manager) GetPosition(ctx context.Context, symbol string) (*exch.Position, error) {
 	// Check cache first
-	var position exchange.Position
+	var position exch.Position
 	err := m.cache.Get(ctx, fmt.Sprintf("position:%s", symbol), &position)
 	if err == nil {
 		return &position, nil
 	}
 
 	// Get from exchange
-	position, err := m.exchange.GetPosition(ctx, symbol)
+	positionPtr, err := m.exchange.GetPosition(ctx, symbol)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get position: %w", err)
 	}
 
 	// Cache the position
-	if err := m.cache.Set(ctx, fmt.Sprintf("position:%s", symbol), position, time.Minute); err != nil {
+	if err := m.cache.Set(ctx, fmt.Sprintf("position:%s", symbol), positionPtr, time.Minute); err != nil {
 		log.Printf("Failed to cache position: %v", err)
 	}
 
 	// Update local cache and notify subscribers
-	m.updatePosition(&position)
+	m.updatePosition(positionPtr)
 
-	return &position, nil
+	return positionPtr, nil
 }
 
 // GetAllPositions returns all open positions
-func (m *Manager) GetAllPositions(ctx context.Context) ([]*exchange.Position, error) {
+func (m *Manager) GetAllPositions(ctx context.Context) ([]*exch.Position, error) {
 	// Get from exchange
 	positions, err := m.exchange.GetPositions(ctx)
 	if err != nil {
@@ -112,7 +112,7 @@ func (m *Manager) GetAllPositions(ctx context.Context) ([]*exchange.Position, er
 }
 
 // GetPositionHistory returns historical position data
-func (m *Manager) GetPositionHistory(ctx context.Context, symbol string, startTime, endTime time.Time) ([]*exchange.Position, error) {
+func (m *Manager) GetPositionHistory(ctx context.Context, symbol string, startTime, endTime time.Time) ([]*exch.Position, error) {
 	query := `
 		SELECT symbol, side, quantity, entry_price, mark_price,
 			   liq_price, leverage, margin_type, unrealized_pnl,
@@ -128,9 +128,9 @@ func (m *Manager) GetPositionHistory(ctx context.Context, symbol string, startTi
 	}
 	defer rows.Close()
 
-	var history []*exchange.Position
+	var history []*exch.Position
 	for rows.Next() {
-		var position exchange.Position
+		var position exch.Position
 		if err := rows.Scan(
 			&position.Symbol,
 			&position.Side,
@@ -178,7 +178,7 @@ func (m *Manager) SetLeverage(ctx context.Context, symbol string, leverage int) 
 }
 
 // SetMarginType sets the margin type for a symbol
-func (m *Manager) SetMarginType(ctx context.Context, symbol string, marginType exchange.MarginType) error {
+func (m *Manager) SetMarginType(ctx context.Context, symbol string, marginType exch.MarginType) error {
 	// Set margin type on exchange
 	if err := m.exchange.SetMarginType(ctx, symbol, marginType); err != nil {
 		return fmt.Errorf("failed to set margin type: %w", err)
@@ -199,7 +199,7 @@ func (m *Manager) SetMarginType(ctx context.Context, symbol string, marginType e
 }
 
 // storePosition stores a position in the database
-func (m *Manager) storePosition(position *exchange.Position) error {
+func (m *Manager) storePosition(position *exch.Position) error {
 	query := `
 		INSERT INTO positions (
 			symbol, side, quantity, entry_price, mark_price,
@@ -232,7 +232,7 @@ func (m *Manager) storePosition(position *exchange.Position) error {
 }
 
 // updatePosition updates the local position cache and notifies subscribers
-func (m *Manager) updatePosition(position *exchange.Position) {
+func (m *Manager) updatePosition(position *exch.Position) {
 	m.mu.Lock()
 	m.positions[position.Symbol] = position
 	m.mu.Unlock()
@@ -242,7 +242,7 @@ func (m *Manager) updatePosition(position *exchange.Position) {
 }
 
 // notifySubscribers notifies all subscribers of a position update
-func (m *Manager) notifySubscribers(position *exchange.Position) {
+func (m *Manager) notifySubscribers(position *exch.Position) {
 	m.mu.RLock()
 	subs := m.subscribers[position.Symbol]
 	m.mu.RUnlock()

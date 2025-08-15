@@ -50,7 +50,7 @@ func (c *Client) signRequest(method, endpoint string, params url.Values) (*http.
 	params.Set("timestamp", strconv.FormatInt(time.Now().UnixMilli(), 10))
 
 	// Create signature
-	mac := hmac.New(sha256.New, []byte(c.config.APISecret))
+	mac := hmac.New(sha256.New, []byte(c.Config().APISecret))
 	mac.Write([]byte(params.Encode()))
 	signature := hex.EncodeToString(mac.Sum(nil))
 	params.Set("signature", signature)
@@ -69,7 +69,7 @@ func (c *Client) signRequest(method, endpoint string, params url.Values) (*http.
 	}
 
 	// Set headers
-	req.Header.Set("X-MBX-APIKEY", c.config.APIKey)
+	req.Header.Set("X-MBX-APIKEY", c.Config().APIKey)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
@@ -132,16 +132,23 @@ func (c *Client) GetExchangeInfo(ctx context.Context) (*exchange.ExchangeInfo, e
 	result := &exchange.ExchangeInfo{
 		Name:       c.Name(),
 		ServerTime: time.Unix(0, info.ServerTime*int64(time.Millisecond)),
-		RateLimits: make([]int, len(info.RateLimits)),
+		RateLimits: make([]exchange.RateLimit, len(info.RateLimits)),
 	}
 
 	for i, limit := range info.RateLimits {
-		result.RateLimits[i] = limit.Limit
+		result.RateLimits[i] = exchange.RateLimit{
+			RateLimitType: limit.RateLimitType,
+			Interval:      limit.Interval,
+			IntervalNum:   limit.IntervalNum,
+			Limit:         limit.Limit,
+		}
 	}
 
-	result.Symbols = make([]string, len(info.Symbols))
+	result.Symbols = make([]exchange.SymbolInfo, len(info.Symbols))
 	for i, symbol := range info.Symbols {
-		result.Symbols[i] = symbol.Symbol
+		result.Symbols[i] = exchange.SymbolInfo{
+			Symbol: symbol.Symbol,
+		}
 	}
 
 	return result, nil
@@ -238,11 +245,11 @@ func (c *Client) GetPositions(ctx context.Context) ([]*exchange.Position, error)
 		position := &exchange.Position{
 			Symbol:     pos.Symbol,
 			UpdatedAt:  time.Unix(0, pos.UpdateTime*int64(time.Millisecond)),
-			MarginType: exchange.MarginTypeCross,
+			MarginType: "CROSSED",
 		}
 
 		if pos.Isolated {
-			position.MarginType = exchange.MarginTypeIsolated
+			position.MarginType = "ISOLATED"
 		}
 
 		position.Quantity, _ = strconv.ParseFloat(pos.PositionAmt, 64)
@@ -251,9 +258,9 @@ func (c *Client) GetPositions(ctx context.Context) ([]*exchange.Position, error)
 		position.Leverage, _ = strconv.Atoi(pos.Leverage)
 
 		if position.Quantity > 0 {
-			position.Side = exchange.PositionSideLong
+			position.Side = "LONG"
 		} else {
-			position.Side = exchange.PositionSideShort
+			position.Side = "SHORT"
 			position.Quantity = -position.Quantity
 		}
 
@@ -286,19 +293,19 @@ func (c *Client) GetPosition(ctx context.Context, symbol string) (*exchange.Posi
 	position := &exchange.Position{
 		Symbol:     pos.Symbol,
 		UpdatedAt:  time.Unix(0, pos.UpdateTime*int64(time.Millisecond)),
-		MarginType: exchange.MarginTypeCross,
+		MarginType: string(exchange.MarginTypeCross),
 	}
 
 	if pos.Isolated {
-		position.MarginType = exchange.MarginTypeIsolated
+		position.MarginType = string(exchange.MarginTypeIsolated)
 	}
 
 	position.Quantity = amount
 	if amount < 0 {
-		position.Side = exchange.PositionSideShort
+		position.Side = string(exchange.PositionSideShort)
 		position.Quantity = -amount
 	} else {
-		position.Side = exchange.PositionSideLong
+		position.Side = string(exchange.PositionSideLong)
 	}
 
 	position.EntryPrice, _ = strconv.ParseFloat(pos.EntryPrice, 64)
@@ -376,10 +383,7 @@ func (c *Client) PlaceOrder(ctx context.Context, req *exchange.OrderRequest) (*e
 	if err := c.doRequest(ctx, http.MethodPost, MethodOrder, params, &order); err != nil {
 		return &exchange.OrderResponse{
 			Success: false,
-			Error: &exchange.Error{
-				Code:    -1,
-				Message: err.Error(),
-			},
+			Error:   err.Error(),
 		}, nil
 	}
 
@@ -406,10 +410,7 @@ func (c *Client) CancelOrder(ctx context.Context, req *exchange.OrderCancelReque
 	if err := c.doRequest(ctx, http.MethodDelete, MethodCancelOrder, params, &order); err != nil {
 		return &exchange.OrderResponse{
 			Success: false,
-			Error: &exchange.Error{
-				Code:    -1,
-				Message: err.Error(),
-			},
+			Error:   err.Error(),
 		}, nil
 	}
 
@@ -495,9 +496,9 @@ func (c *Client) convertOrder(order *Order) *exchange.Order {
 		ExchangeID:    strconv.FormatInt(order.OrderID, 10),
 		ClientOrderID: order.ClientOrderID,
 		Symbol:        order.Symbol,
-		Side:          exchange.OrderSide(strings.ToLower(order.Side)),
-		Type:          exchange.OrderType(strings.ToLower(order.Type)),
-		Status:        exchange.OrderStatus(strings.ToLower(order.Status)),
+		Side:          string(exchange.OrderSide(strings.ToLower(order.Side))),
+		Type:          string(exchange.OrderType(strings.ToLower(order.Type))),
+		Status:        string(exchange.OrderStatus(strings.ToLower(order.Status))),
 		UpdatedAt:     time.Unix(0, order.UpdateTime*int64(time.Millisecond)),
 	}
 

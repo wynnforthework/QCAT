@@ -6,13 +6,13 @@ import (
 	"sync"
 	"time"
 
-	"qcat/internal/exchange"
+	exch "qcat/internal/exchange"
 	"qcat/internal/strategy/signal"
 )
 
 // Manager manages order flow
 type Manager struct {
-	exchange  exchange.Exchange
+	exchange  exch.Exchange
 	signals   *signal.DefaultProcessor
 	orders    map[string]*Order
 	callbacks map[string][]OrderCallback
@@ -21,7 +21,7 @@ type Manager struct {
 
 // Order represents an order with additional metadata
 type Order struct {
-	*exchange.Order
+	*exch.Order
 	Signal     *signal.Signal
 	Metadata   map[string]interface{}
 	UpdatedAt  time.Time
@@ -33,7 +33,7 @@ type Order struct {
 type OrderCallback func(*Order)
 
 // NewManager creates a new order manager
-func NewManager(exchange exchange.Exchange, signals *signal.DefaultProcessor) *Manager {
+func NewManager(exchange exch.Exchange, signals *signal.DefaultProcessor) *Manager {
 	return &Manager{
 		exchange:  exchange,
 		signals:   signals,
@@ -85,8 +85,8 @@ func (m *Manager) CancelOrder(ctx context.Context, orderID string) error {
 	}
 
 	// Create cancel request
-	req := &exchange.OrderCancelRequest{
-		Symbol:  order.Symbol,
+	req := &exch.OrderCancelRequest{
+		Symbol:  order.Order.Symbol, // 通过 Order 字段访问
 		OrderID: orderID,
 	}
 
@@ -148,7 +148,7 @@ func (m *Manager) RemoveCallback(orderID string) {
 }
 
 // OnOrder handles order updates
-func (m *Manager) OnOrder(order *exchange.Order) {
+func (m *Manager) OnOrder(order *exch.Order) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -189,7 +189,7 @@ func (m *Manager) RetryOrder(ctx context.Context, orderID string, maxRetries int
 		return fmt.Errorf("order not found: %s", orderID)
 	}
 
-	if order.Status != exchange.OrderStatusRejected {
+	if string(order.Order.Status) != string(exch.OrderStatusRejected) { // 显式转换为 string 进行比较
 		return fmt.Errorf("order is not in rejected state: %s", orderID)
 	}
 
@@ -230,9 +230,9 @@ func (m *Manager) CleanupOrders(age time.Duration) {
 	cutoff := time.Now().Add(-age)
 	for id, order := range m.orders {
 		if order.UpdatedAt.Before(cutoff) &&
-			(order.Status == exchange.OrderStatusFilled ||
-				order.Status == exchange.OrderStatusCancelled ||
-				order.Status == exchange.OrderStatusRejected) {
+			(string(order.Order.Status) == string(exch.OrderStatusFilled) ||
+				string(order.Order.Status) == string(exch.OrderStatusCancelled) ||
+				string(order.Order.Status) == string(exch.OrderStatusRejected)) { // 显式转换为 string 进行比较
 			delete(m.orders, id)
 			delete(m.callbacks, id)
 		}

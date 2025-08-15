@@ -33,6 +33,9 @@ type Strategy interface {
 	// OnTimer handles timer events
 	OnTimer(ctx context.Context, t time.Time) error
 
+	// OnTick handles tick data (for backtesting)
+	OnTick(ctx context.Context, tick interface{}) error
+
 	// GetState returns current strategy state
 	GetState() *StrategyState
 
@@ -78,6 +81,24 @@ type StrategyState struct {
 	CurrentDrawdown float64              // 当前回撤
 	Positions       []*exchange.Position // 当前持仓
 	Orders          []*exchange.Order    // 活动订单
+}
+
+// StrategyMetrics represents strategy performance metrics
+type StrategyMetrics struct {
+	StrategyID    string    // 策略ID
+	TotalReturn   float64   // 总收益率
+	AnnualReturn  float64   // 年化收益率
+	SharpeRatio   float64   // 夏普比率
+	MaxDrawdown   float64   // 最大回撤
+	Volatility    float64   // 波动率
+	WinRate       float64   // 胜率
+	ProfitFactor  float64   // 盈亏比
+	TotalTrades   int       // 总交易次数
+	WinningTrades int       // 盈利交易次数
+	LosingTrades  int       // 亏损交易次数
+	AverageWin    float64   // 平均盈利
+	AverageLoss   float64   // 平均亏损
+	LastUpdated   time.Time // 最后更新时间
 }
 
 // BaseStrategy provides common functionality for strategies
