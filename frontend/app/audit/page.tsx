@@ -8,11 +8,10 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar, Clock, Search, Download, Play, Pause, Eye, FileText, AlertTriangle, CheckCircle, XCircle } from "lucide-react"
+import { Clock, Download, Eye, FileText, AlertTriangle, CheckCircle, XCircle } from "lucide-react"
 
 interface DecisionChain {
   id: string
@@ -22,7 +21,7 @@ interface DecisionChain {
   timestamp: string
   decisions: Decision[]
   finalAction: string
-  context: Record<string, any>
+  context: Record<string, unknown> // 修复: 使用 unknown 替代 any
   status: "completed" | "failed" | "pending"
 }
 
@@ -30,8 +29,8 @@ interface Decision {
   id: string
   step: string
   description: string
-  input: Record<string, any>
-  output: Record<string, any>
+  input: Record<string, unknown> // 修复: 使用 unknown 替代 any
+  output: Record<string, unknown> // 修复: 使用 unknown 替代 any
   timestamp: string
   duration: number
   status: "success" | "error" | "warning"
@@ -44,7 +43,7 @@ interface AuditLog {
   action: string
   resource: string
   resourceId: string
-  details: Record<string, any>
+  details: Record<string, unknown> // 修复: 使用 unknown 替代 any
   result: "success" | "failure"
   ipAddress: string
   userAgent: string
@@ -64,7 +63,7 @@ export default function AuditPage() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetric[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedChain, setSelectedChain] = useState<DecisionChain | null>(null)
+  // const [selectedChain, setSelectedChain] = useState<DecisionChain | null>(null) // 暂时注释掉未使用的状态
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState("all")
 
@@ -365,11 +364,11 @@ export default function AuditPage() {
                               <div>
                                 <h4 className="font-semibold mb-2">决策步骤</h4>
                                 <div className="space-y-3">
-                                  {chain.decisions.map((decision, index) => (
+                                  {chain.decisions.map((decision) => (
                                     <div key={decision.id} className="border-l-4 border-blue-500 pl-4">
                                       <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center space-x-2">
-                                          <span className="font-medium">步骤 {index + 1}: {decision.step}</span>
+                                          <span className="font-medium">步骤: {decision.step}</span>
                                           {getDecisionStatusIcon(decision.status)}
                                         </div>
                                         <span className="text-sm text-muted-foreground">
@@ -404,7 +403,7 @@ export default function AuditPage() {
                     </div>
                     
                     <div className="space-y-2">
-                      {chain.decisions.map((decision, index) => (
+                      {chain.decisions.map((decision) => (
                         <div key={decision.id} className="flex items-center space-x-2">
                           <div className="flex items-center space-x-2">
                             {getDecisionStatusIcon(decision.status)}

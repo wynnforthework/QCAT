@@ -4,4 +4,4 @@ staticcheck ./... || true
 
 echo ""
 echo "=== 检查 React 代码未定义变量/API ==="
-npx eslint frontend --ext .js,.jsx,.ts,.tsx || true
+cd frontend && npx eslint . --ext .js,.jsx,.ts,.tsx || true

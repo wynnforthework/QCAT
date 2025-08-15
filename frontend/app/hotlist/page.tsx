@@ -13,7 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Switch } from "@/components/ui/switch"
-import { TrendingUp, Star, Filter, Settings, Eye, EyeOff, AlertTriangle, CheckCircle } from "lucide-react"
+import { TrendingUp, Star, Settings, Eye, EyeOff, AlertTriangle } from "lucide-react"
 
 interface HotSymbol {
   symbol: string
@@ -54,7 +54,7 @@ export default function HotlistPage() {
   const [whitelist, setWhitelist] = useState<WhitelistItem[]>([])
   const [loading, setLoading] = useState(true)
   const [autoEnable, setAutoEnable] = useState(false)
-  const [showWhitelistDialog, setShowWhitelistDialog] = useState(false)
+  // const [showWhitelistDialog, setShowWhitelistDialog] = useState(false) // 暂时注释掉未使用的状态
   const [filterRank, setFilterRank] = useState<number>(10)
 
   useEffect(() => {

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Play, Pause, Settings, BarChart3, History, Download, Upload } from "lucide-react"
+import { Play, Pause, Settings, BarChart3, Download, Upload } from "lucide-react" // 修复: 移除未使用的 History
 
 interface Strategy {
   id: string
@@ -35,7 +35,7 @@ interface Strategy {
 export default function StrategiesPage() {
   const [strategies, setStrategies] = useState<Strategy[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null)
+  // const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null) // 暂时注释掉未使用的状态
 
   useEffect(() => {
     const fetchStrategies = async () => {

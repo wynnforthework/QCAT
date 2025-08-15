@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState } from "react" // 修复: 移除未使用的 useEffect
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card" // 修复: 移除未使用的 CardDescription
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -155,7 +155,7 @@ export default function OptimizerPage() {
 
               <div>
                 <Label>优化方法</Label>
-                <Select value={config.method} onValueChange={(value: any) => setConfig({...config, method: value})}>
+                <Select value={config.method} onValueChange={(value: string) => setConfig({...config, method: value as "wfo" | "grid" | "bayesian" | "genetic" | "cmaes"})}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -171,7 +171,7 @@ export default function OptimizerPage() {
 
               <div>
                 <Label>目标函数</Label>
-                <Select value={config.objective} onValueChange={(value: any) => setConfig({...config, objective: value})}>
+                <Select value={config.objective} onValueChange={(value: string) => setConfig({...config, objective: value as "sharpe" | "sortino" | "calmar" | "pnl" | "custom"})}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -323,7 +323,7 @@ export default function OptimizerPage() {
                     </div>
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
-                      点击"开始优化"按钮开始参数优化
+                      点击&quot;开始优化&quot;按钮开始参数优化
                     </div>
                   )}
                 </TabsContent>
