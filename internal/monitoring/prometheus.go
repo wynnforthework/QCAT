@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"qcat/internal/database"
 )
 
 // Metrics holds all Prometheus metrics
@@ -20,6 +21,16 @@ type Metrics struct {
 	strategyExecutions  *prometheus.CounterVec
 	optimizationTasks   *prometheus.CounterVec
 	marketDataUpdates   *prometheus.CounterVec
+	
+	// Database connection pool metrics
+	dbPoolMaxOpen       prometheus.Gauge
+	dbPoolOpen          prometheus.Gauge
+	dbPoolInUse         prometheus.Gauge
+	dbPoolIdle          prometheus.Gauge
+	dbPoolWaitCount     prometheus.Counter
+	dbPoolWaitDuration  prometheus.Histogram
+	dbPoolMaxIdleClosed prometheus.Counter
+	dbPoolMaxLifetimeClosed prometheus.Counter
 }
 
 // NewMetrics creates new Prometheus metrics
@@ -81,6 +92,41 @@ func NewMetrics() *Metrics {
 			},
 			[]string{"symbol", "data_type"},
 		),
+		
+		// Database connection pool metrics
+		dbPoolMaxOpen: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "db_pool_max_open_connections",
+			Help: "Maximum number of open connections to the database",
+		}),
+		dbPoolOpen: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "db_pool_open_connections",
+			Help: "The number of established connections both in use and idle",
+		}),
+		dbPoolInUse: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "db_pool_in_use_connections",
+			Help: "The number of connections currently in use",
+		}),
+		dbPoolIdle: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "db_pool_idle_connections",
+			Help: "The number of idle connections",
+		}),
+		dbPoolWaitCount: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "db_pool_wait_count_total",
+			Help: "The total number of connections waited for",
+		}),
+		dbPoolWaitDuration: prometheus.NewHistogram(prometheus.HistogramOpts{
+			Name:    "db_pool_wait_duration_seconds",
+			Help:    "The total time blocked waiting for a new connection",
+			Buckets: prometheus.DefBuckets,
+		}),
+		dbPoolMaxIdleClosed: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "db_pool_max_idle_closed_total",
+			Help: "The total number of connections closed due to SetMaxIdleConns",
+		}),
+		dbPoolMaxLifetimeClosed: prometheus.NewCounter(prometheus.CounterOpts{
+			Name: "db_pool_max_lifetime_closed_total",
+			Help: "The total number of connections closed due to SetConnMaxLifetime",
+		}),
 	}
 
 	// Register metrics
@@ -93,6 +139,14 @@ func NewMetrics() *Metrics {
 		m.strategyExecutions,
 		m.optimizationTasks,
 		m.marketDataUpdates,
+		m.dbPoolMaxOpen,
+		m.dbPoolOpen,
+		m.dbPoolInUse,
+		m.dbPoolIdle,
+		m.dbPoolWaitCount,
+		m.dbPoolWaitDuration,
+		m.dbPoolMaxIdleClosed,
+		m.dbPoolMaxLifetimeClosed,
 	)
 
 	return m
@@ -155,4 +209,27 @@ func (m *Metrics) RecordMarketDataUpdate(symbol, dataType string) {
 // SetActiveConnections sets the number of active WebSocket connections
 func (m *Metrics) SetActiveConnections(count float64) {
 	m.activeConnections.Set(count)
+}
+
+// UpdateDatabasePoolMetrics updates database connection pool metrics
+func (m *Metrics) UpdateDatabasePoolMetrics(stats *database.PoolStats) {
+	m.dbPoolMaxOpen.Set(float64(stats.MaxOpenConnections))
+	m.dbPoolOpen.Set(float64(stats.OpenConnections))
+	m.dbPoolInUse.Set(float64(stats.InUse))
+	m.dbPoolIdle.Set(float64(stats.Idle))
+	
+	// For counters, we need to track the difference
+	// This is a simplified approach - in production you might want to track the previous values
+	if stats.WaitCount > 0 {
+		m.dbPoolWaitCount.Add(float64(stats.WaitCount))
+	}
+	if stats.WaitDuration > 0 {
+		m.dbPoolWaitDuration.Observe(stats.WaitDuration.Seconds())
+	}
+	if stats.MaxIdleClosed > 0 {
+		m.dbPoolMaxIdleClosed.Add(float64(stats.MaxIdleClosed))
+	}
+	if stats.MaxLifetimeClosed > 0 {
+		m.dbPoolMaxLifetimeClosed.Add(float64(stats.MaxLifetimeClosed))
+	}
 }

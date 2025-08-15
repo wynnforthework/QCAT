@@ -27,6 +27,58 @@ func main() {
 		log.Fatalf("Failed to create server: %v", err)
 	}
 
+	// Start graceful shutdown manager
+	shutdownManager := server.GetShutdownManager()
+	if shutdownManager != nil {
+		shutdownManager.Start()
+	}
+
+	// Register shutdown components
+	if shutdownManager != nil {
+		// Register HTTP server
+		shutdownManager.RegisterComponent("http_server", "HTTP API Server", 1, func(ctx context.Context) error {
+			return server.Stop(ctx)
+		}, 10*time.Second)
+
+		// Register database
+		if server.GetDB() != nil {
+			shutdownManager.RegisterComponent("database", "Database Connection", 2, func(ctx context.Context) error {
+				return server.GetDB().Close()
+			}, 5*time.Second)
+		}
+
+		// Register Redis
+		if server.GetRedis() != nil {
+			shutdownManager.RegisterComponent("redis_cache", "Redis Cache", 3, func(ctx context.Context) error {
+				return server.GetRedis().Close()
+			}, 5*time.Second)
+		}
+
+		// Register memory manager
+		if server.GetMemoryManager() != nil {
+			shutdownManager.RegisterComponent("memory_manager", "Memory Manager", 4, func(ctx context.Context) error {
+				server.GetMemoryManager().Stop()
+				return nil
+			}, 5*time.Second)
+		}
+
+		// Register network manager
+		if server.GetNetworkManager() != nil {
+			shutdownManager.RegisterComponent("network_manager", "Network Reconnect Manager", 5, func(ctx context.Context) error {
+				server.GetNetworkManager().Stop()
+				return nil
+			}, 5*time.Second)
+		}
+
+		// Register health checker
+		if server.GetHealthChecker() != nil {
+			shutdownManager.RegisterComponent("health_checker", "Health Checker", 6, func(ctx context.Context) error {
+				server.GetHealthChecker().Stop()
+				return nil
+			}, 5*time.Second)
+		}
+	}
+
 	// Start API server in a goroutine
 	go func() {
 		if err := server.Start(); err != nil {
@@ -42,12 +94,18 @@ func main() {
 	sig := <-sigChan
 	log.Printf("Received signal %v, shutting down...\n", sig)
 
-	// Graceful shutdown
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	// Use graceful shutdown manager if available
+	if shutdownManager != nil {
+		log.Println("Using graceful shutdown manager...")
+		shutdownManager.WaitForShutdown()
+	} else {
+		// Fallback to manual shutdown
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
 
-	if err := server.Stop(ctx); err != nil {
-		log.Printf("Error during server shutdown: %v", err)
+		if err := server.Stop(ctx); err != nil {
+			log.Printf("Error during server shutdown: %v", err)
+		}
 	}
 
 	log.Println("Server stopped gracefully")
