@@ -1,0 +1,130 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "QCAT系统概览",
+    "tags": ["qcat", "overview"],
+    "style": "dark",
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "系统健康状态",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"qcat\"}",
+            "legendFormat": "QCAT应用"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "HTTP请求率",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "响应时间",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "95th percentile"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "活跃策略数量",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "qcat_active_strategies",
+            "legendFormat": "活跃策略"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "总PnL",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "qcat_total_pnl",
+            "legendFormat": "总盈亏"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": -Infinity},
+                {"color": "green", "value": 0}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "数据库连接数",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "pg_stat_database_numbackends",
+            "legendFormat": "{{datname}}"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Redis内存使用",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "redis_memory_used_bytes",
+            "legendFormat": "内存使用"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "错误率",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
+            "legendFormat": "5xx错误"
+          }
+        ]
+      }
+    ],
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "refresh": "30s"
+  }
+}
