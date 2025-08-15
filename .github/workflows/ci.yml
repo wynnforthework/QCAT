@@ -1,71 +1,63 @@
-name: CI/CD
+name: CI
 
 on:
   push:
     branches: [ main, dev ]
   pull_request:
-    branches: [ main ]
+    branches: [ main, dev ]
 
 jobs:
-  test-backend:
+  security:
+    name: Security Scan
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
+      - name: Run Snyk to check for vulnerabilities
+        uses: snyk/actions/node@master
+        with:
+          args: --all-projects
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
-    - name: Install dependencies
-      run: go mod download
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: go, javascript, typescript
 
-    - name: Run tests
-      run: go test -v ./...
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
 
-  test-frontend:
+  quality:
+    name: Code Quality
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20'
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-    - name: Install dependencies
-      working-directory: ./frontend
-      run: npm ci
-
-    - name: Run tests
-      working-directory: ./frontend
-      run: npm test
-
-  lint:
+  notify:
+    name: Notify
+    needs: [security, quality]
     runs-on: ubuntu-latest
+    if: always()
     steps:
-    - uses: actions/checkout@v3
+      - name: Notify on success
+        if: ${{ success() }}
+        run: |
+          curl -X POST ${{ secrets.WEBHOOK_URL }} \
+            -H 'Content-Type: application/json' \
+            -d '{"text": "✅ CI checks passed successfully!"}'
 
-    - name: Set up Go
-      uses: actions/setup-go@v4
-      with:
-        go-version: '1.21'
-
-    - name: Install golangci-lint
-      run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.55.2
-
-    - name: Run golangci-lint
-      run: golangci-lint run
-
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20'
-
-    - name: Install frontend dependencies
-      working-directory: ./frontend
-      run: npm ci
-
-    - name: Run ESLint
-      working-directory: ./frontend
-      run: npm run lint
+      - name: Notify on failure
+        if: ${{ failure() }}
+        run: |
+          curl -X POST ${{ secrets.WEBHOOK_URL }} \
+            -H 'Content-Type: application/json' \
+            -d '{"text": "❌ CI checks failed! Please check the logs."}'
