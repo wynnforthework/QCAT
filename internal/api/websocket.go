@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"qcat/internal/monitoring"
 )
 
 // WebSocketHandler handles WebSocket connections
@@ -16,6 +18,7 @@ type WebSocketHandler struct {
 	upgrader websocket.Upgrader
 	clients  map[string]*Client
 	mu       sync.RWMutex
+	metrics  *monitoring.Metrics
 }
 
 // Client represents a WebSocket client
@@ -35,10 +38,11 @@ type Message struct {
 }
 
 // NewWebSocketHandler creates a new WebSocket handler
-func NewWebSocketHandler(upgrader websocket.Upgrader) *WebSocketHandler {
+func NewWebSocketHandler(upgrader websocket.Upgrader, metrics *monitoring.Metrics) *WebSocketHandler {
 	handler := &WebSocketHandler{
 		upgrader: upgrader,
 		clients:  make(map[string]*Client),
+		metrics:  metrics,
 	}
 
 	// Start broadcast goroutines
@@ -185,19 +189,20 @@ func (h *WebSocketHandler) registerClient(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.clients[client.ID] = client
-	log.Printf("Client %s connected (%s)", client.ID, client.Type)
+	
+	// Update metrics
+	h.metrics.SetActiveConnections(float64(len(h.clients)))
 }
 
 // unregisterClient unregisters a client
 func (h *WebSocketHandler) unregisterClient(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	delete(h.clients, client.ID)
+	close(client.Send)
 	
-	if _, ok := h.clients[client.ID]; ok {
-		delete(h.clients, client.ID)
-		close(client.Send)
-		log.Printf("Client %s disconnected", client.ID)
-	}
+	// Update metrics
+	h.metrics.SetActiveConnections(float64(len(h.clients)))
 }
 
 // broadcastMarketData broadcasts market data to all market clients
@@ -206,17 +211,28 @@ func (h *WebSocketHandler) broadcastMarketData() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		// TODO: Get real market data from market ingestor
-		marketData := map[string]interface{}{
-			"symbol": "BTCUSDT",
-			"price":  50000.0 + (time.Now().Unix() % 1000),
-			"volume": 1000.0,
-			"change": 0.02,
+		h.mu.RLock()
+		clients := make([]*Client, 0, len(h.clients))
+		for _, client := range h.clients {
+			if client.Type == "market" {
+				clients = append(clients, client)
+			}
+		}
+		h.mu.RUnlock()
+
+		if len(clients) == 0 {
+			continue
 		}
 
+		// Mock market data
 		msg := Message{
 			Type: "market_data",
-			Data: marketData,
+			Data: map[string]interface{}{
+				"symbol":    "BTCUSDT",
+				"price":     45000.0 + (time.Now().Unix() % 1000),
+				"volume":    1000.0,
+				"timestamp": time.Now().Unix(),
+			},
 			Time: time.Now(),
 		}
 
@@ -226,7 +242,14 @@ func (h *WebSocketHandler) broadcastMarketData() {
 			continue
 		}
 
-		h.broadcastToType("market", data)
+		for _, client := range clients {
+			select {
+			case client.Send <- data:
+			default:
+				log.Printf("Client %s send buffer full, closing connection", client.ID)
+				client.Conn.Close()
+			}
+		}
 	}
 }
 
@@ -236,17 +259,29 @@ func (h *WebSocketHandler) broadcastStrategyStatus() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		// TODO: Get real strategy status from strategy runner
-		strategyStatus := map[string]interface{}{
-			"strategy_id": "strategy_1",
-			"status":      "running",
-			"pnl":         1000.0,
-			"positions":   []map[string]interface{}{},
+		h.mu.RLock()
+		clients := make([]*Client, 0, len(h.clients))
+		for _, client := range h.clients {
+			if client.Type == "strategy" {
+				clients = append(clients, client)
+			}
+		}
+		h.mu.RUnlock()
+
+		if len(clients) == 0 {
+			continue
 		}
 
+		// Mock strategy status
 		msg := Message{
 			Type: "strategy_status",
-			Data: strategyStatus,
+			Data: map[string]interface{}{
+				"strategy_id": "strategy_001",
+				"status":      "running",
+				"pnl":         1250.50,
+				"positions":   []string{"BTCUSDT", "ETHUSDT"},
+				"timestamp":   time.Now().Unix(),
+			},
 			Time: time.Now(),
 		}
 
@@ -256,7 +291,14 @@ func (h *WebSocketHandler) broadcastStrategyStatus() {
 			continue
 		}
 
-		h.broadcastToType("strategy", data)
+		for _, client := range clients {
+			select {
+			case client.Send <- data:
+			default:
+				log.Printf("Client %s send buffer full, closing connection", client.ID)
+				client.Conn.Close()
+			}
+		}
 	}
 }
 
@@ -266,17 +308,27 @@ func (h *WebSocketHandler) broadcastAlerts() {
 	defer ticker.Stop()
 
 	for range ticker.C {
-		// TODO: Get real alerts from alert manager
-		alert := map[string]interface{}{
-			"id":       "alert_1",
-			"severity": "warning",
-			"message":  "Strategy performance below threshold",
-			"time":     time.Now(),
+		h.mu.RLock()
+		clients := make([]*Client, 0, len(h.clients))
+		for _, client := range h.clients {
+			if client.Type == "alerts" {
+				clients = append(clients, client)
+			}
+		}
+		h.mu.RUnlock()
+
+		if len(clients) == 0 {
+			continue
 		}
 
+		// Mock alerts
 		msg := Message{
 			Type: "alert",
-			Data: alert,
+			Data: map[string]interface{}{
+				"level":     "info",
+				"message":   "System running normally",
+				"timestamp": time.Now().Unix(),
+			},
 			Time: time.Now(),
 		}
 
@@ -286,21 +338,11 @@ func (h *WebSocketHandler) broadcastAlerts() {
 			continue
 		}
 
-		h.broadcastToType("alerts", data)
-	}
-}
-
-// broadcastToType broadcasts message to clients of specific type
-func (h *WebSocketHandler) broadcastToType(clientType string, data []byte) {
-	h.mu.RLock()
-	defer h.mu.RUnlock()
-
-	for _, client := range h.clients {
-		if client.Type == clientType {
+		for _, client := range clients {
 			select {
 			case client.Send <- data:
 			default:
-				// Channel is full, close connection
+				log.Printf("Client %s send buffer full, closing connection", client.ID)
 				client.Conn.Close()
 			}
 		}
@@ -318,19 +360,13 @@ func (c *Client) writePump() {
 	for {
 		select {
 		case message, ok := <-c.Send:
-			c.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 			if !ok {
 				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
-			w, err := c.Conn.NextWriter(websocket.TextMessage)
-			if err != nil {
-				return
-			}
-			w.Write(message)
-
-			if err := w.Close(); err != nil {
+			c.Conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+			if err := c.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
 				return
 			}
 		case <-ticker.C:
@@ -365,36 +401,12 @@ func (c *Client) readPump() {
 			break
 		}
 
-		// Handle incoming message
-		var msg Message
-		if err := json.Unmarshal(message, &msg); err != nil {
-			log.Printf("Failed to unmarshal message: %v", err)
-			continue
-		}
-
-		// Echo back for now
-		response := Message{
-			Type: "echo",
-			Data: msg.Data,
-			Time: time.Now(),
-		}
-
-		responseData, err := json.Marshal(response)
-		if err != nil {
-			log.Printf("Failed to marshal response: %v", err)
-			continue
-		}
-
-		select {
-		case c.Send <- responseData:
-		default:
-			// Channel is full, close connection
-			return
-		}
+		// Handle incoming messages if needed
+		log.Printf("Received message from client %s: %s", c.ID, string(message))
 	}
 }
 
 // generateClientID generates a unique client ID
 func generateClientID() string {
-	return "client_" + time.Now().Format("20060102150405") + "_" + time.Now().Format("000000000")
+	return fmt.Sprintf("client_%d", time.Now().UnixNano())
 }

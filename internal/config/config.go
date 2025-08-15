@@ -3,78 +3,106 @@ package config
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
 
+// Config represents the application configuration
 type Config struct {
-	App struct {
-		Name    string `yaml:"name"`
-		Version string `yaml:"version"`
-		Env     string `yaml:"env"`
-	} `yaml:"app"`
-
-	Server struct {
-		Host string `yaml:"host"`
-		Port int    `yaml:"port"`
-	} `yaml:"server"`
-
-	Database struct {
-		Driver          string `yaml:"driver"`
-		Host            string `yaml:"host"`
-		Port            int    `yaml:"port"`
-		Name            string `yaml:"name"`
-		User            string `yaml:"user"`
-		Password        string `yaml:"password"`
-		SSLMode         string `yaml:"sslmode"`
-		MaxOpenConns    int    `yaml:"max_open_conns"`
-		MaxIdleConns    int    `yaml:"max_idle_conns"`
-		ConnMaxLifetime string `yaml:"conn_max_lifetime"`
-	} `yaml:"database"`
-
-	Redis struct {
-		Enabled  bool   `yaml:"enabled"`
-		Host     string `yaml:"host"`
-		Port     int    `yaml:"port"`
-		Password string `yaml:"password"`
-		DB       int    `yaml:"db"`
-		PoolSize int    `yaml:"pool_size"`
-	} `yaml:"redis"`
-
-	Exchange struct {
-		Binance struct {
-			APIKey    string `yaml:"api_key"`
-			APISecret string `yaml:"api_secret"`
-			TestNet   bool   `yaml:"testnet"`
-			RateLimit int    `yaml:"rate_limit"`
-		} `yaml:"binance"`
-	} `yaml:"exchange"`
-
-	Risk struct {
-		MaxLeverage             float64 `yaml:"max_leverage"`
-		MaxPositionSize         float64 `yaml:"max_position_size"`
-		MaxDrawdown             float64 `yaml:"max_drawdown"`
-		CircuitBreakerThreshold float64 `yaml:"circuit_breaker_threshold"`
-	} `yaml:"risk"`
-
-	Logging struct {
-		Level  string `yaml:"level"`
-		Format string `yaml:"format"`
-		Output string `yaml:"output"`
-	} `yaml:"logging"`
+	App        AppConfig        `yaml:"app"`
+	Server     ServerConfig     `yaml:"server"`
+	Database   DatabaseConfig   `yaml:"database"`
+	Redis      RedisConfig      `yaml:"redis"`
+	JWT        JWTConfig        `yaml:"jwt"`
+	Monitoring MonitoringConfig `yaml:"monitoring"`
+	CORS       CORSConfig       `yaml:"cors"`
+	RateLimit  RateLimitConfig  `yaml:"rate_limit"`
+	Logging    LoggingConfig    `yaml:"logging"`
 }
 
-// Load reads the config file and returns a Config struct
-func Load(path string) (*Config, error) {
-	data, err := os.ReadFile(path)
+// AppConfig represents application configuration
+type AppConfig struct {
+	Name    string `yaml:"name"`
+	Version string `yaml:"version"`
+	Env     string `yaml:"env"`
+}
+
+// ServerConfig represents server configuration
+type ServerConfig struct {
+	Port           int           `yaml:"port"`
+	Host           string        `yaml:"host"`
+	ReadTimeout    time.Duration `yaml:"read_timeout"`
+	WriteTimeout   time.Duration `yaml:"write_timeout"`
+	MaxHeaderBytes int           `yaml:"max_header_bytes"`
+}
+
+// DatabaseConfig represents database configuration
+type DatabaseConfig struct {
+	Host     string        `yaml:"host"`
+	Port     int           `yaml:"port"`
+	User     string        `yaml:"user"`
+	Password string        `yaml:"password"`
+	DBName   string        `yaml:"dbname"`
+	SSLMode  string        `yaml:"sslmode"`
+	MaxOpen  int           `yaml:"max_open"`
+	MaxIdle  int           `yaml:"max_idle"`
+	Timeout  time.Duration `yaml:"timeout"`
+}
+
+// RedisConfig represents Redis configuration
+type RedisConfig struct {
+	Addr     string `yaml:"addr"`
+	Password string `yaml:"password"`
+	DB       int    `yaml:"db"`
+	PoolSize int    `yaml:"pool_size"`
+}
+
+// JWTConfig represents JWT configuration
+type JWTConfig struct {
+	SecretKey string        `yaml:"secret_key"`
+	Duration  time.Duration `yaml:"duration"`
+}
+
+// MonitoringConfig represents monitoring configuration
+type MonitoringConfig struct {
+	PrometheusEnabled bool   `yaml:"prometheus_enabled"`
+	PrometheusPath    string `yaml:"prometheus_path"`
+}
+
+// CORSConfig represents CORS configuration
+type CORSConfig struct {
+	AllowedOrigins   []string `yaml:"allowed_origins"`
+	AllowedMethods   []string `yaml:"allowed_methods"`
+	AllowedHeaders   []string `yaml:"allowed_headers"`
+	AllowCredentials bool     `yaml:"allow_credentials"`
+}
+
+// RateLimitConfig represents rate limiting configuration
+type RateLimitConfig struct {
+	Enabled           bool `yaml:"enabled"`
+	RequestsPerMinute int  `yaml:"requests_per_minute"`
+	Burst             int  `yaml:"burst"`
+}
+
+// LoggingConfig represents logging configuration
+type LoggingConfig struct {
+	Level  string `yaml:"level"`
+	Format string `yaml:"format"`
+	Output string `yaml:"output"`
+}
+
+// Load loads configuration from a YAML file
+func Load(filename string) (*Config, error) {
+	data, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("error reading config file: %w", err)
+		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("error parsing config file: %w", err)
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	return &cfg, nil
+	return &config, nil
 }

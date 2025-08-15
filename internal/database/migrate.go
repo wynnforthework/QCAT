@@ -1,33 +1,71 @@
 package database
 
 import (
-	"database/sql"
 	"fmt"
+	"log"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
-// MigrateDatabase runs database migrations
-func MigrateDatabase(db *sql.DB, migrationsPath string) error {
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
+// Migrator handles database migrations
+type Migrator struct {
+	migrate *migrate.Migrate
+}
+
+// NewMigrator creates a new migrator instance
+func NewMigrator(db *DB, migrationsPath string) (*Migrator, error) {
+	driver, err := postgres.WithInstance(db.DB, &postgres.Config{})
 	if err != nil {
-		return fmt.Errorf("could not create database driver: %w", err)
+		return nil, fmt.Errorf("failed to create postgres driver: %w", err)
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
 		fmt.Sprintf("file://%s", migrationsPath),
-		"postgres",
-		driver,
-	)
+		"postgres", driver)
 	if err != nil {
-		return fmt.Errorf("could not create migrate instance: %w", err)
+		return nil, fmt.Errorf("failed to create migrator: %w", err)
 	}
 
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
-		return fmt.Errorf("could not run migrations: %w", err)
-	}
+	return &Migrator{migrate: m}, nil
+}
 
+// Up runs all pending migrations
+func (m *Migrator) Up() error {
+	if err := m.migrate.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
+	log.Println("Database migrations completed successfully")
+	return nil
+}
+
+// Down rolls back all migrations
+func (m *Migrator) Down() error {
+	if err := m.migrate.Down(); err != nil {
+		return fmt.Errorf("failed to rollback migrations: %w", err)
+	}
+	log.Println("Database migrations rolled back successfully")
+	return nil
+}
+
+// Version returns the current migration version
+func (m *Migrator) Version() (uint, error) {
+	version, dirty, err := m.migrate.Version()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get migration version: %w", err)
+	}
+	if dirty {
+		return version, fmt.Errorf("database is in dirty state at version %d", version)
+	}
+	return version, nil
+}
+
+// Close closes the migrator
+func (m *Migrator) Close() error {
+	_, err := m.migrate.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close migrator: %w", err)
+	}
 	return nil
 }

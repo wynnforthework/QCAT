@@ -1,48 +1,66 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
+	"log"
 	"time"
 
 	_ "github.com/lib/pq"
 )
 
-// Config holds database configuration
-type Config struct {
-	Driver          string
-	Host            string
-	Port            int
-	Name            string
-	User            string
-	Password        string
-	SSLMode         string
-	MaxOpenConns    int
-	MaxIdleConns    int
-	ConnMaxLifetime time.Duration
+// DB represents the database connection
+type DB struct {
+	*sql.DB
 }
 
-// Connect establishes a connection to the database
-func Connect(cfg *Config) (*sql.DB, error) {
-	dsn := fmt.Sprintf(
-		"host=%s port=%d dbname=%s user=%s password=%s sslmode=%s",
-		cfg.Host, cfg.Port, cfg.Name, cfg.User, cfg.Password, cfg.SSLMode,
-	)
+// Config represents database configuration
+type Config struct {
+	Host     string
+	Port     int
+	User     string
+	Password string
+	DBName   string
+	SSLMode  string
+	MaxOpen  int
+	MaxIdle  int
+	Timeout  time.Duration
+}
 
-	db, err := sql.Open(cfg.Driver, dsn)
+// NewConnection creates a new database connection
+func NewConnection(cfg *Config) (*DB, error) {
+	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, cfg.SSLMode)
+
+	db, err := sql.Open("postgres", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("error opening database: %w", err)
+		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
 	// Configure connection pool
-	db.SetMaxOpenConns(cfg.MaxOpenConns)
-	db.SetMaxIdleConns(cfg.MaxIdleConns)
-	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	db.SetMaxOpenConns(cfg.MaxOpen)
+	db.SetMaxIdleConns(cfg.MaxIdle)
+	db.SetConnMaxLifetime(cfg.Timeout)
 
 	// Test connection
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("error connecting to the database: %w", err)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	return db, nil
+	log.Println("Database connection established successfully")
+	return &DB{db}, nil
+}
+
+// Close closes the database connection
+func (db *DB) Close() error {
+	return db.DB.Close()
+}
+
+// HealthCheck performs a health check on the database
+func (db *DB) HealthCheck(ctx context.Context) error {
+	return db.PingContext(ctx)
 }

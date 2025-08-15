@@ -4,6 +4,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"qcat/internal/cache"
+	"qcat/internal/database"
+	"qcat/internal/monitoring"
 )
 
 // Response represents a standard API response
@@ -15,11 +18,19 @@ type Response struct {
 }
 
 // OptimizerHandler handles optimizer-related API requests
-type OptimizerHandler struct{}
+type OptimizerHandler struct {
+	db      *database.DB
+	redis   *cache.RedisCache
+	metrics *monitoring.Metrics
+}
 
 // NewOptimizerHandler creates a new optimizer handler
-func NewOptimizerHandler() *OptimizerHandler {
-	return &OptimizerHandler{}
+func NewOptimizerHandler(db *database.DB, redis *cache.RedisCache, metrics *monitoring.Metrics) *OptimizerHandler {
+	return &OptimizerHandler{
+		db:      db,
+		redis:   redis,
+		metrics: metrics,
+	}
 }
 
 // RunOptimization starts a new optimization task
@@ -85,11 +96,19 @@ func (h *OptimizerHandler) GetResults(c *gin.Context) {
 }
 
 // StrategyHandler handles strategy-related API requests
-type StrategyHandler struct{}
+type StrategyHandler struct {
+	db      *database.DB
+	redis   *cache.RedisCache
+	metrics *monitoring.Metrics
+}
 
 // NewStrategyHandler creates a new strategy handler
-func NewStrategyHandler() *StrategyHandler {
-	return &StrategyHandler{}
+func NewStrategyHandler(db *database.DB, redis *cache.RedisCache, metrics *monitoring.Metrics) *StrategyHandler {
+	return &StrategyHandler{
+		db:      db,
+		redis:   redis,
+		metrics: metrics,
+	}
 }
 
 // ListStrategies returns all strategies
@@ -240,11 +259,19 @@ func (h *StrategyHandler) RunBacktest(c *gin.Context) {
 }
 
 // PortfolioHandler handles portfolio-related API requests
-type PortfolioHandler struct{}
+type PortfolioHandler struct {
+	db      *database.DB
+	redis   *cache.RedisCache
+	metrics *monitoring.Metrics
+}
 
 // NewPortfolioHandler creates a new portfolio handler
-func NewPortfolioHandler() *PortfolioHandler {
-	return &PortfolioHandler{}
+func NewPortfolioHandler(db *database.DB, redis *cache.RedisCache, metrics *monitoring.Metrics) *PortfolioHandler {
+	return &PortfolioHandler{
+		db:      db,
+		redis:   redis,
+		metrics: metrics,
+	}
 }
 
 // GetOverview returns portfolio overview
@@ -303,11 +330,19 @@ func (h *PortfolioHandler) GetHistory(c *gin.Context) {
 }
 
 // RiskHandler handles risk-related API requests
-type RiskHandler struct{}
+type RiskHandler struct {
+	db      *database.DB
+	redis   *cache.RedisCache
+	metrics *monitoring.Metrics
+}
 
 // NewRiskHandler creates a new risk handler
-func NewRiskHandler() *RiskHandler {
-	return &RiskHandler{}
+func NewRiskHandler(db *database.DB, redis *cache.RedisCache, metrics *monitoring.Metrics) *RiskHandler {
+	return &RiskHandler{
+		db:      db,
+		redis:   redis,
+		metrics: metrics,
+	}
 }
 
 // GetOverview returns risk overview
@@ -387,11 +422,19 @@ func (h *RiskHandler) GetViolations(c *gin.Context) {
 }
 
 // HotlistHandler handles hotlist-related API requests
-type HotlistHandler struct{}
+type HotlistHandler struct {
+	db      *database.DB
+	redis   *cache.RedisCache
+	metrics *monitoring.Metrics
+}
 
 // NewHotlistHandler creates a new hotlist handler
-func NewHotlistHandler() *HotlistHandler {
-	return &HotlistHandler{}
+func NewHotlistHandler(db *database.DB, redis *cache.RedisCache, metrics *monitoring.Metrics) *HotlistHandler {
+	return &HotlistHandler{
+		db:      db,
+		redis:   redis,
+		metrics: metrics,
+	}
 }
 
 // GetHotSymbols returns hot symbols
@@ -468,11 +511,15 @@ func (h *HotlistHandler) RemoveFromWhitelist(c *gin.Context) {
 }
 
 // MetricsHandler handles metrics-related API requests
-type MetricsHandler struct{}
+type MetricsHandler struct {
+	metrics *monitoring.Metrics
+}
 
 // NewMetricsHandler creates a new metrics handler
-func NewMetricsHandler() *MetricsHandler {
-	return &MetricsHandler{}
+func NewMetricsHandler(metrics *monitoring.Metrics) *MetricsHandler {
+	return &MetricsHandler{
+		metrics: metrics,
+	}
 }
 
 // GetStrategyMetrics returns strategy metrics
@@ -507,11 +554,17 @@ func (h *MetricsHandler) GetPerformanceMetrics(c *gin.Context) {
 }
 
 // AuditHandler handles audit-related API requests
-type AuditHandler struct{}
+type AuditHandler struct {
+	db      *database.DB
+	metrics *monitoring.Metrics
+}
 
 // NewAuditHandler creates a new audit handler
-func NewAuditHandler() *AuditHandler {
-	return &AuditHandler{}
+func NewAuditHandler(db *database.DB, metrics *monitoring.Metrics) *AuditHandler {
+	return &AuditHandler{
+		db:      db,
+		metrics: metrics,
+	}
 }
 
 // GetLogs returns audit logs

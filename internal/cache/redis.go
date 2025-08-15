@@ -2,207 +2,103 @@ package cache
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
-// Config holds Redis configuration
+// RedisCache represents Redis cache implementation
+type RedisCache struct {
+	client *redis.Client
+}
+
+// Config represents Redis configuration
 type Config struct {
-	Enabled  bool
-	Host     string
-	Port     int
+	Addr     string
 	Password string
 	DB       int
 	PoolSize int
 }
 
-// Cache represents a Redis cache instance
-type Cache struct {
-	client *redis.Client
-}
-
-// NewCache creates a new Redis cache instance
-func NewCache(cfg *Config) (*Cache, error) {
-	if !cfg.Enabled {
-		return nil, nil
-	}
-
+// NewRedisCache creates a new Redis cache instance
+func NewRedisCache(cfg *Config) (*RedisCache, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr:     fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		Addr:     cfg.Addr,
 		Password: cfg.Password,
 		DB:       cfg.DB,
 		PoolSize: cfg.PoolSize,
 	})
 
 	// Test connection
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
 	if err := client.Ping(ctx).Err(); err != nil {
 		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 
-	return &Cache{client: client}, nil
+	log.Println("Redis connection established successfully")
+	return &RedisCache{client: client}, nil
+}
+
+// Get retrieves a value from cache
+func (r *RedisCache) Get(ctx context.Context, key string) (string, error) {
+	return r.client.Get(ctx, key).Result()
+}
+
+// Set sets a value in cache with expiration
+func (r *RedisCache) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
+	return r.client.Set(ctx, key, value, expiration).Err()
+}
+
+// Del deletes a key from cache
+func (r *RedisCache) Del(ctx context.Context, keys ...string) error {
+	return r.client.Del(ctx, keys...).Err()
+}
+
+// Exists checks if a key exists
+func (r *RedisCache) Exists(ctx context.Context, keys ...string) (int64, error) {
+	return r.client.Exists(ctx, keys...).Result()
+}
+
+// Incr increments a counter
+func (r *RedisCache) Incr(ctx context.Context, key string) (int64, error) {
+	return r.client.Incr(ctx, key).Result()
+}
+
+// HGet retrieves a field from a hash
+func (r *RedisCache) HGet(ctx context.Context, key, field string) (string, error) {
+	return r.client.HGet(ctx, key, field).Result()
+}
+
+// HSet sets a field in a hash
+func (r *RedisCache) HSet(ctx context.Context, key string, values ...interface{}) error {
+	return r.client.HSet(ctx, key, values...).Err()
+}
+
+// HGetAll retrieves all fields from a hash
+func (r *RedisCache) HGetAll(ctx context.Context, key string) (map[string]string, error) {
+	return r.client.HGetAll(ctx, key).Result()
+}
+
+// ZAdd adds a member to a sorted set
+func (r *RedisCache) ZAdd(ctx context.Context, key string, score float64, member string) error {
+	return r.client.ZAdd(ctx, key, redis.Z{Score: score, Member: member}).Err()
+}
+
+// ZRange retrieves members from a sorted set
+func (r *RedisCache) ZRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
+	return r.client.ZRange(ctx, key, start, stop).Result()
+}
+
+// HealthCheck performs a health check on Redis
+func (r *RedisCache) HealthCheck(ctx context.Context) error {
+	return r.client.Ping(ctx).Err()
 }
 
 // Close closes the Redis connection
-func (c *Cache) Close() error {
-	if c.client != nil {
-		return c.client.Close()
-	}
-	return nil
-}
-
-// Market Data Cache Keys
-const (
-	KeyTick    = "md:tick:%s"    // Real-time ticker
-	KeyBook    = "md:book:%s"    // Order book
-	KeyFunding = "md:funding:%s" // Funding rate
-)
-
-// Strategy Cache Keys
-const (
-	KeySignalQueue = "sig:queue"       // Strategy signal queue
-	KeyPendingOrd  = "ord:pending"     // Pending orders
-	KeyPosState    = "state:pos:%s:%s" // Position state (strategy:symbol)
-)
-
-// Lock Keys
-const (
-	KeyLock = "lock:%s" // Distributed lock
-)
-
-// Rate Limit Keys
-const (
-	KeyRateLimit = "rate:%s" // Rate limit by exchange
-)
-
-// Hot Market Keys
-const (
-	KeyHotScore = "hot:score:%s" // Hot market score by symbol
-)
-
-// SetMarketTick stores real-time market tick data
-func (c *Cache) SetMarketTick(ctx context.Context, symbol string, data interface{}, expiration time.Duration) error {
-	return c.set(ctx, fmt.Sprintf(KeyTick, symbol), data, expiration)
-}
-
-// GetMarketTick retrieves real-time market tick data
-func (c *Cache) GetMarketTick(ctx context.Context, symbol string, dest interface{}) error {
-	return c.get(ctx, fmt.Sprintf(KeyTick, symbol), dest)
-}
-
-// SetOrderBook stores order book data
-func (c *Cache) SetOrderBook(ctx context.Context, symbol string, data interface{}, expiration time.Duration) error {
-	return c.set(ctx, fmt.Sprintf(KeyBook, symbol), data, expiration)
-}
-
-// GetOrderBook retrieves order book data
-func (c *Cache) GetOrderBook(ctx context.Context, symbol string, dest interface{}) error {
-	return c.get(ctx, fmt.Sprintf(KeyBook, symbol), dest)
-}
-
-// SetFundingRate stores funding rate data
-func (c *Cache) SetFundingRate(ctx context.Context, symbol string, data interface{}, expiration time.Duration) error {
-	return c.set(ctx, fmt.Sprintf(KeyFunding, symbol), data, expiration)
-}
-
-// GetFundingRate retrieves funding rate data
-func (c *Cache) GetFundingRate(ctx context.Context, symbol string, dest interface{}) error {
-	return c.get(ctx, fmt.Sprintf(KeyFunding, symbol), dest)
-}
-
-// PushSignal adds a signal to the queue
-func (c *Cache) PushSignal(ctx context.Context, signal interface{}) error {
-	data, err := json.Marshal(signal)
-	if err != nil {
-		return fmt.Errorf("failed to marshal signal: %w", err)
-	}
-	return c.client.LPush(ctx, KeySignalQueue, data).Err()
-}
-
-// PopSignal retrieves and removes a signal from the queue
-func (c *Cache) PopSignal(ctx context.Context, dest interface{}) error {
-	data, err := c.client.RPop(ctx, KeySignalQueue).Bytes()
-	if err == redis.Nil {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("failed to pop signal: %w", err)
-	}
-	return json.Unmarshal(data, dest)
-}
-
-// SetPositionState stores position state
-func (c *Cache) SetPositionState(ctx context.Context, strategy, symbol string, data interface{}, expiration time.Duration) error {
-	return c.set(ctx, fmt.Sprintf(KeyPosState, strategy, symbol), data, expiration)
-}
-
-// GetPositionState retrieves position state
-func (c *Cache) GetPositionState(ctx context.Context, strategy, symbol string, dest interface{}) error {
-	return c.get(ctx, fmt.Sprintf(KeyPosState, strategy, symbol), dest)
-}
-
-// AcquireLock attempts to acquire a distributed lock
-func (c *Cache) AcquireLock(ctx context.Context, name string, expiration time.Duration) (bool, error) {
-	return c.client.SetNX(ctx, fmt.Sprintf(KeyLock, name), "1", expiration).Result()
-}
-
-// ReleaseLock releases a distributed lock
-func (c *Cache) ReleaseLock(ctx context.Context, name string) error {
-	return c.client.Del(ctx, fmt.Sprintf(KeyLock, name)).Err()
-}
-
-// CheckRateLimit checks and updates rate limit
-func (c *Cache) CheckRateLimit(ctx context.Context, exchange string, limit int, window time.Duration) (bool, error) {
-	key := fmt.Sprintf(KeyRateLimit, exchange)
-	pipe := c.client.Pipeline()
-
-	now := time.Now().UnixNano()
-	windowStart := now - window.Nanoseconds()
-
-	pipe.ZRemRangeByScore(ctx, key, "0", fmt.Sprintf("%d", windowStart))
-	pipe.ZAdd(ctx, key, redis.Z{Score: float64(now), Member: now})
-	pipe.ZCard(ctx, key)
-
-	cmds, err := pipe.Exec(ctx)
-	if err != nil {
-		return false, fmt.Errorf("failed to check rate limit: %w", err)
-	}
-
-	count := cmds[2].(*redis.IntCmd).Val()
-	return count <= int64(limit), nil
-}
-
-// SetHotScore stores hot market score
-func (c *Cache) SetHotScore(ctx context.Context, symbol string, score float64, expiration time.Duration) error {
-	return c.set(ctx, fmt.Sprintf(KeyHotScore, symbol), score, expiration)
-}
-
-// GetHotScore retrieves hot market score
-func (c *Cache) GetHotScore(ctx context.Context, symbol string) (float64, error) {
-	var score float64
-	err := c.get(ctx, fmt.Sprintf(KeyHotScore, symbol), &score)
-	return score, err
-}
-
-// Helper methods for JSON encoding/decoding
-func (c *Cache) set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
-	data, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Errorf("failed to marshal value: %w", err)
-	}
-	return c.client.Set(ctx, key, data, expiration).Err()
-}
-
-func (c *Cache) get(ctx context.Context, key string, dest interface{}) error {
-	data, err := c.client.Get(ctx, key).Bytes()
-	if err == redis.Nil {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("failed to get value: %w", err)
-	}
-	return json.Unmarshal(data, dest)
+func (r *RedisCache) Close() error {
+	return r.client.Close()
 }
