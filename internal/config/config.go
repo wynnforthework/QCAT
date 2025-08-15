@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -221,6 +222,17 @@ type ShutdownConfig struct {
 
 // Load 加载配置文件
 func Load(configPath string) (*Config, error) {
+	// Initialize environment manager
+	envManager := NewEnvManager("", "QCAT_")
+
+	// Load environment variables from .env file if it exists
+	if _, err := os.Stat(".env"); err == nil {
+		if err := envManager.LoadFromFile(".env"); err != nil {
+			return nil, fmt.Errorf("failed to load .env file: %w", err)
+		}
+	}
+
+	// Load YAML configuration
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, err
@@ -231,5 +243,80 @@ func Load(configPath string) (*Config, error) {
 		return nil, err
 	}
 
+	// Override with environment variables
+	config.overrideWithEnv(envManager)
+
 	return &config, nil
+}
+
+// overrideWithEnv overrides configuration with environment variables
+func (c *Config) overrideWithEnv(env *EnvManager) {
+	// App configuration
+	if env.GetString("APP_NAME", "") != "" {
+		c.App.Name = env.GetString("APP_NAME", c.App.Name)
+	}
+	if env.GetString("APP_VERSION", "") != "" {
+		c.App.Version = env.GetString("APP_VERSION", c.App.Version)
+	}
+	if env.GetString("APP_ENVIRONMENT", "") != "" {
+		c.App.Environment = env.GetString("APP_ENVIRONMENT", c.App.Environment)
+	}
+
+	// Server configuration
+	if env.GetInt("SERVER_PORT", 0) != 0 {
+		c.Server.Port = env.GetInt("SERVER_PORT", c.Server.Port)
+	}
+	if env.GetDuration("SERVER_READ_TIMEOUT", 0) != 0 {
+		c.Server.ReadTimeout = env.GetDuration("SERVER_READ_TIMEOUT", c.Server.ReadTimeout)
+	}
+	if env.GetDuration("SERVER_WRITE_TIMEOUT", 0) != 0 {
+		c.Server.WriteTimeout = env.GetDuration("SERVER_WRITE_TIMEOUT", c.Server.WriteTimeout)
+	}
+
+	// Database configuration
+	if env.GetString("DATABASE_HOST", "") != "" {
+		c.Database.Host = env.GetString("DATABASE_HOST", c.Database.Host)
+	}
+	if env.GetInt("DATABASE_PORT", 0) != 0 {
+		c.Database.Port = env.GetInt("DATABASE_PORT", c.Database.Port)
+	}
+	if env.GetString("DATABASE_USER", "") != "" {
+		c.Database.User = env.GetString("DATABASE_USER", c.Database.User)
+	}
+	if env.GetString("DATABASE_PASSWORD", "") != "" {
+		c.Database.Password = env.GetEncryptedString("DATABASE_PASSWORD", c.Database.Password)
+	}
+	if env.GetString("DATABASE_NAME", "") != "" {
+		c.Database.DBName = env.GetString("DATABASE_NAME", c.Database.DBName)
+	}
+	if env.GetString("DATABASE_SSL_MODE", "") != "" {
+		c.Database.SSLMode = env.GetString("DATABASE_SSL_MODE", c.Database.SSLMode)
+	}
+
+	// Redis configuration
+	if env.GetString("REDIS_ADDR", "") != "" {
+		c.Redis.Addr = env.GetString("REDIS_ADDR", c.Redis.Addr)
+	}
+	if env.GetString("REDIS_PASSWORD", "") != "" {
+		c.Redis.Password = env.GetEncryptedString("REDIS_PASSWORD", c.Redis.Password)
+	}
+	if env.GetInt("REDIS_DB", -1) != -1 {
+		c.Redis.DB = env.GetInt("REDIS_DB", c.Redis.DB)
+	}
+
+	// JWT configuration
+	if env.GetString("JWT_SECRET_KEY", "") != "" {
+		c.JWT.SecretKey = env.GetEncryptedString("JWT_SECRET_KEY", c.JWT.SecretKey)
+	}
+	if env.GetDuration("JWT_DURATION", 0) != 0 {
+		c.JWT.Duration = env.GetDuration("JWT_DURATION", c.JWT.Duration)
+	}
+
+	// Security configuration
+	if env.GetString("SECURITY_KMS_MASTER_KEY", "") != "" {
+		c.Security.KMS.MasterKey = env.GetEncryptedString("SECURITY_KMS_MASTER_KEY", c.Security.KMS.MasterKey)
+	}
+	if env.GetString("SECURITY_ENCRYPTION_MASTER_KEY", "") != "" {
+		c.Security.Encryption.MasterKey = env.GetEncryptedString("SECURITY_ENCRYPTION_MASTER_KEY", c.Security.Encryption.MasterKey)
+	}
 }
