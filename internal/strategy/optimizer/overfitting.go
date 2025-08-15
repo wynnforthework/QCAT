@@ -110,6 +110,7 @@ func (d *OverfitDetector) performPBOTest(inSample, outSample *backtest.Performan
 }
 
 // TODO: 待确认 - 当前未使用，保留以备将来实现
+// TODO: 待确认 - 当前未使用，保留以备将来实现
 // analyzeSensitivity analyzes parameter sensitivity
 func (d *OverfitDetector) analyzeSensitivity(returns []float64) (map[string]float64, error) {
 	// TODO: 实现参数敏感度分析
@@ -128,6 +129,7 @@ func (d *OverfitDetector) evaluateOverfitting(result *OverfitResult) bool {
 	return false
 }
 
+// TODO: 待确认 - 当前未使用，保留以备将来实现
 // TODO: 待确认 - 当前未使用，保留以备将来实现
 // calculateAutocorrelation calculates autocorrelation coefficient
 func calculateAutocorrelation(returns []float64) float64 {

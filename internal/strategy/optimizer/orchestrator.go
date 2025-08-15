@@ -127,6 +127,7 @@ func generateTaskID() string {
 }
 
 // TODO: 待确认 - 当前未使用，保留以备将来实现
+// TODO: 待确认 - 当前未使用，保留以备将来实现
 func calculateConfidence(result *OverfitResult) float64 {
 	// 基于多个指标计算置信度
 	confidence := 1.0
