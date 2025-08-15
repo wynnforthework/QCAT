@@ -5,60 +5,71 @@ import (
 	"time"
 )
 
-// Exchange defines the interface that all exchange implementations must satisfy
+// Exchange defines the interface for interacting with exchanges
 type Exchange interface {
-	// Basic Information
-	Name() string
+	// GetExchangeInfo returns exchange information
 	GetExchangeInfo(ctx context.Context) (*ExchangeInfo, error)
+
+	// GetSymbolInfo returns symbol information
 	GetSymbolInfo(ctx context.Context, symbol string) (*SymbolInfo, error)
+
+	// GetServerTime returns the exchange server time
 	GetServerTime(ctx context.Context) (time.Time, error)
 
-	// Account & Balance
+	// GetAccountBalance returns account balances
 	GetAccountBalance(ctx context.Context) (map[string]*AccountBalance, error)
+
+	// GetPositions returns all positions
 	GetPositions(ctx context.Context) ([]*Position, error)
+
+	// GetPosition returns a specific position
 	GetPosition(ctx context.Context, symbol string) (*Position, error)
+
+	// GetLeverage returns the leverage for a symbol
 	GetLeverage(ctx context.Context, symbol string) (int, error)
+
+	// SetLeverage sets the leverage for a symbol
 	SetLeverage(ctx context.Context, symbol string, leverage int) error
+
+	// SetMarginType sets the margin type for a symbol
 	SetMarginType(ctx context.Context, symbol string, marginType MarginType) error
 
-	// Order Management
+	// PlaceOrder places an order
 	PlaceOrder(ctx context.Context, req *OrderRequest) (*OrderResponse, error)
+
+	// CancelOrder cancels an order
 	CancelOrder(ctx context.Context, req *OrderCancelRequest) (*OrderResponse, error)
+
+	// CancelAllOrders cancels all orders for a symbol
 	CancelAllOrders(ctx context.Context, symbol string) error
+
+	// GetOrder returns order information
 	GetOrder(ctx context.Context, symbol, orderID string) (*Order, error)
+
+	// GetOpenOrders returns open orders
 	GetOpenOrders(ctx context.Context, symbol string) ([]*Order, error)
+
+	// GetOrderHistory returns order history
 	GetOrderHistory(ctx context.Context, symbol string, startTime, endTime time.Time) ([]*Order, error)
 
-	// Risk Management
-	GetRiskLimits(ctx context.Context, symbol string) ([]*RiskLimit, error)
-	SetRiskLimits(ctx context.Context, symbol string, limits []*RiskLimit) error
-
-	// Lifecycle Management
-	Start(ctx context.Context) error
-	Stop(ctx context.Context) error
-	IsRunning() bool
+	// GetRiskLimits returns risk limits for a symbol
+	GetRiskLimits(ctx context.Context, symbol string) (*RiskLimits, error)
 }
 
-// ExchangeOption represents an option for configuring an exchange
-type ExchangeOption func(Exchange) error
-
-// ExchangeConfig represents common exchange configuration
-type ExchangeConfig struct {
-	Name      string `json:"name"`
-	APIKey    string `json:"api_key"`
-	APISecret string `json:"api_secret"`
-	TestNet   bool   `json:"testnet"`
-}
-
-// BaseExchange provides common functionality for exchange implementations
+// BaseExchange provides common functionality for exchanges
 type BaseExchange struct {
-	config     *ExchangeConfig
-	running    bool
-	startTime  time.Time
-	lastUpdate time.Time
+	config *ExchangeConfig
 }
 
-// NewBaseExchange creates a new base exchange instance
+// ExchangeConfig represents exchange configuration
+type ExchangeConfig struct {
+	Name      string
+	APIKey    string
+	APISecret string
+	TestNet   bool
+}
+
+// NewBaseExchange creates a new base exchange
 func NewBaseExchange(config *ExchangeConfig) *BaseExchange {
 	return &BaseExchange{
 		config: config,
@@ -70,50 +81,7 @@ func (e *BaseExchange) Name() string {
 	return e.config.Name
 }
 
-// IsRunning returns whether the exchange is running
-func (e *BaseExchange) IsRunning() bool {
-	return e.running
-}
-
-// Start starts the exchange
-func (e *BaseExchange) Start(ctx context.Context) error {
-	e.running = true
-	e.startTime = time.Now()
-	return nil
-}
-
-// Stop stops the exchange
-func (e *BaseExchange) Stop(ctx context.Context) error {
-	e.running = false
-	return nil
-}
-
-// WithAPIKey sets the API key
-func WithAPIKey(apiKey string) ExchangeOption {
-	return func(e Exchange) error {
-		if be, ok := e.(*BaseExchange); ok {
-			be.config.APIKey = apiKey
-		}
-		return nil
-	}
-}
-
-// WithAPISecret sets the API secret
-func WithAPISecret(apiSecret string) ExchangeOption {
-	return func(e Exchange) error {
-		if be, ok := e.(*BaseExchange); ok {
-			be.config.APISecret = apiSecret
-		}
-		return nil
-	}
-}
-
-// WithTestNet sets whether to use testnet
-func WithTestNet(testnet bool) ExchangeOption {
-	return func(e Exchange) error {
-		if be, ok := e.(*BaseExchange); ok {
-			be.config.TestNet = testnet
-		}
-		return nil
-	}
+// Config returns the exchange configuration
+func (e *BaseExchange) Config() *ExchangeConfig {
+	return e.config
 }

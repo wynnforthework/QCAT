@@ -1,64 +1,48 @@
 package market
 
-import (
-	"time"
-)
+import "time"
 
-// MarketType represents the type of market (spot, futures, etc.)
-type MarketType string
-
-const (
-	MarketTypeSpot    MarketType = "spot"
-	MarketTypeFutures MarketType = "futures"
-)
-
-// Ticker represents real-time price information
-type Ticker struct {
+// OrderBook represents a market order book
+type OrderBook struct {
 	Symbol    string    `json:"symbol"`
-	Price     float64   `json:"price"`
-	Volume    float64   `json:"volume"`
-	High      float64   `json:"high"`
-	Low       float64   `json:"low"`
-	Timestamp time.Time `json:"timestamp"`
+	Bids      []Level   `json:"bids"`
+	Asks      []Level   `json:"asks"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// OrderBookLevel represents a price level in the order book
-type OrderBookLevel struct {
+// Level represents a price level in the order book
+type Level struct {
 	Price    float64 `json:"price"`
 	Quantity float64 `json:"quantity"`
 }
 
-// OrderBook represents the full order book
-type OrderBook struct {
-	Symbol    string           `json:"symbol"`
-	Bids      []OrderBookLevel `json:"bids"`
-	Asks      []OrderBookLevel `json:"asks"`
-	Timestamp time.Time        `json:"timestamp"`
-}
-
-// Trade represents a single trade
+// Trade represents a single executed trade
 type Trade struct {
-	Symbol    string    `json:"symbol"`
 	ID        string    `json:"id"`
+	Symbol    string    `json:"symbol"`
 	Price     float64   `json:"price"`
 	Quantity  float64   `json:"quantity"`
-	Side      string    `json:"side"`
+	Side      string    `json:"side"` // "BUY" or "SELL"
+	Fee       float64   `json:"fee"`
+	FeeCoin   string    `json:"fee_coin"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// Kline represents candlestick data
+// Kline represents a candlestick data point
 type Kline struct {
 	Symbol    string    `json:"symbol"`
+	Interval  string    `json:"interval"`
+	OpenTime  time.Time `json:"open_time"`
+	CloseTime time.Time `json:"close_time"`
 	Open      float64   `json:"open"`
 	High      float64   `json:"high"`
 	Low       float64   `json:"low"`
 	Close     float64   `json:"close"`
 	Volume    float64   `json:"volume"`
-	Interval  string    `json:"interval"`
-	Timestamp time.Time `json:"timestamp"`
+	Complete  bool      `json:"complete"`
 }
 
-// FundingRate represents funding rate data for perpetual futures
+// FundingRate represents the funding rate for a perpetual contract
 type FundingRate struct {
 	Symbol      string    `json:"symbol"`
 	Rate        float64   `json:"rate"`
@@ -67,36 +51,17 @@ type FundingRate struct {
 	LastUpdated time.Time `json:"last_updated"`
 }
 
-// OpenInterest represents open interest data
+// OpenInterest represents the total open interest for a symbol
 type OpenInterest struct {
 	Symbol    string    `json:"symbol"`
-	Value     float64   `json:"value"`
+	Value     float64   `json:"value"`    // OI in contracts
+	Notional  float64   `json:"notional"` // OI in USD/quote currency
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// IndexPrice represents index price data
+// IndexPrice represents the index price for a symbol
 type IndexPrice struct {
 	Symbol    string    `json:"symbol"`
 	Price     float64   `json:"price"`
 	Timestamp time.Time `json:"timestamp"`
 }
-
-// DataQuality represents data quality metrics
-type DataQuality struct {
-	Symbol           string    `json:"symbol"`
-	DataType         string    `json:"data_type"`
-	UpdateFrequency  float64   `json:"update_frequency"`
-	LastUpdate       time.Time `json:"last_update"`
-	MissingDataCount int       `json:"missing_data_count"`
-	ErrorCount       int       `json:"error_count"`
-}
-
-// Subscription represents a market data subscription
-type Subscription struct {
-	Symbol     string     `json:"symbol"`
-	MarketType MarketType `json:"market_type"`
-	Channels   []string   `json:"channels"`
-}
-
-// MarketDataHandler is a callback function type for handling market data
-type MarketDataHandler func(interface{}) error
