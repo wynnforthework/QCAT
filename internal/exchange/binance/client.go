@@ -193,6 +193,37 @@ func (c *Client) GetSymbolInfo(ctx context.Context, symbol string) (*exchange.Sy
 	return nil, fmt.Errorf("symbol not found: %s", symbol)
 }
 
+// GetSymbolPrice implements exchange.Exchange
+func (c *Client) GetSymbolPrice(ctx context.Context, symbol string) (float64, error) {
+	var ticker TickerPrice
+	params := url.Values{}
+	params.Set("symbol", symbol)
+
+	if err := c.doRequest(ctx, http.MethodGet, MethodTickerPrice, params, &ticker); err != nil {
+		return 0, fmt.Errorf("failed to get symbol price: %w", err)
+	}
+
+	price, err := strconv.ParseFloat(ticker.Price, 64)
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse price: %w", err)
+	}
+
+	return price, nil
+}
+
+// GetSymbolTicker24hr implements exchange.Exchange
+func (c *Client) GetSymbolTicker24hr(ctx context.Context, symbol string) (*Ticker24hr, error) {
+	var ticker Ticker24hr
+	params := url.Values{}
+	params.Set("symbol", symbol)
+
+	if err := c.doRequest(ctx, http.MethodGet, MethodTicker24hr, params, &ticker); err != nil {
+		return nil, fmt.Errorf("failed to get 24hr ticker: %w", err)
+	}
+
+	return &ticker, nil
+}
+
 // GetServerTime implements exchange.Exchange
 func (c *Client) GetServerTime(ctx context.Context) (time.Time, error) {
 	var result struct {

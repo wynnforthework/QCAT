@@ -3,6 +3,7 @@ package lifecycle
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -203,7 +204,35 @@ func (m *Manager) promoteStrategy(ctx context.Context, versionID string, targetS
 
 // saveVersion saves version to database
 func (m *Manager) saveVersion(ctx context.Context, version *Version) error {
-	// TODO: 实现数据库存储逻辑
+	// 新增：实现数据库存储逻辑
+	query := `
+		INSERT INTO strategy_versions (
+			id, strategy_id, version, config, state, performance, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (id) DO UPDATE SET
+			config = $4, state = $5, performance = $6, updated_at = $8
+	`
+
+	// 新增：序列化配置和性能数据
+	configJSON, err := json.Marshal(version.Config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	performanceJSON, err := json.Marshal(version.Performance)
+	if err != nil {
+		return fmt.Errorf("failed to marshal performance: %w", err)
+	}
+
+	_, err = m.db.ExecContext(ctx, query,
+		version.ID, version.StrategyID, version.Version, configJSON,
+		version.State, performanceJSON, version.CreatedAt, version.UpdatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to save strategy version: %w", err)
+	}
+
 	return nil
 }
 

@@ -21,7 +21,7 @@ func NewDefaultValidator(exchange exchange.Exchange) *DefaultValidator {
 }
 
 // Validate validates a signal
-func (v *DefaultValidator) Validate(signal *Signal) error {
+func (v *DefaultValidator) Validate(ctx context.Context, signal *Signal) error {
 	// Validate required fields
 	if signal.Strategy == "" {
 		return &ErrInvalidSignal{Field: "strategy", Message: "strategy is required"}
@@ -71,7 +71,7 @@ func (v *DefaultValidator) Validate(signal *Signal) error {
 	}
 
 	// Validate symbol info
-	symbolInfo, err := v.exchange.GetSymbolInfo(context.TODO(), signal.Symbol)
+	symbolInfo, err := v.exchange.GetSymbolInfo(ctx, signal.Symbol)
 	if err != nil {
 		return &ErrSignalValidation{Message: "failed to get symbol info", Err: err}
 	}
@@ -91,7 +91,7 @@ func (v *DefaultValidator) Validate(signal *Signal) error {
 	}
 
 	// Validate risk limits
-	riskLimits, err := v.exchange.GetRiskLimits(context.TODO(), signal.Symbol)
+	riskLimits, err := v.exchange.GetRiskLimits(ctx, signal.Symbol)
 	if err != nil {
 		return &ErrSignalValidation{Message: "failed to get risk limits", Err: err}
 	}
@@ -101,7 +101,7 @@ func (v *DefaultValidator) Validate(signal *Signal) error {
 	}
 
 	// Validate position
-	position, err := v.exchange.GetPosition(context.TODO(), signal.Symbol)
+	position, err := v.exchange.GetPosition(ctx, signal.Symbol)
 	if err != nil && err.Error() != "position not found" {
 		return &ErrSignalValidation{Message: "failed to get position", Err: err}
 	}

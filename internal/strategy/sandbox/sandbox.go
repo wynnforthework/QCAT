@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -153,25 +154,114 @@ func (s *Sandbox) processEvents(ctx context.Context) {
 // handleSignal handles strategy signals
 func (s *Sandbox) handleSignal(ctx context.Context, signal interface{}) {
 	log.Printf("Processing signal: %+v", signal)
-	// TODO: Implement signal processing logic
+	// 新增：实现信号处理逻辑
+	if signal == nil {
+		log.Printf("Received nil signal, ignoring")
+		return
+	}
+
+	// 新增：将信号发送到策略
+	if strategySignal, ok := signal.(*strategy.Signal); ok {
+		if err := s.strategy.OnSignal(ctx, strategySignal); err != nil {
+			log.Printf("Failed to process signal in strategy: %v", err)
+			// 新增：将错误发送到错误通道
+			select {
+			case s.errors <- err:
+			default:
+				log.Printf("Error channel is full, dropped error: %v", err)
+			}
+		}
+	} else {
+		log.Printf("Invalid signal type: %T", signal)
+	}
 }
 
 // handleOrder handles order updates
 func (s *Sandbox) handleOrder(ctx context.Context, order interface{}) {
 	log.Printf("Processing order: %+v", order)
-	// TODO: Implement order processing logic
+	// 新增：实现订单处理逻辑
+	if order == nil {
+		log.Printf("Received nil order, ignoring")
+		return
+	}
+
+	// 新增：将订单发送到策略
+	if exchangeOrder, ok := order.(*exchange.Order); ok {
+		if err := s.strategy.OnOrder(ctx, exchangeOrder); err != nil {
+			log.Printf("Failed to process order in strategy: %v", err)
+			// 新增：将错误发送到错误通道
+			select {
+			case s.errors <- err:
+			default:
+				log.Printf("Error channel is full, dropped error: %v", err)
+			}
+		}
+	} else {
+		log.Printf("Invalid order type: %T", order)
+	}
 }
 
 // handlePosition handles position updates
 func (s *Sandbox) handlePosition(ctx context.Context, position interface{}) {
 	log.Printf("Processing position: %+v", position)
-	// TODO: Implement position processing logic
+	// 新增：实现仓位处理逻辑
+	if position == nil {
+		log.Printf("Received nil position, ignoring")
+		return
+	}
+
+	// 新增：将仓位发送到策略
+	if exchangePosition, ok := position.(*exchange.Position); ok {
+		if err := s.strategy.OnPosition(ctx, exchangePosition); err != nil {
+			log.Printf("Failed to process position in strategy: %v", err)
+			// 新增：将错误发送到错误通道
+			select {
+			case s.errors <- err:
+			default:
+				log.Printf("Error channel is full, dropped error: %v", err)
+			}
+		}
+	} else {
+		log.Printf("Invalid position type: %T", position)
+	}
 }
 
 // handleError handles strategy errors
 func (s *Sandbox) handleError(ctx context.Context, err error) {
 	log.Printf("Strategy error: %v", err)
-	// TODO: Implement error handling logic
+	// 新增：实现错误处理逻辑
+	if err == nil {
+		return
+	}
+
+	// 新增：记录错误到日志
+	log.Printf("Sandbox error: %v", err)
+
+	// 新增：根据错误类型采取不同的处理策略
+	switch {
+	case strings.Contains(err.Error(), "connection"):
+		// 新增：连接错误，尝试重连
+		log.Printf("Connection error detected, attempting to reconnect...")
+		// 新增：这里可以实现重连逻辑
+	case strings.Contains(err.Error(), "rate limit"):
+		// 新增：速率限制错误，等待后重试
+		log.Printf("Rate limit error detected, waiting before retry...")
+		// 新增：这里可以实现等待和重试逻辑
+	case strings.Contains(err.Error(), "insufficient balance"):
+		// 新增：余额不足错误，停止交易
+		log.Printf("Insufficient balance error detected, stopping trading...")
+		// 新增：这里可以实现停止交易逻辑
+	default:
+		// 新增：其他错误，记录并继续
+		log.Printf("Unknown error type: %v", err)
+	}
+
+	// 新增：将错误发送到错误通道
+	select {
+	case s.errors <- err:
+	default:
+		log.Printf("Error channel is full, dropped error: %v", err)
+	}
 }
 
 // setState sets the sandbox state

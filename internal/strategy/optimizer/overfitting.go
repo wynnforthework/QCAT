@@ -149,16 +149,93 @@ func calculateAutocorrelation(returns []float64) float64 {
 
 // calculatePerformanceStats calculates performance statistics
 func calculatePerformanceStats(returns []float64) *backtest.PerformanceStats {
-	// TODO: 实现性能统计计算
+	// 新增：实现性能统计计算
+	if len(returns) == 0 {
+		return &backtest.PerformanceStats{
+			TotalReturn:    0.0,
+			AnnualReturn:   0.0,
+			SharpeRatio:    0.0,
+			MaxDrawdown:    0.0,
+			WinRate:        0.0,
+			ProfitFactor:   0.0,
+			TradeCount:     0,
+			AvgTradeReturn: 0.0,
+			AvgHoldingTime: 0,
+		}
+	}
+
+	// 新增：计算总收益率
+	totalReturn := 0.0
+	for _, r := range returns {
+		totalReturn += r
+	}
+
+	// 新增：计算年化收益率（假设252个交易日）
+	annualReturn := totalReturn * 252.0 / float64(len(returns))
+
+	// 新增：计算夏普比率
+	mean := totalReturn / float64(len(returns))
+	variance := 0.0
+	for _, r := range returns {
+		variance += (r - mean) * (r - mean)
+	}
+	variance /= float64(len(returns))
+
+	sharpeRatio := 0.0
+	if variance > 0 {
+		sharpeRatio = mean / math.Sqrt(variance)
+	}
+
+	// 新增：计算最大回撤
+	maxDrawdown := 0.0
+	peak := 0.0
+	cumulative := 0.0
+
+	for _, r := range returns {
+		cumulative += r
+		if cumulative > peak {
+			peak = cumulative
+		}
+		drawdown := peak - cumulative
+		if drawdown > maxDrawdown {
+			maxDrawdown = drawdown
+		}
+	}
+
+	// 新增：计算胜率
+	wins := 0
+	for _, r := range returns {
+		if r > 0 {
+			wins++
+		}
+	}
+	winRate := float64(wins) / float64(len(returns))
+
+	// 新增：计算盈亏比
+	totalWins := 0.0
+	totalLosses := 0.0
+	for _, r := range returns {
+		if r > 0 {
+			totalWins += r
+		} else {
+			totalLosses += math.Abs(r)
+		}
+	}
+
+	profitFactor := 0.0
+	if totalLosses > 0 {
+		profitFactor = totalWins / totalLosses
+	}
+
 	return &backtest.PerformanceStats{
-		TotalReturn:    0.0,
-		AnnualReturn:   0.0,
-		SharpeRatio:    0.0,
-		MaxDrawdown:    0.0,
-		WinRate:        0.0,
-		ProfitFactor:   0.0,
-		TradeCount:     0,
-		AvgTradeReturn: 0.0,
-		AvgHoldingTime: 0,
+		TotalReturn:    totalReturn,
+		AnnualReturn:   annualReturn,
+		SharpeRatio:    sharpeRatio,
+		MaxDrawdown:    maxDrawdown,
+		WinRate:        winRate,
+		ProfitFactor:   profitFactor,
+		TradeCount:     len(returns),
+		AvgTradeReturn: mean,
+		AvgHoldingTime: 0, // 新增：需要交易时间数据来计算平均持仓时间
 	}
 }

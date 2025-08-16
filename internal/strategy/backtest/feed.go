@@ -28,10 +28,18 @@ func NewDBDataFeed(db *sql.DB, config *Config) (*DBDataFeed, error) {
 
 	// Create data type map
 	dataTypes := make(map[string]bool)
-	// TODO: Add DataTypes field to Config or use default data types
-	dataTypes["kline"] = true
-	dataTypes["trade"] = true
-	dataTypes["funding"] = true
+	// 新增：从配置中获取数据类型，如果没有则使用默认值
+	if len(config.DataTypes) > 0 {
+		for _, dataType := range config.DataTypes {
+			dataTypes[dataType] = true
+		}
+	} else {
+		// 新增：使用默认数据类型
+		dataTypes["kline"] = true
+		dataTypes["trade"] = true
+		dataTypes["funding"] = true
+		dataTypes["oi"] = true
+	}
 
 	return &DBDataFeed{
 		db:        db,

@@ -23,6 +23,8 @@ const (
 	MethodAllOrders    = "/fapi/v1/allOrders"
 	MethodCancelOrder  = "/fapi/v1/order"
 	MethodCancelAll    = "/fapi/v1/allOpenOrders"
+	MethodTicker24hr   = "/fapi/v1/ticker/24hr"
+	MethodTickerPrice  = "/fapi/v1/ticker/price"
 )
 
 // BinanceResponse represents a generic Binance API response
@@ -172,6 +174,31 @@ type Order struct {
 	UpdateTime    int64  `json:"updateTime"`
 	WorkingType   string `json:"workingType"`
 	PriceProtect  bool   `json:"priceProtect"`
+}
+
+// TickerPrice represents a ticker price
+type TickerPrice struct {
+	Symbol string `json:"symbol"`
+	Price  string `json:"price"`
+}
+
+// Ticker24hr represents 24hr ticker statistics
+type Ticker24hr struct {
+	Symbol             string `json:"symbol"`
+	PriceChange        string `json:"priceChange"`
+	PriceChangePercent string `json:"priceChangePercent"`
+	WeightedAvgPrice   string `json:"weightedAvgPrice"`
+	PrevClosePrice     string `json:"prevClosePrice"`
+	LastPrice          string `json:"lastPrice"`
+	LastQty            string `json:"lastQty"`
+	OpenPrice          string `json:"openPrice"`
+	HighPrice          string `json:"highPrice"`
+	LowPrice           string `json:"lowPrice"`
+	Volume             string `json:"volume"`
+	QuoteVolume        string `json:"quoteVolume"`
+	OpenTime           int64  `json:"openTime"`
+	CloseTime          int64  `json:"closeTime"`
+	Count              int64  `json:"count"`
 }
 
 // OrderRequest represents a Binance order request

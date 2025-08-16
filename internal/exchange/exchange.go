@@ -63,6 +63,9 @@ type Exchange interface {
 
 	// GetPositionByID returns position by ID
 	GetPositionByID(ctx context.Context, positionID string) (*Position, error)
+
+	// GetSymbolPrice returns the current price for a symbol
+	GetSymbolPrice(ctx context.Context, symbol string) (float64, error)
 }
 
 // BaseExchange provides common functionality for exchanges
