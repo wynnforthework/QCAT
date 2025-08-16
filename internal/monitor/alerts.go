@@ -1,31 +1,37 @@
 package monitor
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/smtp"
+	"strings"
 	"sync"
+	"text/template"
 	"time"
 )
 
 // AlertManager manages system alerts
 type AlertManager struct {
-	alerts     map[string]*Alert
-	rules      map[string]*AlertRule
-	channels   map[string]AlertChannel
-	mu         sync.RWMutex
+	alerts   map[string]*Alert
+	rules    map[string]*AlertRule
+	channels map[string]AlertChannel
+	mu       sync.RWMutex
 }
 
 // Alert represents a system alert
 type Alert struct {
-	ID          string
-	RuleID      string
-	Severity    AlertSeverity
-	Message     string
-	Details     map[string]interface{}
-	Status      AlertStatus
-	CreatedAt   time.Time
-	ResolvedAt  time.Time
-	ResolvedBy  string
+	ID         string
+	RuleID     string
+	Severity   AlertSeverity
+	Message    string
+	Details    map[string]interface{}
+	Status     AlertStatus
+	CreatedAt  time.Time
+	ResolvedAt time.Time
+	ResolvedBy string
 }
 
 // AlertSeverity represents alert severity level
@@ -71,12 +77,12 @@ type AlertChannel interface {
 
 // EmailChannel represents email alert channel
 type EmailChannel struct {
-	SMTPHost     string
-	SMTPPort     int
-	Username     string
-	Password     string
-	FromEmail    string
-	ToEmails     []string
+	SMTPHost  string
+	SMTPPort  int
+	Username  string
+	Password  string
+	FromEmail string
+	ToEmails  []string
 }
 
 // SlackChannel represents Slack alert channel
@@ -304,12 +310,151 @@ func (am *AlertManager) CleanupResolvedAlerts(age time.Duration) {
 
 // Send implements AlertChannel interface for EmailChannel
 func (ec *EmailChannel) Send(ctx context.Context, alert *Alert) error {
-	// TODO: Implement email sending logic
+	// 新增：实现邮件发送逻辑
+	// 构建邮件内容
+	subject := fmt.Sprintf("[%s] %s", strings.ToUpper(string(alert.Severity)), alert.Message)
+
+	// 新增：邮件模板
+	emailTemplate := `
+Alert Details:
+- ID: {{.ID}}
+- Severity: {{.Severity}}
+- Message: {{.Message}}
+- Created At: {{.CreatedAt.Format "2006-01-02 15:04:05"}}
+
+Details:
+{{range $key, $value := .Details}}
+- {{$key}}: {{$value}}
+{{end}}
+
+Please check the system immediately.
+`
+
+	// 解析模板
+	tmpl, err := template.New("alert").Parse(emailTemplate)
+	if err != nil {
+		return fmt.Errorf("failed to parse email template: %w", err)
+	}
+
+	// 执行模板
+	var body bytes.Buffer
+	if err := tmpl.Execute(&body, alert); err != nil {
+		return fmt.Errorf("failed to execute email template: %w", err)
+	}
+
+	// 构建邮件头
+	headers := make(map[string]string)
+	headers["From"] = ec.FromEmail
+	headers["To"] = strings.Join(ec.ToEmails, ", ")
+	headers["Subject"] = subject
+	headers["MIME-Version"] = "1.0"
+	headers["Content-Type"] = "text/plain; charset=UTF-8"
+
+	var emailBody bytes.Buffer
+	for key, value := range headers {
+		emailBody.WriteString(fmt.Sprintf("%s: %s\r\n", key, value))
+	}
+	emailBody.WriteString("\r\n")
+	emailBody.Write(body.Bytes())
+
+	// 发送邮件
+	auth := smtp.PlainAuth("", ec.Username, ec.Password, ec.SMTPHost)
+	addr := fmt.Sprintf("%s:%d", ec.SMTPHost, ec.SMTPPort)
+
+	if err := smtp.SendMail(addr, auth, ec.FromEmail, ec.ToEmails, emailBody.Bytes()); err != nil {
+		return fmt.Errorf("failed to send email: %w", err)
+	}
+
 	return nil
 }
 
 // Send implements AlertChannel interface for SlackChannel
 func (sc *SlackChannel) Send(ctx context.Context, alert *Alert) error {
-	// TODO: Implement Slack webhook sending logic
+	// 新增：实现Slack webhook发送逻辑
+
+	// 新增：构建Slack消息
+	slackMessage := map[string]interface{}{
+		"channel": sc.Channel,
+		"text":    fmt.Sprintf("🚨 *Alert: %s*", alert.Message),
+		"attachments": []map[string]interface{}{
+			{
+				"color": sc.getSeverityColor(alert.Severity),
+				"fields": []map[string]interface{}{
+					{
+						"title": "Alert ID",
+						"value": alert.ID,
+						"short": true,
+					},
+					{
+						"title": "Severity",
+						"value": string(alert.Severity),
+						"short": true,
+					},
+					{
+						"title": "Created At",
+						"value": alert.CreatedAt.Format("2006-01-02 15:04:05"),
+						"short": true,
+					},
+				},
+			},
+		},
+	}
+
+	// 新增：添加详细信息
+	if len(alert.Details) > 0 {
+		details := make([]string, 0, len(alert.Details))
+		for key, value := range alert.Details {
+			details = append(details, fmt.Sprintf("• %s: %v", key, value))
+		}
+
+		slackMessage["attachments"].([]map[string]interface{})[0]["fields"] = append(
+			slackMessage["attachments"].([]map[string]interface{})[0]["fields"].([]map[string]interface{}),
+			map[string]interface{}{
+				"title": "Details",
+				"value": strings.Join(details, "\n"),
+				"short": false,
+			},
+		)
+	}
+
+	// 序列化消息
+	jsonData, err := json.Marshal(slackMessage)
+	if err != nil {
+		return fmt.Errorf("failed to marshal Slack message: %w", err)
+	}
+
+	// 发送HTTP请求
+	req, err := http.NewRequestWithContext(ctx, "POST", sc.WebhookURL, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create HTTP request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send Slack webhook: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("Slack webhook returned status code: %d", resp.StatusCode)
+	}
+
 	return nil
+}
+
+// 新增：获取严重程度对应的颜色
+func (sc *SlackChannel) getSeverityColor(severity AlertSeverity) string {
+	switch severity {
+	case AlertSeverityInfo:
+		return "#36a64f" // 绿色
+	case AlertSeverityWarning:
+		return "#ff9500" // 橙色
+	case AlertSeverityCritical:
+		return "#ff0000" // 红色
+	default:
+		return "#808080" // 灰色
+	}
 }

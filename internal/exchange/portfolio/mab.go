@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/rand"
+	"slices"
 	"sync"
 	"time"
 )
@@ -179,15 +180,16 @@ func (s *MABScheduler) GetAllArms() []*Arm {
 		arms = append(arms, arm)
 	}
 
-	// Sort by UCB value
-	// TODO: Implement sorting or use slices.Sort
-	for i := 0; i < len(arms)-1; i++ {
-		for j := i + 1; j < len(arms); j++ {
-			if arms[i].UCB < arms[j].UCB {
-				arms[i], arms[j] = arms[j], arms[i]
-			}
+	// Sort by UCB value in descending order (highest UCB first)
+	slices.SortFunc(arms, func(a, b *Arm) int {
+		if a.UCB > b.UCB {
+			return -1
 		}
-	}
+		if a.UCB < b.UCB {
+			return 1
+		}
+		return 0
+	})
 
 	return arms
 }

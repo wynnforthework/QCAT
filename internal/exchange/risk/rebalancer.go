@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"sync"
 	"time"
 
@@ -77,7 +78,7 @@ func (r *Rebalancer) CheckAndRebalance(ctx context.Context) error {
 	needRebalance := false
 	for asset, targetRatio := range r.targetRatios {
 		currentRatio := currentRatios[asset]
-		if abs(currentRatio-targetRatio) > r.tolerance {
+		if math.Abs(currentRatio-targetRatio) > r.tolerance {
 			needRebalance = true
 			break
 		}
@@ -90,7 +91,7 @@ func (r *Rebalancer) CheckAndRebalance(ctx context.Context) error {
 	// 执行再平衡
 	for asset, targetRatio := range r.targetRatios {
 		currentRatio := currentRatios[asset]
-		if abs(currentRatio-targetRatio) <= r.tolerance {
+		if math.Abs(currentRatio-targetRatio) <= r.tolerance {
 			continue
 		}
 
@@ -116,7 +117,7 @@ func (r *Rebalancer) CheckAndRebalance(ctx context.Context) error {
 		order := &exch.OrderRequest{
 			Symbol:   pos.Symbol,
 			Type:     string(exch.OrderTypeMarket), // 显式转换为 string
-			Quantity: abs(sizeDiff),
+			Quantity: math.Abs(sizeDiff),
 		}
 
 		if sizeDiff > 0 {
@@ -134,12 +135,3 @@ func (r *Rebalancer) CheckAndRebalance(ctx context.Context) error {
 	r.lastRebalance = time.Now()
 	return nil
 }
-
-// abs returns the absolute value of x
-// TODO: Use math.Abs instead
-// func abs(x float64) float64 {
-// 	if x < 0 {
-// 		return -x
-// 	}
-// 	return x
-// }
