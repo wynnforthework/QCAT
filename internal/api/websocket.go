@@ -8,9 +8,10 @@ import (
 	"sync"
 	"time"
 
+	"qcat/internal/monitoring"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"qcat/internal/monitoring"
 )
 
 // WebSocketHandler handles WebSocket connections
@@ -23,18 +24,18 @@ type WebSocketHandler struct {
 
 // Client represents a WebSocket client
 type Client struct {
-	ID       string
-	Type     string
-	Conn     *websocket.Conn
-	Send     chan []byte
-	Handler  *WebSocketHandler
+	ID      string
+	Type    string
+	Conn    *websocket.Conn
+	Send    chan []byte
+	Handler *WebSocketHandler
 }
 
 // Message represents a WebSocket message
 type Message struct {
-	Type    string      `json:"type"`
-	Data    interface{} `json:"data"`
-	Time    time.Time   `json:"time"`
+	Type string      `json:"type"`
+	Data interface{} `json:"data"`
+	Time time.Time   `json:"time"`
 }
 
 // NewWebSocketHandler creates a new WebSocket handler
@@ -87,7 +88,7 @@ func (h *WebSocketHandler) MarketStream(c *gin.Context) {
 	msg := Message{
 		Type: "connected",
 		Data: map[string]interface{}{
-			"symbol": symbol,
+			"symbol":    symbol,
 			"client_id": clientID,
 		},
 		Time: time.Now(),
@@ -189,7 +190,7 @@ func (h *WebSocketHandler) registerClient(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.clients[client.ID] = client
-	
+
 	// Update metrics
 	h.metrics.SetActiveConnections(float64(len(h.clients)))
 }
@@ -200,7 +201,7 @@ func (h *WebSocketHandler) unregisterClient(client *Client) {
 	defer h.mu.Unlock()
 	delete(h.clients, client.ID)
 	close(client.Send)
-	
+
 	// Update metrics
 	h.metrics.SetActiveConnections(float64(len(h.clients)))
 }

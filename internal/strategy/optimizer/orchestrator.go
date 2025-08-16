@@ -6,6 +6,15 @@ import (
 	"time"
 )
 
+// 新增：Config represents optimization configuration
+type Config struct {
+	StrategyID string                 `json:"strategy_id"`
+	Method     string                 `json:"method"`
+	Params     map[string]interface{} `json:"params"`
+	Objective  string                 `json:"objective"`
+	CreatedAt  time.Time              `json:"created_at"`
+}
+
 // OptimizerTask represents an optimization task
 type OptimizerTask struct {
 	ID         string
@@ -47,6 +56,33 @@ func NewOrchestrator(checker *TriggerChecker, optimizer *WalkForwardOptimizer, d
 	}
 }
 
+// 新增：StartOptimization starts a new optimization task
+func (o *Orchestrator) StartOptimization(ctx context.Context, config *Config) (string, error) {
+	// 创建优化任务
+	task := &OptimizerTask{
+		ID:         generateTaskID(),
+		StrategyID: config.StrategyID,
+		Trigger:    config.Method,
+		Status:     TaskStatusPending,
+		Params:     config.Params,
+		CreatedAt:  config.CreatedAt,
+		UpdatedAt:  config.CreatedAt,
+	}
+
+	// 存储任务
+	o.tasks[task.ID] = task
+
+	// 异步执行优化任务
+	go func() {
+		if err := o.RunTask(ctx, task.ID); err != nil {
+			// 记录错误但不返回，因为这是异步执行
+			fmt.Printf("Optimization task %s failed: %v\n", task.ID, err)
+		}
+	}()
+
+	return task.ID, nil
+}
+
 // CreateTask creates a new optimization task
 func (o *Orchestrator) CreateTask(ctx context.Context, strategyID string, trigger string) (*OptimizerTask, error) {
 	task := &OptimizerTask{
@@ -80,12 +116,12 @@ func (o *Orchestrator) RunTask(ctx context.Context, taskID string) error {
 		Returns: []float64{0.01, -0.005, 0.02, -0.01, 0.015},
 		Prices:  []float64{100, 99.5, 101.5, 100.5, 102},
 	}
-	
+
 	paramSpace := map[string][2]float64{
 		"param1": {0.1, 0.5},
 		"param2": {10, 50},
 	}
-	
+
 	result, err := o.optimizer.Optimize(ctx, data, paramSpace)
 	if err != nil {
 		task.Status = TaskStatusFailed

@@ -6,7 +6,7 @@ import (
 
 	"qcat/internal/cache"
 	"qcat/internal/database"
-	"qcat/internal/monitoring"
+	"qcat/internal/monitor"
 	"qcat/internal/strategy/optimizer"
 
 	"github.com/gin-gonic/gin"
@@ -24,18 +24,22 @@ type Response struct {
 type OptimizerHandler struct {
 	db      *database.DB
 	redis   *cache.RedisCache
-	metrics *monitoring.Metrics
+	metrics *monitor.MetricsCollector
 	// 新增：优化器实例
 	optimizer *optimizer.Orchestrator
 }
 
 // NewOptimizerHandler creates a new optimizer handler
-func NewOptimizerHandler(db *database.DB, redis *cache.RedisCache, metrics *monitoring.Metrics) *OptimizerHandler {
+func NewOptimizerHandler(db *database.DB, redis *cache.RedisCache, metrics *monitor.MetricsCollector) *OptimizerHandler {
+	// 新增：使用工厂创建优化器实例
+	factory := optimizer.NewFactory()
+	orchestrator := factory.CreateOrchestrator()
+
 	return &OptimizerHandler{
 		db:        db,
 		redis:     redis,
 		metrics:   metrics,
-		optimizer: optimizer.NewOrchestrator(), // 新增：创建优化器实例
+		optimizer: orchestrator, // 新增：创建优化器实例
 	}
 }
 
@@ -249,13 +253,13 @@ func (h *OptimizerHandler) GetResults(c *gin.Context) {
 type StrategyHandler struct {
 	db      *database.DB
 	redis   *cache.RedisCache
-	metrics *monitoring.Metrics
+	metrics *monitor.MetricsCollector
 	// 新增：策略管理器
 	strategyManager interface{} // 新增：策略管理器接口
 }
 
 // NewStrategyHandler creates a new strategy handler
-func NewStrategyHandler(db *database.DB, redis *cache.RedisCache, metrics *monitoring.Metrics) *StrategyHandler {
+func NewStrategyHandler(db *database.DB, redis *cache.RedisCache, metrics *monitor.MetricsCollector) *StrategyHandler {
 	return &StrategyHandler{
 		db:              db,
 		redis:           redis,
@@ -730,13 +734,13 @@ func (h *StrategyHandler) RunBacktest(c *gin.Context) {
 type PortfolioHandler struct {
 	db      *database.DB
 	redis   *cache.RedisCache
-	metrics *monitoring.Metrics
+	metrics *monitor.MetricsCollector
 	// 新增：投资组合管理器
 	portfolioManager interface{} // 新增：投资组合管理器接口
 }
 
 // NewPortfolioHandler creates a new portfolio handler
-func NewPortfolioHandler(db *database.DB, redis *cache.RedisCache, metrics *monitoring.Metrics) *PortfolioHandler {
+func NewPortfolioHandler(db *database.DB, redis *cache.RedisCache, metrics *monitor.MetricsCollector) *PortfolioHandler {
 	return &PortfolioHandler{
 		db:               db,
 		redis:            redis,
@@ -1016,13 +1020,13 @@ func (h *PortfolioHandler) GetHistory(c *gin.Context) {
 type RiskHandler struct {
 	db      *database.DB
 	redis   *cache.RedisCache
-	metrics *monitoring.Metrics
+	metrics *monitor.MetricsCollector
 	// 新增：风控管理器
 	riskManager interface{} // 新增：风控管理器接口
 }
 
 // NewRiskHandler creates a new risk handler
-func NewRiskHandler(db *database.DB, redis *cache.RedisCache, metrics *monitoring.Metrics) *RiskHandler {
+func NewRiskHandler(db *database.DB, redis *cache.RedisCache, metrics *monitor.MetricsCollector) *RiskHandler {
 	return &RiskHandler{
 		db:          db,
 		redis:       redis,
@@ -1445,13 +1449,13 @@ func (h *RiskHandler) GetViolations(c *gin.Context) {
 type HotlistHandler struct {
 	db      *database.DB
 	redis   *cache.RedisCache
-	metrics *monitoring.Metrics
+	metrics *monitor.MetricsCollector
 	// 新增：热门币种管理器
 	hotlistManager interface{} // 新增：热门币种管理器接口
 }
 
 // NewHotlistHandler creates a new hotlist handler
-func NewHotlistHandler(db *database.DB, redis *cache.RedisCache, metrics *monitoring.Metrics) *HotlistHandler {
+func NewHotlistHandler(db *database.DB, redis *cache.RedisCache, metrics *monitor.MetricsCollector) *HotlistHandler {
 	return &HotlistHandler{
 		db:             db,
 		redis:          redis,
@@ -1759,12 +1763,12 @@ func (h *HotlistHandler) RemoveFromWhitelist(c *gin.Context) {
 
 // MetricsHandler handles metrics-related API requests
 type MetricsHandler struct {
-	metrics *monitoring.Metrics
+	metrics *monitor.MetricsCollector
 	db      *database.DB // 新增：数据库引用
 }
 
 // NewMetricsHandler creates a new metrics handler
-func NewMetricsHandler(metrics *monitoring.Metrics, db *database.DB) *MetricsHandler {
+func NewMetricsHandler(db *database.DB, metrics *monitor.MetricsCollector) *MetricsHandler {
 	return &MetricsHandler{
 		metrics: metrics,
 		db:      db, // 新增：初始化数据库引用
@@ -1902,11 +1906,11 @@ func (h *MetricsHandler) GetPerformanceMetrics(c *gin.Context) {
 // AuditHandler handles audit-related API requests
 type AuditHandler struct {
 	db      *database.DB
-	metrics *monitoring.Metrics
+	metrics *monitor.MetricsCollector
 }
 
 // NewAuditHandler creates a new audit handler
-func NewAuditHandler(db *database.DB, metrics *monitoring.Metrics) *AuditHandler {
+func NewAuditHandler(db *database.DB, metrics *monitor.MetricsCollector) *AuditHandler {
 	return &AuditHandler{
 		db:      db,
 		metrics: metrics,

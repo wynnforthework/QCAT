@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -45,11 +46,15 @@ func NewRedisCache(cfg *Config) (*RedisCache, error) {
 
 // Get retrieves a value from cache
 func (r *RedisCache) Get(ctx context.Context, key string, dest interface{}) error {
-	_, err := r.client.Get(ctx, key).Result()
+	result, err := r.client.Get(ctx, key).Result()
 	if err != nil {
 		return err
 	}
-	// TODO: Implement proper deserialization
+
+	// Implement proper deserialization
+	if dest != nil {
+		return json.Unmarshal([]byte(result), dest)
+	}
 	return nil
 }
 
@@ -70,11 +75,15 @@ func (r *RedisCache) Incr(ctx context.Context, key string) (int64, error) {
 
 // HGet retrieves a field from a hash
 func (r *RedisCache) HGet(ctx context.Context, key, field string, dest interface{}) error {
-	_, err := r.client.HGet(ctx, key, field).Result()
+	result, err := r.client.HGet(ctx, key, field).Result()
 	if err != nil {
 		return err
 	}
-	// TODO: Implement proper deserialization to dest
+
+	// Implement proper deserialization to dest
+	if dest != nil {
+		return json.Unmarshal([]byte(result), dest)
+	}
 	return nil
 }
 
@@ -131,16 +140,30 @@ func (r *RedisCache) RPush(ctx context.Context, key string, values ...interface{
 
 // LPop pops a value from the left of a list
 func (r *RedisCache) LPop(ctx context.Context, key string, dest interface{}) error {
-	_, err := r.client.LPop(ctx, key).Result()
-	// TODO: Implement proper deserialization
-	return err
+	result, err := r.client.LPop(ctx, key).Result()
+	if err != nil {
+		return err
+	}
+
+	// Implement proper deserialization
+	if dest != nil {
+		return json.Unmarshal([]byte(result), dest)
+	}
+	return nil
 }
 
 // RPop pops a value from the right of a list
 func (r *RedisCache) RPop(ctx context.Context, key string, dest interface{}) error {
-	_, err := r.client.RPop(ctx, key).Result()
-	// TODO: Implement proper deserialization
-	return err
+	result, err := r.client.RPop(ctx, key).Result()
+	if err != nil {
+		return err
+	}
+
+	// Implement proper deserialization
+	if dest != nil {
+		return json.Unmarshal([]byte(result), dest)
+	}
+	return nil
 }
 
 // LRange retrieves a range of elements from a list

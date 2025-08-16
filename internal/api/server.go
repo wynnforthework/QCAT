@@ -12,6 +12,7 @@ import (
 	"qcat/internal/cache"
 	"qcat/internal/config"
 	"qcat/internal/database"
+	"qcat/internal/monitor"
 	"qcat/internal/monitoring"
 	"qcat/internal/stability"
 
@@ -30,14 +31,15 @@ type Server struct {
 	handlers   *Handlers
 
 	// Core services
-	db         *database.DB
-	redis      cache.Cacher
-	jwtManager *auth.JWTManager
-	metrics    *monitoring.Metrics
-	memory     *stability.MemoryManager
-	network    *stability.NetworkReconnectManager
-	health     *stability.HealthChecker
-	shutdown   *stability.GracefulShutdownManager
+	db               *database.DB
+	redis            cache.Cacher
+	jwtManager       *auth.JWTManager
+	metrics          *monitoring.Metrics
+	metricsCollector *monitor.MetricsCollector
+	memory           *stability.MemoryManager
+	network          *stability.NetworkReconnectManager
+	health           *stability.HealthChecker
+	shutdown         *stability.GracefulShutdownManager
 }
 
 // Handlers contains all API handlers
@@ -217,7 +219,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 	jwtManager := auth.NewJWTManager(cfg.JWT.SecretKey, cfg.JWT.Duration)
 	metrics := monitoring.NewMetrics()
-
+	metricsCollector := monitor.NewMetricsCollector()
 	// Initialize memory manager with configuration
 	memoryConfig := &stability.MemoryConfig{
 		MonitorInterval:      cfg.Memory.MonitorInterval,
@@ -281,14 +283,15 @@ func NewServer(cfg *config.Config) (*Server, error) {
 				return true // Allow all origins for now
 			},
 		},
-		db:         db,
-		redis:      redis,
-		jwtManager: jwtManager,
-		metrics:    metrics,
-		memory:     memory,
-		network:    network,
-		health:     health,
-		shutdown:   shutdown,
+		db:               db,
+		redis:            redis,
+		jwtManager:       jwtManager,
+		metrics:          metrics,
+		metricsCollector: metricsCollector,
+		memory:           memory,
+		network:          network,
+		health:           health,
+		shutdown:         shutdown,
 	}
 
 	// Set up database connection pool monitoring
@@ -298,13 +301,13 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 	// Initialize handlers with dependencies
 	server.handlers = &Handlers{
-		Optimizer: NewOptimizerHandler(db, redis, metrics),
-		Strategy:  NewStrategyHandler(db, redis, metrics),
-		Portfolio: NewPortfolioHandler(db, redis, metrics),
-		Risk:      NewRiskHandler(db, redis, metrics),
-		Hotlist:   NewHotlistHandler(db, redis, metrics),
-		Metrics:   NewMetricsHandler(metrics),
-		Audit:     NewAuditHandler(db, metrics),
+		Optimizer: NewOptimizerHandler(db, redis, metricsCollector),
+		Strategy:  NewStrategyHandler(db, redis, metricsCollector),
+		Portfolio: NewPortfolioHandler(db, redis, metricsCollector),
+		Risk:      NewRiskHandler(db, redis, metricsCollector),
+		Hotlist:   NewHotlistHandler(db, redis, metricsCollector),
+		Metrics:   NewMetricsHandler(db, metricsCollector),
+		Audit:     NewAuditHandler(db, metricsCollector),
 		WebSocket: NewWebSocketHandler(server.upgrader, metrics),
 		Auth:      NewAuthHandler(jwtManager, db),
 	}
