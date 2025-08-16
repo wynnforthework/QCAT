@@ -45,10 +45,13 @@ func (d *OverfitDetector) CheckOverfitting(ctx context.Context, inSample, outSam
 	}
 	result.PBOScore = pbo
 
-	// 执行参数敏感度分析（使用模拟数据）
-	// 由于PerformanceStats结构体中没有Returns字段，使用模拟数据
-	simulatedReturns := []float64{0.01, -0.005, 0.02, -0.01, 0.015}
-	sensitivity, err := d.analyzeSensitivity(simulatedReturns)
+	// 执行参数敏感度分析（使用真实数据）
+	// 现在PerformanceStats结构体已经包含Returns字段，使用真实数据
+	if len(inSample.Returns) == 0 {
+		return nil, fmt.Errorf("no returns data available for sensitivity analysis")
+	}
+	
+	sensitivity, err := d.analyzeSensitivity(inSample.Returns)
 	if err != nil {
 		return nil, fmt.Errorf("failed to analyze sensitivity: %w", err)
 	}
@@ -75,15 +78,29 @@ func (d *OverfitDetector) calculateDeflatedSharpe(stats *backtest.PerformanceSta
 		return 0, nil
 	}
 
-	// 计算收缩夏普比率
-	// 由于PerformanceStats结构体中没有Returns字段，使用简化计算
-	n := 100 // 假设样本量
-	if n < d.config.MinSamples {
-		return 0, fmt.Errorf("insufficient samples for DSR calculation")
+	// 使用真实的收益率数据计算收缩夏普比率
+	if len(stats.Returns) == 0 {
+		return 0, fmt.Errorf("no returns data available for DSR calculation")
 	}
 
-	// 使用简化的收缩因子计算
-	shrinkage := math.Sqrt(float64(n-1) / float64(n))
+	n := len(stats.Returns)
+	if n < d.config.MinSamples {
+		return 0, fmt.Errorf("insufficient samples for DSR calculation: %d < %d", n, d.config.MinSamples)
+	}
+
+	// 计算收益率的自相关性
+	autocorr := calculateAutocorrelation(stats.Returns)
+	
+	// 计算有效样本数（考虑自相关性）
+	effectiveN := float64(n) * (1 - autocorr) / (1 + autocorr)
+	if effectiveN <= 1 {
+		effectiveN = 1
+	}
+
+	// 计算收缩因子
+	shrinkage := math.Sqrt((effectiveN - 1) / effectiveN)
+	
+	// 应用收缩因子
 	dsr := stats.SharpeRatio * shrinkage
 
 	return dsr, nil
@@ -91,9 +108,73 @@ func (d *OverfitDetector) calculateDeflatedSharpe(stats *backtest.PerformanceSta
 
 // performPBOTest performs Probability of Backtest Overfitting test
 func (d *OverfitDetector) performPBOTest(inSample, outSample *backtest.PerformanceStats) (float64, error) {
-	// 使用模拟数据进行PBO检验
-	// 由于PerformanceStats结构体中没有Returns字段，使用模拟数据
-	return 0.5, nil
+	// 使用真实数据进行PBO检验
+	if len(inSample.Returns) == 0 || len(outSample.Returns) == 0 {
+		return 0, fmt.Errorf("insufficient returns data for PBO test")
+	}
+
+	// 计算样本内和样本外的夏普比率
+	inSampleSharpe := inSample.SharpeRatio
+	outSampleSharpe := outSample.SharpeRatio
+
+	// 如果样本外表现显著差于样本内，则可能存在过拟合
+	if inSampleSharpe <= 0 {
+		return 1.0, nil // 如果样本内夏普比率为负，认为过拟合概率为100%
+	}
+
+	// 计算性能衰减比率
+	performanceDecay := (inSampleSharpe - outSampleSharpe) / inSampleSharpe
+	
+	// 基于性能衰减计算PBO概率
+	// 如果样本外表现比样本内差50%以上，认为过拟合概率很高
+	pboScore := math.Max(0, math.Min(1, performanceDecay*2))
+
+	// 考虑统计显著性
+	// 计算t统计量来评估差异的显著性
+	n1, n2 := len(inSample.Returns), len(outSample.Returns)
+	if n1 > 1 && n2 > 1 {
+		// 计算合并方差
+		var1 := d.calculateVariance(inSample.Returns)
+		var2 := d.calculateVariance(outSample.Returns)
+		pooledVar := ((float64(n1-1)*var1 + float64(n2-1)*var2) / float64(n1+n2-2))
+		
+		if pooledVar > 0 {
+			// 计算标准误差
+			se := math.Sqrt(pooledVar * (1.0/float64(n1) + 1.0/float64(n2)))
+			
+			// 计算t统计量
+			tStat := math.Abs(inSampleSharpe - outSampleSharpe) / se
+			
+			// 如果t统计量大于临界值（约1.96对应95%置信水平），调整PBO分数
+			if tStat > 1.96 {
+				pboScore = math.Min(1.0, pboScore*1.5)
+			}
+		}
+	}
+
+	return pboScore, nil
+}
+
+// calculateVariance calculates the variance of returns
+func (d *OverfitDetector) calculateVariance(returns []float64) float64 {
+	if len(returns) <= 1 {
+		return 0
+	}
+
+	mean := 0.0
+	for _, r := range returns {
+		mean += r
+	}
+	mean /= float64(len(returns))
+
+	variance := 0.0
+	for _, r := range returns {
+		diff := r - mean
+		variance += diff * diff
+	}
+	variance /= float64(len(returns) - 1)
+
+	return variance
 }
 
 // analyzeSensitivity analyzes parameter sensitivity

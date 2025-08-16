@@ -5,6 +5,10 @@ import (
 	"math"
 	"math/rand"
 	"sort"
+	"time"
+
+	"qcat/internal/config"
+	"qcat/internal/market"
 )
 
 // SearchAlgorithm defines the interface for optimization algorithms
@@ -20,9 +24,15 @@ type GridSearcher struct {
 
 // NewGridSearcher creates a new grid searcher
 func NewGridSearcher(paramSpace map[string][2]float64) *GridSearcher {
+	// Get grid size from configuration
+	gridSize := 10 // Default fallback
+	if config := config.GetAlgorithmConfig(); config != nil {
+		gridSize = config.GetGridSize()
+	}
+	
 	return &GridSearcher{
 		paramSpace: paramSpace,
-		gridSize:   10, // 每个维度10个点
+		gridSize:   gridSize,
 	}
 }
 
@@ -281,7 +291,12 @@ func evaluateParams(ctx context.Context, data *DataSet, params map[string]float6
 
 // DataSet represents a dataset for optimization
 type DataSet struct {
-	Returns []float64
-	Prices  []float64
-	Volume  []float64
+	Symbol     string             `json:"symbol"`
+	Returns    []float64          `json:"returns"`
+	Prices     []float64          `json:"prices"`
+	Volumes    []float64          `json:"volumes"`
+	Timestamps []time.Time        `json:"timestamps"`
+	Trades     []*market.Trade    `json:"trades,omitempty"`
+	StartTime  time.Time          `json:"start_time"`
+	EndTime    time.Time          `json:"end_time"`
 }

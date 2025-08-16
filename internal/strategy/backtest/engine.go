@@ -122,18 +122,38 @@ type Result struct {
 	PerformanceStats *PerformanceStats
 }
 
-// PerformanceStats represents performance statistics
+// PerformanceStats represents comprehensive performance statistics
 type PerformanceStats struct {
-	Returns        []float64
-	TotalReturn    float64
-	AnnualReturn   float64
-	SharpeRatio    float64
-	MaxDrawdown    float64
-	WinRate        float64
-	ProfitFactor   float64
-	TradeCount     int
-	AvgTradeReturn float64
-	AvgHoldingTime time.Duration
+	// 基础收益指标
+	Returns         []float64 `json:"returns"`          // 收益率序列
+	DailyReturns    []float64 `json:"daily_returns"`    // 日收益率
+	TotalReturn     float64   `json:"total_return"`     // 总收益率
+	AnnualReturn    float64   `json:"annual_return"`    // 年化收益率
+	
+	// 风险指标
+	Volatility      float64   `json:"volatility"`       // 波动率
+	SharpeRatio     float64   `json:"sharpe_ratio"`     // 夏普比率
+	SortinoRatio    float64   `json:"sortino_ratio"`    // Sortino比率
+	CalmarRatio     float64   `json:"calmar_ratio"`     // Calmar比率
+	MaxDrawdown     float64   `json:"max_drawdown"`     // 最大回撤
+	
+	// 分布特征
+	Skewness        float64   `json:"skewness"`         // 偏度
+	Kurtosis        float64   `json:"kurtosis"`         // 峰度
+	VaR95           float64   `json:"var_95"`           // 95% VaR
+	VaR99           float64   `json:"var_99"`           // 99% VaR
+	
+	// 交易统计
+	WinRate         float64   `json:"win_rate"`         // 胜率
+	ProfitFactor    float64   `json:"profit_factor"`    // 盈利因子
+	TradeCount      int       `json:"trade_count"`      // 交易次数
+	AvgTradeReturn  float64   `json:"avg_trade_return"` // 平均交易收益
+	AvgHoldingTime  time.Duration `json:"avg_holding_time"` // 平均持仓时间
+	
+	// 时间相关
+	StartDate       time.Time `json:"start_date"`       // 开始日期
+	EndDate         time.Time `json:"end_date"`         // 结束日期
+	TradingDays     int       `json:"trading_days"`     // 交易天数
 }
 
 // SlippageModel defines the interface for slippage models

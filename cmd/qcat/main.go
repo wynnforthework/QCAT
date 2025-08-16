@@ -10,6 +10,7 @@ import (
 
 	"qcat/internal/api"
 	"qcat/internal/config"
+	"qcat/internal/orchestrator"
 )
 
 func main() {
@@ -21,11 +22,23 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
+	// Initialize orchestrator
+	orch := orchestrator.NewOrchestrator()
+	
+	// Start orchestrator
+	if err := orch.Start(); err != nil {
+		log.Fatalf("Failed to start orchestrator: %v", err)
+	}
+
 	// Create API server
 	server, err := api.NewServer(cfg)
 	if err != nil {
 		log.Fatalf("Failed to create server: %v", err)
 	}
+	
+	// Add orchestrator handler to server
+	orchHandler := api.NewOrchestratorHandler(orch)
+	server.RegisterOrchestratorHandler(orchHandler)
 
 	// Start graceful shutdown manager
 	shutdownManager := server.GetShutdownManager()
@@ -35,6 +48,11 @@ func main() {
 
 	// Register shutdown components
 	if shutdownManager != nil {
+		// Register orchestrator
+		shutdownManager.RegisterComponent("orchestrator", "Process Orchestrator", 0, func(ctx context.Context) error {
+			return orch.Shutdown()
+		}, 15*time.Second)
+
 		// Register HTTP server
 		shutdownManager.RegisterComponent("http_server", "HTTP API Server", 1, func(ctx context.Context) error {
 			return server.Stop(ctx)

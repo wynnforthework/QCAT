@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"qcat/internal/cache"
+	"qcat/internal/common"
 	"qcat/internal/database"
 	"qcat/internal/monitor"
 	"qcat/internal/strategy/optimizer"
@@ -2279,7 +2280,5 @@ func (h *AuditHandler) ExportReport(c *gin.Context) {
 
 // 新增：生成UUID的辅助函数
 func generateUUID() string {
-	// 这里应该使用真实的UUID生成库
-	// 为了简化，使用时间戳作为临时ID
-	return "id_" + time.Now().Format("20060102150405")
+	return common.GenerateUUID()
 }

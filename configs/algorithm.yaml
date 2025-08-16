@@ -1,0 +1,229 @@
+# Algorithm Configuration
+# This file contains configurable parameters for various algorithms and strategies
+
+# Strategy Optimizer Configuration
+optimizer:
+  # Grid Search Parameters
+  grid_search:
+    default_grid_size: 10
+    max_iterations: 1000
+    convergence_threshold: 0.001
+    
+  # Bayesian Optimization Parameters
+  bayesian:
+    acquisition_function: "EI"  # Expected Improvement
+    n_initial_points: 10
+    n_calls: 100
+    random_state: 42
+    
+  # CMA-ES Parameters
+  cma_es:
+    population_size: 20
+    sigma: 0.1
+    max_generations: 100
+    
+  # Genetic Algorithm Parameters
+  genetic:
+    population_size: 50
+    mutation_rate: 0.1
+    crossover_rate: 0.8
+    max_generations: 100
+    elite_size: 5
+    
+  # Walk-Forward Optimization
+  walk_forward:
+    train_ratio: 0.7
+    validation_ratio: 0.15
+    test_ratio: 0.15
+    min_samples: 100
+    step_size: 30  # days
+
+# Strategy Elimination Configuration
+elimination:
+  window_size_days: 20
+  min_trades: 50
+  performance_threshold: 0.05
+  correlation_threshold: 0.8
+  volatility_threshold: 0.3
+  
+  # Multi-armed bandit parameters
+  bandit:
+    exploration_rate: 0.1
+    decay_rate: 0.99
+    min_exploration: 0.01
+    confidence_level: 0.95
+
+# Risk Management Configuration
+risk_management:
+  # Position sizing
+  position:
+    max_weight_percent: 20.0
+    min_weight_percent: 1.0
+    rebalance_threshold: 5.0
+    max_leverage: 10
+    
+  # Stop loss parameters
+  stop_loss:
+    default_atr_multiplier: 2.0
+    trailing_stop_percent: 1.0
+    max_stop_loss_percent: 10.0
+    min_stop_loss_percent: 0.5
+    
+  # Margin management
+  margin:
+    max_margin_ratio: 80.0
+    warning_margin_ratio: 70.0
+    maintenance_margin_ratio: 50.0
+    liquidation_margin_ratio: 20.0
+
+# Overfitting Detection Configuration
+overfitting:
+  min_samples: 100
+  confidence_level: 0.95
+  pbo_threshold: 0.5
+  deflated_sharpe_threshold: 1.0
+  sensitivity_threshold: 0.3
+  
+  # Cross-validation parameters
+  cross_validation:
+    n_folds: 5
+    shuffle: true
+    random_state: 42
+
+# Performance Metrics Configuration
+performance:
+  # Risk-free rate (annual)
+  risk_free_rate: 0.02
+  
+  # Trading days per year
+  trading_days_per_year: 252
+  
+  # Benchmark configuration
+  benchmark:
+    symbol: "BTCUSDT"
+    rebalance_frequency: "monthly"
+    
+  # Metrics calculation
+  metrics:
+    rolling_window_days: 30
+    var_confidence_levels: [0.95, 0.99]
+    max_drawdown_lookback_days: 365
+
+# Market Data Configuration
+market_data:
+  # Data quality thresholds
+  quality:
+    max_latency_ms: 5000
+    max_gap_duration_seconds: 30
+    min_quality_score: 0.95
+    outlier_threshold_std: 3.0
+    
+  # Sampling configuration
+  sampling:
+    tick_sample_rate: 100  # milliseconds
+    kline_intervals: ["1m", "5m", "15m", "1h", "4h", "1d"]
+    orderbook_depth: 20
+    
+  # Storage configuration
+  storage:
+    retention_days: 90
+    compression_enabled: true
+    batch_size: 1000
+
+# Hotlist Configuration
+hotlist:
+  # Scoring weights
+  scoring:
+    volume_weight: 0.3
+    volatility_weight: 0.25
+    momentum_weight: 0.2
+    funding_rate_weight: 0.15
+    open_interest_weight: 0.1
+    
+  # Thresholds
+  thresholds:
+    min_volume_24h: 1000000  # $1M
+    min_market_cap: 10000000  # $10M
+    max_volatility: 0.5  # 50%
+    
+  # Update frequency
+  update_interval_minutes: 60
+  top_n_symbols: 50
+
+# Monitoring Configuration
+monitoring:
+  # Alert thresholds
+  alerts:
+    high_latency_ms: 1000
+    error_rate_percent: 5.0
+    memory_usage_percent: 80.0
+    cpu_usage_percent: 80.0
+    
+  # Health check intervals
+  health_check:
+    interval_seconds: 30
+    timeout_seconds: 10
+    retry_count: 3
+    
+  # Metrics collection
+  metrics:
+    collection_interval_seconds: 60
+    retention_hours: 168  # 7 days
+    aggregation_intervals: ["1m", "5m", "1h", "1d"]
+
+# Backtesting Configuration
+backtesting:
+  # Default parameters
+  default:
+    initial_capital: 100000.0
+    commission_rate: 0.001  # 0.1%
+    slippage_rate: 0.0005   # 0.05%
+    
+  # Execution simulation
+  execution:
+    fill_probability: 0.95
+    partial_fill_enabled: true
+    market_impact_model: "linear"
+    latency_simulation_ms: 50
+    
+  # Risk simulation
+  risk:
+    margin_call_enabled: true
+    liquidation_enabled: true
+    funding_rate_enabled: true
+    
+# Automation Configuration
+automation:
+  # Rebalancing
+  rebalancing:
+    frequency: "daily"
+    time_utc: "00:00"
+    min_rebalance_amount: 100.0
+    
+  # Optimization scheduling
+  optimization:
+    frequency: "weekly"
+    day_of_week: "sunday"
+    time_utc: "02:00"
+    
+  # Risk monitoring
+  risk_monitoring:
+    check_interval_seconds: 5
+    alert_cooldown_minutes: 5
+    
+# Logging Configuration
+logging:
+  # Log levels by component
+  levels:
+    default: "info"
+    optimizer: "debug"
+    risk_engine: "warn"
+    market_data: "info"
+    
+  # Output configuration
+  output:
+    console_enabled: true
+    file_enabled: true
+    file_path: "logs/qcat.log"
+    max_file_size_mb: 100
+    max_backup_files: 10

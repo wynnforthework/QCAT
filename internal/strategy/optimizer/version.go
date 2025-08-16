@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"qcat/internal/config"
 	"qcat/internal/strategy/sdk"
 )
 
@@ -95,8 +96,13 @@ func (m *VersionManager) EnableCanary(ctx context.Context, versionID string, all
 	}
 
 	// 检查资金分配比例
-	if allocation <= 0 || allocation > 0.2 { // 最多20%资金用于canary
-		return fmt.Errorf("invalid canary allocation: %.2f", allocation)
+	maxAllocation := 0.2 // Default fallback
+	if config := config.GetAlgorithmConfig(); config != nil {
+		maxAllocation = config.GetMaxWeight()
+	}
+	
+	if allocation <= 0 || allocation > maxAllocation {
+		return fmt.Errorf("invalid canary allocation: %.2f (max: %.2f)", allocation, maxAllocation)
 	}
 
 	version.Status = VersionStatusCanary

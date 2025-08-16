@@ -7,6 +7,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"qcat/internal/config"
 )
 
 // EliminationManager manages strategy elimination
@@ -56,7 +58,10 @@ func (m *EliminationManager) UpdateStrategyMetrics(id string, returns []float64)
 	state.Returns = returns
 
 	// 计算滚动窗口指标
-	windowSize := 20 // 20天窗口
+	windowSize := 20 // Default fallback
+	if config := config.GetAlgorithmConfig(); config != nil {
+		windowSize = config.GetWindowSize()
+	}
 	if len(returns) >= windowSize {
 		state.RollingReturns = calculateRollingReturns(returns, windowSize)
 		state.RollingVol = calculateRollingVolatility(returns, windowSize)
@@ -112,8 +117,13 @@ func (m *EliminationManager) EvaluateStrategies(ctx context.Context) ([]*Elimina
 		return scores[sortedStrategies[i]] < scores[sortedStrategies[j]]
 	})
 
-	// 选择末尾20%作为淘汰候选
-	eliminationCount := int(float64(len(sortedStrategies)) * 0.2)
+	// 选择末尾策略作为淘汰候选
+	eliminationRatio := 0.2 // Default fallback
+	if config := config.GetAlgorithmConfig(); config != nil {
+		eliminationRatio = config.Elimination.PerformanceThreshold
+	}
+	
+	eliminationCount := int(float64(len(sortedStrategies)) * eliminationRatio)
 	for i := 0; i < eliminationCount && i < len(sortedStrategies); i++ {
 		id := sortedStrategies[i]
 		candidates = append(candidates, &EliminationCandidate{

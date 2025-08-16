@@ -181,7 +181,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 	// Initialize core services
 	var db *database.DB
-	var redis *cache.RedisCache
+	var redis cache.Cacher
 	var err error
 
 	// Try to connect to database, but don't fail if unavailable
@@ -204,17 +204,33 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		db = nil
 	}
 
-	// Try to connect to Redis, but don't fail if unavailable
-	redis, err = cache.NewRedisCache(&cache.Config{
-		Addr:     cfg.Redis.Addr,
-		Password: cfg.Redis.Password,
-		DB:       cfg.Redis.DB,
-		PoolSize: cfg.Redis.PoolSize,
+	// Initialize cache with fallback support
+	cacheFactory := cache.NewCacheFactory(&cache.CacheFactoryConfig{
+		RedisEnabled:      true,
+		RedisAddr:         cfg.Redis.Addr,
+		RedisPassword:     cfg.Redis.Password,
+		RedisDB:           cfg.Redis.DB,
+		RedisPoolSize:     cfg.Redis.PoolSize,
+		MemoryEnabled:     true,
+		MemoryMaxSize:     10000,
+		DatabaseEnabled:   db != nil,
+		DatabaseTableName: "cache_entries",
+		FallbackConfig:    cache.DefaultFallbackConfig(),
 	})
+
+	cacheManager, err := cacheFactory.CreateCache(db)
 	if err != nil {
-		log.Printf("Warning: Failed to connect to Redis: %v", err)
-		log.Printf("Server will start without Redis support")
-		redis = nil
+		log.Printf("Warning: Failed to create cache manager: %v", err)
+		log.Printf("Server will start with memory-only cache")
+		cacheManager = cacheFactory.CreateMemoryOnlyCache()
+	}
+
+	// Create cache adapter to maintain interface compatibility
+	if cacheManager, ok := cacheManager.(*cache.CacheManager); ok {
+		redis = cache.NewCacheAdapter(cacheManager)
+	} else {
+		// If it's already a Cacher (memory-only cache), use it directly
+		redis = cacheManager
 	}
 
 	jwtManager := auth.NewJWTManager(cfg.JWT.SecretKey, cfg.JWT.Duration)
@@ -866,4 +882,23 @@ func (s *Server) GetNetworkManager() *stability.NetworkReconnectManager {
 // GetHealthChecker returns the health checker
 func (s *Server) GetHealthChecker() *stability.HealthChecker {
 	return s.health
+}
+
+// RegisterOrchestratorHandler registers the orchestrator handler routes
+func (s *Server) RegisterOrchestratorHandler(handler *OrchestratorHandler) {
+	// Add orchestrator routes to the protected API group
+	v1 := s.router.Group("/api/v1")
+	protected := v1.Group("")
+	protected.Use(s.jwtManager.AuthMiddleware())
+	
+	orchestrator := protected.Group("/orchestrator")
+	{
+		orchestrator.GET("/status", handler.handleStatus)
+		orchestrator.GET("/services", handler.handleServices)
+		orchestrator.POST("/services/start", handler.handleStartService)
+		orchestrator.POST("/services/stop", handler.handleStopService)
+		orchestrator.POST("/services/restart", handler.handleRestartService)
+		orchestrator.POST("/optimize", handler.handleOptimize)
+		orchestrator.GET("/health", handler.handleHealth)
+	}
 }

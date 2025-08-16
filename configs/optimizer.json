@@ -1,0 +1,20 @@
+{
+  "port": 8081,
+  "message_queue": "memory",
+  "redis_addr": "localhost:6379",
+  "log_level": "info",
+  "optimization": {
+    "max_concurrent_jobs": 4,
+    "job_timeout": "30m",
+    "result_cache_ttl": "1h"
+  },
+  "health_check": {
+    "enabled": true,
+    "interval": "30s",
+    "timeout": "5s"
+  },
+  "metrics": {
+    "enabled": true,
+    "collection_interval": "10s"
+  }
+}

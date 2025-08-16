@@ -5,8 +5,13 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"sync"
 	"time"
+
+	"qcat/internal/market/binance"
+	"qcat/internal/market/quality"
+	"qcat/internal/market/storage"
 )
 
 // Subscription represents a market data subscription
@@ -25,181 +30,307 @@ func (s *channelSubscription) Close() {
 	s.cancel()
 }
 
-// Ingestor manages market data collection
+// Ingestor manages market data collection with real Binance integration
 type Ingestor struct {
-	db       *sql.DB
-	wsClient *WSClient
-	mu       sync.RWMutex // 保护并发访问
+	db            *sql.DB
+	binanceClient *binance.Client
+	binanceWS     *binance.WSClient
+	storage       *storage.Storage
+	qualityMonitor *quality.Monitor
+	mu            sync.RWMutex
 
-	// 新增：延迟监控
-	latencyHistory []time.Duration
-	lastUpdate     time.Time
+	// Configuration
+	testnet bool
+	apiKey  string
+	apiSecret string
 
-	// 新增：数据质量监控
-	dataGaps []time.Time
-	outliers []interface{}
-
-	// 新增：订阅管理
+	// Subscription management
 	subscriptions map[string]*channelSubscription
+	
+	// Data processing workers
+	workers       int
+	workerPool    chan struct{}
+	
+	// Metrics and monitoring
+	stats         map[string]*IngestorStats
+	lastUpdate    time.Time
 }
 
-// NewIngestor creates a new market data ingestor
-func NewIngestor(db *sql.DB) *Ingestor {
-	// 新增：创建WebSocket客户端
-	wsClient := NewWSClient("wss://stream.binance.com:9443/ws")
+// IngestorStats represents ingestion statistics
+type IngestorStats struct {
+	Symbol          string    `json:"symbol"`
+	DataType        string    `json:"data_type"`
+	MessagesTotal   int64     `json:"messages_total"`
+	MessagesValid   int64     `json:"messages_valid"`
+	MessagesInvalid int64     `json:"messages_invalid"`
+	LastMessage     time.Time `json:"last_message"`
+	AvgLatency      time.Duration `json:"avg_latency"`
+}
 
-	return &Ingestor{
+// NewIngestor creates a new market data ingestor with real Binance integration
+func NewIngestor(db *sql.DB, apiKey, apiSecret string, testnet bool) *Ingestor {
+	// Create Binance clients
+	binanceClient := binance.NewClient(apiKey, apiSecret, testnet)
+	binanceWS := binance.NewWSClient(testnet)
+	
+	// Create storage and quality monitor
+	storageManager := storage.NewStorage(db)
+	qualityMonitor := quality.NewMonitor()
+	
+	ingestor := &Ingestor{
 		db:             db,
-		wsClient:       wsClient,
+		binanceClient:  binanceClient,
+		binanceWS:      binanceWS,
+		storage:        storageManager,
+		qualityMonitor: qualityMonitor,
+		testnet:        testnet,
+		apiKey:         apiKey,
+		apiSecret:      apiSecret,
 		subscriptions:  make(map[string]*channelSubscription),
-		latencyHistory: make([]time.Duration, 0, 100),
-		dataGaps:       make([]time.Time, 0, 50),
-		outliers:       make([]interface{}, 0, 50),
+		workers:        10, // Number of worker goroutines
+		workerPool:     make(chan struct{}, 10),
+		stats:          make(map[string]*IngestorStats),
 	}
+	
+	// Set up quality monitor callback
+	qualityMonitor.SetIssueCallback(func(issue quality.QualityIssue) {
+		log.Printf("Data quality issue: %s - %s", issue.IssueType, issue.Description)
+	})
+	
+	// Initialize worker pool
+	for i := 0; i < ingestor.workers; i++ {
+		ingestor.workerPool <- struct{}{}
+	}
+	
+	return ingestor
 }
 
-// SubscribeOrderBook subscribes to order book updates
+// SubscribeOrderBook subscribes to order book updates using real Binance WebSocket
 func (i *Ingestor) SubscribeOrderBook(ctx context.Context, symbol string) (<-chan *OrderBook, error) {
-	ch := make(chan *OrderBook, 1000)
-
-	// 新增：创建可取消的上下文
-	ctx, cancel := context.WithCancel(ctx)
-	sub := &channelSubscription{ch: ch, cancel: cancel}
-
-	// 新增：保存订阅
-	i.mu.Lock()
-	i.subscriptions[symbol+"_orderbook"] = sub
-	i.mu.Unlock()
-
-	// 新增：创建WebSocket订阅
-	wsSub := WSSubscription{
-		Symbol:     symbol,
-		MarketType: MarketTypeSpot,
-		Channels:   []string{fmt.Sprintf("%s@depth20@100ms", symbol)},
+	// Connect to Binance WebSocket if not already connected
+	if err := i.binanceWS.Connect(ctx); err != nil {
+		return nil, fmt.Errorf("failed to connect to Binance WebSocket: %w", err)
 	}
 
-	// 新增：设置消息处理器
-	handler := func(msg interface{}) error {
-		if orderBook, ok := msg.(*OrderBook); ok {
-			select {
-			case ch <- orderBook:
-				// 新增：更新延迟监控
-				i.updateLatency()
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-		return nil
-	}
-
-	// 新增：连接到WebSocket并订阅
-	if err := i.wsClient.Connect(ctx); err != nil {
-		cancel()
-		return nil, fmt.Errorf("failed to connect WebSocket: %w", err)
-	}
-
-	if err := i.wsClient.Subscribe(wsSub, handler); err != nil {
-		cancel()
+	// Subscribe to order book updates with 100ms speed
+	orderBookCh, err := i.binanceWS.SubscribeOrderBook(ctx, symbol, "100ms")
+	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to order book: %w", err)
 	}
 
-	return ch, nil
-}
+	// Create output channel
+	outputCh := make(chan *OrderBook, 1000)
 
-// SubscribeTrades subscribes to trade updates
-func (i *Ingestor) SubscribeTrades(ctx context.Context, symbol string) (<-chan *Trade, error) {
-	ch := make(chan *Trade, 1000)
-
-	// 新增：创建可取消的上下文
+	// Create cancellable context
 	ctx, cancel := context.WithCancel(ctx)
-	sub := &channelSubscription{ch: ch, cancel: cancel}
+	sub := &channelSubscription{ch: outputCh, cancel: cancel}
 
-	// 新增：保存订阅
+	// Save subscription
 	i.mu.Lock()
-	i.subscriptions[symbol+"_trades"] = sub
+	i.subscriptions[symbol+"_orderbook"] = sub
+	i.updateStats(symbol, "orderbook")
 	i.mu.Unlock()
 
-	// 新增：创建WebSocket订阅
-	wsSub := WSSubscription{
-		Symbol:     symbol,
-		MarketType: MarketTypeSpot,
-		Channels:   []string{fmt.Sprintf("%s@trade", symbol)},
-	}
+	// Start processing goroutine
+	go func() {
+		defer close(outputCh)
+		defer cancel()
 
-	// 新增：设置消息处理器
-	handler := func(msg interface{}) error {
-		if trade, ok := msg.(*Trade); ok {
+		for {
 			select {
-			case ch <- trade:
-				// 新增：更新延迟监控
-				i.updateLatency()
+			case orderBook, ok := <-orderBookCh:
+				if !ok {
+					log.Printf("Order book channel closed for %s", symbol)
+					return
+				}
+
+				// Quality check
+				if err := i.qualityMonitor.CheckOrderBook(orderBook); err != nil {
+					log.Printf("Order book quality check failed for %s: %v", symbol, err)
+					i.updateStatsError(symbol, "orderbook")
+					continue
+				}
+
+				// Store in database (async)
+				go func(ob *OrderBook) {
+					<-i.workerPool // Acquire worker
+					defer func() { i.workerPool <- struct{}{} }() // Release worker
+
+					if err := i.storage.SaveOrderBook(context.Background(), ob); err != nil {
+						log.Printf("Failed to save order book for %s: %v", ob.Symbol, err)
+					}
+				}(orderBook)
+
+				// Send to output channel
+				select {
+				case outputCh <- orderBook:
+					i.updateStatsSuccess(symbol, "orderbook")
+				case <-ctx.Done():
+					return
+				default:
+					// Channel full, skip this update
+					log.Printf("Order book channel full for %s, skipping update", symbol)
+				}
+
 			case <-ctx.Done():
-				return ctx.Err()
+				return
 			}
 		}
-		return nil
+	}()
+
+	return outputCh, nil
+}
+
+// SubscribeTrades subscribes to trade updates using real Binance WebSocket
+func (i *Ingestor) SubscribeTrades(ctx context.Context, symbol string) (<-chan *Trade, error) {
+	// Connect to Binance WebSocket if not already connected
+	if err := i.binanceWS.Connect(ctx); err != nil {
+		return nil, fmt.Errorf("failed to connect to Binance WebSocket: %w", err)
 	}
 
-	// 新增：连接到WebSocket并订阅
-	if err := i.wsClient.Connect(ctx); err != nil {
-		cancel()
-		return nil, fmt.Errorf("failed to connect WebSocket: %w", err)
-	}
-
-	if err := i.wsClient.Subscribe(wsSub, handler); err != nil {
-		cancel()
+	// Subscribe to trade updates
+	tradeCh, err := i.binanceWS.SubscribeTrades(ctx, symbol)
+	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to trades: %w", err)
 	}
 
-	return ch, nil
-}
+	// Create output channel
+	outputCh := make(chan *Trade, 1000)
 
-// SubscribeKlines subscribes to kline updates
-func (i *Ingestor) SubscribeKlines(ctx context.Context, symbol, interval string) (<-chan *Kline, error) {
-	ch := make(chan *Kline, 1000)
-
-	// 新增：创建可取消的上下文
+	// Create cancellable context
 	ctx, cancel := context.WithCancel(ctx)
-	sub := &channelSubscription{ch: ch, cancel: cancel}
+	sub := &channelSubscription{ch: outputCh, cancel: cancel}
 
-	// 新增：保存订阅
+	// Save subscription
 	i.mu.Lock()
-	i.subscriptions[symbol+"_klines"] = sub
+	i.subscriptions[symbol+"_trades"] = sub
+	i.updateStats(symbol, "trades")
 	i.mu.Unlock()
 
-	// 新增：创建WebSocket订阅
-	wsSub := WSSubscription{
-		Symbol:     symbol,
-		MarketType: MarketTypeSpot,
-		Channels:   []string{fmt.Sprintf("%s@kline_%s", symbol, interval)},
-	}
+	// Start processing goroutine
+	go func() {
+		defer close(outputCh)
+		defer cancel()
 
-	// 新增：设置消息处理器
-	handler := func(msg interface{}) error {
-		if kline, ok := msg.(*Kline); ok {
+		for {
 			select {
-			case ch <- kline:
-				// 新增：更新延迟监控
-				i.updateLatency()
+			case trade, ok := <-tradeCh:
+				if !ok {
+					log.Printf("Trade channel closed for %s", symbol)
+					return
+				}
+
+				// Quality check
+				if err := i.qualityMonitor.CheckTrade(trade); err != nil {
+					log.Printf("Trade quality check failed for %s: %v", symbol, err)
+					i.updateStatsError(symbol, "trades")
+					continue
+				}
+
+				// Store in database (async)
+				go func(t *Trade) {
+					<-i.workerPool // Acquire worker
+					defer func() { i.workerPool <- struct{}{} }() // Release worker
+
+					if err := i.storage.SaveTrade(context.Background(), t); err != nil {
+						log.Printf("Failed to save trade for %s: %v", t.Symbol, err)
+					}
+				}(trade)
+
+				// Send to output channel
+				select {
+				case outputCh <- trade:
+					i.updateStatsSuccess(symbol, "trades")
+				case <-ctx.Done():
+					return
+				default:
+					// Channel full, skip this update
+					log.Printf("Trade channel full for %s, skipping update", symbol)
+				}
+
 			case <-ctx.Done():
-				return ctx.Err()
+				return
 			}
 		}
-		return nil
+	}()
+
+	return outputCh, nil
+}
+
+// SubscribeKlines subscribes to kline updates using real Binance WebSocket
+func (i *Ingestor) SubscribeKlines(ctx context.Context, symbol, interval string) (<-chan *Kline, error) {
+	// Connect to Binance WebSocket if not already connected
+	if err := i.binanceWS.Connect(ctx); err != nil {
+		return nil, fmt.Errorf("failed to connect to Binance WebSocket: %w", err)
 	}
 
-	// 新增：连接到WebSocket并订阅
-	if err := i.wsClient.Connect(ctx); err != nil {
-		cancel()
-		return nil, fmt.Errorf("failed to connect WebSocket: %w", err)
-	}
-
-	if err := i.wsClient.Subscribe(wsSub, handler); err != nil {
-		cancel()
+	// Subscribe to kline updates
+	klineCh, err := i.binanceWS.SubscribeKlines(ctx, symbol, interval)
+	if err != nil {
 		return nil, fmt.Errorf("failed to subscribe to klines: %w", err)
 	}
 
-	return ch, nil
+	// Create output channel
+	outputCh := make(chan *Kline, 1000)
+
+	// Create cancellable context
+	ctx, cancel := context.WithCancel(ctx)
+	sub := &channelSubscription{ch: outputCh, cancel: cancel}
+
+	// Save subscription
+	i.mu.Lock()
+	i.subscriptions[symbol+"_klines_"+interval] = sub
+	i.updateStats(symbol, "klines_"+interval)
+	i.mu.Unlock()
+
+	// Start processing goroutine
+	go func() {
+		defer close(outputCh)
+		defer cancel()
+
+		for {
+			select {
+			case kline, ok := <-klineCh:
+				if !ok {
+					log.Printf("Kline channel closed for %s %s", symbol, interval)
+					return
+				}
+
+				// Quality check
+				if err := i.qualityMonitor.CheckKline(kline); err != nil {
+					log.Printf("Kline quality check failed for %s %s: %v", symbol, interval, err)
+					i.updateStatsError(symbol, "klines_"+interval)
+					continue
+				}
+
+				// Store in database (async)
+				go func(k *Kline) {
+					<-i.workerPool // Acquire worker
+					defer func() { i.workerPool <- struct{}{} }() // Release worker
+
+					if err := i.storage.SaveKline(context.Background(), k); err != nil {
+						log.Printf("Failed to save kline for %s %s: %v", k.Symbol, k.Interval, err)
+					}
+				}(kline)
+
+				// Send to output channel
+				select {
+				case outputCh <- kline:
+					i.updateStatsSuccess(symbol, "klines_"+interval)
+				case <-ctx.Done():
+					return
+				default:
+					// Channel full, skip this update
+					log.Printf("Kline channel full for %s %s, skipping update", symbol, interval)
+				}
+
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	return outputCh, nil
 }
 
 // SubscribeFundingRates subscribes to funding rate updates
@@ -559,4 +690,204 @@ func (i *Ingestor) GetOrderBook(ctx context.Context, symbol string) (*OrderBook,
 	}
 
 	return &orderBook, nil
+}
+// updateStats initializes or updates statistics for a symbol and data type
+func (i *Ingestor) updateStats(symbol, dataType string) {
+	key := fmt.Sprintf("%s:%s", symbol, dataType)
+	if _, exists := i.stats[key]; !exists {
+		i.stats[key] = &IngestorStats{
+			Symbol:   symbol,
+			DataType: dataType,
+		}
+	}
+}
+
+// updateStatsSuccess updates statistics for successful message processing
+func (i *Ingestor) updateStatsSuccess(symbol, dataType string) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	
+	key := fmt.Sprintf("%s:%s", symbol, dataType)
+	if stats, exists := i.stats[key]; exists {
+		stats.MessagesTotal++
+		stats.MessagesValid++
+		stats.LastMessage = time.Now()
+	}
+}
+
+// updateStatsError updates statistics for failed message processing
+func (i *Ingestor) updateStatsError(symbol, dataType string) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	
+	key := fmt.Sprintf("%s:%s", symbol, dataType)
+	if stats, exists := i.stats[key]; exists {
+		stats.MessagesTotal++
+		stats.MessagesInvalid++
+		stats.LastMessage = time.Now()
+	}
+}
+
+// GetHistoricalKlines fetches historical kline data from Binance API
+func (i *Ingestor) GetHistoricalKlines(ctx context.Context, symbol, interval string, startTime, endTime time.Time, limit int) ([]*Kline, error) {
+	return i.binanceClient.GetKlines(ctx, symbol, interval, startTime, endTime, limit)
+}
+
+// GetHistoricalTrades fetches historical trade data from Binance API
+func (i *Ingestor) GetHistoricalTrades(ctx context.Context, symbol string, limit int) ([]*Trade, error) {
+	return i.binanceClient.GetTrades(ctx, symbol, limit)
+}
+
+// GetCurrentOrderBook fetches current order book from Binance API
+func (i *Ingestor) GetCurrentOrderBook(ctx context.Context, symbol string, limit int) (*OrderBook, error) {
+	return i.binanceClient.GetOrderBook(ctx, symbol, limit)
+}
+
+// GetCurrentFundingRate fetches current funding rate from Binance API
+func (i *Ingestor) GetCurrentFundingRate(ctx context.Context, symbol string) (*FundingRate, error) {
+	return i.binanceClient.GetFundingRate(ctx, symbol)
+}
+
+// GetCurrentOpenInterest fetches current open interest from Binance API
+func (i *Ingestor) GetCurrentOpenInterest(ctx context.Context, symbol string) (*OpenInterest, error) {
+	return i.binanceClient.GetOpenInterest(ctx, symbol)
+}
+
+// GetStats returns ingestion statistics
+func (i *Ingestor) GetStats() map[string]*IngestorStats {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	
+	result := make(map[string]*IngestorStats)
+	for k, v := range i.stats {
+		// Create a copy
+		stats := *v
+		result[k] = &stats
+	}
+	
+	return result
+}
+
+// GetQualityMetrics returns data quality metrics
+func (i *Ingestor) GetQualityMetrics() map[string]*quality.QualityMetrics {
+	return i.qualityMonitor.GetMetrics()
+}
+
+// GetQualityIssues returns recent data quality issues
+func (i *Ingestor) GetQualityIssues(limit int) []quality.QualityIssue {
+	return i.qualityMonitor.GetIssues(limit)
+}
+
+// GetOverallQualityScore returns overall data quality score
+func (i *Ingestor) GetOverallQualityScore() float64 {
+	return i.qualityMonitor.GetQualityScore()
+}
+
+// Close closes all subscriptions and connections
+func (i *Ingestor) Close() error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	
+	// Close all subscriptions
+	for _, sub := range i.subscriptions {
+		sub.Close()
+	}
+	
+	// Close WebSocket connection
+	if err := i.binanceWS.Close(); err != nil {
+		log.Printf("Error closing Binance WebSocket: %v", err)
+	}
+	
+	return nil
+}
+
+// StartDataCollection starts collecting data for specified symbols
+func (i *Ingestor) StartDataCollection(ctx context.Context, symbols []string, intervals []string) error {
+	log.Printf("Starting data collection for %d symbols", len(symbols))
+	
+	for _, symbol := range symbols {
+		// Subscribe to order book updates
+		if _, err := i.SubscribeOrderBook(ctx, symbol); err != nil {
+			log.Printf("Failed to subscribe to order book for %s: %v", symbol, err)
+		}
+		
+		// Subscribe to trade updates
+		if _, err := i.SubscribeTrades(ctx, symbol); err != nil {
+			log.Printf("Failed to subscribe to trades for %s: %v", symbol, err)
+		}
+		
+		// Subscribe to kline updates for each interval
+		for _, interval := range intervals {
+			if _, err := i.SubscribeKlines(ctx, symbol, interval); err != nil {
+				log.Printf("Failed to subscribe to klines for %s %s: %v", symbol, interval, err)
+			}
+		}
+		
+		// Fetch and store initial historical data
+		go i.fetchInitialData(ctx, symbol, intervals)
+	}
+	
+	log.Printf("Data collection started successfully")
+	return nil
+}
+
+// fetchInitialData fetches initial historical data for a symbol
+func (i *Ingestor) fetchInitialData(ctx context.Context, symbol string, intervals []string) {
+	log.Printf("Fetching initial data for %s", symbol)
+	
+	// Fetch recent trades
+	trades, err := i.GetHistoricalTrades(ctx, symbol, 1000)
+	if err != nil {
+		log.Printf("Failed to fetch historical trades for %s: %v", symbol, err)
+	} else {
+		for _, trade := range trades {
+			if err := i.storage.SaveTrade(ctx, trade); err != nil {
+				log.Printf("Failed to save historical trade for %s: %v", symbol, err)
+			}
+		}
+		log.Printf("Saved %d historical trades for %s", len(trades), symbol)
+	}
+	
+	// Fetch recent klines for each interval
+	endTime := time.Now()
+	startTime := endTime.Add(-24 * time.Hour) // Last 24 hours
+	
+	for _, interval := range intervals {
+		klines, err := i.GetHistoricalKlines(ctx, symbol, interval, startTime, endTime, 1000)
+		if err != nil {
+			log.Printf("Failed to fetch historical klines for %s %s: %v", symbol, interval, err)
+			continue
+		}
+		
+		for _, kline := range klines {
+			if err := i.storage.SaveKline(ctx, kline); err != nil {
+				log.Printf("Failed to save historical kline for %s %s: %v", symbol, interval, err)
+			}
+		}
+		log.Printf("Saved %d historical klines for %s %s", len(klines), symbol, interval)
+	}
+	
+	// Fetch current order book
+	orderBook, err := i.GetCurrentOrderBook(ctx, symbol, 20)
+	if err != nil {
+		log.Printf("Failed to fetch current order book for %s: %v", symbol, err)
+	} else {
+		if err := i.storage.SaveOrderBook(ctx, orderBook); err != nil {
+			log.Printf("Failed to save current order book for %s: %v", symbol, err)
+		} else {
+			log.Printf("Saved current order book for %s", symbol)
+		}
+	}
+}
+
+// PerformDataCleanup performs periodic data cleanup
+func (i *Ingestor) PerformDataCleanup(ctx context.Context, retentionDays int) error {
+	log.Printf("Starting data cleanup with %d days retention", retentionDays)
+	
+	if err := i.storage.CleanupOldData(ctx, retentionDays); err != nil {
+		return fmt.Errorf("failed to cleanup old data: %w", err)
+	}
+	
+	log.Printf("Data cleanup completed successfully")
+	return nil
 }
