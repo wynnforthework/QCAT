@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"qcat/internal/auth"
@@ -50,6 +51,121 @@ type Handlers struct {
 	Audit     *AuditHandler
 	WebSocket *WebSocketHandler
 	Auth      *AuthHandler
+}
+
+// RateLimiter 速率限制器结构
+type RateLimiter struct {
+	requestsPerMinute int
+	burst             int
+	clients           map[string]*ClientLimiter
+	mu                sync.RWMutex
+	cleanupTicker     *time.Ticker
+	done              chan bool
+}
+
+// ClientLimiter 客户端限制器
+type ClientLimiter struct {
+	tokens     int
+	lastRefill time.Time
+	burst      int
+	rate       int
+}
+
+// NewRateLimiter 创建新的速率限制器
+func NewRateLimiter(requestsPerMinute, burst int) *RateLimiter {
+	rl := &RateLimiter{
+		requestsPerMinute: requestsPerMinute,
+		burst:             burst,
+		clients:           make(map[string]*ClientLimiter),
+		cleanupTicker:     time.NewTicker(time.Minute * 5), // 每5分钟清理一次
+		done:              make(chan bool),
+	}
+
+	// 启动清理协程
+	go rl.cleanup()
+	return rl
+}
+
+// cleanup 定期清理过期的客户端限制器
+func (rl *RateLimiter) cleanup() {
+	for {
+		select {
+		case <-rl.cleanupTicker.C:
+			rl.mu.Lock()
+			now := time.Now()
+			for clientID, limiter := range rl.clients {
+				// 如果超过10分钟没有活动，删除该客户端
+				if now.Sub(limiter.lastRefill) > time.Minute*10 {
+					delete(rl.clients, clientID)
+				}
+			}
+			rl.mu.Unlock()
+		case <-rl.done:
+			rl.cleanupTicker.Stop()
+			return
+		}
+	}
+}
+
+// Stop 停止速率限制器
+func (rl *RateLimiter) Stop() {
+	close(rl.done)
+}
+
+// Allow 检查是否允许请求
+func (rl *RateLimiter) Allow(clientID string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	now := time.Now()
+	limiter, exists := rl.clients[clientID]
+
+	if !exists {
+		// 创建新的客户端限制器
+		limiter = &ClientLimiter{
+			tokens:     rl.burst,
+			lastRefill: now,
+			burst:      rl.burst,
+			rate:       rl.requestsPerMinute,
+		}
+		rl.clients[clientID] = limiter
+	}
+
+	// 计算需要补充的令牌数
+	timePassed := now.Sub(limiter.lastRefill)
+	tokensToAdd := int(timePassed.Minutes() * float64(limiter.rate))
+
+	if tokensToAdd > 0 {
+		limiter.tokens = min(limiter.burst, limiter.tokens+tokensToAdd)
+		limiter.lastRefill = now
+	}
+
+	// 检查是否有可用令牌
+	if limiter.tokens > 0 {
+		limiter.tokens--
+		return true
+	}
+
+	return false
+}
+
+// min 返回两个整数中的较小值
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// getClientID 获取客户端标识符
+func getClientID(c *gin.Context) string {
+	// 优先使用用户ID（如果已认证）
+	if userID, exists := c.Get("user_id"); exists {
+		return fmt.Sprintf("user:%s", userID)
+	}
+
+	// 否则使用IP地址
+	return fmt.Sprintf("ip:%s", c.ClientIP())
 }
 
 // NewServer creates a new API server
@@ -480,8 +596,30 @@ func corsMiddleware(corsConfig config.CORSConfig) gin.HandlerFunc {
 
 // rateLimitMiddleware adds rate limiting
 func rateLimitMiddleware(rateLimitConfig config.RateLimitConfig) gin.HandlerFunc {
+	// 如果速率限制未启用，直接返回空中间件
+	if !rateLimitConfig.Enabled {
+		return func(c *gin.Context) {
+			c.Next()
+		}
+	}
+
+	// 创建速率限制器
+	rateLimiter := NewRateLimiter(rateLimitConfig.RequestsPerMinute, rateLimitConfig.Burst)
+
 	return func(c *gin.Context) {
-		// TODO: Implement rate limiting
+		// 获取客户端标识符
+		clientID := getClientID(c)
+
+		// 检查是否允许请求
+		if !rateLimiter.Allow(clientID) {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error":   "Rate limit exceeded",
+				"message": "Too many requests, please try again later",
+			})
+			c.Abort()
+			return
+		}
+
 		c.Next()
 	}
 }

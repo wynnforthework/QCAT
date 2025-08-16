@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"math"
 	"sync"
 	"time"
 
@@ -490,6 +491,10 @@ func (r *Reporter) getPerformanceMetrics(ctx context.Context, report *Report) (m
 		metrics["entry_price"] = position.EntryPrice
 		metrics["unrealized_pnl"] = position.UnrealizedPnL
 		metrics["leverage"] = position.Leverage
+		metrics["mark_price"] = position.MarkPrice
+		metrics["liquidation_price"] = position.LiquidationPrice
+		metrics["margin_type"] = position.MarginType
+		metrics["maintenance_margin"] = position.MaintenanceMargin
 	}
 
 	// Get account balance
@@ -501,11 +506,392 @@ func (r *Reporter) getPerformanceMetrics(ctx context.Context, report *Report) (m
 	if balance, exists := balances["USDT"]; exists {
 		metrics["balance"] = balance.Total
 		metrics["available"] = balance.Available
+		metrics["locked"] = balance.Locked
+		metrics["unrealized_pnl_total"] = balance.UnrealizedPnL
+		metrics["realized_pnl_total"] = balance.RealizedPnL
 	}
 
-	// TODO: Add more metrics (e.g., trade history, performance ratios)
+	// Get margin information
+	marginInfo, err := r.exchange.GetMarginInfo(ctx)
+	if err == nil && marginInfo != nil {
+		metrics["total_asset_value"] = marginInfo.TotalAssetValue
+		metrics["total_debt_value"] = marginInfo.TotalDebtValue
+		metrics["margin_ratio"] = marginInfo.MarginRatio
+		metrics["maintenance_margin_ratio"] = marginInfo.MaintenanceMargin
+		metrics["margin_call_ratio"] = marginInfo.MarginCallRatio
+		metrics["liquidation_ratio"] = marginInfo.LiquidationRatio
+	}
+
+	// Get trade history from database
+	tradeHistory, err := r.getTradeHistory(ctx, report.Strategy, report.Symbol)
+	if err == nil {
+		metrics["total_trades"] = len(tradeHistory)
+		metrics["trade_history"] = tradeHistory
+
+		// Calculate trade-based metrics
+		if len(tradeHistory) > 0 {
+			tradeMetrics := r.calculateTradeMetrics(tradeHistory)
+			metrics["win_rate"] = tradeMetrics.WinRate
+			metrics["profit_factor"] = tradeMetrics.ProfitFactor
+			metrics["avg_trade_return"] = tradeMetrics.AvgTradeReturn
+			metrics["total_volume"] = tradeMetrics.TotalVolume
+			metrics["total_fees"] = tradeMetrics.TotalFees
+			metrics["largest_win"] = tradeMetrics.LargestWin
+			metrics["largest_loss"] = tradeMetrics.LargestLoss
+			metrics["avg_holding_time"] = tradeMetrics.AvgHoldingTime
+		}
+	}
+
+	// Get performance metrics from database
+	perfMetrics, err := r.getPerformanceMetricsFromDB(ctx, report.Strategy)
+	if err == nil && len(perfMetrics) > 0 {
+		// Get the latest performance metrics
+		latest := perfMetrics[len(perfMetrics)-1]
+		metrics["equity"] = latest.Equity
+		metrics["pnl_daily"] = latest.PnLDaily
+		metrics["sharpe_ratio"] = latest.SharpeRatio
+		metrics["sortino_ratio"] = latest.SortinoRatio
+		metrics["max_drawdown"] = latest.MaxDrawdown
+		metrics["win_rate_db"] = latest.WinRate
+
+		// Calculate additional performance ratios
+		if len(perfMetrics) > 1 {
+			metrics["equity_curve"] = perfMetrics
+			metrics["total_return"] = (latest.Equity - perfMetrics[0].Equity) / perfMetrics[0].Equity
+			metrics["volatility"] = r.calculateVolatility(perfMetrics)
+			metrics["calmar_ratio"] = r.calculateCalmarRatio(latest.Equity, perfMetrics[0].Equity, latest.MaxDrawdown)
+		}
+	}
+
+	// Get order history
+	orderHistory, err := r.exchange.GetOrderHistory(ctx, report.Symbol, time.Now().Add(-30*24*time.Hour), time.Now())
+	if err == nil {
+		metrics["total_orders"] = len(orderHistory)
+		metrics["filled_orders"] = r.countFilledOrders(orderHistory)
+		metrics["pending_orders"] = r.countPendingOrders(orderHistory)
+		metrics["order_success_rate"] = float64(r.countFilledOrders(orderHistory)) / float64(len(orderHistory))
+	}
+
+	// Get risk limits
+	riskLimits, err := r.exchange.GetRiskLimits(ctx, report.Symbol)
+	if err == nil && riskLimits != nil {
+		metrics["max_leverage"] = riskLimits.MaxLeverage
+		metrics["max_position_value"] = riskLimits.MaxPositionValue
+		metrics["max_order_value"] = riskLimits.MaxOrderValue
+		metrics["min_order_value"] = riskLimits.MinOrderValue
+	}
+
+	// Calculate additional performance ratios
+	if position != nil && len(tradeHistory) > 0 {
+		metrics["roi"] = r.calculateROI(position, tradeHistory)
+		metrics["risk_reward_ratio"] = r.calculateRiskRewardRatio(tradeHistory)
+		metrics["expectancy"] = r.calculateExpectancy(tradeHistory)
+	}
 
 	return metrics, nil
+}
+
+// TradeMetrics represents calculated trade metrics
+type TradeMetrics struct {
+	WinRate        float64
+	ProfitFactor   float64
+	AvgTradeReturn float64
+	TotalVolume    float64
+	TotalFees      float64
+	LargestWin     float64
+	LargestLoss    float64
+	AvgHoldingTime time.Duration
+}
+
+// PerformanceMetric represents performance metric from database
+type PerformanceMetric struct {
+	Equity       float64
+	PnLDaily     float64
+	SharpeRatio  float64
+	SortinoRatio float64
+	MaxDrawdown  float64
+	WinRate      float64
+	Timestamp    time.Time
+}
+
+// getTradeHistory retrieves trade history from database
+func (r *Reporter) getTradeHistory(ctx context.Context, strategy, symbol string) ([]*exchange.Trade, error) {
+	query := `
+		SELECT id, symbol, side, size, price, fee, fee_currency, created_at
+		FROM trades
+		WHERE strategy_id = (SELECT id FROM strategies WHERE name = $1)
+		AND symbol = $2
+		ORDER BY created_at DESC
+		LIMIT 1000
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, strategy, symbol)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query trade history: %w", err)
+	}
+	defer rows.Close()
+
+	var trades []*exchange.Trade
+	for rows.Next() {
+		var trade exchange.Trade
+		var id string
+		var side string
+		var size, price, fee float64
+		var feeCurrency string
+		var createdAt time.Time
+
+		if err := rows.Scan(&id, &trade.Symbol, &side, &size, &price, &fee, &feeCurrency, &createdAt); err != nil {
+			return nil, fmt.Errorf("failed to scan trade: %w", err)
+		}
+
+		trade.ID = id
+		trade.Side = side
+		trade.Quantity = size
+		trade.Price = price
+		trade.Fee = fee
+		trade.FeeCurrency = feeCurrency
+		trade.Time = createdAt
+
+		trades = append(trades, &trade)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating trades: %w", err)
+	}
+
+	return trades, nil
+}
+
+// getPerformanceMetricsFromDB retrieves performance metrics from database
+func (r *Reporter) getPerformanceMetricsFromDB(ctx context.Context, strategy string) ([]PerformanceMetric, error) {
+	query := `
+		SELECT equity, pnl_daily, sharpe_ratio, sortino_ratio, max_drawdown, win_rate, timestamp
+		FROM performance_metrics
+		WHERE strategy_id = (SELECT id FROM strategies WHERE name = $1)
+		ORDER BY timestamp ASC
+		LIMIT 1000
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, strategy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query performance metrics: %w", err)
+	}
+	defer rows.Close()
+
+	var metrics []PerformanceMetric
+	for rows.Next() {
+		var metric PerformanceMetric
+		var sharpeRatio, sortinoRatio, maxDrawdown, winRate sql.NullFloat64
+
+		if err := rows.Scan(
+			&metric.Equity,
+			&metric.PnLDaily,
+			&sharpeRatio,
+			&sortinoRatio,
+			&maxDrawdown,
+			&winRate,
+			&metric.Timestamp,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan performance metric: %w", err)
+		}
+
+		if sharpeRatio.Valid {
+			metric.SharpeRatio = sharpeRatio.Float64
+		}
+		if sortinoRatio.Valid {
+			metric.SortinoRatio = sortinoRatio.Float64
+		}
+		if maxDrawdown.Valid {
+			metric.MaxDrawdown = maxDrawdown.Float64
+		}
+		if winRate.Valid {
+			metric.WinRate = winRate.Float64
+		}
+
+		metrics = append(metrics, metric)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating performance metrics: %w", err)
+	}
+
+	return metrics, nil
+}
+
+// calculateTradeMetrics calculates metrics from trade history
+func (r *Reporter) calculateTradeMetrics(trades []*exchange.Trade) *TradeMetrics {
+	if len(trades) == 0 {
+		return &TradeMetrics{}
+	}
+
+	metrics := &TradeMetrics{}
+	var wins, losses int
+	var totalProfit, totalLoss, totalVolume, totalFees float64
+	var totalHoldingTime time.Duration
+
+	for _, trade := range trades {
+		// Calculate trade PnL (simplified - assuming buy/sell pairs)
+		tradeValue := trade.Price * trade.Quantity
+		totalVolume += tradeValue
+		totalFees += trade.Fee
+
+		// For simplicity, assume positive PnL for buy trades and negative for sell trades
+		// In a real implementation, you would need to track entry/exit pairs
+		if trade.Side == "BUY" {
+			totalProfit += tradeValue
+			wins++
+			if tradeValue > metrics.LargestWin {
+				metrics.LargestWin = tradeValue
+			}
+		} else {
+			totalLoss += tradeValue
+			losses++
+			if tradeValue > metrics.LargestLoss {
+				metrics.LargestLoss = tradeValue
+			}
+		}
+	}
+
+	// Calculate metrics
+	totalTrades := len(trades)
+	if totalTrades > 0 {
+		metrics.WinRate = float64(wins) / float64(totalTrades)
+		metrics.AvgTradeReturn = (totalProfit - totalLoss) / float64(totalTrades)
+		metrics.AvgHoldingTime = totalHoldingTime / time.Duration(totalTrades)
+	}
+
+	if totalLoss > 0 {
+		metrics.ProfitFactor = totalProfit / totalLoss
+	}
+
+	metrics.TotalVolume = totalVolume
+	metrics.TotalFees = totalFees
+
+	return metrics
+}
+
+// calculateVolatility calculates volatility from performance metrics
+func (r *Reporter) calculateVolatility(metrics []PerformanceMetric) float64 {
+	if len(metrics) < 2 {
+		return 0
+	}
+
+	var returns []float64
+	for i := 1; i < len(metrics); i++ {
+		ret := (metrics[i].Equity - metrics[i-1].Equity) / metrics[i-1].Equity
+		returns = append(returns, ret)
+	}
+
+	if len(returns) == 0 {
+		return 0
+	}
+
+	// Calculate mean
+	mean := 0.0
+	for _, r := range returns {
+		mean += r
+	}
+	mean /= float64(len(returns))
+
+	// Calculate variance
+	variance := 0.0
+	for _, r := range returns {
+		diff := r - mean
+		variance += diff * diff
+	}
+	variance /= float64(len(returns) - 1)
+
+	return math.Sqrt(variance)
+}
+
+// calculateCalmarRatio calculates Calmar ratio
+func (r *Reporter) calculateCalmarRatio(currentEquity, initialEquity, maxDrawdown float64) float64 {
+	if maxDrawdown == 0 {
+		return 0
+	}
+
+	totalReturn := (currentEquity - initialEquity) / initialEquity
+	return totalReturn / maxDrawdown
+}
+
+// calculateROI calculates Return on Investment
+func (r *Reporter) calculateROI(position *exchange.Position, trades []*exchange.Trade) float64 {
+	if position == nil || len(trades) == 0 {
+		return 0
+	}
+
+	// Simplified ROI calculation
+	// In a real implementation, you would track the initial investment
+	totalInvestment := position.EntryPrice * position.Quantity
+	if totalInvestment == 0 {
+		return 0
+	}
+
+	return position.UnrealizedPnL / totalInvestment
+}
+
+// calculateRiskRewardRatio calculates risk/reward ratio
+func (r *Reporter) calculateRiskRewardRatio(trades []*exchange.Trade) float64 {
+	if len(trades) == 0 {
+		return 0
+	}
+
+	var totalRisk, totalReward float64
+	for _, trade := range trades {
+		tradeValue := trade.Price * trade.Quantity
+		if trade.Side == "BUY" {
+			totalReward += tradeValue
+		} else {
+			totalRisk += tradeValue
+		}
+	}
+
+	if totalRisk == 0 {
+		return 0
+	}
+
+	return totalReward / totalRisk
+}
+
+// calculateExpectancy calculates expectancy
+func (r *Reporter) calculateExpectancy(trades []*exchange.Trade) float64 {
+	if len(trades) == 0 {
+		return 0
+	}
+
+	var totalExpectancy float64
+	for _, trade := range trades {
+		tradeValue := trade.Price * trade.Quantity
+		if trade.Side == "BUY" {
+			totalExpectancy += tradeValue
+		} else {
+			totalExpectancy -= tradeValue
+		}
+	}
+
+	return totalExpectancy / float64(len(trades))
+}
+
+// countFilledOrders counts filled orders
+func (r *Reporter) countFilledOrders(orders []*exchange.Order) int {
+	count := 0
+	for _, order := range orders {
+		if order.Status == "FILLED" {
+			count++
+		}
+	}
+	return count
+}
+
+// countPendingOrders counts pending orders
+func (r *Reporter) countPendingOrders(orders []*exchange.Order) int {
+	count := 0
+	for _, order := range orders {
+		if order.Status == "NEW" || order.Status == "PENDING" || order.Status == "PARTIALLY_FILLED" {
+			count++
+		}
+	}
+	return count
 }
 
 // generateHTMLReport generates an HTML report

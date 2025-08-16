@@ -6,11 +6,17 @@ on:
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend.yml'
+      - 'deploy/**'
   pull_request:
     branches: [ main, dev ]
     paths:
       - 'frontend/**'
       - '.github/workflows/frontend.yml'
+      - 'deploy/**'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/qcat-frontend
 
 jobs:
   test:
@@ -48,9 +54,22 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
+      digest: ${{ steps.build.outputs.digest }}
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -67,14 +86,176 @@ jobs:
       working-directory: frontend
       run: npm run build
 
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./deploy/Dockerfile.frontend
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        platforms: linux/amd64,linux/arm64
+
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: frontend-build
         path: frontend/.next
 
-  deploy:
-    name: Deploy
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/dev'
+    environment: staging
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-build
+        path: frontend/.next
+
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+
+    - name: Deploy to staging server
+      run: |
+        # 连接到staging服务器并部署
+        ssh -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
+          # 停止现有服务
+          sudo systemctl stop nginx || true
+          
+          # 备份当前版本
+          sudo cp -r /var/www/qcat-staging /var/www/qcat-staging.backup.$(date +%Y%m%d_%H%M%S) || true
+          
+          # 创建目录
+          sudo mkdir -p /var/www/qcat-staging
+          sudo mkdir -p /var/log/qcat-frontend-staging
+          
+          # 设置权限
+          sudo chown -R $USER:$USER /var/www/qcat-staging
+          sudo chown -R $USER:$USER /var/log/qcat-frontend-staging
+        EOF
+        
+        # 上传新版本
+        rsync -avz --delete frontend/.next/ ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }}:/var/www/qcat-staging/
+        
+        # 配置和启动服务
+        ssh -o StrictHostKeyChecking=no ${{ secrets.STAGING_USER }}@${{ secrets.STAGING_HOST }} << 'EOF'
+          # 设置权限
+          sudo chown -R www-data:www-data /var/www/qcat-staging
+          
+          # 创建nginx配置
+          sudo tee /etc/nginx/sites-available/qcat-staging > /dev/null << 'NGINX_EOF'
+          server {
+              listen 80;
+              server_name staging.qcat.local;
+              root /var/www/qcat-staging;
+              index index.html;
+              
+              # Gzip压缩
+              gzip on;
+              gzip_vary on;
+              gzip_min_length 1024;
+              gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+              
+              # 静态文件缓存
+              location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+                  expires 1y;
+                  add_header Cache-Control "public, immutable";
+              }
+              
+              # Next.js路由
+              location / {
+                  try_files $uri $uri/ /index.html;
+              }
+              
+              # API代理到后端
+              location /api/ {
+                  proxy_pass http://localhost:8080;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_cache_bypass $http_upgrade;
+              }
+              
+              # WebSocket代理
+              location /ws/ {
+                  proxy_pass http://localhost:8080;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+              }
+              
+              # 错误页面
+              error_page 404 /404.html;
+              error_page 500 502 503 504 /50x.html;
+          }
+          NGINX_EOF
+          
+          # 启用站点
+          sudo ln -sf /etc/nginx/sites-available/qcat-staging /etc/nginx/sites-enabled/
+          
+          # 测试nginx配置
+          sudo nginx -t
+          
+          # 重启nginx
+          sudo systemctl restart nginx
+          sudo systemctl enable nginx
+          
+          # 检查nginx状态
+          sudo systemctl status nginx
+        EOF
+
+    - name: Health check staging
+      run: |
+        # 等待服务完全启动
+        sleep 30
+        
+        # 健康检查
+        for i in {1..5}; do
+          if curl -f http://${{ secrets.STAGING_HOST }}; then
+            echo "Health check passed"
+            break
+          else
+            echo "Health check failed, attempt $i/5"
+            if [ $i -eq 5 ]; then
+              echo "Health check failed after 5 attempts"
+              exit 1
+            fi
+            sleep 10
+          fi
+        done
+
+  deploy-production:
+    name: Deploy to Production
     runs-on: ubuntu-latest
     needs: build
     if: github.ref == 'refs/heads/main'
@@ -89,7 +270,171 @@ jobs:
         name: frontend-build
         path: frontend/.next
 
-    - name: Deploy to production
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.PRODUCTION_SSH_KEY }}
+
+    - name: Deploy to production server
       run: |
-        # TODO: Add deployment steps here
-        echo "Deploying to production..."
+        # 连接到production服务器并部署
+        ssh -o StrictHostKeyChecking=no ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'EOF'
+          # 停止现有服务
+          sudo systemctl stop nginx || true
+          
+          # 备份当前版本
+          sudo cp -r /var/www/qcat-production /var/www/qcat-production.backup.$(date +%Y%m%d_%H%M%S) || true
+          
+          # 创建目录
+          sudo mkdir -p /var/www/qcat-production
+          sudo mkdir -p /var/log/qcat-frontend-production
+          
+          # 设置权限
+          sudo chown -R $USER:$USER /var/www/qcat-production
+          sudo chown -R $USER:$USER /var/log/qcat-frontend-production
+        EOF
+        
+        # 上传新版本
+        rsync -avz --delete frontend/.next/ ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }}:/var/www/qcat-production/
+        
+        # 配置和启动服务
+        ssh -o StrictHostKeyChecking=no ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'EOF'
+          # 设置权限
+          sudo chown -R www-data:www-data /var/www/qcat-production
+          
+          # 创建nginx配置
+          sudo tee /etc/nginx/sites-available/qcat-production > /dev/null << 'NGINX_EOF'
+          server {
+              listen 80;
+              server_name qcat.local;
+              root /var/www/qcat-production;
+              index index.html;
+              
+              # 安全头
+              add_header X-Frame-Options "SAMEORIGIN" always;
+              add_header X-XSS-Protection "1; mode=block" always;
+              add_header X-Content-Type-Options "nosniff" always;
+              add_header Referrer-Policy "no-referrer-when-downgrade" always;
+              add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+              
+              # Gzip压缩
+              gzip on;
+              gzip_vary on;
+              gzip_min_length 1024;
+              gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+              
+              # 静态文件缓存
+              location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+                  expires 1y;
+                  add_header Cache-Control "public, immutable";
+              }
+              
+              # Next.js路由
+              location / {
+                  try_files $uri $uri/ /index.html;
+              }
+              
+              # API代理到后端
+              location /api/ {
+                  proxy_pass http://localhost:8080;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_cache_bypass $http_upgrade;
+                  
+                  # 超时设置
+                  proxy_connect_timeout 60s;
+                  proxy_send_timeout 60s;
+                  proxy_read_timeout 60s;
+              }
+              
+              # WebSocket代理
+              location /ws/ {
+                  proxy_pass http://localhost:8080;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade $http_upgrade;
+                  proxy_set_header Connection "upgrade";
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  
+                  # WebSocket超时设置
+                  proxy_connect_timeout 7d;
+                  proxy_send_timeout 7d;
+                  proxy_read_timeout 7d;
+              }
+              
+              # 错误页面
+              error_page 404 /404.html;
+              error_page 500 502 503 504 /50x.html;
+          }
+          NGINX_EOF
+          
+          # 启用站点
+          sudo ln -sf /etc/nginx/sites-available/qcat-production /etc/nginx/sites-enabled/
+          
+          # 测试nginx配置
+          sudo nginx -t
+          
+          # 重启nginx
+          sudo systemctl restart nginx
+          sudo systemctl enable nginx
+          
+          # 检查nginx状态
+          sudo systemctl status nginx
+        EOF
+
+    - name: Health check production
+      run: |
+        # 等待服务完全启动
+        sleep 30
+        
+        # 健康检查
+        for i in {1..5}; do
+          if curl -f http://${{ secrets.PRODUCTION_HOST }}; then
+            echo "Health check passed"
+            break
+          else
+            echo "Health check failed, attempt $i/5"
+            if [ $i -eq 5 ]; then
+              echo "Health check failed after 5 attempts"
+              exit 1
+            fi
+            sleep 10
+          fi
+        done
+
+    - name: Notify deployment success
+      if: success()
+      run: |
+        echo "Production deployment completed successfully!"
+        # 这里可以添加通知逻辑，如Slack、钉钉等
+        # curl -X POST -H 'Content-type: application/json' \
+        #   --data '{"text":"QCAT Frontend Production deployment successful!"}' \
+        #   ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Rollback on failure
+      if: failure()
+      run: |
+        echo "Deployment failed, initiating rollback..."
+        ssh -o StrictHostKeyChecking=no ${{ secrets.PRODUCTION_USER }}@${{ secrets.PRODUCTION_HOST }} << 'EOF'
+          # 停止nginx
+          sudo systemctl stop nginx
+          
+          # 恢复备份版本
+          BACKUP_DIR=$(ls -td /var/www/qcat-production.backup.* | head -1)
+          if [ -n "$BACKUP_DIR" ]; then
+            sudo rm -rf /var/www/qcat-production
+            sudo cp -r "$BACKUP_DIR" /var/www/qcat-production
+            sudo chown -R www-data:www-data /var/www/qcat-production
+            sudo systemctl start nginx
+            echo "Rollback completed"
+          else
+            echo "No backup found for rollback"
+          fi
+        EOF
