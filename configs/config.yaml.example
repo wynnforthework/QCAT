@@ -1,0 +1,179 @@
+app:
+  name: "QCAT"
+  version: "1.0.0"
+  environment: "development"
+
+server:
+  port: 8082
+  read_timeout: 30s
+  write_timeout: 30s
+  max_header_bytes: 1048576
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "123"
+  dbname: "qcat"
+  ssl_mode: "disable"
+  max_open: 50
+  max_idle: 10
+  timeout: 5s
+  conn_max_lifetime: 1h
+  conn_max_idle_time: 15m
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+  pool_size: 20
+
+jwt:
+  secret_key: "your-secret-key-here-change-in-production"
+  duration: 24h
+
+monitoring:
+  prometheus_enabled: true
+  prometheus_path: "/metrics"
+
+cors:
+  allowed_origins: ["*"]
+  allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+  allowed_headers: ["*"]
+  allow_credentials: true
+
+rate_limit:
+  enabled: true
+  requests_per_minute: 100
+  burst: 20
+
+# 安全与合规配置
+security:
+  # 密钥管理服务配置
+  kms:
+    master_key: "your-master-key-here-change-in-production"
+    key_rotation: 90d
+    encryption_key: "your-encryption-key-here"
+  
+  # 加密配置
+  encryption:
+    algorithm: "AES-256-GCM"
+    key_size: 256
+    key_rotation: 90d
+    master_key: "your-encryption-master-key-here"
+    public_key_path: "certs/public.pem"
+    private_key_path: "certs/private.pem"
+  
+  # TLS配置
+  tls:
+    enabled: false
+    cert_path: "certs/server.crt"
+    key_path: "certs/server.key"
+    min_version: 771  # TLS 1.2
+    max_version: 772  # TLS 1.3
+    cipher_suites:
+      - 4865  # TLS_AES_128_GCM_SHA256
+      - 4866  # TLS_AES_256_GCM_SHA384
+      - 4867  # TLS_CHACHA20_POLY1305_SHA256
+  
+  # 网络安全配置
+  network:
+    rate_limit_enabled: true
+    rate_limit_requests: 100
+    rate_limit_window: 1m
+    max_connections: 1000
+    connection_timeout: 30s
+    idle_timeout: 60s
+    read_timeout: 30s
+    write_timeout: 30s
+    allowed_origins: ["*"]
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allowed_headers: ["*"]
+    exposed_headers: ["X-Total-Count"]
+    allow_credentials: true
+    max_age: 86400s
+  
+  # 审计日志配置
+  audit:
+    enabled: true
+    log_level: "info"
+    retention_days: 90
+    encryption_enabled: true
+  
+  # 审批流程配置
+  approval:
+    enabled: true
+    default_expiry: 7d
+    min_approvers: 2
+    auto_approve_roles: ["admin"]
+
+# 日志配置
+logging:
+  level: "info"
+  format: "json"
+  output: "file"
+  max_size: 100
+  max_backups: 10
+  max_age: 30
+  compress: true
+  log_dir: "logs"
+
+# 内存管理配置
+memory:
+  monitor_interval: 30s
+  high_water_mark_percent: 80.0
+  low_water_mark_percent: 60.0
+  alert_threshold: 90.0
+  enable_auto_gc: true
+  gc_interval: 5m
+  force_gc_threshold: 95.0
+  max_memory_mb: 1024
+  max_heap_mb: 512
+
+# 网络重连配置
+network:
+  max_retries: 10
+  initial_delay: 1s
+  max_delay: 5m
+  backoff_multiplier: 2.0
+  jitter_factor: 0.1
+  health_check_interval: 30s
+  connection_timeout: 30s
+  ping_interval: 30s
+  pong_timeout: 10s
+  max_consecutive_failures: 5
+  alert_threshold: 3
+
+# 健康检查配置
+health:
+  check_interval: 30s
+  timeout: 10s
+  retry_count: 3
+  retry_interval: 5s
+  degraded_threshold: 0.8
+  unhealthy_threshold: 0.5
+  alert_threshold: 3
+  alert_cooldown: 5m
+
+# 优雅关闭配置
+shutdown:
+  shutdown_timeout: 30s
+  component_timeout: 10s
+  signal_timeout: 5s
+  enable_signal_handling: true
+  force_shutdown_after: 60s
+  log_shutdown_progress: true
+  shutdown_order:
+    - websocket_connections
+    - strategy_runners
+    - market_data_streams
+    - order_managers
+    - position_managers
+    - risk_engine
+    - optimizer
+    - health_checker
+    - network_manager
+    - memory_manager
+    - redis_cache
+    - database
+    - http_server
