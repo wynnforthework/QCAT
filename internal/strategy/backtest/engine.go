@@ -120,6 +120,7 @@ type Result struct {
 
 // PerformanceStats represents performance statistics
 type PerformanceStats struct {
+	Returns        []float64
 	TotalReturn    float64
 	AnnualReturn   float64
 	SharpeRatio    float64

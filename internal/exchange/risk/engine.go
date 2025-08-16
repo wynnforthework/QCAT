@@ -156,8 +156,14 @@ func (e *RiskEngine) CheckRiskLimits(ctx context.Context, req *exch.OrderRequest
 	// Get current position
 	pos, err := e.posManager.GetPosition(ctx, req.Symbol)
 	if err != nil {
-		// TODO: 待确认 - position.ErrPositionNotFound 不存在，暂时忽略错误
-		pos = nil
+		// Check if it's a "not found" error or other error
+		if err.Error() == "failed to get position: failed to get position: position not found" {
+			// Position not found, treat as no position
+			pos = nil
+		} else {
+			// Other error, return it
+			return fmt.Errorf("failed to get position for risk check: %w", err)
+		}
 	}
 
 	// Check position size limit

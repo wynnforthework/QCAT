@@ -47,14 +47,17 @@ func (m *PositionManager) OpenPosition(trade *exch.Trade) error {
 	}
 
 	// 更新持仓
-	if string(trade.Side) == string(exch.OrderSideBuy) { // 显式转换为 string 进行比较
-		// TODO: 待确认 - Position 结构体中没有 Long 字段，暂时使用 Size 字段
+	if string(trade.Side) == string(exch.OrderSideBuy) { // 买入开多仓
 		position.Size += trade.Quantity
-		position.EntryPrice = (position.EntryPrice*position.Size + trade.Price*trade.Quantity) / (position.Size + trade.Quantity)
-	} else {
-		// TODO: 待确认 - Position 结构体中没有 Short 字段，暂时使用 Size 字段
-		position.Size += trade.Quantity
-		position.EntryPrice = (position.EntryPrice*position.Size + trade.Price*trade.Quantity) / (position.Size + trade.Quantity)
+		position.Side = "LONG"
+	} else { // 卖出开空仓
+		position.Size -= trade.Quantity
+		position.Side = "SHORT"
+	}
+
+	// 更新开仓均价
+	if position.Size != 0 {
+		position.EntryPrice = (position.EntryPrice*math.Abs(position.Size) + trade.Price*trade.Quantity) / (math.Abs(position.Size) + trade.Quantity)
 	}
 
 	// 扣除手续费
@@ -72,14 +75,12 @@ func (m *PositionManager) ClosePosition(trade *exch.Trade) error {
 
 	// 计算平仓数量
 	var closeQuantity float64
-	if string(trade.Side) == string(exch.OrderSideSell) { // 显式转换为 string 进行比较
-		// TODO: 待确认 - Position 结构体中没有 Long 字段，暂时使用 Size 字段
+	if string(trade.Side) == string(exch.OrderSideSell) { // 卖出平多仓
 		closeQuantity = math.Min(position.Size, trade.Quantity)
 		position.Size -= closeQuantity
-	} else {
-		// TODO: 待确认 - Position 结构体中没有 Short 字段，暂时使用 Size 字段
-		closeQuantity = math.Min(position.Size, trade.Quantity)
-		position.Size -= closeQuantity
+	} else { // 买入平空仓
+		closeQuantity = math.Min(math.Abs(position.Size), trade.Quantity)
+		position.Size += closeQuantity
 	}
 
 	// 计算平仓盈亏
@@ -120,9 +121,8 @@ func (m *PositionManager) ApplyFundingFee(rate *funding.Rate) {
 
 	// 计算资金费用
 	var fundingFee float64
-	// TODO: 待确认 - Position 结构体中没有 Long 和 Short 字段，暂时使用 Size 字段
-	if position.Size > 0 {
-		fundingFee = position.Size * position.EntryPrice * rate.Rate
+	if position.Size != 0 {
+		fundingFee = math.Abs(position.Size) * position.EntryPrice * rate.Rate
 	}
 
 	// 更新账户余额
@@ -178,8 +178,8 @@ func (m *PositionManager) UpdatePosition(symbol string, price float64) {
 	position.MarkPrice = price
 
 	// 计算未实现盈亏
-	// TODO: 待确认 - Position 结构体中没有 Long 和 Short 字段，暂时使用 Size 字段
-	if position.Size > 0 {
+	// 使用Size字段的正负值来区分多空方向
+	if position.Size != 0 {
 		position.UnrealizedPnL = position.Size * (price - position.EntryPrice)
 	}
 }

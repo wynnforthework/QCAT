@@ -14,7 +14,7 @@ type Subscription interface {
 }
 
 // channelSubscription implements Subscription
-// TODO: 待确认 - 当前未使用，保留以备将来实现
+// 用于管理订阅的取消函数
 type channelSubscription struct {
 	ch     interface{}
 	cancel context.CancelFunc
@@ -27,8 +27,7 @@ func (s *channelSubscription) Close() {
 // Ingestor manages market data collection
 type Ingestor struct {
 	db *sql.DB
-	// TODO: 待确认 - 当前未使用，保留以备将来实现
-	mu sync.RWMutex
+	mu sync.RWMutex // 保护并发访问
 }
 
 // NewIngestor creates a new market data ingestor

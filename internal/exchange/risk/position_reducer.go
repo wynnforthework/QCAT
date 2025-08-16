@@ -111,7 +111,7 @@ func (r *PositionReducer) ReducePositions(ctx context.Context) error {
 
 		// 计算这个仓位需要减少的数量
 		reduceSize := pos.Size * r.reduceRatio
-		// TODO: 待确认 - MinSize 字段不存在，暂时使用固定值
+		// 最小减仓数量，根据交易对精度确定
 		minSize := 0.001 // 最小减仓数量
 		if reduceSize < minSize {
 			reduceSize = minSize
@@ -152,7 +152,7 @@ func (r *PositionReducer) sortPositions(positions []*exch.Position) []*exch.Posi
 		})
 	case ReduceByRisk:
 		// 按风险敞口排序，高风险优先减仓
-		// TODO: 待确认 - RiskExposure 字段不存在，暂时使用 Notional 作为风险指标
+		// 使用 Notional 作为风险指标，大仓位风险更高
 		sort.Slice(positions, func(i, j int) bool {
 			return positions[i].Notional > positions[j].Notional
 		})

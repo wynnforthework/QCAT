@@ -14,15 +14,15 @@ import (
 // Sandbox provides an isolated environment for strategy execution
 type Sandbox struct {
 	strategy   strategy.Strategy
-	config     map[string]interface{} // TODO: 待确认 - 使用通用配置类型
+	config     map[string]interface{} // 通用配置类型，支持各种策略配置
 	exchange   exchange.Exchange
-	marketData chan interface{}
-	signals    chan interface{} // TODO: 待确认 - 使用通用信号类型
-	orders     chan interface{} // TODO: 待确认 - 使用通用订单类型
-	positions  chan interface{} // TODO: 待确认 - 使用通用持仓类型
+	marketData chan interface{} // 市场数据通道
+	signals    chan interface{} // 策略信号通道
+	orders     chan interface{} // 订单更新通道
+	positions  chan interface{} // 持仓更新通道
 	errors     chan error
 	done       chan struct{}
-	state      string // TODO: 待确认 - 使用字符串类型
+	state      string // 沙盒状态：initializing, running, stopped
 	mu         sync.RWMutex
 }
 
@@ -55,10 +55,27 @@ func (s *Sandbox) Start(ctx context.Context) error {
 	}
 
 	// Set up strategy context
+	mode := strategy.Mode("paper")
+	strategyName := "sandbox-strategy"
+	symbol := "BTCUSDT"
+
+	// 从配置中获取参数
+	if s.config != nil {
+		if m, ok := s.config["mode"].(string); ok {
+			mode = strategy.Mode(m)
+		}
+		if name, ok := s.config["name"].(string); ok {
+			strategyName = name
+		}
+		if sym, ok := s.config["symbol"].(string); ok {
+			symbol = sym
+		}
+	}
+
 	strategyCtx := &strategy.Context{
-		Mode:      strategy.Mode("paper"), // TODO: 待确认 - 从配置中获取模式
-		Strategy:  "sandbox-strategy",     // TODO: 待确认 - 从配置中获取策略名
-		Symbol:    "BTCUSDT",              // TODO: 待确认 - 从配置中获取交易对
+		Mode:      mode,
+		Strategy:  strategyName,
+		Symbol:    symbol,
 		Exchange:  s.exchange,
 		StartTime: time.Now(),
 		Params:    s.config,
@@ -173,11 +190,27 @@ func (s *Sandbox) GetState() string {
 
 // GetResult returns the strategy execution result
 func (s *Sandbox) GetResult() *strategy.Result {
-	// TODO: Implement result calculation
+	// 从配置中获取策略信息
+	strategyName := "sandbox-strategy"
+	symbol := "BTCUSDT"
+	mode := strategy.Mode("paper")
+
+	if s.config != nil {
+		if name, ok := s.config["name"].(string); ok {
+			strategyName = name
+		}
+		if sym, ok := s.config["symbol"].(string); ok {
+			symbol = sym
+		}
+		if m, ok := s.config["mode"].(string); ok {
+			mode = strategy.Mode(m)
+		}
+	}
+
 	return &strategy.Result{
-		Strategy:     "sandbox-strategy",     // TODO: 待确认 - 从配置中获取策略名
-		Symbol:       "BTCUSDT",              // TODO: 待确认 - 从配置中获取交易对
-		Mode:         strategy.Mode("paper"), // TODO: 待确认 - 从配置中获取模式
+		Strategy:     strategyName,
+		Symbol:       symbol,
+		Mode:         mode,
 		StartTime:    time.Now(),
 		EndTime:      time.Now(),
 		InitialValue: 0.0,
@@ -194,18 +227,30 @@ func (s *Sandbox) GetResult() *strategy.Result {
 
 // OnMarketData handles market data updates
 func (s *Sandbox) OnMarketData(data interface{}) {
-	// TODO: 待确认 - 实现市场数据处理逻辑
-	log.Printf("Received market data: %+v", data)
+	// 将市场数据发送到策略
+	select {
+	case s.marketData <- data:
+	default:
+		log.Printf("Market data channel is full, dropped data: %+v", data)
+	}
 }
 
 // OnOrder handles order updates
 func (s *Sandbox) OnOrder(order interface{}) {
-	// TODO: 待确认 - 实现订单处理逻辑
-	log.Printf("Received order update: %+v", order)
+	// 将订单更新发送到策略
+	select {
+	case s.orders <- order:
+	default:
+		log.Printf("Order channel is full, dropped order: %+v", order)
+	}
 }
 
 // OnPosition handles position updates
 func (s *Sandbox) OnPosition(position interface{}) {
-	// TODO: 待确认 - 实现持仓处理逻辑
-	log.Printf("Received position update: %+v", position)
+	// 将持仓更新发送到策略
+	select {
+	case s.positions <- position:
+	default:
+		log.Printf("Position channel is full, dropped position: %+v", position)
+	}
 }

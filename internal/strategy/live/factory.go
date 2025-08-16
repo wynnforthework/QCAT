@@ -40,7 +40,6 @@ func NewFactory(sandboxFactory *sandbox.Factory, market *market.Ingestor, order 
 func (f *Factory) CreateRunner(strategy strategy.Strategy, config *strategy.Config) (*Runner, error) {
 	// Convert config to map[string]interface{}
 	configMap := make(map[string]interface{})
-	// TODO: 待确认 - 转换配置结构
 	if config != nil {
 		configMap["name"] = config.Name
 		configMap["symbol"] = config.Symbol

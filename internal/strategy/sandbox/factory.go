@@ -34,7 +34,6 @@ func (f *Factory) CreateSandbox(strategy strategy.Strategy, config map[string]in
 
 	// Store sandbox
 	f.mu.Lock()
-	// TODO: 待确认 - 从配置中获取策略名
 	strategyName := "sandbox-strategy"
 	if name, ok := config["name"].(string); ok {
 		strategyName = name

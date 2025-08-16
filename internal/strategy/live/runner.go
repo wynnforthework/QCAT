@@ -21,8 +21,7 @@ type Runner struct {
 	order      *order.Manager
 	position   *position.Manager
 	risk       *risk.Manager
-	marketSubs []interface{} // 暂时使用 interface{} 替代 market.Subscription
-	// TODO: 待确认 - 当前未使用，保留以备将来实现
+	marketSubs []interface{} // 市场数据订阅列表
 	mu sync.RWMutex
 }
 
@@ -51,10 +50,7 @@ func (r *Runner) Start(ctx context.Context) error {
 
 	// Subscribe to order updates
 	config := r.sandbox.GetConfig()
-	symbol := "BTCUSDT" // TODO: 待确认 - 从配置中获取交易对
-	if s, ok := config["symbol"].(string); ok {
-		symbol = s
-	}
+	symbol := r.getSymbolFromConfig(config)
 	orderCh := r.order.Subscribe(symbol)
 	go r.handleOrders(ctx, orderCh)
 
@@ -77,10 +73,7 @@ func (r *Runner) Stop(ctx context.Context) error {
 
 	// Unsubscribe from order updates
 	config := r.sandbox.GetConfig()
-	symbol := "BTCUSDT" // TODO: 待确认 - 从配置中获取交易对
-	if s, ok := config["symbol"].(string); ok {
-		symbol = s
-	}
+	symbol := r.getSymbolFromConfig(config)
 	r.order.Unsubscribe(symbol, nil)
 
 	// Unsubscribe from position updates
@@ -97,10 +90,7 @@ func (r *Runner) Stop(ctx context.Context) error {
 // subscribeMarketData subscribes to required market data
 func (r *Runner) subscribeMarketData(ctx context.Context) error {
 	config := r.sandbox.GetConfig()
-	symbol := "BTCUSDT" // TODO: 待确认 - 从配置中获取交易对
-	if s, ok := config["symbol"].(string); ok {
-		symbol = s
-	}
+	symbol := r.getSymbolFromConfig(config)
 
 	// Subscribe to order book updates
 	bookCh, err := r.market.SubscribeOrderBook(ctx, symbol)
@@ -137,10 +127,17 @@ func (r *Runner) subscribeMarketData(ctx context.Context) error {
 	return nil
 }
 
+// getSymbolFromConfig extracts symbol from configuration
+func (r *Runner) getSymbolFromConfig(config map[string]interface{}) string {
+	if s, ok := config["symbol"].(string); ok && s != "" {
+		return s
+	}
+	return "BTCUSDT" // 默认交易对
+}
+
 // unsubscribeMarketData unsubscribes from all market data
 func (r *Runner) unsubscribeMarketData() {
-	// TODO: 待确认 - market.Ingestor 的订阅方法返回的是 channel，不是 Subscription 接口
-	// 暂时清空订阅列表
+	// 清空订阅列表，market.Ingestor 返回的是 channel，无需显式取消订阅
 	r.marketSubs = nil
 }
 

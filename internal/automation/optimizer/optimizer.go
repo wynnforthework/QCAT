@@ -507,17 +507,18 @@ func (o *Optimizer) generateParameters(params []Parameter) map[string]interface{
 func (o *Optimizer) calculateMetrics(result *backtest.Result) map[string]float64 {
 	metrics := make(map[string]float64)
 
-	// Calculate PnL metrics
-	// TODO: 待确认 - Result 结构体中没有 PnL 和 PnLPercent 字段
-	// metrics["pnl"] = result.PnL
-	// metrics["pnl_percent"] = result.PnLPercent
-
-	// Calculate risk metrics
+	// Calculate PnL metrics from PerformanceStats
 	if result.PerformanceStats != nil {
+		metrics["total_return"] = result.PerformanceStats.TotalReturn
+		metrics["annual_return"] = result.PerformanceStats.AnnualReturn
+		metrics["pnl"] = result.PerformanceStats.TotalReturn               // 使用TotalReturn作为PnL
+		metrics["pnl_percent"] = result.PerformanceStats.TotalReturn * 100 // 转换为百分比
 		metrics["max_drawdown"] = result.PerformanceStats.MaxDrawdown
 		metrics["sharpe_ratio"] = result.PerformanceStats.SharpeRatio
 		metrics["win_rate"] = result.PerformanceStats.WinRate
 		metrics["num_trades"] = float64(result.PerformanceStats.TradeCount)
+		metrics["profit_factor"] = result.PerformanceStats.ProfitFactor
+		metrics["avg_trade_return"] = result.PerformanceStats.AvgTradeReturn
 	}
 
 	return metrics

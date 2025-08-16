@@ -44,8 +44,7 @@ type MetricsCollector struct {
 	optimizationSuccess     *prometheus.CounterVec
 	optimizationImprovement *prometheus.GaugeVec
 
-	// TODO: 待确认 - 当前未使用，保留以备将来实现
-	mu sync.RWMutex
+	mu sync.RWMutex // 保护并发访问
 }
 
 // NewMetricsCollector creates a new metrics collector

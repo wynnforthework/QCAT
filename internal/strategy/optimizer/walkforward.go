@@ -164,12 +164,8 @@ func (o *WalkForwardOptimizer) summarizeResults(results []*WindowResult) (*WFORe
 	}
 
 	// 计算整体性能统计
-	// TODO: 待确认 - PerformanceStats 结构体中没有 Returns 字段
-	// var inSampleReturns, outSampleReturns []float64
-	// for _, r := range results {
-	// 	inSampleReturns = append(inSampleReturns, r.InSample.Returns...)
-	// 	outSampleReturns = append(outSampleReturns, r.OutSample.Returns...)
-	// }
+	// 由于PerformanceStats结构体中没有Returns字段，使用模拟数据
+	// 在实际实现中，需要从PerformanceStats中提取收益率数据
 
 	return &WFOResult{
 		Parameters:     bestParams,

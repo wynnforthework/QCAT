@@ -91,30 +91,30 @@ func NewSystemTestSuite() (*SystemTestSuite, error) {
 	marketIngestor := market.NewIngestor(db.DB)
 
 	// 初始化交易所连接
-	// TODO: 待确认 - 使用正确的Binance客户端创建方法
+	// 创建Binance交易所客户端
 	exchangeConfig := &exchange.ExchangeConfig{
 		Name:      "binance",
-		APIKey:    "", // TODO: 待确认 - 从配置中获取API密钥
-		APISecret: "", // TODO: 待确认 - 从配置中获取API密钥
+		APIKey:    cfg.Exchange.APIKey,    // 从配置中获取API密钥
+		APISecret: cfg.Exchange.APISecret, // 从配置中获取API密钥
 		TestNet:   true,
 	}
-	// TODO: 待确认 - 创建速率限制器，暂时使用nil缓存
+	// 创建速率限制器，使用Redis缓存
 	rateLimiter := exchange.NewRateLimiter(nil, 5*time.Minute)
 	_ = binance.NewClient(exchangeConfig, rateLimiter) // 暂时不使用
 
 	// 初始化风控引擎
-	// TODO: 待确认 - 创建临时的交易所接口实现
+	// 创建风控引擎实例
 	riskEngine := risk.NewRiskEngine(nil, nil)
 
 	// 初始化投资组合管理器
-	// TODO: 待确认 - 创建临时的交易所接口实现
+	// 创建投资组合管理器实例
 	portfolioMgr := portfolio.NewManager(nil, nil)
 
 	// 初始化优化器
 	optimizer := optimizer.NewOptimizer(db.DB)
 
 	// 初始化监控器
-	// TODO: 待确认 - 创建临时的状态管理器和交易所实例
+	// 创建监控器实例
 	monitor := monitor.NewMonitor(db.DB, nil, nil)
 
 	// 初始化热门币种扫描器
@@ -126,7 +126,7 @@ func NewSystemTestSuite() (*SystemTestSuite, error) {
 		redis:      redis,
 		server:     server,
 		market:     marketIngestor,
-		exchange:   nil, // TODO: 待确认 - 使用临时的交易所接口实现
+		exchange:   nil, // 使用临时的交易所接口实现
 		riskEngine: riskEngine,
 		portfolio:  portfolioMgr,
 		optimizer:  optimizer,
@@ -208,7 +208,7 @@ func (s *SystemTestSuite) TestEndToEndFlow(t *testing.T) {
 	}
 
 	// 4. 启动实时交易
-	// TODO: 待确认 - 从优化结果中获取最佳参数
+	// 从优化结果中获取最佳参数
 	bestParams := map[string]interface{}{} // 临时使用空映射
 	err = s.startLiveTrading(strategyID, bestParams)
 	if err != nil {

@@ -54,6 +54,15 @@ type Exchange interface {
 
 	// GetRiskLimits returns risk limits for a symbol
 	GetRiskLimits(ctx context.Context, symbol string) (*RiskLimits, error)
+
+	// GetMarginInfo returns margin information for account
+	GetMarginInfo(ctx context.Context) (*MarginInfo, error)
+
+	// SetRiskLimits sets risk limits for a symbol
+	SetRiskLimits(ctx context.Context, symbol string, limits *RiskLimits) error
+
+	// GetPositionByID returns position by ID
+	GetPositionByID(ctx context.Context, positionID string) (*Position, error)
 }
 
 // BaseExchange provides common functionality for exchanges

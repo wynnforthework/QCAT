@@ -14,6 +14,7 @@ type Config struct {
 	Server     ServerConfig     `yaml:"server"`
 	Database   DatabaseConfig   `yaml:"database"`
 	Redis      RedisConfig      `yaml:"redis"`
+	Exchange   ExchangeConfig   `yaml:"exchange"`
 	JWT        JWTConfig        `yaml:"jwt"`
 	Monitoring MonitoringConfig `yaml:"monitoring"`
 	CORS       CORSConfig       `yaml:"cors"`
@@ -62,6 +63,15 @@ type RedisConfig struct {
 	Password string `yaml:"password"`
 	DB       int    `yaml:"db"`
 	PoolSize int    `yaml:"pool_size"`
+}
+
+// ExchangeConfig 交易所配置
+type ExchangeConfig struct {
+	Name      string `yaml:"name"`
+	APIKey    string `yaml:"api_key"`
+	APISecret string `yaml:"api_secret"`
+	TestNet   bool   `yaml:"test_net"`
+	BaseURL   string `yaml:"base_url"`
 }
 
 // JWTConfig JWT配置

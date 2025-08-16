@@ -30,7 +30,7 @@ type Server struct {
 
 	// Core services
 	db         *database.DB
-	redis      *cache.RedisCache
+	redis      cache.Cacher
 	jwtManager *auth.JWTManager
 	metrics    *monitoring.Metrics
 	memory     *stability.MemoryManager
@@ -360,7 +360,8 @@ func (s *Server) setupRoutes() {
 		// Check Redis health
 		redisHealth := "ok"
 		if s.redis != nil {
-			if err := s.redis.HealthCheck(c.Request.Context()); err != nil {
+			// Try to perform a simple operation to check health
+			if err := s.redis.Set(c.Request.Context(), "health_check", "ok", time.Second); err != nil {
 				redisHealth = "error"
 			}
 		} else {
@@ -707,7 +708,7 @@ func (s *Server) GetDB() *database.DB {
 }
 
 // GetRedis returns the Redis cache
-func (s *Server) GetRedis() *cache.RedisCache {
+func (s *Server) GetRedis() cache.Cacher {
 	return s.redis
 }
 

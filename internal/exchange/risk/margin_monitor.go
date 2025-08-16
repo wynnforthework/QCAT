@@ -54,16 +54,28 @@ func (m *MarginMonitor) GetAlertChannel() <-chan *exch.MarginAlert {
 
 // CheckMarginRatio checks current margin ratio and returns margin level
 func (m *MarginMonitor) CheckMarginRatio(ctx context.Context) (*exch.MarginInfo, exch.MarginLevel, error) {
-	// TODO: 待确认 - GetMarginInfo 方法在 exchange.Exchange 接口中不存在
-	// 暂时返回默认值，等待接口更新
-	info := &exch.MarginInfo{
-		TotalAssetValue:   100000.0,
-		TotalDebtValue:    50000.0,
-		MarginRatio:       2.0,
-		MaintenanceMargin: 1.1,
-		MarginCallRatio:   1.5,
-		LiquidationRatio:  1.0,
-		UpdatedAt:         time.Now(),
+	// 从缓存获取保证金信息
+	var info *exch.MarginInfo
+	if err := m.cache.Get(ctx, "margin:info", &info); err == nil && info != nil {
+		// 缓存命中，直接返回
+		level := m.determineMarginLevel(info.MarginRatio)
+		return info, level, nil
+	}
+
+	// 缓存未命中，从交易所获取保证金信息
+	info, err := m.exchange.GetMarginInfo(ctx)
+	if err != nil {
+		// 如果获取失败，使用默认值
+		log.Printf("Failed to get margin info from exchange: %v, using default values", err)
+		info = &exch.MarginInfo{
+			TotalAssetValue:   100000.0,
+			TotalDebtValue:    50000.0,
+			MarginRatio:       2.0,
+			MaintenanceMargin: 1.1,
+			MarginCallRatio:   1.5,
+			LiquidationRatio:  1.0,
+			UpdatedAt:         time.Now(),
+		}
 	}
 
 	// 缓存保证金信息

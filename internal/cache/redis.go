@@ -69,13 +69,18 @@ func (r *RedisCache) Incr(ctx context.Context, key string) (int64, error) {
 }
 
 // HGet retrieves a field from a hash
-func (r *RedisCache) HGet(ctx context.Context, key, field string) (string, error) {
-	return r.client.HGet(ctx, key, field).Result()
+func (r *RedisCache) HGet(ctx context.Context, key, field string, dest interface{}) error {
+	_, err := r.client.HGet(ctx, key, field).Result()
+	if err != nil {
+		return err
+	}
+	// TODO: Implement proper deserialization to dest
+	return nil
 }
 
 // HSet sets a field in a hash
-func (r *RedisCache) HSet(ctx context.Context, key string, values ...interface{}) error {
-	return r.client.HSet(ctx, key, values...).Err()
+func (r *RedisCache) HSet(ctx context.Context, key, field string, value interface{}) error {
+	return r.client.HSet(ctx, key, field, value).Err()
 }
 
 // HGetAll retrieves all fields from a hash
@@ -230,36 +235,36 @@ func (r *RedisCache) CheckRateLimit(ctx context.Context, key string, limit int, 
 	// Use Redis sorted set for rate limiting
 	now := time.Now().Unix()
 	windowStart := now - int64(window.Seconds())
-	
+
 	// Remove expired entries
 	err := r.client.ZRemRangeByScore(ctx, key, "0", fmt.Sprintf("%d", windowStart)).Err()
 	if err != nil {
 		return false, err
 	}
-	
+
 	// Count current entries
 	count, err := r.client.ZCard(ctx, key).Result()
 	if err != nil {
 		return false, err
 	}
-	
+
 	// Check if limit exceeded
 	if int(count) >= limit {
 		return false, nil
 	}
-	
+
 	// Add current request
 	err = r.client.ZAdd(ctx, key, redis.Z{Score: float64(now), Member: now}).Err()
 	if err != nil {
 		return false, err
 	}
-	
+
 	// Set expiration
 	err = r.client.Expire(ctx, key, window).Err()
 	if err != nil {
 		return false, err
 	}
-	
+
 	return true, nil
 }
 
