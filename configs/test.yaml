@@ -1,0 +1,179 @@
+# QCAT 测试环境配置
+
+app:
+  name: "QCAT Test"
+  version: "1.0.0"
+  environment: "test"
+  debug: true
+
+server:
+  port: 8080
+  host: "localhost"
+  debug: true
+  read_timeout: 30s
+  write_timeout: 30s
+  max_header_bytes: 1048576
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "postgres"
+  dbname: "qcat_test"
+  sslmode: "disable"
+  max_open: 10
+  max_idle: 5
+  timeout: 30s
+  conn_max_lifetime: 1h
+  conn_max_idle_time: 30m
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 1  # 使用测试数据库
+  pool_size: 10
+  min_idle_conns: 5
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+
+# 测试特定配置
+test:
+  # 数据库配置
+  database:
+    use_memory: true  # 使用内存数据库
+    auto_migrate: true
+    seed_data: true
+    
+  # 缓存配置
+  cache:
+    use_memory: true  # 使用内存缓存
+    mock_redis: true
+    
+  # 日志配置
+  logger:
+    level: "error"  # 测试时减少日志输出
+    format: "text"
+    output: "stdout"
+    
+  # 超时配置
+  timeouts:
+    unit_test: "5s"
+    integration_test: "30s"
+    e2e_test: "2m"
+    benchmark_test: "10m"
+    
+  # 并发配置
+  concurrency:
+    max_goroutines: 100
+    test_parallelism: 4
+    
+  # 性能基准
+  performance:
+    min_ops_per_sec: 1000
+    max_latency_ms: 100
+    max_memory_mb: 100
+    max_allocs_per_op: 10
+
+# Mock配置
+mocks:
+  # 交易所API模拟
+  exchange:
+    enabled: true
+    latency_ms: 50
+    error_rate: 0.05
+    
+  # 市场数据模拟
+  market_data:
+    enabled: true
+    update_interval: 100ms
+    symbols: ["BTCUSDT", "ETHUSDT", "ADAUSDT"]
+    
+  # 策略执行模拟
+  strategy:
+    enabled: true
+    execution_time_ms: 10
+    success_rate: 0.95
+
+# 测试数据配置
+test_data:
+  # 策略测试数据
+  strategies:
+    count: 10
+    types: ["trend", "mean_reversion", "arbitrage"]
+    
+  # 历史数据
+  historical_data:
+    days: 30
+    interval: "1m"
+    symbols: ["BTCUSDT", "ETHUSDT"]
+    
+  # 订单数据
+  orders:
+    count: 100
+    sides: ["BUY", "SELL"]
+    types: ["MARKET", "LIMIT"]
+
+# 断言配置
+assertions:
+  # 性能断言
+  performance:
+    max_response_time: 100ms
+    min_throughput: 1000
+    max_error_rate: 0.05
+    
+  # 资源断言
+  resources:
+    max_memory_usage: 100MB
+    max_cpu_usage: 80
+    max_goroutines: 1000
+    
+  # 业务断言
+  business:
+    min_strategy_count: 1
+    max_drawdown: 0.2
+    min_sharpe_ratio: 1.0
+
+# 报告配置
+reporting:
+  # 覆盖率报告
+  coverage:
+    format: "html"
+    output: "coverage.html"
+    threshold: 70
+    
+  # 基准测试报告
+  benchmark:
+    format: "txt"
+    output: "benchmark.txt"
+    compare_previous: true
+    
+  # 测试报告
+  test_report:
+    format: "markdown"
+    output: "test_report.md"
+    include_details: true
+    
+  # JUnit报告（用于CI/CD）
+  junit:
+    enabled: true
+    output: "test-results.xml"
+
+# CI/CD配置
+ci:
+  # 质量门禁
+  quality_gates:
+    min_coverage: 70
+    max_error_rate: 0.05
+    max_test_duration: "5m"
+    
+  # 通知配置
+  notifications:
+    slack_webhook: ""
+    email_recipients: []
+    
+  # 构建配置
+  build:
+    timeout: "10m"
+    parallel_jobs: 4
+    cache_enabled: true

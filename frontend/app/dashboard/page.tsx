@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TrendingUp, TrendingDown, AlertTriangle, CheckCircle, XCircle } from "lucide-react"
+import { RealTimeMonitor } from "@/components/dashboard/real-time-monitor"
 
 interface DashboardData {
   account: {
@@ -122,6 +124,14 @@ export default function DashboardPage() {
           <span className="ml-1">风险等级: {data.risk.level.toUpperCase()}</span>
         </Badge>
       </div>
+
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview">概览</TabsTrigger>
+          <TabsTrigger value="monitor">实时监控</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
 
       {/* 账户权益卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -255,6 +265,12 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+        </TabsContent>
+
+        <TabsContent value="monitor" className="space-y-6">
+          <RealTimeMonitor />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

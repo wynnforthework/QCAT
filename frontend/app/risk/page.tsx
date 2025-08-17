@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs" // 修复: 添加缺失的 Tabs 组件
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog" // 修复: 移除未使用的 DialogTrigger
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Switch } from "@/components/ui/switch"
-import { Shield, AlertTriangle, Settings, CheckCircle, XCircle, Zap } from "lucide-react" // 修复: 移除未使用的 Clock
+import { Shield, AlertTriangle, Settings, CheckCircle, XCircle, Zap } from "lucide-react"
+import { RiskDashboard } from "@/components/risk/risk-dashboard"
 
 interface RiskConfig {
   limits: RiskLimits
@@ -289,14 +290,19 @@ export default function RiskPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="overview" className="w-full">
+      <Tabs defaultValue="dashboard" className="w-full">
         <TabsList>
+          <TabsTrigger value="dashboard">风险仪表板</TabsTrigger>
           <TabsTrigger value="overview">风控概览</TabsTrigger>
           <TabsTrigger value="circuit-breakers">熔断机制</TabsTrigger>
           <TabsTrigger value="stop-loss">止盈止损</TabsTrigger>
           <TabsTrigger value="approvals">审批流程</TabsTrigger>
           <TabsTrigger value="violations">违规记录</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="dashboard" className="space-y-6">
+          <RiskDashboard />
+        </TabsContent>
 
         <TabsContent value="overview" className="space-y-6">
           {/* 风控指标卡片 */}

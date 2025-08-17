@@ -54,7 +54,6 @@ export default function HotlistPage() {
   const [whitelist, setWhitelist] = useState<WhitelistItem[]>([])
   const [loading, setLoading] = useState(true)
   const [autoEnable, setAutoEnable] = useState(false)
-  // const [showWhitelistDialog, setShowWhitelistDialog] = useState(false) // 暂时注释掉未使用的状态
   const [filterRank, setFilterRank] = useState<number>(10)
 
   useEffect(() => {
@@ -254,9 +253,9 @@ export default function HotlistPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">热门币种管理</h1>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowWhitelistDialog(true)}>
-            <Star className="h-4 w-4 mr-2" />
-            白名单管理
+          <Button variant="outline">
+            <TrendingUp className="h-4 w-4 mr-2" />
+            刷新排行
           </Button>
         </div>
       </div>

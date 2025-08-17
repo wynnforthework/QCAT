@@ -8,6 +8,8 @@ import { Progress } from "@/components/ui/progress"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Play, Pause, Settings, BarChart3, Download, Upload } from "lucide-react" // 修复: 移除未使用的 History
+import { TradeHistory } from "@/components/strategies/trade-history"
+import { ParameterSettings } from "@/components/strategies/parameter-settings"
 
 interface Strategy {
   id: string
@@ -301,14 +303,16 @@ export default function StrategiesPage() {
                         </Card>
                       </TabsContent>
                       <TabsContent value="trades" className="space-y-4">
-                        <div className="text-center text-muted-foreground py-8">
-                          交易记录功能开发中...
-                        </div>
+                        <TradeHistory 
+                          strategyId={strategy.id} 
+                          strategyName={strategy.name}
+                        />
                       </TabsContent>
                       <TabsContent value="settings" className="space-y-4">
-                        <div className="text-center text-muted-foreground py-8">
-                          参数设置功能开发中...
-                        </div>
+                        <ParameterSettings 
+                          strategyId={strategy.id} 
+                          strategyName={strategy.name}
+                        />
                       </TabsContent>
                     </Tabs>
                   </DialogContent>

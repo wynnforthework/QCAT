@@ -1,0 +1,220 @@
+# 日志配置
+logger:
+  # 日志级别: trace, debug, info, warn, error, fatal, panic
+  level: "info"
+  
+  # 日志格式: json, text
+  format: "json"
+  
+  # 输出目标: stdout, stderr, file
+  output: "file"
+  
+  # 日志文件配置
+  filename: "logs/qcat.log"
+  
+  # 单个日志文件最大大小(MB)
+  max_size: 100
+  
+  # 日志文件保留天数
+  max_age: 30
+  
+  # 最大备份文件数
+  max_backups: 10
+  
+  # 是否压缩备份文件
+  compress: true
+  
+  # 是否显示调用者信息
+  caller: true
+  
+  # 是否显示时间戳
+  timestamp: true
+
+# 不同环境的日志配置
+environments:
+  development:
+    logger:
+      level: "debug"
+      format: "text"
+      output: "stdout"
+      caller: true
+      
+  testing:
+    logger:
+      level: "warn"
+      format: "json"
+      output: "file"
+      filename: "logs/test.log"
+      
+  production:
+    logger:
+      level: "info"
+      format: "json"
+      output: "file"
+      filename: "/var/log/qcat/app.log"
+      max_size: 500
+      max_age: 90
+      max_backups: 30
+      compress: true
+
+# 特定模块的日志配置
+modules:
+  database:
+    level: "warn"
+    
+  cache:
+    level: "error"
+    
+  exchange:
+    level: "info"
+    
+  strategy:
+    level: "debug"
+    
+  risk:
+    level: "info"
+    
+  audit:
+    level: "info"
+    separate_file: true
+    filename: "logs/audit.log"
+    
+  security:
+    level: "warn"
+    separate_file: true
+    filename: "logs/security.log"
+    
+  performance:
+    level: "info"
+    separate_file: true
+    filename: "logs/performance.log"
+
+# 日志轮转配置
+rotation:
+  # 轮转策略: size, time, both
+  strategy: "both"
+  
+  # 按大小轮转的阈值(MB)
+  size_threshold: 100
+  
+  # 按时间轮转的间隔: hourly, daily, weekly, monthly
+  time_interval: "daily"
+  
+  # 轮转时间点(24小时制)
+  rotation_time: "00:00"
+  
+  # 是否立即轮转
+  rotate_immediately: false
+
+# 日志过滤配置
+filters:
+  # 敏感信息过滤
+  sensitive_fields:
+    - "password"
+    - "token"
+    - "api_key"
+    - "secret"
+    - "private_key"
+    - "credit_card"
+    - "ssn"
+    
+  # 排除的路径
+  exclude_paths:
+    - "/health"
+    - "/metrics"
+    - "/favicon.ico"
+    
+  # 排除的用户代理
+  exclude_user_agents:
+    - "kube-probe"
+    - "health-check"
+    
+  # 最小日志级别过滤
+  min_level_by_path:
+    "/api/v1/health": "error"
+    "/api/v1/metrics": "warn"
+
+# 日志采样配置
+sampling:
+  # 是否启用采样
+  enabled: false
+  
+  # 采样率(0.0-1.0)
+  rate: 0.1
+  
+  # 采样策略: random, systematic, stratified
+  strategy: "random"
+  
+  # 高优先级日志不采样
+  exclude_levels:
+    - "error"
+    - "fatal"
+    - "panic"
+
+# 日志缓冲配置
+buffering:
+  # 是否启用缓冲
+  enabled: true
+  
+  # 缓冲区大小
+  buffer_size: 1000
+  
+  # 刷新间隔(秒)
+  flush_interval: 5
+  
+  # 强制刷新的日志级别
+  force_flush_levels:
+    - "error"
+    - "fatal"
+    - "panic"
+
+# 日志监控配置
+monitoring:
+  # 是否启用监控
+  enabled: true
+  
+  # 监控指标
+  metrics:
+    - "log_count_by_level"
+    - "log_rate"
+    - "error_rate"
+    - "log_size"
+    
+  # 告警配置
+  alerts:
+    error_rate_threshold: 0.05  # 错误率超过5%告警
+    log_rate_threshold: 1000    # 日志速率超过1000/分钟告警
+    disk_usage_threshold: 0.8   # 磁盘使用率超过80%告警
+
+# 日志查询配置
+query:
+  # 是否启用查询API
+  enabled: true
+  
+  # 查询API端点
+  endpoint: "/api/v1/logs"
+  
+  # 最大查询结果数
+  max_results: 1000
+  
+  # 查询超时时间(秒)
+  timeout: 30
+  
+  # 支持的查询字段
+  searchable_fields:
+    - "level"
+    - "message"
+    - "timestamp"
+    - "request_id"
+    - "user_id"
+    - "module"
+    - "error_code"
+    
+  # 索引配置
+  indexes:
+    - field: "timestamp"
+      type: "btree"
+    - field: "level"
+      type: "hash"
+    - field: "request_id"
+      type: "hash"

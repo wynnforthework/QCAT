@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Settings, BarChart3, Target, Zap, TrendingUp, AlertTriangle } from "lucide-react"
+import { SensitivityHeatmap, generateMockSensitivityData } from "@/components/optimizer/sensitivity-heatmap"
 
 interface OptimizationConfig {
   strategyId: string
@@ -354,11 +355,10 @@ export default function OptimizerPage() {
                 </TabsContent>
 
                 <TabsContent value="sensitivity" className="space-y-4">
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>敏感度热图功能开发中...</p>
-                    <p className="text-sm">将显示参数对目标函数的敏感度分析</p>
-                  </div>
+                  <SensitivityHeatmap 
+                    data={generateMockSensitivityData()} 
+                    objective={config.objective}
+                  />
                 </TabsContent>
               </Tabs>
             </CardContent>

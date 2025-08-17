@@ -1,0 +1,188 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: qcat_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:6
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Install dependencies
+      run: go mod download
+
+    - name: Run unit tests
+      run: go test -v -race -coverprofile=coverage.out ./internal/...
+      env:
+        QCAT_ENV: test
+        QCAT_DATABASE_URL: postgres://postgres:postgres@localhost:5432/qcat_test?sslmode=disable
+        QCAT_REDIS_URL: redis://localhost:6379/1
+
+    - name: Generate coverage report
+      run: go tool cover -html=coverage.out -o coverage.html
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: codecov-umbrella
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: qcat_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:6
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21
+
+    - name: Run integration tests
+      run: go test -v -tags=integration ./tests/integration/...
+      env:
+        QCAT_ENV: test
+        QCAT_DATABASE_URL: postgres://postgres:postgres@localhost:5432/qcat_test?sslmode=disable
+        QCAT_REDIS_URL: redis://localhost:6379/1
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21
+
+    - name: Build application
+      run: go build -o qcat ./cmd/server
+
+    - name: Start application
+      run: ./qcat &
+      env:
+        QCAT_ENV: test
+        QCAT_SERVER_PORT: 8080
+
+    - name: Wait for application to start
+      run: |
+        timeout 30 bash -c 'until curl -f http://localhost:8080/health; do sleep 1; done'
+
+    - name: Run E2E tests
+      run: go test -v -tags=e2e ./tests/e2e/...
+      env:
+        QCAT_API_URL: http://localhost:8080
+
+  benchmark-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21
+
+    - name: Run benchmark tests
+      run: go test -bench=. -benchmem -run=^$ ./internal/...
+
+    - name: Store benchmark result
+      uses: benchmark-action/github-action-benchmark@v1
+      with:
+        tool: 'go'
+        output-file-path: benchmark.txt
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        auto-push: true
+
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.21
+
+    - name: Run Gosec Security Scanner
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        args: './...'
+
+    - name: Run govulncheck
+      run: |
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...

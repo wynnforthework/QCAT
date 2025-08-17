@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -281,4 +282,19 @@ func parseIntParam(param string) (int, error) {
 		return 0, err
 	}
 	return result, nil
+}
+
+// RegisterRoutes registers cache management routes
+func (h *CacheHandler) RegisterRoutes(router *gin.RouterGroup) {
+	cache := router.Group("/cache")
+	{
+		cache.GET("/status", h.handleCacheStatus)
+		cache.GET("/health", h.handleCacheHealth)
+		cache.GET("/metrics", h.handleCacheMetrics)
+		cache.GET("/events", h.handleCacheEvents)
+		cache.GET("/config", h.handleCacheConfig)
+		cache.POST("/test", h.handleTestCache)
+		cache.POST("/fallback/force", h.handleForceFallback)
+		cache.POST("/counters/reset", h.handleResetCounters)
+	}
 }

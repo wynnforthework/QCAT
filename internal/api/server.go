@@ -14,6 +14,7 @@ import (
 	"qcat/internal/database"
 	"qcat/internal/monitor"
 	"qcat/internal/monitoring"
+	"qcat/internal/security"
 	"qcat/internal/stability"
 
 	"github.com/gin-gonic/gin"
@@ -40,6 +41,10 @@ type Server struct {
 	network          *stability.NetworkReconnectManager
 	health           *stability.HealthChecker
 	shutdown         *stability.GracefulShutdownManager
+
+	// Security services
+	keyManager      *security.KeyManager
+	auditLogger     *security.AuditLogger
 }
 
 // Handlers contains all API handlers
@@ -53,6 +58,8 @@ type Handlers struct {
 	Audit     *AuditHandler
 	WebSocket *WebSocketHandler
 	Auth      *AuthHandler
+	Cache     *CacheHandler
+	Security  *SecurityHandler
 }
 
 // RateLimiter 速率限制器结构
@@ -310,9 +317,28 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		shutdown:         shutdown,
 	}
 
+	// Store cache manager reference for cache handler
+	var cacheManagerRef *cache.CacheManager
+	if cacheAdapter, ok := redis.(*cache.CacheAdapter); ok {
+		cacheManagerRef = cacheAdapter.manager
+	}
+
 	// Set up database connection pool monitoring
 	if db != nil {
 		db.SetMonitorCallback(metrics.UpdateDatabasePoolMetrics)
+	}
+
+	// Initialize security system
+	keyManager, err := initializeKeyManager(cfg)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize key manager: %v", err)
+		keyManager = nil
+	}
+
+	auditLogger, err := initializeAuditLogger(cfg)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize audit logger: %v", err)
+		auditLogger = nil
 	}
 
 	// Initialize handlers with dependencies
@@ -326,13 +352,38 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		Audit:     NewAuditHandler(db, metricsCollector),
 		WebSocket: NewWebSocketHandler(server.upgrader, metrics),
 		Auth:      NewAuthHandler(jwtManager, db),
+		Cache:     NewCacheHandler(cacheManagerRef),
+		Security:  NewSecurityHandler(keyManager, auditLogger),
 	}
+
+	// Store security components for middleware
+	server.keyManager = keyManager
+	server.auditLogger = auditLogger
 
 	// Setup routes
 	server.setupRoutes()
 
 	return server, nil
 }
+
+// initializeKeyManager initializes the key manager
+func initializeKeyManager(cfg *config.Config) (*security.KeyManager, error) {
+	keyManagerConfig := security.DefaultKeyManagerConfig()
+	
+	// Override with config values if available
+	// This would be expanded based on your config structure
+	
+	return security.NewKeyManager(keyManagerConfig)
+}
+
+// initializeAuditLogger initializes the audit logger
+func initializeAuditLogger(cfg *config.Config) (*security.AuditLogger, error) {
+	auditConfig := security.DefaultAuditConfig()
+	
+	// Override with config values if available
+	// This would be expanded based on your config structure
+	
+	return security.NewAuditLogger(auditConfig)
 
 // setupRoutes configures all API routes
 func (s *Server) setupRoutes() {
@@ -468,6 +519,16 @@ func (s *Server) setupRoutes() {
 				audit.GET("/decisions", s.handlers.Audit.GetDecisionChains)
 				audit.GET("/performance", s.handlers.Audit.GetPerformanceMetrics)
 				audit.POST("/export", s.handlers.Audit.ExportReport)
+			}
+
+			// Cache management routes
+			if s.handlers.Cache != nil {
+				s.handlers.Cache.RegisterRoutes(protected)
+			}
+
+			// Security management routes
+			if s.handlers.Security != nil {
+				s.handlers.Security.RegisterRoutes(protected)
 			}
 		}
 	}

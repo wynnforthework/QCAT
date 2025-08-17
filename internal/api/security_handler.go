@@ -1,520 +1,508 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
 	"qcat/internal/security"
-
 	"github.com/gin-gonic/gin"
 )
 
-// SecurityHandler 安全相关处理器
+// SecurityHandler handles security-related API requests
 type SecurityHandler struct {
-	kms      *security.KMS
-	rbac     *security.RBAC
-	workflow *security.ApprovalWorkflow
+	keyManager   *security.KeyManager
+	auditLogger  *security.AuditLogger
 }
 
-// NewSecurityHandler 创建安全处理器
-func NewSecurityHandler(kms *security.KMS, rbac *security.RBAC, workflow *security.ApprovalWorkflow) *SecurityHandler {
+// NewSecurityHandler creates a new security handler
+func NewSecurityHandler(keyManager *security.KeyManager, auditLogger *security.AuditLogger) *SecurityHandler {
 	return &SecurityHandler{
-		kms:      kms,
-		rbac:     rbac,
-		workflow: workflow,
+		keyManager:  keyManager,
+		auditLogger: auditLogger,
 	}
 }
 
-// ==================== KMS API ====================
+// RegisterRoutes registers security management routes
+func (h *SecurityHandler) RegisterRoutes(router *gin.RouterGroup) {
+	security := router.Group("/security")
+	{
+		// API Key management
+		keys := security.Group("/keys")
+		{
+			keys.POST("/", h.createAPIKey)
+			keys.GET("/", h.listAPIKeys)
+			keys.GET("/:keyId", h.getAPIKey)
+			keys.POST("/:keyId/rotate", h.rotateAPIKey)
+			keys.POST("/:keyId/revoke", h.revokeAPIKey)
+			keys.GET("/:keyId/usage", h.getKeyUsage)
+			keys.GET("/:keyId/schedule", h.getRotationSchedule)
+		}
 
-// CreateAPIKeyRequest 创建API密钥请求
-type CreateAPIKeyRequest struct {
-	Name        string   `json:"name" binding:"required"`
-	Exchange    string   `json:"exchange" binding:"required"`
-	Key         string   `json:"key" binding:"required"`
-	Secret      string   `json:"secret" binding:"required"`
-	Permissions []string `json:"permissions"`
+		// Audit logs
+		audit := security.Group("/audit")
+		{
+			audit.GET("/logs", h.getAuditLogs)
+			audit.GET("/logs/:id", h.getAuditLog)
+			audit.POST("/logs/export", h.exportAuditLogs)
+			audit.GET("/integrity", h.verifyIntegrity)
+		}
+
+		// Security monitoring
+		monitoring := security.Group("/monitoring")
+		{
+			monitoring.GET("/alerts", h.getSecurityAlerts)
+			monitoring.POST("/alerts/:id/acknowledge", h.acknowledgeAlert)
+			monitoring.GET("/events", h.getSecurityEvents)
+		}
+	}
 }
 
-// CreateAPIKey 创建API密钥
-func (h *SecurityHandler) CreateAPIKey(c *gin.Context) {
-	var req CreateAPIKeyRequest
+// createAPIKey creates a new API key
+func (h *SecurityHandler) createAPIKey(c *gin.Context) {
+	var req struct {
+		Name        string                    `json:"name" binding:"required"`
+		Permissions []security.KeyPermission `json:"permissions" binding:"required"`
+		ExpiresAt   time.Time                `json:"expires_at"`
+	}
+
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request format",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	apiKey, err := h.kms.CreateAPIKey(c.Request.Context(), req.Name, req.Exchange, req.Key, req.Secret, req.Permissions)
+	// Set default expiration if not provided
+	if req.ExpiresAt.IsZero() {
+		req.ExpiresAt = time.Now().Add(365 * 24 * time.Hour) // 1 year
+	}
+
+	// Create the key
+	keyInfo, keyString, err := h.keyManager.GenerateKey(req.Name, req.Permissions, req.ExpiresAt)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to create API key",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusCreated, apiKey)
+	// Log the action
+	userID := getUserID(c)
+	h.auditLogger.LogUserAction(userID, "create_api_key", keyInfo.ID, map[string]interface{}{
+		"key_name": req.Name,
+		"permissions": req.Permissions,
+		"expires_at": req.ExpiresAt,
+	}, true, "")
+
+	c.JSON(http.StatusCreated, gin.H{
+		"success": true,
+		"key_info": keyInfo,
+		"api_key": keyString, // Only returned once
+		"message": "API key created successfully",
+	})
 }
 
-// GetAPIKey 获取API密钥
-func (h *SecurityHandler) GetAPIKey(c *gin.Context) {
-	id := c.Param("id")
+// listAPIKeys lists all API keys
+func (h *SecurityHandler) listAPIKeys(c *gin.Context) {
+	// Parse query parameters for filtering
+	filter := &security.KeyFilter{}
+	
+	if status := c.Query("status"); status != "" {
+		filter.Status = security.KeyStatus(status)
+	}
+	if name := c.Query("name"); name != "" {
+		filter.Name = name
+	}
+	if permission := c.Query("permission"); permission != "" {
+		filter.Permission = permission
+	}
 
-	apiKey, err := h.kms.GetAPIKey(c.Request.Context(), id)
+	keys, err := h.keyManager.ListKeys(filter)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to list API keys",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, apiKey)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"keys": keys,
+		"count": len(keys),
+	})
 }
 
-// ListAPIKeys 列出所有API密钥
-func (h *SecurityHandler) ListAPIKeys(c *gin.Context) {
-	keys, err := h.kms.ListAPIKeys(c.Request.Context())
+// getAPIKey gets a specific API key
+func (h *SecurityHandler) getAPIKey(c *gin.Context) {
+	keyID := c.Param("keyId")
+	if keyID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Key ID is required",
+		})
+		return
+	}
+
+	keyInfo, err := h.keyManager.vault.GetKey(keyID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "API key not found",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, keys)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"key_info": keyInfo,
+	})
 }
 
-// UpdateAPIKey 更新API密钥
-func (h *SecurityHandler) UpdateAPIKey(c *gin.Context) {
-	id := c.Param("id")
-
-	var updates map[string]interface{}
-	if err := c.ShouldBindJSON(&updates); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+// rotateAPIKey rotates an API key
+func (h *SecurityHandler) rotateAPIKey(c *gin.Context) {
+	keyID := c.Param("keyId")
+	if keyID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Key ID is required",
+		})
 		return
 	}
 
-	err := h.kms.UpdateAPIKey(c.Request.Context(), id, updates)
+	newKeyInfo, newKeyString, err := h.keyManager.RotateKey(keyID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to rotate API key",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "API key updated successfully"})
+	// Log the action
+	userID := getUserID(c)
+	h.auditLogger.LogUserAction(userID, "rotate_api_key", keyID, map[string]interface{}{
+		"rotation_type": "manual",
+	}, true, "")
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"key_info": newKeyInfo,
+		"new_api_key": newKeyString, // Only returned once
+		"message": "API key rotated successfully",
+	})
 }
 
-// DeleteAPIKey 删除API密钥
-func (h *SecurityHandler) DeleteAPIKey(c *gin.Context) {
-	id := c.Param("id")
-
-	err := h.kms.DeleteAPIKey(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+// revokeAPIKey revokes an API key
+func (h *SecurityHandler) revokeAPIKey(c *gin.Context) {
+	keyID := c.Param("keyId")
+	if keyID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Key ID is required",
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "API key deleted successfully"})
-}
-
-// RotateKeys 轮换密钥
-func (h *SecurityHandler) RotateKeys(c *gin.Context) {
-	err := h.kms.RotateKeys(c.Request.Context())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+	var req struct {
+		Reason string `json:"reason"`
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Keys rotated successfully"})
-}
-
-// ==================== RBAC API ====================
-
-// CreateRoleRequest 创建角色请求
-type CreateRoleRequest struct {
-	ID          string            `json:"id" binding:"required"`
-	Name        string            `json:"name" binding:"required"`
-	Description string            `json:"description"`
-	Permissions []string          `json:"permissions"`
-	Metadata    map[string]string `json:"metadata"`
-}
-
-// CreateRole 创建角色
-func (h *SecurityHandler) CreateRole(c *gin.Context) {
-	var req CreateRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+		req.Reason = "Manual revocation"
 	}
 
-	role := &security.Role{
-		ID:          req.ID,
-		Name:        req.Name,
-		Description: req.Description,
-		Permissions: req.Permissions,
-		Metadata:    req.Metadata,
-	}
-
-	err := h.rbac.CreateRole(c.Request.Context(), role)
+	err := h.keyManager.RevokeKey(keyID, req.Reason)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to revoke API key",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusCreated, role)
+	// Log the action
+	userID := getUserID(c)
+	h.auditLogger.LogUserAction(userID, "revoke_api_key", keyID, map[string]interface{}{
+		"reason": req.Reason,
+	}, true, "")
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "API key revoked successfully",
+	})
 }
 
-// GetRole 获取角色
-func (h *SecurityHandler) GetRole(c *gin.Context) {
+// getKeyUsage gets usage statistics for an API key
+func (h *SecurityHandler) getKeyUsage(c *gin.Context) {
+	keyID := c.Param("keyId")
+	if keyID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Key ID is required",
+		})
+		return
+	}
+
+	// Parse period parameter
+	periodStr := c.DefaultQuery("period", "24h")
+	period, err := time.ParseDuration(periodStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid period format",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	stats, err := h.keyManager.GetKeyUsageStats(keyID, period)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Usage statistics not found",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"usage_stats": stats,
+		"period": periodStr,
+	})
+}
+
+// getRotationSchedule gets rotation schedule for an API key
+func (h *SecurityHandler) getRotationSchedule(c *gin.Context) {
+	keyID := c.Param("keyId")
+	if keyID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Key ID is required",
+		})
+		return
+	}
+
+	keyInfo, err := h.keyManager.vault.GetKey(keyID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "API key not found",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	schedule := h.keyManager.rotator.GetRotationSchedule(keyInfo)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"schedule": schedule,
+	})
+}
+
+// getAuditLogs gets audit logs with optional filtering
+func (h *SecurityHandler) getAuditLogs(c *gin.Context) {
+	filter := &security.AuditFilter{}
+
+	// Parse query parameters
+	if userID := c.Query("user_id"); userID != "" {
+		filter.UserID = userID
+	}
+	if action := c.Query("action"); action != "" {
+		filter.Action = action
+	}
+	if resource := c.Query("resource"); resource != "" {
+		filter.Resource = resource
+	}
+	if startTime := c.Query("start_time"); startTime != "" {
+		if t, err := time.Parse(time.RFC3339, startTime); err == nil {
+			filter.StartTime = t
+		}
+	}
+	if endTime := c.Query("end_time"); endTime != "" {
+		if t, err := time.Parse(time.RFC3339, endTime); err == nil {
+			filter.EndTime = t
+		}
+	}
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if limit, err := strconv.Atoi(limitStr); err == nil {
+			filter.Limit = limit
+		}
+	}
+
+	entries, err := h.auditLogger.GetEntries(filter)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to get audit logs",
+			"details": err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"entries": entries,
+		"count": len(entries),
+	})
+}
+
+// getAuditLog gets a specific audit log entry
+func (h *SecurityHandler) getAuditLog(c *gin.Context) {
 	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Audit log ID is required",
+		})
+		return
+	}
 
-	role, err := h.rbac.GetRole(c.Request.Context(), id)
+	entry, err := h.auditLogger.storage.Retrieve(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Audit log entry not found",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, role)
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"entry": entry,
+	})
 }
 
-// ListRoles 列出所有角色
-func (h *SecurityHandler) ListRoles(c *gin.Context) {
-	roles, err := h.rbac.ListRoles(c.Request.Context())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+// exportAuditLogs exports audit logs
+func (h *SecurityHandler) exportAuditLogs(c *gin.Context) {
+	var req struct {
+		Filter *security.AuditFilter `json:"filter"`
+		Format string               `json:"format"`
 	}
 
-	c.JSON(http.StatusOK, roles)
-}
-
-// UpdateRole 更新角色
-func (h *SecurityHandler) UpdateRole(c *gin.Context) {
-	id := c.Param("id")
-
-	var updates map[string]interface{}
-	if err := c.ShouldBindJSON(&updates); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	err := h.rbac.UpdateRole(c.Request.Context(), id, updates)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Role updated successfully"})
-}
-
-// DeleteRole 删除角色
-func (h *SecurityHandler) DeleteRole(c *gin.Context) {
-	id := c.Param("id")
-
-	err := h.rbac.DeleteRole(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Role deleted successfully"})
-}
-
-// CreateUserRequest 创建用户请求
-type CreateUserRequest struct {
-	ID       string   `json:"id" binding:"required"`
-	Username string   `json:"username" binding:"required"`
-	Email    string   `json:"email" binding:"required,email"`
-	Roles    []string `json:"roles"`
-	IsActive bool     `json:"is_active"`
-}
-
-// CreateUser 创建用户
-func (h *SecurityHandler) CreateUser(c *gin.Context) {
-	var req CreateUserRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request format",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	user := &security.User{
-		ID:       req.ID,
-		Username: req.Username,
-		Email:    req.Email,
-		Roles:    req.Roles,
-		IsActive: req.IsActive,
+	if req.Format == "" {
+		req.Format = "json"
 	}
 
-	err := h.rbac.CreateUser(c.Request.Context(), user)
+	data, err := h.auditLogger.ExportLogs(req.Filter, req.Format)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to export audit logs",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusCreated, user)
+	// Set appropriate content type
+	var contentType string
+	switch req.Format {
+	case "json":
+		contentType = "application/json"
+	case "csv":
+		contentType = "text/csv"
+	default:
+		contentType = "application/octet-stream"
+	}
+
+	c.Header("Content-Type", contentType)
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=audit_logs.%s", req.Format))
+	c.Data(http.StatusOK, contentType, data)
 }
 
-// GetUser 获取用户
-func (h *SecurityHandler) GetUser(c *gin.Context) {
-	id := c.Param("id")
-
-	user, err := h.rbac.GetUser(c.Request.Context(), id)
+// verifyIntegrity verifies audit log integrity
+func (h *SecurityHandler) verifyIntegrity(c *gin.Context) {
+	report, err := h.auditLogger.VerifyIntegrity()
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to verify integrity",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	statusCode := http.StatusOK
+	if !report.IntegrityValid {
+		statusCode = http.StatusConflict
+	}
+
+	c.JSON(statusCode, gin.H{
+		"success": report.IntegrityValid,
+		"report": report,
+	})
 }
 
-// ListUsers 列出所有用户
-func (h *SecurityHandler) ListUsers(c *gin.Context) {
-	users, err := h.rbac.ListUsers(c.Request.Context())
+// getSecurityAlerts gets security alerts
+func (h *SecurityHandler) getSecurityAlerts(c *gin.Context) {
+	acknowledgedStr := c.DefaultQuery("acknowledged", "false")
+	acknowledged := acknowledgedStr == "true"
+
+	alerts := h.keyManager.monitor.GetAlerts(acknowledged)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"alerts": alerts,
+		"count": len(alerts),
+	})
+}
+
+// acknowledgeAlert acknowledges a security alert
+func (h *SecurityHandler) acknowledgeAlert(c *gin.Context) {
+	alertID := c.Param("id")
+	if alertID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Alert ID is required",
+		})
+		return
+	}
+
+	userID := getUserID(c)
+	err := h.keyManager.monitor.AcknowledgeAlert(alertID, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Failed to acknowledge alert",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, users)
+	// Log the action
+	h.auditLogger.LogUserAction(userID, "acknowledge_alert", alertID, map[string]interface{}{
+		"alert_id": alertID,
+	}, true, "")
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Alert acknowledged successfully",
+	})
 }
 
-// UpdateUser 更新用户
-func (h *SecurityHandler) UpdateUser(c *gin.Context) {
-	id := c.Param("id")
-
-	var updates map[string]interface{}
-	if err := c.ShouldBindJSON(&updates); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	err := h.rbac.UpdateUser(c.Request.Context(), id, updates)
+// getSecurityEvents gets recent security events
+func (h *SecurityHandler) getSecurityEvents(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "100")
+	limit, err := strconv.Atoi(limitStr)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		limit = 100
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User updated successfully"})
+	events := h.keyManager.monitor.GetRecentEvents(limit)
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"events": events,
+		"count": len(events),
+	})
 }
 
-// DeleteUser 删除用户
-func (h *SecurityHandler) DeleteUser(c *gin.Context) {
-	id := c.Param("id")
-
-	err := h.rbac.DeleteUser(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+// Helper function to get user ID from context
+func getUserID(c *gin.Context) string {
+	if userID, exists := c.Get("user_id"); exists {
+		if uid, ok := userID.(string); ok {
+			return uid
+		}
 	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
-}
-
-// CheckPermissionRequest 检查权限请求
-type CheckPermissionRequest struct {
-	UserID   string `json:"user_id" binding:"required"`
-	Resource string `json:"resource" binding:"required"`
-	Action   string `json:"action" binding:"required"`
-}
-
-// CheckPermission 检查权限
-func (h *SecurityHandler) CheckPermission(c *gin.Context) {
-	var req CheckPermissionRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	hasPermission, err := h.rbac.CheckPermission(c.Request.Context(), req.UserID, req.Resource, req.Action)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"has_permission": hasPermission})
-}
-
-// GetUserPermissions 获取用户权限
-func (h *SecurityHandler) GetUserPermissions(c *gin.Context) {
-	userID := c.Param("id")
-
-	permissions, err := h.rbac.GetUserPermissions(c.Request.Context(), userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"permissions": permissions})
-}
-
-// AssignRoleRequest 分配角色请求
-type AssignRoleRequest struct {
-	RoleID string `json:"role_id" binding:"required"`
-}
-
-// AssignRole 分配角色
-func (h *SecurityHandler) AssignRole(c *gin.Context) {
-	userID := c.Param("id")
-
-	var req AssignRoleRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	err := h.rbac.AssignRole(c.Request.Context(), userID, req.RoleID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Role assigned successfully"})
-}
-
-// RemoveRole 移除角色
-func (h *SecurityHandler) RemoveRole(c *gin.Context) {
-	userID := c.Param("id")
-	roleID := c.Param("role_id")
-
-	err := h.rbac.RemoveRole(c.Request.Context(), userID, roleID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Role removed successfully"})
-}
-
-// ==================== 审批流程 API ====================
-
-// CreateApprovalRequest 创建审批请求
-type CreateApprovalRequest struct {
-	Type        security.ApprovalType  `json:"type" binding:"required"`
-	Title       string                 `json:"title" binding:"required"`
-	Description string                 `json:"description"`
-	RequesterID string                 `json:"requester_id" binding:"required"`
-	Data        map[string]interface{} `json:"data"`
-	Priority    int                    `json:"priority"`
-	ExpiresAt   string                 `json:"expires_at"`
-}
-
-// CreateApproval 创建审批请求
-func (h *SecurityHandler) CreateApproval(c *gin.Context) {
-	var req CreateApprovalRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	approvalReq := &security.ApprovalRequest{
-		Type:        req.Type,
-		Title:       req.Title,
-		Description: req.Description,
-		RequesterID: req.RequesterID,
-		Data:        req.Data,
-		Priority:    req.Priority,
-	}
-
-	err := h.workflow.CreateApprovalRequest(c.Request.Context(), approvalReq)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusCreated, approvalReq)
-}
-
-// GetApproval 获取审批请求
-func (h *SecurityHandler) GetApproval(c *gin.Context) {
-	id := c.Param("id")
-
-	approval, err := h.workflow.GetApprovalRequest(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, approval)
-}
-
-// ListApprovals 列出审批请求
-func (h *SecurityHandler) ListApprovals(c *gin.Context) {
-	userID := c.Query("user_id")
-	status := c.Query("status")
-
-	var approvalStatus security.ApprovalStatus
-	if status != "" {
-		approvalStatus = security.ApprovalStatus(status)
-	}
-
-	approvals, err := h.workflow.ListApprovalRequests(c.Request.Context(), userID, approvalStatus)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, approvals)
-}
-
-// GetPendingApprovals 获取待审批请求
-func (h *SecurityHandler) GetPendingApprovals(c *gin.Context) {
-	userID := c.Param("id")
-
-	approvals, err := h.workflow.GetPendingApprovals(c.Request.Context(), userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, approvals)
-}
-
-// ApproveRequest 审批通过请求
-type ApproveRequest struct {
-	Comment string `json:"comment"`
-}
-
-// Approve 审批通过
-func (h *SecurityHandler) Approve(c *gin.Context) {
-	requestID := c.Param("id")
-	approverID := c.GetString("user_id") // 从JWT中获取
-
-	var req ApproveRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	err := h.workflow.Approve(c.Request.Context(), requestID, approverID, req.Comment)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Approval granted successfully"})
-}
-
-// Reject 审批拒绝
-func (h *SecurityHandler) Reject(c *gin.Context) {
-	requestID := c.Param("id")
-	approverID := c.GetString("user_id") // 从JWT中获取
-
-	var req ApproveRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	err := h.workflow.Reject(c.Request.Context(), requestID, approverID, req.Comment)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Approval rejected successfully"})
-}
-
-// CancelApproval 取消审批请求
-func (h *SecurityHandler) CancelApproval(c *gin.Context) {
-	requestID := c.Param("id")
-	userID := c.GetString("user_id") // 从JWT中获取
-
-	err := h.workflow.CancelApprovalRequest(c.Request.Context(), requestID, userID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Approval request cancelled successfully"})
+	return "unknown"
 }

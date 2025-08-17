@@ -1,0 +1,137 @@
+# Security Configuration
+security:
+  # API Key Management
+  key_management:
+    vault:
+      storage_type: "file"  # "memory", "file", "database"
+      storage_path: "./vault"
+      encryption_key: "${VAULT_ENCRYPTION_KEY}"
+      backup_enabled: true
+      backup_interval: "24h"
+      max_backups: 7
+    
+    rotation:
+      auto_rotate: true
+      check_interval: "1h"
+      min_rotation_interval: "24h"
+      max_key_age: "720h"  # 30 days
+      rotate_before_expiry: "168h"  # 7 days
+      max_usage_before_rotation: 100000
+      rotate_on_suspicious_activity: true
+      notify_before_rotation: "24h"
+      grace_period_after_rotation: "1h"
+    
+    monitoring:
+      max_events: 10000
+      retention_period: "720h"  # 30 days
+      enable_alerting: true
+      alert_channels: ["console", "email"]
+      alert_thresholds:
+        max_failed_validations: 10
+        max_usage_per_hour: 1000
+        max_usage_per_day: 10000
+        suspicious_patterns: true
+        unusual_access_times: true
+        alert_cooldown: "1h"
+
+  # Audit Logging
+  audit:
+    enable_encryption: true
+    enable_integrity_check: true
+    retention_period: "8760h"  # 1 year
+    max_entries: 1000000
+    storage_type: "file"
+    storage_path: "./audit_logs"
+    alert_on_tampering: true
+
+  # Security Middleware
+  middleware:
+    enable_api_key_auth: true
+    enable_rate_limiting: true
+    enable_ip_whitelist: false
+    enable_suspicious_activity_detection: true
+    
+    rate_limiting:
+      requests_per_minute: 60
+      burst_size: 10
+    
+    ip_whitelist:
+      allowed_ips: []
+    
+    security_headers:
+      enable: true
+      hsts_max_age: 31536000
+      content_security_policy: "default-src 'self'"
+
+  # Default Permissions
+  default_permissions:
+    read_only: ["read"]
+    standard: ["read", "write"]
+    trading: ["read", "write", "trade"]
+    admin: ["read", "write", "trade", "admin"]
+
+# Environment-specific overrides
+development:
+  security:
+    key_management:
+      vault:
+        storage_type: "memory"
+        backup_enabled: false
+      rotation:
+        auto_rotate: false
+        max_key_age: "168h"  # 7 days for testing
+      monitoring:
+        alert_thresholds:
+          max_failed_validations: 5
+          max_usage_per_hour: 100
+    audit:
+      storage_type: "memory"
+      retention_period: "24h"
+    middleware:
+      enable_ip_whitelist: false
+
+production:
+  security:
+    key_management:
+      vault:
+        storage_type: "database"
+        backup_enabled: true
+        backup_interval: "12h"
+        max_backups: 14
+      rotation:
+        auto_rotate: true
+        max_key_age: "2160h"  # 90 days
+        rotate_before_expiry: "336h"  # 14 days
+      monitoring:
+        alert_channels: ["email", "slack", "pagerduty"]
+        alert_thresholds:
+          max_failed_validations: 20
+          max_usage_per_hour: 5000
+          max_usage_per_day: 100000
+    audit:
+      storage_type: "database"
+      retention_period: "17520h"  # 2 years
+      max_entries: 10000000
+    middleware:
+      enable_ip_whitelist: true
+      rate_limiting:
+        requests_per_minute: 120
+        burst_size: 20
+
+testing:
+  security:
+    key_management:
+      vault:
+        storage_type: "memory"
+        backup_enabled: false
+      rotation:
+        auto_rotate: false
+      monitoring:
+        enable_alerting: false
+    audit:
+      storage_type: "memory"
+      enable_encryption: false
+      enable_integrity_check: false
+    middleware:
+      enable_api_key_auth: false
+      enable_rate_limiting: false

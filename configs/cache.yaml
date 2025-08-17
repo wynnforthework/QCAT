@@ -1,0 +1,65 @@
+# Cache Configuration
+cache:
+  # Redis configuration
+  redis:
+    enabled: true
+    addr: "localhost:6379"
+    password: ""
+    db: 0
+    pool_size: 10
+    
+  # Memory cache configuration
+  memory:
+    enabled: true
+    max_size: 10000
+    
+  # Database cache configuration
+  database:
+    enabled: true
+    table_name: "cache_entries"
+    
+  # Fallback configuration
+  fallback:
+    enable_fallback: true
+    health_check_interval: "30s"
+    failure_threshold: 3
+    recovery_threshold: 2
+    fallback_timeout: "5s"
+    sync_interval: "60s"
+    max_memory_cache_size: 10000
+    enable_data_sync: true
+    log_fallback_events: true
+
+# Environment-specific overrides
+development:
+  cache:
+    redis:
+      addr: "localhost:6379"
+    fallback:
+      health_check_interval: "10s"
+      log_fallback_events: true
+
+production:
+  cache:
+    redis:
+      addr: "redis-cluster:6379"
+      pool_size: 20
+    memory:
+      max_size: 50000
+    fallback:
+      health_check_interval: "60s"
+      failure_threshold: 5
+      recovery_threshold: 3
+      log_fallback_events: false
+
+testing:
+  cache:
+    redis:
+      enabled: false
+    memory:
+      enabled: true
+      max_size: 1000
+    database:
+      enabled: false
+    fallback:
+      enable_fallback: false
