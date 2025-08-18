@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,11 +33,7 @@ export default function AuditPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  useEffect(() => {
-    loadAuditData();
-  }, []);
-
-  const loadAuditData = async () => {
+  const loadAuditData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -213,7 +209,11 @@ export default function AuditPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadAuditData();
+  }, [loadAuditData]);
 
   const exportAuditReport = async () => {
     try {
@@ -240,16 +240,7 @@ export default function AuditPage() {
     }
   };
 
-  const getOutcomeColor = (outcome: string) => {
-    switch (outcome) {
-      case 'success':
-        return 'text-green-600';
-      case 'failure':
-        return 'text-red-600';
-      default:
-        return 'text-yellow-600';
-    }
-  };
+
 
   const getActionIcon = (action: string) => {
     if (action.includes('strategy')) return <Activity className="h-4 w-4" />;

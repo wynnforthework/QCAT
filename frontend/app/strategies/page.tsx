@@ -12,29 +12,6 @@ import { Play, Pause, Settings, BarChart3, Download, Upload } from "lucide-react
 import { TradeHistory } from "@/components/strategies/trade-history"
 import { ParameterSettings } from "@/components/strategies/parameter-settings"
 
-interface Strategy {
-  id: string
-  name: string
-  description: string
-  status: "running" | "stopped" | "error"
-  version: string
-  performance: {
-    pnl: number
-    pnlPercent: number
-    sharpe: number
-    maxDrawdown: number
-    winRate: number
-    totalTrades: number
-  }
-  risk: {
-    exposure: number
-    limit: number
-    violations: number
-  }
-  lastUpdate: string
-  symbols: string[]
-}
-
 export default function StrategiesPage() {
   const [strategies, setStrategies] = useState<Strategy[]>([])
   const [loading, setLoading] = useState(true)

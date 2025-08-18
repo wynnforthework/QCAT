@@ -191,6 +191,14 @@ class ApiClient {
     return this.request<DecisionChain[]>(endpoint);
   }
 
+  // Report API
+  async exportReport(config: ExportReportConfig): Promise<void> {
+    return this.request<void>('/api/v1/reports/export', {
+      method: 'POST',
+      body: JSON.stringify(config),
+    });
+  }
+
   // Metrics API
   async getStrategyMetrics(strategyId: string): Promise<StrategyMetrics> {
     return this.request<StrategyMetrics>(`/api/v1/metrics/strategy/${strategyId}`);
@@ -463,6 +471,14 @@ export interface DecisionChainFilters {
   startTime?: string;
   endTime?: string;
   limit?: number;
+}
+
+export interface ExportReportConfig {
+  type: "audit" | "performance" | "risk" | "strategy";
+  startDate?: string;
+  endDate?: string;
+  format?: "pdf" | "excel" | "csv";
+  includeCharts?: boolean;
 }
 
 export interface StrategyMetrics {
