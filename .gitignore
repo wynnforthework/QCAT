@@ -48,6 +48,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -55,5 +56,38 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# QCAT specific
+# 敏感配置文件（不应提交）
 configs/config.yaml
-scripts/start_local.sh
+configs/*.local.yaml
+configs/*.prod.yaml
+configs/*.staging.yaml
+
+# 日志文件
+logs/
+*.log
+
+# 临时文件
+tmp/
+temp/
+
+# 证书文件
+certs/
+*.crt
+*.key
+*.pem
+
+# 数据库文件
+*.db
+*.sqlite
+
+# 缓存文件
+.cache/
+cache/
+
+# 构建产物
+qcat
+optimizer
+qcat-config
+configs/cache.yaml

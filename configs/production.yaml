@@ -18,12 +18,12 @@ server:
 # 数据库配置
 database:
   driver: "postgres"
-  host: "${DB_HOST:localhost}"
-  port: "${DB_PORT:5432}"
-  name: "${DB_NAME:qcat}"
-  user: "${DB_USER:postgres}"
-  password: "${DB_PASSWORD:}"
-  sslmode: "${DB_SSLMODE:require}"
+  host: "${QCAT_DATABASE_HOST:-localhost}"
+  port: "${QCAT_DATABASE_PORT:-5432}"
+  name: "${QCAT_DATABASE_NAME:-qcat}"
+  user: "${QCAT_DATABASE_USER:-postgres}"
+  password: "${QCAT_DATABASE_PASSWORD}"
+  sslmode: "${QCAT_DATABASE_SSL_MODE:-require}"
   max_connections: 20
   max_idle_connections: 5
   connection_lifetime: "5m"
@@ -31,10 +31,10 @@ database:
 # Redis配置
 redis:
   enabled: true
-  host: "${REDIS_HOST:localhost}"
-  port: "${REDIS_PORT:6379}"
-  password: "${REDIS_PASSWORD:}"
-  db: "${REDIS_DB:0}"
+  host: "${QCAT_REDIS_HOST:-localhost}"
+  port: "${QCAT_REDIS_PORT:-6379}"
+  password: "${QCAT_REDIS_PASSWORD}"
+  db: "${QCAT_REDIS_DB:-0}"
   pool_size: 10
   min_idle_connections: 5
   dial_timeout: "5s"
@@ -44,8 +44,8 @@ redis:
 # 交易所配置
 exchange:
   binance:
-    api_key: "${BINANCE_API_KEY:}"
-    api_secret: "${BINANCE_API_SECRET:}"
+    api_key: "${QCAT_EXCHANGE_API_KEY}"
+    api_secret: "${QCAT_EXCHANGE_API_SECRET}"
     testnet: false
     base_url: "https://fapi.binance.com"
     rate_limit: 1200
@@ -55,12 +55,12 @@ exchange:
 # 安全配置
 security:
   jwt:
-    secret: "${JWT_SECRET:your-super-secret-jwt-key-change-this-in-production}"
+    secret: "${QCAT_JWT_SECRET_KEY}"
     expiry: "24h"
     refresh_expiry: "168h"
   
   encryption:
-    key: "${ENCRYPTION_KEY:your-32-byte-encryption-key-change-this}"
+    key: "${QCAT_ENCRYPTION_KEY}"
   
   api_keys:
     rotation_interval: "720h"  # 30 days

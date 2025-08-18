@@ -17,7 +17,15 @@ COVERAGE_HTML=coverage.html
 
 # Build the application
 build:
-	$(GOBUILD) -o $(BINARY_NAME) -v ./cmd/server
+	$(GOBUILD) -o $(BINARY_NAME) -v ./cmd/qcat
+
+# Build optimizer
+build-optimizer:
+	$(GOBUILD) -o optimizer -v ./cmd/optimizer
+
+# Build config tool
+build-config:
+	$(GOBUILD) -o qcat-config -v ./cmd/config
 
 # Build for Linux
 build-linux:
@@ -146,6 +154,33 @@ generate-mocks:
 	mockgen -source=internal/cache/cache.go -destination=internal/mocks/cache_mock.go
 	mockgen -source=internal/database/database.go -destination=internal/mocks/database_mock.go
 
+# Configuration management
+config-validate:
+	@echo "Validating configuration..."
+	$(GOBUILD) -o qcat-config -v ./cmd/config
+	./qcat-config -validate
+
+config-generate:
+	@echo "Generating environment template..."
+	$(GOBUILD) -o qcat-config -v ./cmd/config
+	./qcat-config -generate
+
+config-encrypt:
+	@echo "Encrypting string..."
+	$(GOBUILD) -o qcat-config -v ./cmd/config
+	./qcat-config -encrypt "$(TEXT)"
+
+config-decrypt:
+	@echo "Decrypting string..."
+	$(GOBUILD) -o qcat-config -v ./cmd/config
+	./qcat-config -decrypt "$(TEXT)"
+
+# Start local development
+start-local:
+	@echo "Starting local development environment..."
+	chmod +x scripts/start_local.sh
+	./scripts/start_local.sh
+
 # Help
 help:
 	@echo "Available targets:"
@@ -173,4 +208,9 @@ help:
 	@echo "  migrate-up      - Run database migrations"
 	@echo "  migrate-down    - Rollback database migrations"
 	@echo "  generate-mocks  - Generate mocks"
+	@echo "  config-validate - Validate configuration"
+	@echo "  config-generate - Generate environment template"
+	@echo "  config-encrypt  - Encrypt string (TEXT=string)"
+	@echo "  config-decrypt  - Decrypt string (TEXT=string)"
+	@echo "  start-local     - Start local development environment"
 	@echo "  help            - Show this help"

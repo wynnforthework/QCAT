@@ -25,6 +25,12 @@ type Config struct {
 	Network    NetworkConfig    `yaml:"network"`
 	Health     HealthConfig     `yaml:"health"`
 	Shutdown   ShutdownConfig   `yaml:"shutdown"`
+	Strategy   StrategyConfig   `yaml:"strategy"`
+	Optimizer  OptimizerConfig  `yaml:"optimizer"`
+	MarketData MarketDataConfig `yaml:"market_data"`
+	Order      OrderConfig      `yaml:"order"`
+	Risk       RiskConfig       `yaml:"risk"`
+	Cache      CacheConfig      `yaml:"cache"`
 }
 
 // AppConfig 应用配置
@@ -59,19 +65,39 @@ type DatabaseConfig struct {
 
 // RedisConfig Redis配置
 type RedisConfig struct {
-	Addr     string `yaml:"addr"`
-	Password string `yaml:"password"`
-	DB       int    `yaml:"db"`
-	PoolSize int    `yaml:"pool_size"`
+	Enabled      bool          `yaml:"enabled"`
+	Addr         string        `yaml:"addr"`
+	Password     string        `yaml:"password"`
+	DB           int           `yaml:"db"`
+	PoolSize     int           `yaml:"pool_size"`
+	MinIdleConns int           `yaml:"min_idle_conns"`
+	MaxRetries   int           `yaml:"max_retries"`
+	DialTimeout  time.Duration `yaml:"dial_timeout"`
+	ReadTimeout  time.Duration `yaml:"read_timeout"`
+	WriteTimeout time.Duration `yaml:"write_timeout"`
 }
 
 // ExchangeConfig 交易所配置
 type ExchangeConfig struct {
-	Name      string `yaml:"name"`
-	APIKey    string `yaml:"api_key"`
-	APISecret string `yaml:"api_secret"`
-	TestNet   bool   `yaml:"test_net"`
-	BaseURL   string `yaml:"base_url"`
+	Name      string              `yaml:"name"`
+	APIKey    string              `yaml:"api_key"`
+	APISecret string              `yaml:"api_secret"`
+	TestNet   bool                `yaml:"test_net"`
+	BaseURL   string              `yaml:"base_url"`
+	WebsocketURL string           `yaml:"websocket_url"`
+	FuturesBaseURL string         `yaml:"futures_base_url"`
+	FuturesWebsocketURL string    `yaml:"futures_websocket_url"`
+	RateLimit ExchangeRateLimit   `yaml:"rate_limit"`
+	Timeout   time.Duration       `yaml:"timeout"`
+	RetryAttempts int             `yaml:"retry_attempts"`
+	RetryDelay time.Duration      `yaml:"retry_delay"`
+}
+
+// ExchangeRateLimit 交易所限流配置
+type ExchangeRateLimit struct {
+	Enabled           bool `yaml:"enabled"`
+	RequestsPerMinute int  `yaml:"requests_per_minute"`
+	Burst             int  `yaml:"burst"`
 }
 
 // JWTConfig JWT配置
@@ -204,6 +230,11 @@ type LoggingConfig struct {
 	Output string       `yaml:"output"`
 	Levels map[string]string `yaml:"levels"`
 	OutputConfig OutputConfig `yaml:"output_config"`
+	MaxSize int    `yaml:"max_size"`
+	MaxBackups int `yaml:"max_backups"`
+	MaxAge int     `yaml:"max_age"`
+	Compress bool  `yaml:"compress"`
+	LogDir  string `yaml:"log_dir"`
 }
 
 // OutputConfig represents log output configuration
@@ -264,6 +295,82 @@ type ShutdownConfig struct {
 	ForceShutdownAfter   time.Duration `yaml:"force_shutdown_after"`
 	LogShutdownProgress  bool          `yaml:"log_shutdown_progress"`
 	ShutdownOrder        []string      `yaml:"shutdown_order"`
+}
+
+// StrategyConfig 策略配置
+type StrategyConfig struct {
+	DefaultMode            string              `yaml:"default_mode"`
+	MaxConcurrentStrategies int                `yaml:"max_concurrent_strategies"`
+	StrategyTimeout        time.Duration       `yaml:"strategy_timeout"`
+	MemoryLimitMB          int                 `yaml:"memory_limit_mb"`
+	SandboxEnabled         bool                `yaml:"sandbox_enabled"`
+	Backtest               BacktestConfig      `yaml:"backtest"`
+}
+
+// BacktestConfig 回测配置
+type BacktestConfig struct {
+	Enabled           bool          `yaml:"enabled"`
+	Timeout           time.Duration `yaml:"timeout"`
+	MaxConcurrency    int           `yaml:"max_concurrency"`
+	DataRetentionDays int           `yaml:"data_retention_days"`
+}
+
+// OptimizerConfig 优化器配置
+type OptimizerConfig struct {
+	Enabled          bool     `yaml:"enabled"`
+	Timeout          time.Duration `yaml:"timeout"`
+	MaxIterations    int      `yaml:"max_iterations"`
+	Concurrency      int      `yaml:"concurrency"`
+	Algorithms       []string `yaml:"algorithms"`
+	DefaultAlgorithm string   `yaml:"default_algorithm"`
+}
+
+// MarketDataConfig 市场数据配置
+type MarketDataConfig struct {
+	Enabled        bool          `yaml:"enabled"`
+	CacheTTL       time.Duration `yaml:"cache_ttl"`
+	BatchSize      int           `yaml:"batch_size"`
+	UpdateInterval time.Duration `yaml:"update_interval"`
+	Symbols        []string      `yaml:"symbols"`
+	DataTypes      []string      `yaml:"data_types"`
+}
+
+// OrderConfig 订单管理配置
+type OrderConfig struct {
+	Timeout            time.Duration `yaml:"timeout"`
+	MaxPendingOrders   int           `yaml:"max_pending_orders"`
+	RetryAttempts      int           `yaml:"retry_attempts"`
+	RetryDelay         time.Duration `yaml:"retry_delay"`
+	AutoCancelTimeout  time.Duration `yaml:"auto_cancel_timeout"`
+}
+
+// RiskConfig 风险管理配置
+type RiskConfig struct {
+	Enabled                bool          `yaml:"enabled"`
+	CheckInterval          time.Duration `yaml:"check_interval"`
+	MarginCallThreshold    float64       `yaml:"margin_call_threshold"`
+	LiquidationThreshold   float64       `yaml:"liquidation_threshold"`
+	MaxPositionSize        float64       `yaml:"max_position_size"`
+	MaxLeverage            int           `yaml:"max_leverage"`
+	MaxDrawdown            float64       `yaml:"max_drawdown"`
+	CircuitBreakerThreshold float64      `yaml:"circuit_breaker_threshold"`
+	PositionMonitoring     PositionMonitoringConfig `yaml:"position_monitoring"`
+}
+
+// PositionMonitoringConfig 仓位监控配置
+type PositionMonitoringConfig struct {
+	Enabled        bool          `yaml:"enabled"`
+	Interval       time.Duration `yaml:"interval"`
+	AlertThreshold float64       `yaml:"alert_threshold"`
+}
+
+// CacheConfig 缓存配置
+type CacheConfig struct {
+	TTL                time.Duration `yaml:"ttl"`
+	MaxSize            int           `yaml:"max_size"`
+	CleanupInterval    time.Duration `yaml:"cleanup_interval"`
+	CompressionEnabled bool          `yaml:"compression_enabled"`
+	EncryptionEnabled  bool          `yaml:"encryption_enabled"`
 }
 
 // Load 加载配置文件
@@ -340,6 +447,9 @@ func (c *Config) overrideWithEnv(env *EnvManager) {
 	}
 
 	// Redis configuration
+	if env.GetBool("REDIS_ENABLED", c.Redis.Enabled) != c.Redis.Enabled {
+		c.Redis.Enabled = env.GetBool("REDIS_ENABLED", c.Redis.Enabled)
+	}
 	if env.GetString("REDIS_ADDR", "") != "" {
 		c.Redis.Addr = env.GetString("REDIS_ADDR", c.Redis.Addr)
 	}
@@ -348,6 +458,29 @@ func (c *Config) overrideWithEnv(env *EnvManager) {
 	}
 	if env.GetInt("REDIS_DB", -1) != -1 {
 		c.Redis.DB = env.GetInt("REDIS_DB", c.Redis.DB)
+	}
+	if env.GetInt("REDIS_POOL_SIZE", 0) != 0 {
+		c.Redis.PoolSize = env.GetInt("REDIS_POOL_SIZE", c.Redis.PoolSize)
+	}
+
+	// Exchange configuration
+	if env.GetString("EXCHANGE_NAME", "") != "" {
+		c.Exchange.Name = env.GetString("EXCHANGE_NAME", c.Exchange.Name)
+	}
+	if env.GetString("EXCHANGE_API_KEY", "") != "" {
+		c.Exchange.APIKey = env.GetEncryptedString("EXCHANGE_API_KEY", c.Exchange.APIKey)
+	}
+	if env.GetString("EXCHANGE_API_SECRET", "") != "" {
+		c.Exchange.APISecret = env.GetEncryptedString("EXCHANGE_API_SECRET", c.Exchange.APISecret)
+	}
+	if env.GetBool("EXCHANGE_TEST_NET", c.Exchange.TestNet) != c.Exchange.TestNet {
+		c.Exchange.TestNet = env.GetBool("EXCHANGE_TEST_NET", c.Exchange.TestNet)
+	}
+	if env.GetString("EXCHANGE_BASE_URL", "") != "" {
+		c.Exchange.BaseURL = env.GetString("EXCHANGE_BASE_URL", c.Exchange.BaseURL)
+	}
+	if env.GetString("EXCHANGE_WEBSOCKET_URL", "") != "" {
+		c.Exchange.WebsocketURL = env.GetString("EXCHANGE_WEBSOCKET_URL", c.Exchange.WebsocketURL)
 	}
 
 	// JWT configuration

@@ -1,6 +1,6 @@
 app:
   name: "QCAT"
-  version: "1.0.0"
+  version: "2.0.0"
   environment: "development"
 
 server:
@@ -13,7 +13,7 @@ database:
   host: "localhost"
   port: 5432
   user: "postgres"
-  password: "123"
+  password: "${DATABASE_PASSWORD}"
   dbname: "qcat"
   ssl_mode: "disable"
   max_open: 50
@@ -23,18 +23,58 @@ database:
   conn_max_idle_time: 15m
 
 redis:
+  enabled: true
   addr: "localhost:6379"
-  password: ""
+  password: "${REDIS_PASSWORD}"
   db: 0
   pool_size: 20
+  min_idle_conns: 5
+  max_retries: 3
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+
+exchange:
+  name: "binance"
+  api_key: "${EXCHANGE_API_KEY}"
+  api_secret: "${EXCHANGE_API_SECRET}"
+  test_net: true
+  base_url: "https://api.binance.com"
+  websocket_url: "wss://stream.binance.com:9443"
+  futures_base_url: "https://fapi.binance.com"
+  futures_websocket_url: "wss://fstream.binance.com"
+  rate_limit:
+    enabled: true
+    requests_per_minute: 1200
+    burst: 100
+  timeout: 30s
+  retry_attempts: 3
+  retry_delay: 1s
 
 jwt:
-  secret_key: "your-secret-key-here-change-in-production"
+  secret_key: "${JWT_SECRET_KEY}"
   duration: 24h
 
 monitoring:
   prometheus_enabled: true
   prometheus_path: "/metrics"
+  alerts:
+    high_latency_ms: 1000
+    error_rate_percent: 5.0
+    memory_usage_percent: 80.0
+    cpu_usage_percent: 80.0
+  health_check:
+    interval_seconds: 30
+    timeout_seconds: 10
+    retry_count: 3
+  metrics:
+    collection_interval_seconds: 60
+    retention_hours: 24
+    aggregation_intervals:
+      - "1m"
+      - "5m"
+      - "15m"
+      - "1h"
 
 cors:
   allowed_origins: ["*"]
@@ -51,16 +91,16 @@ rate_limit:
 security:
   # 密钥管理服务配置
   kms:
-    master_key: "your-master-key-here-change-in-production"
+    master_key: "${SECURITY_KMS_MASTER_KEY}"
     key_rotation: 90d
-    encryption_key: "your-encryption-key-here"
+    encryption_key: "${SECURITY_ENCRYPTION_KEY}"
   
   # 加密配置
   encryption:
     algorithm: "AES-256-GCM"
     key_size: 256
     key_rotation: 90d
-    master_key: "your-encryption-master-key-here"
+    master_key: "${SECURITY_ENCRYPTION_MASTER_KEY}"
     public_key_path: "certs/public.pem"
     private_key_path: "certs/private.pem"
   
@@ -112,6 +152,18 @@ logging:
   level: "info"
   format: "json"
   output: "file"
+  levels:
+    default: "info"
+    qcat: "debug"
+    exchange: "info"
+    strategy: "debug"
+    optimizer: "info"
+  output_config:
+    console_enabled: true
+    file_enabled: true
+    file_path: "logs/qcat.log"
+    max_file_size_mb: 100
+    max_backup_files: 10
   max_size: 100
   max_backups: 10
   max_age: 30
@@ -177,3 +229,76 @@ shutdown:
     - redis_cache
     - database
     - http_server
+
+# 策略配置
+strategy:
+  default_mode: "paper"
+  max_concurrent_strategies: 10
+  strategy_timeout: 300s
+  memory_limit_mb: 512
+  sandbox_enabled: true
+  backtest:
+    enabled: true
+    timeout: 3600s
+    max_concurrency: 2
+    data_retention_days: 90
+
+# 优化器配置
+optimizer:
+  enabled: true
+  timeout: 1800s
+  max_iterations: 1000
+  concurrency: 4
+  algorithms:
+    - "walk_forward"
+    - "grid_search"
+    - "bayesian"
+  default_algorithm: "walk_forward"
+
+# 市场数据配置
+market_data:
+  enabled: true
+  cache_ttl: 60s
+  batch_size: 1000
+  update_interval: 1s
+  symbols:
+    - "BTCUSDT"
+    - "ETHUSDT"
+    - "BNBUSDT"
+  data_types:
+    - "klines"
+    - "trades"
+    - "orderbook"
+    - "funding_rate"
+    - "open_interest"
+
+# 订单管理配置
+order:
+  timeout: 30s
+  max_pending_orders: 100
+  retry_attempts: 3
+  retry_delay: 1s
+  auto_cancel_timeout: 60s
+
+# 风险管理配置
+risk:
+  enabled: true
+  check_interval: 5s
+  margin_call_threshold: 1.1
+  liquidation_threshold: 1.0
+  max_position_size: 100000
+  max_leverage: 10
+  max_drawdown: 0.1
+  circuit_breaker_threshold: 0.15
+  position_monitoring:
+    enabled: true
+    interval: 10s
+    alert_threshold: 0.8
+
+# 缓存配置
+cache:
+  ttl: 3600s
+  max_size: 1000
+  cleanup_interval: 300s
+  compression_enabled: true
+  encryption_enabled: false

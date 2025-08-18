@@ -187,8 +187,12 @@ func (c *Client) GetFundingRate(ctx context.Context, symbol string) (*types.Fund
 	params := url.Values{}
 	params.Set("symbol", strings.ToUpper(symbol))
 
-	// Use futures API endpoint
-	baseURL := strings.Replace(c.baseURL, "api.binance.com", "fapi.binance.com", 1)
+	// Use futures API endpoint from config
+	baseURL := c.BaseExchange.Config().FuturesBaseURL
+	if baseURL == "" {
+		// Fallback to default futures URL
+		baseURL = strings.Replace(c.baseURL, "api.binance.com", "fapi.binance.com", 1)
+	}
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/fapi/v1/premiumIndex?"+params.Encode(), nil)
 	if err != nil {
@@ -240,8 +244,12 @@ func (c *Client) GetOpenInterest(ctx context.Context, symbol string) (*types.Ope
 	params := url.Values{}
 	params.Set("symbol", strings.ToUpper(symbol))
 
-	// Use futures API endpoint
-	baseURL := strings.Replace(c.baseURL, "api.binance.com", "fapi.binance.com", 1)
+	// Use futures API endpoint from config
+	baseURL := c.BaseExchange.Config().FuturesBaseURL
+	if baseURL == "" {
+		// Fallback to default futures URL
+		baseURL = strings.Replace(c.baseURL, "api.binance.com", "fapi.binance.com", 1)
+	}
 	
 	req, err := http.NewRequestWithContext(ctx, "GET", baseURL+"/fapi/v1/openInterest?"+params.Encode(), nil)
 	if err != nil {

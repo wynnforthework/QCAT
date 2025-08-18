@@ -15,11 +15,11 @@ server:
   max_header_bytes: 1048576
 
 database:
-  host: "localhost"
+  host: "${QCAT_TEST_DATABASE_HOST:-localhost}"
   port: 5432
-  user: "postgres"
-  password: "postgres"
-  dbname: "qcat_test"
+  user: "${QCAT_TEST_DATABASE_USER:-postgres}"
+  password: "${QCAT_TEST_DATABASE_PASSWORD:-postgres}"
+  dbname: "${QCAT_TEST_DATABASE_NAME:-qcat_test}"
   sslmode: "disable"
   max_open: 10
   max_idle: 5
@@ -28,8 +28,8 @@ database:
   conn_max_idle_time: 30m
 
 redis:
-  addr: "localhost:6379"
-  password: ""
+  addr: "${QCAT_TEST_REDIS_ADDR:-localhost:6379}"
+  password: "${QCAT_TEST_REDIS_PASSWORD}"
   db: 1  # 使用测试数据库
   pool_size: 10
   min_idle_conns: 5

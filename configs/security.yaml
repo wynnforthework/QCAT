@@ -5,7 +5,7 @@ security:
     vault:
       storage_type: "file"  # "memory", "file", "database"
       storage_path: "./vault"
-      encryption_key: "${VAULT_ENCRYPTION_KEY}"
+      encryption_key: "${SECURITY_VAULT_ENCRYPTION_KEY}"
       backup_enabled: true
       backup_interval: "24h"
       max_backups: 7

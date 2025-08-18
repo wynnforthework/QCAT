@@ -10,7 +10,7 @@ logger:
   output: "file"
   
   # 日志文件配置
-  filename: "logs/qcat.log"
+  filename: "${LOGGER_FILE_PATH:-logs/qcat.log}"
   
   # 单个日志文件最大大小(MB)
   max_size: 100
@@ -44,14 +44,14 @@ environments:
       level: "warn"
       format: "json"
       output: "file"
-      filename: "logs/test.log"
+      filename: "${LOGGER_TEST_FILE_PATH:-logs/test.log}"
       
   production:
     logger:
       level: "info"
       format: "json"
       output: "file"
-      filename: "/var/log/qcat/app.log"
+      filename: "${LOGGER_PROD_FILE_PATH:-/var/log/qcat/app.log}"
       max_size: 500
       max_age: 90
       max_backups: 30
@@ -77,17 +77,17 @@ modules:
   audit:
     level: "info"
     separate_file: true
-    filename: "logs/audit.log"
+    filename: "${LOGGER_AUDIT_FILE_PATH:-logs/audit.log}"
     
   security:
     level: "warn"
     separate_file: true
-    filename: "logs/security.log"
+    filename: "${LOGGER_SECURITY_FILE_PATH:-logs/security.log}"
     
   performance:
     level: "info"
     separate_file: true
-    filename: "logs/performance.log"
+    filename: "${LOGGER_PERFORMANCE_FILE_PATH:-logs/performance.log}"
 
 # 日志轮转配置
 rotation:
