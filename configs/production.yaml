@@ -1,0 +1,160 @@
+# 生产环境配置文件
+app:
+  name: "qcat"
+  version: "1.0.0"
+  env: "production"
+  debug: false
+  log_level: "info"
+
+# 服务器配置
+server:
+  host: "0.0.0.0"
+  port: 8082
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "120s"
+  max_header_size: 1048576
+
+# 数据库配置
+database:
+  driver: "postgres"
+  host: "${DB_HOST:localhost}"
+  port: "${DB_PORT:5432}"
+  name: "${DB_NAME:qcat}"
+  user: "${DB_USER:postgres}"
+  password: "${DB_PASSWORD:}"
+  sslmode: "${DB_SSLMODE:require}"
+  max_connections: 20
+  max_idle_connections: 5
+  connection_lifetime: "5m"
+
+# Redis配置
+redis:
+  enabled: true
+  host: "${REDIS_HOST:localhost}"
+  port: "${REDIS_PORT:6379}"
+  password: "${REDIS_PASSWORD:}"
+  db: "${REDIS_DB:0}"
+  pool_size: 10
+  min_idle_connections: 5
+  dial_timeout: "5s"
+  read_timeout: "3s"
+  write_timeout: "3s"
+
+# 交易所配置
+exchange:
+  binance:
+    api_key: "${BINANCE_API_KEY:}"
+    api_secret: "${BINANCE_API_SECRET:}"
+    testnet: false
+    base_url: "https://fapi.binance.com"
+    rate_limit: 1200
+    timeout: "10s"
+    retries: 3
+
+# 安全配置
+security:
+  jwt:
+    secret: "${JWT_SECRET:your-super-secret-jwt-key-change-this-in-production}"
+    expiry: "24h"
+    refresh_expiry: "168h"
+  
+  encryption:
+    key: "${ENCRYPTION_KEY:your-32-byte-encryption-key-change-this}"
+  
+  api_keys:
+    rotation_interval: "720h"  # 30 days
+    max_age: "2160h"          # 90 days
+  
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 60
+    burst: 10
+
+# 风险管理配置
+risk:
+  max_leverage: 10
+  max_position_size: 100000
+  max_drawdown: 0.1
+  circuit_breaker_threshold: 0.05
+  margin_call_threshold: 0.8
+  liquidation_threshold: 0.9
+  
+  # 仓位限制
+  position_limits:
+    single_symbol_max: 0.2     # 单个品种最大仓位20%
+    sector_max: 0.3            # 单个板块最大仓位30%
+    correlation_limit: 0.8     # 相关性限制
+  
+  # 止损配置
+  stop_loss:
+    default_percentage: 0.05   # 默认5%止损
+    max_percentage: 0.1        # 最大10%止损
+    trailing_enabled: true
+    atr_multiplier: 2.0
+
+# 监控配置
+monitoring:
+  enabled: true
+  metrics_interval: "10s"
+  health_check_interval: "30s"
+  
+  # Prometheus配置
+  prometheus:
+    enabled: true
+    endpoint: "/metrics"
+    
+  # 告警配置
+  alerts:
+    enabled: true
+    channels: ["email", "webhook"]
+    thresholds:
+      high_latency_ms: 1000
+      error_rate_percent: 5.0
+      memory_usage_percent: 80.0
+      cpu_usage_percent: 80.0
+
+# 日志配置
+logging:
+  level: "info"
+  format: "json"
+  output: "file"
+  file_path: "/var/log/qcat/app.log"
+  max_file_size: "100MB"
+  max_backups: 10
+  max_age_days: 30
+  compress: true
+  
+  # 审计日志
+  audit:
+    enabled: true
+    file_path: "/var/log/qcat/audit.log"
+    retention_days: 365
+
+# 性能配置
+performance:
+  cache_ttl: "5m"
+  batch_size: 100
+  worker_pool_size: 10
+  max_concurrent_requests: 1000
+  
+  # 数据库连接池
+  db_pool:
+    max_connections: 20
+    max_idle: 5
+    max_lifetime: "5m"
+    
+  # 内存管理
+  memory:
+    gc_percent: 100
+    max_heap_size: "2GB"
+
+# 特性开关
+features:
+  auto_optimization: true
+  risk_monitoring: true
+  audit_logging: true
+  metrics_collection: true
+  circuit_breaker: true
+  auto_rebalancing: true
+  hot_symbol_detection: true

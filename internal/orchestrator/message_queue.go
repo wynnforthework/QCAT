@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 // MessageQueue defines the interface for inter-process communication
@@ -157,38 +159,170 @@ func (mq *InMemoryMessageQueue) Close() error {
 
 // RedisMessageQueue implements MessageQueue using Redis pub/sub
 type RedisMessageQueue struct {
-	// Redis implementation would go here
-	// For now, we'll use the in-memory implementation as fallback
-	fallback *InMemoryMessageQueue
+	client      *redis.Client
+	pubsub      *redis.PubSub
+	subscribers map[string][]MessageHandler
+	mu          sync.RWMutex
+	ctx         context.Context
+	cancel      context.CancelFunc
+	wg          sync.WaitGroup
 }
 
 // NewRedisMessageQueue creates a new Redis-based message queue
 func NewRedisMessageQueue(redisAddr string) *RedisMessageQueue {
-	// For now, return in-memory fallback
-	// TODO: Implement actual Redis pub/sub
-	return &RedisMessageQueue{
-		fallback: NewInMemoryMessageQueue(1000),
+	// Parse Redis address and create client
+	rdb := redis.NewClient(&redis.Options{
+		Addr: redisAddr,
+		DB:   0, // Use default DB
+	})
+	
+	ctx, cancel := context.WithCancel(context.Background())
+	
+	rmq := &RedisMessageQueue{
+		client:      rdb,
+		subscribers: make(map[string][]MessageHandler),
+		ctx:         ctx,
+		cancel:      cancel,
 	}
+	
+	return rmq
 }
 
 // Publish publishes a message using Redis
 func (rmq *RedisMessageQueue) Publish(topic string, message interface{}) error {
-	return rmq.fallback.Publish(topic, message)
+	// Serialize message to JSON
+	data, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("failed to marshal message: %w", err)
+	}
+	
+	// Publish to Redis
+	err = rmq.client.Publish(rmq.ctx, topic, data).Err()
+	if err != nil {
+		return fmt.Errorf("failed to publish message to Redis: %w", err)
+	}
+	
+	return nil
 }
 
 // Subscribe subscribes to a topic using Redis
 func (rmq *RedisMessageQueue) Subscribe(topic string, handler MessageHandler) error {
-	return rmq.fallback.Subscribe(topic, handler)
+	rmq.mu.Lock()
+	defer rmq.mu.Unlock()
+	
+	// Add handler to subscribers list
+	rmq.subscribers[topic] = append(rmq.subscribers[topic], handler)
+	
+	// If this is the first subscriber for this topic, start Redis subscription
+	if len(rmq.subscribers[topic]) == 1 {
+		if rmq.pubsub == nil {
+			rmq.pubsub = rmq.client.PSubscribe(rmq.ctx, topic)
+		} else {
+			rmq.pubsub.Subscribe(rmq.ctx, topic)
+		}
+		
+		// Start message listener for this topic
+		rmq.wg.Add(1)
+		go rmq.listenForMessages(topic)
+	}
+	
+	return nil
 }
 
 // Unsubscribe unsubscribes from a topic
 func (rmq *RedisMessageQueue) Unsubscribe(topic string) error {
-	return rmq.fallback.Unsubscribe(topic)
+	rmq.mu.Lock()
+	defer rmq.mu.Unlock()
+	
+	// Remove all handlers for this topic
+	delete(rmq.subscribers, topic)
+	
+	// Unsubscribe from Redis
+	if rmq.pubsub != nil {
+		err := rmq.pubsub.Unsubscribe(rmq.ctx, topic)
+		if err != nil {
+			return fmt.Errorf("failed to unsubscribe from Redis: %w", err)
+		}
+	}
+	
+	return nil
 }
 
 // Close closes the Redis message queue
 func (rmq *RedisMessageQueue) Close() error {
-	return rmq.fallback.Close()
+	// Cancel context to stop all operations
+	rmq.cancel()
+	
+	// Wait for all goroutines to finish
+	rmq.wg.Wait()
+	
+	// Close Redis pubsub
+	if rmq.pubsub != nil {
+		err := rmq.pubsub.Close()
+		if err != nil {
+			return fmt.Errorf("failed to close Redis pubsub: %w", err)
+		}
+	}
+	
+	// Close Redis client
+	err := rmq.client.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close Redis client: %w", err)
+	}
+	
+	return nil
+}
+
+// listenForMessages listens for messages on a specific topic
+func (rmq *RedisMessageQueue) listenForMessages(topic string) {
+	defer rmq.wg.Done()
+	
+	for {
+		select {
+		case <-rmq.ctx.Done():
+			return
+		default:
+			if rmq.pubsub == nil {
+				return
+			}
+			
+			// Receive message with timeout
+			msg, err := rmq.pubsub.ReceiveTimeout(rmq.ctx, time.Second)
+			if err != nil {
+				// Check if context was cancelled
+				if rmq.ctx.Err() != nil {
+					return
+				}
+				// Continue on timeout or other errors
+				continue
+			}
+			
+			// Process the message
+			switch m := msg.(type) {
+			case *redis.Message:
+				rmq.handleMessage(m.Channel, []byte(m.Payload))
+			case *redis.Subscription:
+				// Subscription confirmation, ignore
+			}
+		}
+	}
+}
+
+// handleMessage handles incoming Redis messages
+func (rmq *RedisMessageQueue) handleMessage(topic string, payload []byte) {
+	rmq.mu.RLock()
+	handlers := rmq.subscribers[topic]
+	rmq.mu.RUnlock()
+	
+	// Call all handlers for this topic
+	for _, handler := range handlers {
+		go func(h MessageHandler) {
+			if err := h(topic, payload); err != nil {
+				// Log error but don't stop processing
+				fmt.Printf("Error handling message for topic %s: %v\n", topic, err)
+			}
+		}(handler)
+	}
 }
 
 // generateMessageID generates a unique message ID
@@ -200,11 +334,14 @@ func generateMessageID() string {
 
 // OptimizationRequest represents a request to start optimization
 type OptimizationRequest struct {
-	RequestID    string                 `json:"request_id"`
-	StrategyID   string                 `json:"strategy_id"`
-	Parameters   map[string]interface{} `json:"parameters"`
-	TimeRange    TimeRange              `json:"time_range"`
-	Optimization OptimizationConfig     `json:"optimization"`
+	RequestID      string                 `json:"request_id"`
+	StrategyID     string                 `json:"strategy_id"`
+	Parameters     map[string]interface{} `json:"parameters"`
+	TimeRange      TimeRange              `json:"time_range"`
+	Optimization   OptimizationConfig     `json:"optimization"`
+	Method         string                 `json:"method"`
+	GridSize       int                    `json:"grid_size,omitempty"`
+	MaxIterations  int                    `json:"max_iterations,omitempty"`
 }
 
 // OptimizationResult represents the result of an optimization
@@ -215,6 +352,8 @@ type OptimizationResult struct {
 	Performance    PerformanceMetrics     `json:"performance"`
 	Status         string                 `json:"status"`
 	Error          string                 `json:"error,omitempty"`
+	Duration       time.Duration          `json:"duration,omitempty"`
+	Iterations     int                    `json:"iterations,omitempty"`
 }
 
 // TradeSignal represents a trading signal

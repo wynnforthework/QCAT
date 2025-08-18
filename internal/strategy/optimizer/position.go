@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 
+	"qcat/internal/config"
 	"qcat/internal/exchange"
 )
 
@@ -123,8 +124,12 @@ func (o *PositionOptimizer) CalculateRiskBudget(metrics *PerformanceMetrics) flo
 		return 0
 	}
 
-	// 基础风险预算
-	base := 0.1 // 10%基础分配
+	// 基础风险预算 - 从配置获取基础分配比例
+	base := 0.1 // 10%基础分配 (默认值)
+	if algorithmConfig := config.GetAlgorithmConfig(); algorithmConfig != nil {
+		// 使用配置的最小权重作为基础分配
+		base = algorithmConfig.RiskMgmt.Position.MinWeightPercent / 100.0
+	}
 
 	// 根据Sharpe比率调整
 	if metrics.SharpeRatio > 0 {

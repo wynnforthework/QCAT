@@ -69,7 +69,7 @@ QCAT是一个全面的加密货币合约自动化交易系统，具有先进的�
 
 ### 前置要求
 
-- Go 1.21 或更高版本
+- Go 1.23 或更高版本
 - Node.js 20 或更高版本
 - PostgreSQL 15 或更高版本
 - Redis 7 或更高版本
@@ -87,27 +87,56 @@ QCAT是一个全面的加密货币合约自动化交易系统，具有先进的�
    go mod download
    ```
 
-3. 安装Node.js依赖:
+3. 安装前端依赖:
    ```bash
    cd frontend
    npm install
+   cd ..
    ```
 
 4. 配置应用程序:
    ```bash
+   # 复制示例配置文件
    cp configs/config.yaml.example configs/config.yaml
-   # 编辑 configs/config.yaml 文件，填入您的设置
+   cp configs/production.yaml.example configs/production.yaml
+   
+   # 设置环境变量
+   export DB_HOST=localhost
+   export DB_PASSWORD=your_password
+   export REDIS_HOST=localhost
+   export BINANCE_API_KEY=your_api_key
+   export BINANCE_API_SECRET=your_api_secret
+   export JWT_SECRET=your_jwt_secret
    ```
 
-5. 启动后端服务器:
+5. 初始化数据库:
    ```bash
+   # 创建数据库
+   createdb qcat
+   
+   # 运行数据库迁移
+   go run cmd/qcat/main.go -migrate
+   ```
+
+6. 启动服务:
+   
+   **开发模式:**
+   ```bash
+   # 启动后端服务器
    go run cmd/qcat/main.go
-   ```
-
-6. 启动前端开发服务器:
-   ```bash
+   
+   # 启动前端开发服务器（新终端）
    cd frontend
    npm run dev
+   ```
+   
+   **生产模式:**
+   ```bash
+   # 构建应用
+   make build
+   
+   # 使用Docker部署
+   docker-compose up -d
    ```
 
 ## API文档

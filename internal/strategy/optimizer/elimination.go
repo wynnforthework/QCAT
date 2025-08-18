@@ -57,10 +57,10 @@ func (m *EliminationManager) UpdateStrategyMetrics(id string, returns []float64)
 	// 更新收益序列
 	state.Returns = returns
 
-	// 计算滚动窗口指标
+	// 计算滚动窗口指标 - 从配置获取窗口大小
 	windowSize := 20 // Default fallback
-	if config := config.GetAlgorithmConfig(); config != nil {
-		windowSize = config.GetWindowSize()
+	if algorithmConfig := config.GetAlgorithmConfig(); algorithmConfig != nil {
+		windowSize = algorithmConfig.GetWindowSize()
 	}
 	if len(returns) >= windowSize {
 		state.RollingReturns = calculateRollingReturns(returns, windowSize)

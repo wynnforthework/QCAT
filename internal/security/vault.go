@@ -53,8 +53,10 @@ func NewVault(config *VaultConfig) (*Vault, error) {
 			return nil, fmt.Errorf("failed to create file storage: %w", err)
 		}
 	case "database":
-		// TODO: Implement database storage
-		return nil, fmt.Errorf("database storage not implemented yet")
+		storage, err = NewDatabaseVaultStorage(config.StoragePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create database storage: %w", err)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported storage type: %s", config.StorageType)
 	}

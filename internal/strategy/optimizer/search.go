@@ -24,10 +24,10 @@ type GridSearcher struct {
 
 // NewGridSearcher creates a new grid searcher
 func NewGridSearcher(paramSpace map[string][2]float64) *GridSearcher {
-	// Get grid size from configuration
+	// Get grid size from configuration with proper fallback
 	gridSize := 10 // Default fallback
-	if config := config.GetAlgorithmConfig(); config != nil {
-		gridSize = config.GetGridSize()
+	if algorithmConfig := config.GetAlgorithmConfig(); algorithmConfig != nil {
+		gridSize = algorithmConfig.GetGridSize()
 	}
 	
 	return &GridSearcher{

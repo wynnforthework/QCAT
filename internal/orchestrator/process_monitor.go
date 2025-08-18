@@ -279,16 +279,34 @@ func (pm *ProcessMonitor) GetProcessMetrics() map[string]ProcessMetrics {
 	return metrics
 }
 
-// getCPUUsage gets CPU usage for a process (placeholder implementation)
+// getCPUUsage gets CPU usage for a process
 func (pm *ProcessMonitor) getCPUUsage(process *Process) float64 {
-	// TODO: Implement actual CPU usage monitoring
-	// This would require platform-specific code or external libraries
-	return 0.0
+	// Get system information for the process
+	if process.Handle == nil {
+		return 0.0
+	}
+	
+	pid := process.Handle.Pid
+	return pm.getCPUUsageByPID(pid)
 }
 
-// getMemoryUsage gets memory usage for a process (placeholder implementation)
+// getMemoryUsage gets memory usage for a process in bytes
 func (pm *ProcessMonitor) getMemoryUsage(process *Process) int64 {
-	// TODO: Implement actual memory usage monitoring
-	// This would require platform-specific code or external libraries
-	return 0
+	// Get system information for the process
+	if process.Handle == nil {
+		return 0
+	}
+	
+	pid := process.Handle.Pid
+	return pm.getMemoryUsageByPID(pid)
+}
+
+// getCPUUsageByPID gets CPU usage for a process by PID
+func (pm *ProcessMonitor) getCPUUsageByPID(pid int) float64 {
+	return getCPUUsageByPID(pid)
+}
+
+// getMemoryUsageByPID gets memory usage for a process by PID
+func (pm *ProcessMonitor) getMemoryUsageByPID(pid int) int64 {
+	return getMemoryUsageByPID(pid)
 }

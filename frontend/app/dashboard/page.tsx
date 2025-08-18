@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import apiClient, { type DashboardData } from "@/lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
@@ -42,40 +43,14 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // 模拟数据获取
     const fetchData = async () => {
       try {
-        // 实际项目中这里会调用API
-        const mockData: DashboardData = {
-          account: {
-            equity: 125000.50,
-            pnl: 2500.75,
-            pnlPercent: 2.04,
-            drawdown: -1500.25,
-            maxDrawdown: -5000.00
-          },
-          strategies: {
-            total: 8,
-            running: 6,
-            stopped: 1,
-            error: 1
-          },
-          risk: {
-            level: "medium",
-            exposure: 75000,
-            limit: 100000,
-            violations: 0
-          },
-          performance: {
-            sharpe: 1.85,
-            sortino: 2.12,
-            calmar: 1.45,
-            winRate: 0.68
-          }
-        }
-        setData(mockData)
+        const dashboardData = await apiClient.getDashboardData()
+        setData(dashboardData)
       } catch (error) {
         console.error("Failed to fetch dashboard data:", error)
+        // 可选：设置错误状态或显示错误消息
+        // setError(error.message)
       } finally {
         setLoading(false)
       }

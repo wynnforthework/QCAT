@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import apiClient, { type Strategy } from "@/lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -42,76 +43,9 @@ export default function StrategiesPage() {
   useEffect(() => {
     const fetchStrategies = async () => {
       try {
-        // 模拟数据
-        const mockStrategies: Strategy[] = [
-          {
-            id: "strategy_1",
-            name: "趋势跟踪策略",
-            description: "基于移动平均线的趋势跟踪策略",
-            status: "running",
-            version: "v2.1.0",
-            performance: {
-              pnl: 2500.75,
-              pnlPercent: 12.5,
-              sharpe: 1.85,
-              maxDrawdown: -1500.25,
-              winRate: 0.68,
-              totalTrades: 156
-            },
-            risk: {
-              exposure: 25000,
-              limit: 50000,
-              violations: 0
-            },
-            lastUpdate: "2024-01-15 14:30:00",
-            symbols: ["BTCUSDT", "ETHUSDT"]
-          },
-          {
-            id: "strategy_2",
-            name: "均值回归策略",
-            description: "基于布林带的均值回归策略",
-            status: "running",
-            version: "v1.8.2",
-            performance: {
-              pnl: 1800.50,
-              pnlPercent: 9.2,
-              sharpe: 1.45,
-              maxDrawdown: -2200.00,
-              winRate: 0.72,
-              totalTrades: 89
-            },
-            risk: {
-              exposure: 18000,
-              limit: 40000,
-              violations: 1
-            },
-            lastUpdate: "2024-01-15 14:25:00",
-            symbols: ["ADAUSDT", "DOTUSDT"]
-          },
-          {
-            id: "strategy_3",
-            name: "套利策略",
-            description: "跨交易所套利策略",
-            status: "stopped",
-            version: "v1.5.0",
-            performance: {
-              pnl: 950.25,
-              pnlPercent: 4.8,
-              sharpe: 0.95,
-              maxDrawdown: -800.50,
-              winRate: 0.85,
-              totalTrades: 45
-            },
-            risk: {
-              exposure: 0,
-              limit: 30000,
-              violations: 0
-            },
-            lastUpdate: "2024-01-15 10:15:00",
-            symbols: ["BTCUSDT", "ETHUSDT"]
-          }
-        ]
-        setStrategies(mockStrategies)
+        const strategies = await apiClient.getStrategies()
+        setStrategies(strategies)
+
       } catch (error) {
         console.error("Failed to fetch strategies:", error)
       } finally {

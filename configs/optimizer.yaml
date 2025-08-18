@@ -1,0 +1,65 @@
+# 策略优化器配置
+optimizer:
+  # 网格搜索配置
+  grid_search:
+    default_grid_size: 10
+    max_grid_size: 50
+    min_grid_size: 5
+  
+  # 随机搜索配置
+  random_search:
+    default_iterations: 100
+    max_iterations: 1000
+    min_iterations: 10
+  
+  # 贝叶斯优化配置
+  bayesian:
+    default_iterations: 50
+    max_iterations: 200
+    min_iterations: 10
+    exploration_ratio: 0.3
+    top_selection_ratio: 0.2
+    gaussian_noise_std: 0.1
+  
+  # 遗传算法配置
+  genetic:
+    population_size: 50
+    generations: 100
+    mutation_rate: 0.1
+    crossover_rate: 0.8
+    elite_size: 10
+  
+  # 参数消除配置
+  elimination:
+    window_size_days: 20
+    min_window_size: 5
+    max_window_size: 60
+    confidence_threshold: 0.95
+  
+  # 过拟合检测配置
+  overfitting:
+    shrinkage_factor: 0.1
+    max_shrinkage: 0.5
+    min_shrinkage: 0.01
+    validation_split: 0.3
+  
+  # 仓位优化配置
+  position:
+    max_weight_limit: 0.2
+    min_weight_limit: 0.01
+    weight_step: 0.01
+    risk_budget_limit: 1.0
+  
+  # 触发器配置
+  trigger:
+    penalty_coefficient: 0.1
+    max_penalty: 0.5
+    min_penalty: 0.01
+    frequency_weight: 0.05
+  
+  # 通用配置
+  general:
+    max_concurrent_optimizations: 5
+    timeout_minutes: 60
+    result_cache_ttl_hours: 24
+    log_level: "info"

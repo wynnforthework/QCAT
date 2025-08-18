@@ -1,0 +1,115 @@
+# 自动化配置
+automation:
+  # 仓位管理自动化
+  position_management:
+    enabled: true
+    check_interval: "30s"
+    
+    # 风险控制阈值
+    thresholds:
+      margin_threshold: 0.8          # 80% 保证金使用率触发减仓
+      stop_loss_threshold: 0.05      # 5% 亏损触发止损
+      profit_taking_threshold: 0.15  # 15% 盈利触发止盈
+      position_size_threshold: 1000  # 最小仓位大小
+      emergency_close_threshold: 0.1 # 10% 紧急平仓阈值
+    
+    # 基于风险的减仓
+    risk_based_reduction:
+      enabled: true
+      max_drawdown_percent: 0.08     # 8% 最大回撤
+      reduction_percent: 0.3         # 30% 减仓比例
+      min_position_size: 500         # 最小仓位大小
+    
+    # 余额驱动的操作
+    balance_driven:
+      enabled: true
+      equity_change_threshold: 0.05  # 5% 权益变化阈值
+      margin_utilization_max: 0.7    # 70% 最大保证金使用率
+      auto_rebalance_enabled: true
+      rebalance_threshold: 0.1       # 10% 再平衡阈值
+
+  # 策略优化自动化
+  strategy_optimization:
+    enabled: true
+    frequency: "weekly"              # 每周优化一次
+    day_of_week: "sunday"           # 周日执行
+    time_utc: "02:00"               # UTC 2点执行
+    
+    # 触发条件
+    triggers:
+      performance_decline_days: 7    # 连续7天表现下降
+      sharpe_ratio_threshold: 0.5    # 夏普比率低于0.5
+      max_drawdown_threshold: 0.1    # 最大回撤超过10%
+      no_new_high_days: 14          # 14天无新高
+    
+    # 优化参数
+    optimization:
+      method: "bayesian"             # 优化方法
+      max_iterations: 50             # 最大迭代次数
+      timeout_minutes: 120           # 超时时间
+      
+  # 再平衡自动化
+  rebalancing:
+    enabled: true
+    frequency: "daily"               # 每日检查
+    time_utc: "00:00"               # UTC 0点执行
+    min_rebalance_amount: 100       # 最小再平衡金额
+    
+    # 再平衡条件
+    conditions:
+      weight_deviation_threshold: 0.05  # 5% 权重偏差
+      correlation_threshold: 0.8         # 80% 相关性阈值
+      volatility_change_threshold: 0.2   # 20% 波动率变化
+
+  # 热门币种自动化
+  hotlist_automation:
+    enabled: true
+    update_interval_minutes: 60      # 每小时更新
+    
+    # 自动添加条件
+    auto_add_conditions:
+      volume_increase_threshold: 2.0   # 成交量增长2倍
+      price_change_threshold: 0.1      # 价格变化10%
+      social_sentiment_threshold: 0.7  # 社交情绪阈值
+      
+    # 自动移除条件
+    auto_remove_conditions:
+      volume_decrease_threshold: 0.5   # 成交量下降50%
+      price_stability_days: 7          # 7天价格稳定
+      low_activity_threshold: 0.3      # 低活跃度阈值
+
+  # 风险监控自动化
+  risk_monitoring:
+    enabled: true
+    check_interval_seconds: 10       # 每10秒检查一次
+    alert_cooldown_minutes: 5        # 5分钟告警冷却
+    
+    # 监控指标
+    metrics:
+      portfolio_var_threshold: 0.02   # 2% VaR阈值
+      concentration_risk_threshold: 0.3  # 30% 集中度风险
+      correlation_risk_threshold: 0.9    # 90% 相关性风险
+      liquidity_risk_threshold: 0.1      # 10% 流动性风险
+      
+    # 自动执行动作
+    auto_actions:
+      emergency_stop_enabled: true     # 紧急停止
+      auto_hedge_enabled: true         # 自动对冲
+      position_scaling_enabled: true   # 仓位缩放
+
+# 通知配置
+notifications:
+  automation_alerts:
+    enabled: true
+    channels: ["email", "webhook"]
+    
+  performance_reports:
+    enabled: true
+    frequency: "daily"
+    time_utc: "08:00"
+    recipients: ["admin@example.com"]
+    
+  risk_alerts:
+    enabled: true
+    immediate_notification: true
+    escalation_levels: ["warning", "critical", "emergency"]

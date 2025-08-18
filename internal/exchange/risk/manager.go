@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"qcat/internal/cache"
+	"qcat/internal/config"
 	exch "qcat/internal/exchange"
 )
 
@@ -184,8 +185,11 @@ func (m *Manager) CheckRiskLimits(ctx context.Context, order *exch.OrderRequest)
 
 	// Check maintenance margin
 	if position != nil {
-		// 使用默认维持保证金率进行风控检查
-		maintenanceMarginRate := 0.1 // 10% 维持保证金率
+		// 从配置获取维持保证金率
+		maintenanceMarginRate := 0.1 // 10% 维持保证金率 (默认值)
+		if algorithmConfig := config.GetAlgorithmConfig(); algorithmConfig != nil {
+			maintenanceMarginRate = algorithmConfig.RiskMgmt.Margin.MaintenanceMarginRatio
+		}
 		maintenanceMargin := (position.Quantity + order.Quantity) * position.MarkPrice * maintenanceMarginRate
 		if maintenanceMargin > position.UnrealizedPnL {
 			return fmt.Errorf("maintenance margin would be insufficient: %.8f > %.8f",
@@ -211,8 +215,8 @@ func (m *Manager) storeLimit(limit *exch.RiskLimit) error {
 		limit.Symbol,
 		limit.MaxLeverage,      // 使用 MaxLeverage 替代 Leverage
 		limit.MaxPositionValue, // 使用 MaxPositionValue 替代 MaxPositionSize
-		0.1,                    // 默认维持保证金率 10%
-		0.2,                    // 默认初始保证金率 20%
+		getMaintenanceMarginRate(), // 从配置获取维持保证金率
+		getInitialMarginRate(),     // 从配置获取初始保证金率
 		time.Now(),             // 更新时间
 	)
 
@@ -277,4 +281,22 @@ func (m *Manager) monitorRiskLimits() {
 			}
 		}
 	}
+}
+
+// getMaintenanceMarginRate returns the configured maintenance margin rate
+func getMaintenanceMarginRate() float64 {
+	defaultRate := 0.1 // 10% default
+	if algorithmConfig := config.GetAlgorithmConfig(); algorithmConfig != nil {
+		return algorithmConfig.RiskMgmt.Margin.MaintenanceMarginRatio
+	}
+	return defaultRate
+}
+
+// getInitialMarginRate returns the configured initial margin rate
+func getInitialMarginRate() float64 {
+	defaultRate := 0.2 // 20% default
+	if algorithmConfig := config.GetAlgorithmConfig(); algorithmConfig != nil {
+		return algorithmConfig.RiskMgmt.Margin.MaxMarginRatio
+	}
+	return defaultRate
 }
