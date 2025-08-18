@@ -1,0 +1,255 @@
+# 结果共享配置
+result_sharing:
+  # 启用结果共享
+  enabled: true
+  
+  # 共享模式: file, string, seed, hybrid
+  mode: "hybrid"
+  
+  # 文件共享配置
+  file_sharing:
+    # 共享文件目录
+    directory: "./data/shared_results/files"
+    # 文件同步间隔
+    sync_interval: "5m"
+    # 文件保留天数
+    retention_days: 30
+    
+  # 字符串共享配置
+  string_sharing:
+    # 共享字符串存储文件
+    storage_file: "./data/shared_results/strings.txt"
+    # 字符串格式: json, csv, custom
+    format: "json"
+    # 自定义分隔符
+    delimiter: "|"
+    
+  # 种子共享配置
+  seed_sharing:
+    # 种子映射文件
+    mapping_file: "./data/shared_results/seed_mapping.json"
+    # 种子范围
+    seed_range:
+      min: 1
+      max: 1000000
+    # 种子生成策略: random, sequential, hash_based
+    strategy: "hash_based"
+    
+  # 性能阈值
+  performance_threshold:
+    # 最小收益率阈值
+    min_profit_rate: 5.0
+    # 最小夏普比率阈值
+    min_sharpe_ratio: 0.5
+    # 最大回撤阈值
+    max_drawdown: 15.0
+
+# 服务器标识配置
+server:
+  # 服务器ID（用于标识结果来源）
+  id: "server-001"
+  # 服务器名称
+  name: "QCAT-Optimizer-01"
+  # 服务器位置
+  location: "datacenter-1"
+  # 服务器标签
+  tags:
+    - "optimizer"
+    - "production"
+    - "high-performance"
+
+# 结果共享策略
+sharing_strategy:
+  # 自动共享阈值（性能提升百分比）
+  auto_share_threshold: 2.0
+  # 强制共享阈值（性能提升百分比）
+  force_share_threshold: 5.0
+  # 共享频率限制
+  rate_limit:
+    # 最大共享次数/小时
+    max_per_hour: 100
+    # 最小共享间隔
+    min_interval: "1m"
+  
+  # 结果验证
+  validation:
+    # 启用结果验证
+    enabled: true
+    # 验证超时
+    timeout: "5m"
+    # 最小验证次数
+    min_validations: 1
+    
+  # 结果采用策略
+  adoption:
+    # 自动采用阈值
+    auto_adopt_threshold: 3.0
+    # 手动确认阈值
+    manual_confirm_threshold: 8.0
+    # 采用验证
+    validation_required: true
+    # 回测验证
+    backtest_validation: true
+
+# 监控和日志
+monitoring:
+  # 共享统计
+  statistics:
+    # 启用统计
+    enabled: true
+    # 统计间隔
+    interval: "10m"
+    # 保留统计天数
+    retention_days: 7
+    
+  # 日志配置
+  logging:
+    # 日志级别
+    level: "info"
+    # 日志文件
+    file: "./logs/result_sharing.log"
+    # 最大日志大小（MB）
+    max_size: 100
+    # 保留日志文件数
+    max_files: 10
+    
+  # 告警配置
+  alerts:
+    # 启用告警
+    enabled: true
+    # 性能下降告警阈值
+    performance_decline_threshold: 10.0
+    # 共享失败告警
+    share_failure_alert: true
+    # 采用失败告警
+    adoption_failure_alert: true
+
+# 安全配置
+security:
+  # 结果签名
+  signing:
+    # 启用结果签名
+    enabled: true
+    # 签名算法
+    algorithm: "sha256"
+    # 签名密钥（实际使用时应该从环境变量获取）
+    secret_key: "your-secret-key-here"
+    
+  # 结果加密
+  encryption:
+    # 启用结果加密
+    enabled: false
+    # 加密算法
+    algorithm: "aes-256-gcm"
+    # 加密密钥（实际使用时应该从环境变量获取）
+    encryption_key: "your-encryption-key-here"
+    
+  # 访问控制
+  access_control:
+    # 启用访问控制
+    enabled: false
+    # 允许的服务器ID列表
+    allowed_servers:
+      - "server-001"
+      - "server-002"
+      - "server-003"
+    # 允许的IP地址列表
+    allowed_ips:
+      - "192.168.1.0/24"
+      - "10.0.0.0/8"
+
+# 网络配置
+network:
+  # 共享端点
+  endpoints:
+    # HTTP端点
+    http:
+      enabled: true
+      port: 8082
+      path: "/api/v1/shared-results"
+    # gRPC端点
+    grpc:
+      enabled: false
+      port: 8083
+      
+  # 连接配置
+  connection:
+    # 连接超时
+    timeout: "10s"
+    # 重试次数
+    max_retries: 3
+    # 重试间隔
+    retry_interval: "1s"
+    # 心跳间隔
+    heartbeat_interval: "30s"
+    
+  # 代理配置
+  proxy:
+    # 启用代理
+    enabled: false
+    # 代理地址
+    address: ""
+    # 代理类型: http, socks5
+    type: "http"
+    # 代理认证
+    auth:
+      username: ""
+      password: ""
+
+# 存储配置
+storage:
+  # 本地存储
+  local:
+    # 存储类型: file, database
+    type: "file"
+    # 存储路径
+    path: "./data/shared_results"
+    # 最大存储大小（MB）
+    max_size_mb: 1000
+    # 压缩存储
+    compression: true
+    
+  # 远程存储
+  remote:
+    # 启用远程存储
+    enabled: false
+    # 存储类型: s3, gcs, azure
+    type: "s3"
+    # 存储配置
+    config:
+      bucket: "qcat-shared-results"
+      region: "us-east-1"
+      access_key: ""
+      secret_key: ""
+      
+  # 缓存配置
+  cache:
+    # 启用缓存
+    enabled: true
+    # 缓存类型: memory, redis
+    type: "memory"
+    # 缓存大小
+    size: 1000
+    # 缓存过期时间
+    ttl: "1h"
+    # Redis配置（如果使用Redis缓存）
+    redis:
+      host: "localhost"
+      port: 6379
+      password: ""
+      database: 1
+
+# 备份配置
+backup:
+  # 启用备份
+  enabled: true
+  # 备份间隔
+  interval: "1h"
+  # 备份保留天数
+  retention_days: 7
+  # 备份路径
+  path: "./backups/shared_results"
+  # 压缩备份
+  compression: true
+  # 加密备份
+  encryption: false

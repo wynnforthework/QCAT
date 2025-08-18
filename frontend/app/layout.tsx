@@ -105,7 +105,7 @@ export default function RootLayout({
                   </div>
                   <div>
                     <h1 className="text-xl font-bold text-gray-900">QCAT</h1>
-                    <p className="text-xs text-gray-500">量化交易系统</p>
+                    <p className="text-xs text-gray-500">智能化自动交易系统</p>
                   </div>
                 </div>
                 <Button
@@ -126,7 +126,7 @@ export default function RootLayout({
                     <span className="text-sm text-green-700 font-medium">系统运行中</span>
                   </div>
                   <Badge variant="outline" className="text-xs">
-                    v2.1.0
+                    v2.0.0
                   </Badge>
                 </div>
               </div>

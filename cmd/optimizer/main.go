@@ -2,27 +2,38 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
+	"math"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
+	"qcat/internal/learning/automl"
 	"qcat/internal/orchestrator"
 	"qcat/internal/strategy/optimizer"
 )
 
 // OptimizerService represents the standalone optimizer service
 type OptimizerService struct {
-	server     *http.Server
-	msgQueue   orchestrator.MessageQueue
-	optimizer  *optimizer.Orchestrator
-	ctx        context.Context
-	cancel     context.CancelFunc
+	server           *http.Server
+	msgQueue         orchestrator.MessageQueue
+	optimizer        *optimizer.Orchestrator
+	resultSharingMgr *automl.ResultSharingManager
+	ctx              context.Context
+	cancel           context.CancelFunc
 }
 
 // Config holds the optimizer service configuration
@@ -31,6 +42,7 @@ type Config struct {
 	MessageQueue string `json:"message_queue"`
 	RedisAddr    string `json:"redis_addr,omitempty"`
 	LogLevel     string `json:"log_level"`
+	ResultSharing *automl.ResultSharingConfig `json:"result_sharing" yaml:"result_sharing"`
 }
 
 func main() {
@@ -85,6 +97,18 @@ func NewOptimizerService(config *Config) (*OptimizerService, error) {
 	// Create optimizer
 	optimizerInstance := optimizer.NewOrchestrator()
 
+	// Create result sharing manager
+	var resultSharingMgr *automl.ResultSharingManager
+	if config.ResultSharing != nil && config.ResultSharing.Enabled {
+		var err error
+		resultSharingMgr, err = automl.NewResultSharingManager(config.ResultSharing)
+		if err != nil {
+			log.Printf("Warning: failed to create result sharing manager: %v", err)
+		} else {
+			log.Printf("Result sharing manager initialized with mode: %s", config.ResultSharing.Mode)
+		}
+	}
+
 	// Create HTTP server
 	mux := http.NewServeMux()
 	server := &http.Server{
@@ -93,11 +117,12 @@ func NewOptimizerService(config *Config) (*OptimizerService, error) {
 	}
 
 	service := &OptimizerService{
-		server:    server,
-		msgQueue:  msgQueue,
-		optimizer: optimizerInstance,
-		ctx:       ctx,
-		cancel:    cancel,
+		server:           server,
+		msgQueue:         msgQueue,
+		optimizer:        optimizerInstance,
+		resultSharingMgr: resultSharingMgr,
+		ctx:              ctx,
+		cancel:           cancel,
 	}
 
 	// Setup HTTP routes
@@ -149,6 +174,8 @@ func (s *OptimizerService) setupRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/optimize", s.optimizeHandler)
 	mux.HandleFunc("/status", s.statusHandler)
 	mux.HandleFunc("/metrics", s.metricsHandler)
+	mux.HandleFunc("/shared-results", s.sharedResultsHandler)
+	mux.HandleFunc("/share-result", s.shareResultHandler)
 }
 
 // setupMessageHandlers sets up message queue handlers
@@ -243,6 +270,24 @@ func (s *OptimizerService) processOptimizationRequest(req *orchestrator.Optimiza
 		Status:     "running",
 	}
 
+	// Check for shared results first
+	if s.resultSharingMgr != nil {
+		if sharedResult := s.resultSharingMgr.GetBestSharedResult(req.RequestID, req.StrategyID); sharedResult != nil {
+			log.Printf("Found shared result for request %s, profit rate: %.2f%%", 
+				req.RequestID, sharedResult.Performance.ProfitRate)
+			
+			// Convert shared result to optimization result
+			result.Status = "completed"
+			result.BestParameters = sharedResult.Parameters
+			result.Performance = sharedResult.Performance
+			result.Duration = time.Duration(0) // Shared results don't have duration
+			result.Iterations = 0 // Shared results don't have iterations
+			
+			log.Printf("Using shared result for request %s", req.RequestID)
+			return result
+		}
+	}
+
 	// Perform actual optimization using the built-in optimizer
 	optimizationResult, err := s.runOptimization(req)
 	if err != nil {
@@ -258,6 +303,11 @@ func (s *OptimizerService) processOptimizationRequest(req *orchestrator.Optimiza
 	result.Performance = optimizationResult.Performance
 	result.Duration = optimizationResult.Duration
 	result.Iterations = optimizationResult.Iterations
+
+	// Share the result if sharing is enabled
+	if s.resultSharingMgr != nil {
+		go s.shareOptimizationResult(req, optimizationResult)
+	}
 
 	log.Printf("Completed optimization request %s with %d iterations in %v", 
 		req.RequestID, result.Iterations, result.Duration)
@@ -399,8 +449,8 @@ func (s *OptimizerService) randomSearch(paramSpace map[string][2]float64, req *o
 	bestParams := make(map[string]float64)
 	bestScore := math.Inf(-1)
 	
-	// 使用确定性随机种子
-	seed := int64(42) // 固定种子确保可重现性
+	// 使用随机种子确保每台服务器的训练都不重复
+	seed := time.Now().UnixNano() + int64(len(req.StrategyID)*1000) + int64(req.MaxIterations*100)
 	rand.Seed(seed)
 
 	for i := 0; i < maxIterations; i++ {
@@ -442,8 +492,8 @@ func (s *OptimizerService) bayesianOptimization(paramSpace map[string][2]float64
 	observations := make([]map[string]float64, 0)
 	scores := make([]float64, 0)
 	
-	// 使用确定性随机种子
-	seed := int64(42) // 固定种子确保可重现性
+	// 使用随机种子确保每台服务器的训练都不重复
+	seed := time.Now().UnixNano() + int64(len(req.StrategyID)*1000) + int64(req.MaxIterations*100)
 	rand.Seed(seed)
 
 	// Exploration phase
@@ -625,6 +675,101 @@ func (s *OptimizerService) calculatePerformanceMetrics(score float64, iterations
 	}
 }
 
+// shareOptimizationResult shares the optimization result
+func (s *OptimizerService) shareOptimizationResult(req *orchestrator.OptimizationRequest, optResult *OptimizationResult) {
+	if s.resultSharingMgr == nil {
+		return
+	}
+
+	// Create shared result
+	sharedResult := &automl.SharedResult{
+		ID:           fmt.Sprintf("%s_%s_%d", req.RequestID, req.StrategyID, time.Now().Unix()),
+		TaskID:       req.RequestID,
+		StrategyName: req.StrategyID,
+		Parameters:   optResult.BestParameters,
+		Performance:  optResult.Performance,
+		RandomSeed:   time.Now().UnixNano(),
+		DataHash:     fmt.Sprintf("%s_%s", req.RequestID, req.StrategyID),
+		DiscoveredBy: "optimizer-service",
+		DiscoveredAt: time.Now(),
+		ShareMethod:  "optimization",
+		AdoptionCount: 0,
+		IsGlobalBest: false,
+	}
+
+	// Share the result
+	if err := s.resultSharingMgr.ShareResult(sharedResult); err != nil {
+		log.Printf("Failed to share optimization result: %v", err)
+	} else {
+		log.Printf("Successfully shared optimization result for request %s", req.RequestID)
+	}
+}
+
+// sharedResultsHandler handles shared results requests
+func (s *OptimizerService) sharedResultsHandler(w http.ResponseWriter, r *http.Request) {
+	if s.resultSharingMgr == nil {
+		http.Error(w, "Result sharing not enabled", http.StatusServiceUnavailable)
+		return
+	}
+
+	results := s.resultSharingMgr.GetAllSharedResults()
+	
+	response := map[string]interface{}{
+		"results": results,
+		"count":   len(results),
+		"timestamp": time.Now(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+// shareResultHandler handles manual result sharing requests
+func (s *OptimizerService) shareResultHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if s.resultSharingMgr == nil {
+		http.Error(w, "Result sharing not enabled", http.StatusServiceUnavailable)
+		return
+	}
+
+	var sharedResult automl.SharedResult
+	if err := json.NewDecoder(r.Body).Decode(&sharedResult); err != nil {
+		http.Error(w, fmt.Sprintf("Invalid request: %v", err), http.StatusBadRequest)
+		return
+	}
+
+	// Set missing fields
+	if sharedResult.ID == "" {
+		sharedResult.ID = fmt.Sprintf("%s_%s_%d", sharedResult.TaskID, sharedResult.StrategyName, time.Now().Unix())
+	}
+	if sharedResult.DiscoveredAt.IsZero() {
+		sharedResult.DiscoveredAt = time.Now()
+	}
+	if sharedResult.DiscoveredBy == "" {
+		sharedResult.DiscoveredBy = "manual-upload"
+	}
+
+	// Share the result
+	if err := s.resultSharingMgr.ShareResult(&sharedResult); err != nil {
+		http.Error(w, fmt.Sprintf("Failed to share result: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	response := map[string]interface{}{
+		"status":  "success",
+		"message": "Result shared successfully",
+		"id":      sharedResult.ID,
+		"timestamp": time.Now(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
 // loadConfig loads configuration from file or uses defaults
 func loadConfig(configFile string, port int, logLevel string) (*Config, error) {
 	config := &Config{
@@ -643,6 +788,14 @@ func loadConfig(configFile string, port int, logLevel string) (*Config, error) {
 
 		if err := json.NewDecoder(file).Decode(config); err != nil {
 			return nil, fmt.Errorf("failed to decode config file: %w", err)
+		}
+	}
+
+	// Load result sharing config if not present
+	if config.ResultSharing == nil {
+		config.ResultSharing = &automl.ResultSharingConfig{
+			Enabled: true,
+			Mode:    "hybrid",
 		}
 	}
 

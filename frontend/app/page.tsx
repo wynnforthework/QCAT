@@ -1,31 +1,31 @@
-"use client";
+"use client"
 
-import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { RealTimeMonitor } from "@/components/dashboard/real-time-monitor";
-import { TrendingUp, TrendingDown, Activity, Shield, AlertTriangle, DollarSign } from "lucide-react";
-import Link from "next/link";
-import apiClient, { DashboardData } from "@/lib/api";
+import { useEffect, useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { RealTimeMonitor } from "@/components/dashboard/real-time-monitor"
+import { TrendingUp, TrendingDown, Activity, Shield, AlertTriangle, DollarSign, Share2, List } from "lucide-react"
+import Link from "next/link"
+import apiClient, { DashboardData } from "@/lib/api"
 
 export default function HomePage() {
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        setLoading(true);
-        const data = await apiClient.getDashboardData();
-        setDashboardData(data);
-        setError(null);
+        setLoading(true)
+        const data = await apiClient.getDashboardData()
+        setDashboardData(data)
+        setError(null)
       } catch (error) {
-        console.error('Failed to fetch dashboard data:', error);
-        setError('无法获取仪表板数据');
+        console.error('Failed to fetch dashboard data:', error)
+        setError('无法获取仪表板数据')
         // 设置模拟数据以便开发和测试
         setDashboardData({
           account: {
@@ -53,28 +53,28 @@ export default function HomePage() {
             calmar: 3.45,
             winRate: 68.5
           }
-        });
+        })
       } finally {
-        setLoading(false);
+        setLoading(false)
       }
-    };
+    }
 
-    fetchDashboardData();
+    fetchDashboardData()
     // 每30秒更新一次数据
-    const interval = setInterval(fetchDashboardData, 30000);
+    const interval = setInterval(fetchDashboardData, 30000)
     
-    return () => clearInterval(interval);
-  }, []);
+    return () => clearInterval(interval)
+  }, [])
 
   if (loading) {
-  return (
+    return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p>加载仪表板数据...</p>
         </div>
       </div>
-    );
+    )
   }
 
   if (!dashboardData) {
@@ -91,32 +91,41 @@ export default function HomePage() {
           </Button>
         </div>
       </div>
-    );
+    )
   }
 
-  const { account, strategies, risk, performance } = dashboardData;
-  const riskLevel = risk.level;
-  const riskColor = riskLevel === "低风险" ? "green" : riskLevel === "中风险" ? "yellow" : "red";
+  const { account, strategies, risk, performance } = dashboardData
+  const riskLevel = risk.level
+  const riskColor = riskLevel === "低风险" ? "green" : riskLevel === "中风险" ? "yellow" : "red"
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* 页面标题 */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">QCAT 量化交易系统</h1>
-            <p className="text-gray-600 mt-1">全自动化加密货币合约量化交易平台</p>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Badge variant="outline" className="text-sm">
-              <Activity className="h-4 w-4 mr-1" />
-              系统运行中
-            </Badge>
-            <div className="text-sm text-gray-500">
-              最后更新: {new Date().toLocaleTimeString()}
+    <div className="space-y-8">
+
+        {/* 策略结果分享快捷入口 */}
+        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">策略结果分享系统</h2>
+                <p className="text-gray-600">分享您的优秀策略结果，发现他人的成功经验</p>
+              </div>
+              <div className="flex space-x-3">
+                <Link href="/share-result">
+                  <Button className="bg-blue-600 hover:bg-blue-700">
+                    <Share2 className="mr-2 h-4 w-4" />
+                    分享结果
+                  </Button>
+                </Link>
+                <Link href="/shared-results">
+                  <Button variant="outline">
+                    <List className="mr-2 h-4 w-4" />
+                    浏览结果
+                  </Button>
+                </Link>
+              </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
         {/* 核心指标卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -324,7 +333,6 @@ export default function HomePage() {
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
-  );
+  )
 }

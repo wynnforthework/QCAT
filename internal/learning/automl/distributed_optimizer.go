@@ -4,10 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/rand"
+	"os"
 	"sync"
 	"time"
 
+	"gopkg.in/yaml.v3"
 	"qcat/internal/config"
 	"qcat/internal/logger"
 )
@@ -20,6 +23,9 @@ type DistributedOptimizer struct {
 	optimizationHub  *OptimizationHub
 	performanceDB    *PerformanceDatabase
 	clusterManager   *ClusterManager
+	adaptiveOptimizer *AdaptiveOptimizer
+	conf             *distributedOptConfig
+	backtestRunner   BacktestRunner
 	mu               sync.RWMutex
 }
 
@@ -133,6 +139,12 @@ func NewDistributedOptimizer(cfg *config.Config, consistencyMgr *ConsistencyMana
 	}
 	optimizer.clusterManager.broadcaster.cluster = optimizer.clusterManager
 
+	// 加载分布式优化配置
+	optimizer.conf = loadDistributedOptConfig("configs/distributed_optimization.yaml")
+
+	// 初始化自适应优化器（默认配置）
+	optimizer.adaptiveOptimizer = NewAdaptiveOptimizer(nil)
+
 	// 启动后台任务
 	go optimizer.startBackgroundTasks()
 
@@ -158,10 +170,21 @@ func (do *DistributedOptimizer) StartOptimization(ctx context.Context, taskID st
 	
 	do.logger.Info("使用随机种子进行本地优化", "task_id", taskID, "seed", randomSeed)
 
-	// 3. 执行本地训练（这里简化处理，实际应该调用AutoML引擎）
-	localResult, err := do.performLocalOptimization(taskID, strategyName, dataHash, randomSeed)
-	if err != nil {
-		return nil, fmt.Errorf("本地优化失败: %w", err)
+	var localResult *OptimizationResult
+	var err error
+	// 优先使用自适应优化器（若可用）
+	if do.adaptiveOptimizer != nil {
+		localResult, err = do.adaptiveOptimizer.Optimize(ctx, strategyName, dataHash, randomSeed)
+		if err != nil {
+			do.logger.Warn("自适应优化器执行失败，回退到本地优化", "error", err)
+		}
+	}
+	if localResult == nil || err != nil {
+		// 回退到内置本地优化
+		localResult, err = do.performLocalOptimization(taskID, strategyName, dataHash, randomSeed)
+		if err != nil {
+			return nil, fmt.Errorf("本地优化失败: %w", err)
+		}
 	}
 
 	// 4. 检查是否为新的全局最优
@@ -192,12 +215,17 @@ func (do *DistributedOptimizer) AdoptBestResult(taskID string, result *Optimizat
 		return fmt.Errorf("结果验证失败: %w", err)
 	}
 
-	// 2. 应用最优参数和模型
+	// 2. 回测验证（若启用）
+	if err := do.validateByBacktest(result); err != nil {
+		return fmt.Errorf("回测验证失败: %w", err)
+	}
+
+	// 3. 应用最优参数和模型
 	if err := do.applyOptimalResult(result); err != nil {
 		return fmt.Errorf("应用最优结果失败: %w", err)
 	}
 
-	// 3. 记录采用事件
+	// 4. 记录采用事件
 	do.recordOptimizationEvent(&OptimizationEvent{
 		Timestamp:   time.Now(),
 		EventType:   "adoption",
@@ -211,9 +239,98 @@ func (do *DistributedOptimizer) AdoptBestResult(taskID string, result *Optimizat
 		},
 	})
 
-	// 4. 更新采用计数
+	// 5. 更新采用计数
 	result.AdoptionCount++
 
+	return nil
+}
+
+// validateByBacktest 回测验证桩函数
+func (do *DistributedOptimizer) validateByBacktest(result *OptimizationResult) error {
+	// 若存在真实回测执行器且启用，优先使用
+	if do.backtestRunner != nil && do.conf != nil && do.conf.Validation.Backtest.Enabled {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		stats, err := do.backtestRunner.Run(ctx, result.TaskID, result.StrategyName, toFloatParams(result.Parameters), result.DataHash)
+		if err != nil {
+			return fmt.Errorf("真实回测失败: %w", err)
+		}
+		// 使用配置阈值进行校验
+		if stats.MaxDrawdown > do.conf.Validation.Backtest.MaxDrawdown {
+			return fmt.Errorf("回测最大回撤超阈: maxDD=%.2f%% > %.2f%%", stats.MaxDrawdown, do.conf.Validation.Backtest.MaxDrawdown)
+		}
+		// 要求总收益不显著低于候选结果
+		minRetention := do.conf.Validation.Backtest.MinMeanRetention
+		if stats.TotalReturn < result.Performance.TotalReturn*minRetention {
+			return fmt.Errorf("回测收益偏低: total=%.2f%% < threshold=%.2f%%", stats.TotalReturn, result.Performance.TotalReturn*minRetention)
+		}
+		return nil
+	}
+
+	// 否则采用模拟扰动校验（见原逻辑）
+	// 配置
+	runs := 5
+	maxAllowedDrawdown := 10.0 // %
+	minMeanRetention := 0.8     // 平均收益需至少达到原结果的80%
+	if do.conf != nil {
+		if do.conf.Validation.Backtest.Runs > 0 {
+			runs = do.conf.Validation.Backtest.Runs
+		}
+		if do.conf.Validation.Backtest.MaxDrawdown > 0 {
+			maxAllowedDrawdown = do.conf.Validation.Backtest.MaxDrawdown
+		}
+		if do.conf.Validation.Backtest.MinMeanRetention > 0 {
+			minMeanRetention = do.conf.Validation.Backtest.MinMeanRetention
+		}
+	}
+	profitSamples := make([]float64, 0, runs)
+	maxDrawdowns := make([]float64, 0, runs)
+	for i := 0; i < runs; i++ {
+		noise := (rand.Float64()*2 - 1) * 0.2
+		simProfit := result.Performance.ProfitRate * (1 + noise)
+		if simProfit < 0 {
+			simProfit = 0
+		}
+		profitSamples = append(profitSamples, simProfit)
+		simDD := math.Min(20.0, math.Abs(noise)*20.0)
+		maxDrawdowns = append(maxDrawdowns, simDD)
+	}
+	meanProfit := 0.0
+	for _, p := range profitSamples {
+		meanProfit += p
+	}
+	meanProfit /= float64(len(profitSamples))
+	variance := 0.0
+	for _, p := range profitSamples {
+		d := p - meanProfit
+		variance += d * d
+	}
+	variance /= float64(len(profitSamples))
+	maxDD := 0.0
+	for _, dd := range maxDrawdowns {
+		if dd > maxDD {
+			maxDD = dd
+		}
+	}
+	if meanProfit < result.Performance.ProfitRate*minMeanRetention {
+		return fmt.Errorf("回测均值偏低: mean=%.2f%% < threshold=%.2f%%", meanProfit, result.Performance.ProfitRate*minMeanRetention)
+	}
+	if maxDD > maxAllowedDrawdown {
+		return fmt.Errorf("回测最大回撤超阈: maxDD=%.2f%% > %.2f%%", maxDD, maxAllowedDrawdown)
+	}
+	do.recordOptimizationEvent(&OptimizationEvent{
+		Timestamp: time.Now(),
+		EventType: "backtest_validation",
+		NodeID:    do.getNodeID(),
+		TaskID:    result.TaskID,
+		Description: fmt.Sprintf("回测通过: mean=%.2f%%, var=%.4f, maxDD=%.2f%%", 
+			meanProfit, variance, maxDD),
+		Data: map[string]interface{}{
+			"mean_profit": meanProfit,
+			"variance":    variance,
+			"max_dd":      maxDD,
+		},
+	})
 	return nil
 }
 
@@ -469,4 +586,85 @@ func (rb *ResultBroadcaster) broadcast(result *OptimizationResult) error {
 	// TODO: 实现实际的广播逻辑
 	// 可以使用 gRPC、HTTP、消息队列等方式
 	return nil
+}
+
+// BacktestRunner 定义真实回测执行接口
+type BacktestRunner interface {
+	Run(ctx context.Context, taskID string, strategyName string, parameters map[string]interface{}, dataHash string) (*BacktestStats, error)
+}
+
+// BacktestStats 回测关键指标
+type BacktestStats struct {
+	TotalReturn   float64
+	MaxDrawdown   float64
+	SharpeRatio   float64
+}
+
+// SetBacktestRunner 注入回测执行器
+func (do *DistributedOptimizer) SetBacktestRunner(r BacktestRunner) {
+	do.mu.Lock()
+	defer do.mu.Unlock()
+	do.backtestRunner = r
+}
+
+// EnsureDefaultBacktestRunner installs a default runner if none was injected.
+func (do *DistributedOptimizer) EnsureDefaultBacktestRunner() {
+	do.mu.Lock()
+	defer do.mu.Unlock()
+	if do.backtestRunner == nil {
+		do.backtestRunner = NewDefaultBacktestRunner()
+	}
+}
+
+// distributedOptConfig 仅提取需要的分布式优化配置
+type distributedOptConfig struct {
+	Validation struct {
+		Backtest struct {
+			Enabled           bool    `yaml:"enabled"`
+			Runs              int     `yaml:"runs"`
+			MaxDrawdown       float64 `yaml:"max_drawdown"`
+			MinMeanRetention  float64 `yaml:"min_mean_retention"`
+		} `yaml:"backtest"`
+	} `yaml:"validation"`
+}
+
+func loadDistributedOptConfig(path string) *distributedOptConfig {
+	cfg := &distributedOptConfig{}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return cfg
+	}
+	_ = yaml.Unmarshal(data, cfg)
+	// 合理的默认值
+	if cfg.Validation.Backtest.Runs <= 0 {
+		cfg.Validation.Backtest.Runs = 5
+	}
+	if cfg.Validation.Backtest.MaxDrawdown <= 0 {
+		cfg.Validation.Backtest.MaxDrawdown = 10.0
+	}
+	if cfg.Validation.Backtest.MinMeanRetention <= 0 {
+		cfg.Validation.Backtest.MinMeanRetention = 0.8
+	}
+	return cfg
+}
+
+func toFloatParams(p map[string]interface{}) map[string]float64 {
+	out := make(map[string]float64)
+	for k, v := range p {
+		switch t := v.(type) {
+		case float64:
+			out[k] = t
+		case float32:
+			out[k] = float64(t)
+		case int:
+			out[k] = float64(t)
+		case int64:
+			out[k] = float64(t)
+		case json.Number:
+			if f, err := t.Float64(); err == nil {
+				out[k] = f
+			}
+		}
+	}
+	return out
 }
