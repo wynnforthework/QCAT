@@ -490,20 +490,6 @@ go run scripts/deploy_model.go --model-path=models/your_model
 - 📖 **文档**: [完整文档](docs/)
 - 🐛 **Bug报告**: [GitHub Issues](https://github.com/wynnforthework/QCAT/issues)
 - 💡 **功能建议**: [GitHub Discussions](https://github.com/wynnforthework/QCAT/discussions)
-- 📧 **邮件支持**: qcat-support@wynnforthework.com
-
-### 社区资源
-- 🎯 **官方网站**: [qcat.ai](https://qcat.ai)
-- 📺 **视频教程**: [YouTube频道](https://youtube.com/qcat-ai)
-- 💬 **技术交流**: [Discord社区](https://discord.gg/qcat)
-- 📱 **微信群**: 扫码加入技术交流群
-
-### 专业服务
-- 🏢 **企业版**: 联系获取企业级功能和支持
-- 🔧 **定制开发**: 智能化交易策略定制服务
-- 📊 **性能优化**: 系统性能调优咨询
-- 🎓 **培训服务**: 量化交易和AI技术培训
-
 ---
 
 **🤖 QCAT v2.0 - 让AI为您的交易保驾护航！**
