@@ -1,455 +1,411 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Textarea } from "@/components/ui/textarea"
-import { Clock, Download, Eye, FileText, AlertTriangle, CheckCircle, XCircle } from "lucide-react"
-
-interface DecisionChain {
-  id: string
-  strategyId: string
-  strategyName: string
-  symbol: string
-  timestamp: string
-  decisions: Decision[]
-  finalAction: string
-  context: Record<string, unknown> // 修复: 使用 unknown 替代 any
-  status: "completed" | "failed" | "pending"
-}
-
-interface Decision {
-  id: string
-  step: string
-  description: string
-  input: Record<string, unknown> // 修复: 使用 unknown 替代 any
-  output: Record<string, unknown> // 修复: 使用 unknown 替代 any
-  timestamp: string
-  duration: number
-  status: "success" | "error" | "warning"
-}
-
-interface AuditLog {
-  id: string
-  timestamp: string
-  userId: string
-  action: string
-  resource: string
-  resourceId: string
-  details: Record<string, unknown> // 修复: 使用 unknown 替代 any
-  result: "success" | "failure"
-  ipAddress: string
-  userAgent: string
-}
-
-interface PerformanceMetric {
-  id: string
-  name: string
-  value: number
-  unit: string
-  timestamp: string
-  category: "system" | "strategy" | "market" | "risk"
-}
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  BookOpen, 
+  Download, 
+  Search, 
+  Filter,
+  Eye,
+  Calendar,
+  User,
+  Activity,
+  AlertTriangle,
+  CheckCircle,
+  XCircle
+} from "lucide-react";
+import apiClient, { AuditLog, DecisionChain } from "@/lib/api";
 
 export default function AuditPage() {
-  const [decisionChains, setDecisionChains] = useState<DecisionChain[]>([])
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
-  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetric[]>([])
-  const [loading, setLoading] = useState(true)
-  // const [selectedChain, setSelectedChain] = useState<DecisionChain | null>(null) // 暂时注释掉未使用的状态
-  const [searchQuery, setSearchQuery] = useState("")
-  const [filterType, setFilterType] = useState("all")
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [decisionChains, setDecisionChains] = useState<DecisionChain[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [actionFilter, setActionFilter] = useState("");
+  const [outcomeFilter, setOutcomeFilter] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // 模拟决策链数据
-        const mockDecisionChains: DecisionChain[] = [
-          {
-            id: "dc_1",
-            strategyId: "strategy_1",
-            strategyName: "趋势跟踪策略",
-            symbol: "BTCUSDT",
-            timestamp: "2024-01-15 14:30:00",
-            status: "completed",
-            finalAction: "BUY",
-            context: {
-              currentPrice: 43250.50,
-              signal: "strong_buy",
-              confidence: 0.85
-            },
-            decisions: [
-              {
-                id: "d_1",
-                step: "信号生成",
-                description: "基于移动平均线生成交易信号",
-                input: { ma_short: 20, ma_long: 50, price: 43250.50 },
-                output: { signal: "buy", strength: 0.85 },
-                timestamp: "2024-01-15 14:30:00",
-                duration: 15,
-                status: "success"
-              },
-              {
-                id: "d_2",
-                step: "风险检查",
-                description: "检查当前风险敞口和限额",
-                input: { currentExposure: 75000, maxExposure: 100000 },
-                output: { riskLevel: "acceptable", availableMargin: 25000 },
-                timestamp: "2024-01-15 14:30:01",
-                duration: 8,
-                status: "success"
-              },
-              {
-                id: "d_3",
-                step: "仓位计算",
-                description: "计算目标仓位大小",
-                input: { availableMargin: 25000, riskPerTrade: 0.02 },
-                output: { targetPosition: 5000, leverage: 2.5 },
-                timestamp: "2024-01-15 14:30:02",
-                duration: 12,
-                status: "success"
-              }
+    loadAuditData();
+  }, []);
+
+  const loadAuditData = async () => {
+    try {
+      setLoading(true);
+      
+      const filters = {
+        startTime: dateFrom || undefined,
+        endTime: dateTo || undefined,
+        action: actionFilter || undefined,
+        outcome: (outcomeFilter as 'success' | 'failure') || undefined,
+        limit: 100
+      };
+      
+      const [logs, chains] = await Promise.all([
+        apiClient.getAuditLogs(filters),
+        apiClient.getDecisionChains({ limit: 50 })
+      ]);
+      
+      setAuditLogs(logs);
+      setDecisionChains(chains);
+    } catch (error) {
+      console.error('Failed to load audit data:', error);
+      
+      // 设置模拟数据
+      const mockAuditLogs: AuditLog[] = [
+        {
+          id: 'log_1',
+          timestamp: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+          userId: 'system',
+          action: 'strategy_start',
+          resource: 'strategy_001',
+          outcome: 'success',
+          details: {
+            strategyName: '趋势跟踪策略 Alpha',
+            parameters: { period: 20, threshold: 0.05 }
+          },
+          ipAddress: '192.168.1.100'
+        },
+        {
+          id: 'log_2',
+          timestamp: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+          userId: 'admin',
+          action: 'risk_limit_update',
+          resource: 'risk_limits',
+          outcome: 'success',
+          details: {
+            symbol: 'BTCUSDT',
+            oldLimit: 50000,
+            newLimit: 60000
+          },
+          ipAddress: '192.168.1.101'
+        },
+        {
+          id: 'log_3',
+          timestamp: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+          userId: 'system',
+          action: 'portfolio_rebalance',
+          resource: 'portfolio',
+          outcome: 'success',
+          details: {
+            trigger: 'scheduled',
+            changes: [
+              { strategy: 'strategy_001', from: 40, to: 45 },
+              { strategy: 'strategy_002', from: 30, to: 25 }
             ]
           },
-          {
-            id: "dc_2",
-            strategyId: "strategy_2",
-            strategyName: "均值回归策略",
-            symbol: "ETHUSDT",
-            timestamp: "2024-01-15 14:25:00",
-            status: "failed",
-            finalAction: "HOLD",
-            context: {
-              currentPrice: 2650.75,
-              signal: "weak_sell",
-              confidence: 0.45
+          ipAddress: '127.0.0.1'
+        },
+        {
+          id: 'log_4',
+          timestamp: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
+          userId: 'trader_01',
+          action: 'strategy_stop',
+          resource: 'strategy_003',
+          outcome: 'failure',
+          details: {
+            strategyName: '套利策略 Gamma',
+            reason: 'Manual stop requested',
+            error: 'Strategy has open positions'
+          },
+          ipAddress: '192.168.1.102'
+        },
+        {
+          id: 'log_5',
+          timestamp: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+          userId: 'system',
+          action: 'optimization_complete',
+          resource: 'optimizer',
+          outcome: 'success',
+          details: {
+            strategyId: 'strategy_002',
+            method: 'bayesian',
+            iterations: 100,
+            bestScore: 1.85
+          },
+          ipAddress: '127.0.0.1'
+        }
+      ];
+      
+      const mockDecisionChains: DecisionChain[] = [
+        {
+          id: 'chain_1',
+          timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+          type: 'strategy',
+          trigger: 'signal_generated',
+          decisions: [
+            {
+              step: 1,
+              description: '信号生成',
+              reasoning: '价格突破20日均线且成交量放大',
+              parameters: { price: 45000, ma20: 44500, volume: 1.5 },
+              timestamp: new Date(Date.now() - 10 * 60 * 1000).toISOString()
             },
-            decisions: [
-              {
-                id: "d_4",
-                step: "信号生成",
-                description: "基于布林带生成交易信号",
-                input: { upper_band: 2700, lower_band: 2600, price: 2650.75 },
-                output: { signal: "sell", strength: 0.45 },
-                timestamp: "2024-01-15 14:25:00",
-                duration: 10,
-                status: "success"
-              },
-              {
-                id: "d_5",
-                step: "风险检查",
-                description: "检查当前风险敞口和限额",
-                input: { currentExposure: 85000, maxExposure: 100000 },
-                output: { riskLevel: "high", availableMargin: 15000 },
-                timestamp: "2024-01-15 14:25:01",
-                duration: 5,
-                status: "warning"
-              },
-              {
-                id: "d_6",
-                step: "仓位计算",
-                description: "计算目标仓位大小",
-                input: { availableMargin: 15000, riskPerTrade: 0.02 },
-                output: { targetPosition: 0, reason: "insufficient_margin" },
-                timestamp: "2024-01-15 14:25:02",
-                duration: 8,
-                status: "error"
-              }
-            ]
+            {
+              step: 2,
+              description: '风险检查',
+              reasoning: '检查仓位限制和保证金',
+              parameters: { currentPosition: 0.3, maxPosition: 0.5, marginRatio: 0.4 },
+              timestamp: new Date(Date.now() - 9 * 60 * 1000).toISOString()
+            },
+            {
+              step: 3,
+              description: '订单执行',
+              reasoning: '风险检查通过，执行买入订单',
+              parameters: { orderType: 'limit', quantity: 0.5, price: 45100 },
+              timestamp: new Date(Date.now() - 8 * 60 * 1000).toISOString()
+            }
+          ],
+          outcome: 'order_placed',
+          metadata: {
+            strategyId: 'strategy_001',
+            symbol: 'BTCUSDT',
+            orderId: 'order_12345'
           }
-        ]
-
-        // 模拟审计日志
-        const mockAuditLogs: AuditLog[] = [
-          {
-            id: "log_1",
-            timestamp: "2024-01-15 14:30:00",
-            userId: "system",
-            action: "strategy_execution",
-            resource: "strategy",
-            resourceId: "strategy_1",
-            details: { symbol: "BTCUSDT", action: "BUY", amount: 5000 },
-            result: "success",
-            ipAddress: "127.0.0.1",
-            userAgent: "QCAT-System/1.0"
-          },
-          {
-            id: "log_2",
-            timestamp: "2024-01-15 14:25:00",
-            userId: "admin",
-            action: "risk_limit_update",
-            resource: "risk_config",
-            resourceId: "limits",
-            details: { maxExposure: 100000, maxDrawdown: 0.15 },
-            result: "success",
-            ipAddress: "192.168.1.100",
-            userAgent: "Mozilla/5.0"
-          },
-          {
-            id: "log_3",
-            timestamp: "2024-01-15 14:20:00",
-            userId: "trader_1",
-            action: "strategy_parameter_update",
-            resource: "strategy",
-            resourceId: "strategy_2",
-            details: { ma_short: 15, ma_long: 45 },
-            result: "success",
-            ipAddress: "192.168.1.101",
-            userAgent: "Mozilla/5.0"
+        },
+        {
+          id: 'chain_2',
+          timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+          type: 'risk',
+          trigger: 'risk_threshold_exceeded',
+          decisions: [
+            {
+              step: 1,
+              description: '风险阈值触发',
+              reasoning: 'VaR超过设定阈值',
+              parameters: { currentVar: 5500, threshold: 5000 },
+              timestamp: new Date(Date.now() - 25 * 60 * 1000).toISOString()
+            },
+            {
+              step: 2,
+              description: '风险评估',
+              reasoning: '分析当前市场状况和持仓风险',
+              parameters: { volatility: 0.25, correlation: 0.8, exposure: 75000 },
+              timestamp: new Date(Date.now() - 24 * 60 * 1000).toISOString()
+            },
+            {
+              step: 3,
+              description: '风险处理',
+              reasoning: '执行减仓操作降低风险',
+              parameters: { action: 'reduce_position', reduction: 0.2 },
+              timestamp: new Date(Date.now() - 23 * 60 * 1000).toISOString()
+            }
+          ],
+          outcome: 'risk_mitigated',
+          metadata: {
+            originalVar: 5500,
+            finalVar: 4200,
+            affectedStrategies: ['strategy_001', 'strategy_002']
           }
-        ]
-
-        // 模拟性能指标
-        const mockPerformanceMetrics: PerformanceMetric[] = [
-          {
-            id: "pm_1",
-            name: "系统CPU使用率",
-            value: 45.2,
-            unit: "%",
-            timestamp: "2024-01-15 14:30:00",
-            category: "system"
-          },
-          {
-            id: "pm_2",
-            name: "内存使用率",
-            value: 68.5,
-            unit: "%",
-            timestamp: "2024-01-15 14:30:00",
-            category: "system"
-          },
-          {
-            id: "pm_3",
-            name: "策略执行延迟",
-            value: 125,
-            unit: "ms",
-            timestamp: "2024-01-15 14:30:00",
-            category: "strategy"
-          },
-          {
-            id: "pm_4",
-            name: "市场数据延迟",
-            value: 45,
-            unit: "ms",
-            timestamp: "2024-01-15 14:30:00",
-            category: "market"
-          }
-        ]
-
-        setDecisionChains(mockDecisionChains)
-        setAuditLogs(mockAuditLogs)
-        setPerformanceMetrics(mockPerformanceMetrics)
-      } catch (error) {
-        console.error("Failed to fetch audit data:", error)
-      } finally {
-        setLoading(false)
-      }
+        }
+      ];
+      
+      setAuditLogs(mockAuditLogs);
+      setDecisionChains(mockDecisionChains);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    fetchData()
-  }, [])
-
-  const handleExportReport = (type: string) => {
-    console.log(`Exporting ${type} report...`)
-    // 实际项目中这里会调用API导出报告
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed": return "text-green-600 bg-green-100"
-      case "failed": return "text-red-600 bg-red-100"
-      case "pending": return "text-yellow-600 bg-yellow-100"
-      default: return "text-gray-600 bg-gray-100"
+  const exportAuditReport = async () => {
+    try {
+      await apiClient.exportReport({
+        type: 'audit',
+        startDate: dateFrom,
+        endDate: dateTo
+      });
+      alert('报告导出请求已提交');
+    } catch (error) {
+      console.error('Failed to export report:', error);
+      alert('导出失败，请重试');
     }
-  }
+  };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "completed": return <CheckCircle className="h-4 w-4" />
-      case "failed": return <XCircle className="h-4 w-4" />
-      case "pending": return <Clock className="h-4 w-4" />
-      default: return <Clock className="h-4 w-4" />
+  const getOutcomeIcon = (outcome: string) => {
+    switch (outcome) {
+      case 'success':
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
+      case 'failure':
+        return <XCircle className="h-4 w-4 text-red-500" />;
+      default:
+        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
     }
-  }
+  };
 
-  const getDecisionStatusIcon = (status: string) => {
-    switch (status) {
-      case "success": return <CheckCircle className="h-4 w-4 text-green-600" />
-      case "error": return <XCircle className="h-4 w-4 text-red-600" />
-      case "warning": return <AlertTriangle className="h-4 w-4 text-yellow-600" />
-      default: return <Clock className="h-4 w-4 text-gray-600" />
+  const getOutcomeColor = (outcome: string) => {
+    switch (outcome) {
+      case 'success':
+        return 'text-green-600';
+      case 'failure':
+        return 'text-red-600';
+      default:
+        return 'text-yellow-600';
     }
-  }
+  };
+
+  const getActionIcon = (action: string) => {
+    if (action.includes('strategy')) return <Activity className="h-4 w-4" />;
+    if (action.includes('user') || action.includes('auth')) return <User className="h-4 w-4" />;
+    if (action.includes('risk')) return <AlertTriangle className="h-4 w-4" />;
+    return <BookOpen className="h-4 w-4" />;
+  };
+
+  const filteredLogs = auditLogs.filter(log => {
+    const matchesSearch = !searchTerm || 
+      log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.resource.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      log.userId.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesAction = !actionFilter || log.action === actionFilter;
+    const matchesOutcome = !outcomeFilter || log.outcome === outcomeFilter;
+    
+    return matchesSearch && matchesAction && matchesOutcome;
+  });
+
+  const filteredChains = decisionChains.filter(chain => {
+    return !searchTerm || 
+      chain.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      chain.trigger.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      chain.outcome.toLowerCase().includes(searchTerm.toLowerCase());
+  });
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64">Loading...</div>
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p>加载审计数据...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
+      {/* 页面标题和操作 */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">审计与回放</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => handleExportReport("audit")}>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">审计日志</h1>
+          <p className="text-gray-600 mt-1">系统操作记录和决策链追踪</p>
+        </div>
+        <div className="flex items-center space-x-4">
+          <Button variant="outline" onClick={exportAuditReport}>
             <Download className="h-4 w-4 mr-2" />
-            导出审计报告
-          </Button>
-          <Button variant="outline" onClick={() => handleExportReport("performance")}>
-            <FileText className="h-4 w-4 mr-2" />
-            导出性能报告
+            导出报告
           </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="decisions" className="w-full">
+      {/* 过滤器 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center">
+            <Filter className="h-4 w-4 mr-2" />
+            筛选条件
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="relative">
+              <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
+              <Input
+                placeholder="搜索操作、资源或用户..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            
+            <Select value={actionFilter} onValueChange={setActionFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="操作类型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">全部操作</SelectItem>
+                <SelectItem value="strategy_start">启动策略</SelectItem>
+                <SelectItem value="strategy_stop">停止策略</SelectItem>
+                <SelectItem value="portfolio_rebalance">投资组合再平衡</SelectItem>
+                <SelectItem value="risk_limit_update">风险限制更新</SelectItem>
+                <SelectItem value="optimization_complete">优化完成</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={outcomeFilter} onValueChange={setOutcomeFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="执行结果" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">全部结果</SelectItem>
+                <SelectItem value="success">成功</SelectItem>
+                <SelectItem value="failure">失败</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <div className="relative">
+              <Calendar className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
+              <Input
+                type="date"
+                placeholder="开始日期"
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <div className="relative">
+              <Calendar className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
+              <Input
+                type="date"
+                placeholder="结束日期"
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+          
+          <div className="mt-4 flex justify-between items-center">
+            <span className="text-sm text-gray-600">
+              显示 {filteredLogs.length} / {auditLogs.length} 条记录
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setSearchTerm('');
+                setActionFilter('');
+                setOutcomeFilter('');
+                setDateFrom('');
+                setDateTo('');
+              }}
+            >
+              重置筛选
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Tabs defaultValue="logs" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="decisions">决策链追踪</TabsTrigger>
-          <TabsTrigger value="logs">审计日志</TabsTrigger>
-          <TabsTrigger value="performance">性能监控</TabsTrigger>
+          <TabsTrigger value="logs">操作日志</TabsTrigger>
+          <TabsTrigger value="decisions">决策链</TabsTrigger>
+          <TabsTrigger value="reports">审计报告</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="decisions" className="space-y-6">
+        <TabsContent value="logs" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>决策链时间线</CardTitle>
-              <CardDescription>系统决策过程的详细追踪</CardDescription>
+              <CardTitle>系统操作日志</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {decisionChains.map((chain) => (
-                  <div key={chain.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="font-semibold">{chain.strategyName}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {chain.symbol} • {chain.timestamp}
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="outline" className={getStatusColor(chain.status)}>
-                          {getStatusIcon(chain.status)}
-                          <span className="ml-1">{chain.status}</span>
-                        </Badge>
-                        <Badge variant="secondary">
-                          {chain.finalAction}
-                        </Badge>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-4xl">
-                            <DialogHeader>
-                              <DialogTitle>决策链详情 - {chain.strategyName}</DialogTitle>
-                              <DialogDescription>
-                                {chain.symbol} • {chain.timestamp}
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div>
-                                <h4 className="font-semibold mb-2">上下文信息</h4>
-                                <div className="bg-gray-50 p-3 rounded">
-                                  <pre className="text-sm">
-                                    {JSON.stringify(chain.context, null, 2)}
-                                  </pre>
-                                </div>
-                              </div>
-                              <div>
-                                <h4 className="font-semibold mb-2">决策步骤</h4>
-                                <div className="space-y-3">
-                                  {chain.decisions.map((decision) => (
-                                    <div key={decision.id} className="border-l-4 border-blue-500 pl-4">
-                                      <div className="flex items-center justify-between mb-2">
-                                        <div className="flex items-center space-x-2">
-                                          <span className="font-medium">步骤: {decision.step}</span>
-                                          {getDecisionStatusIcon(decision.status)}
-                                        </div>
-                                        <span className="text-sm text-muted-foreground">
-                                          {decision.duration}ms
-                                        </span>
-                                      </div>
-                                      <p className="text-sm text-muted-foreground mb-2">
-                                        {decision.description}
-                                      </p>
-                                      <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                          <span className="font-medium">输入:</span>
-                                          <pre className="bg-gray-50 p-2 rounded mt-1">
-                                            {JSON.stringify(decision.input, null, 2)}
-                                          </pre>
-                                        </div>
-                                        <div>
-                                          <span className="font-medium">输出:</span>
-                                          <pre className="bg-gray-50 p-2 rounded mt-1">
-                                            {JSON.stringify(decision.output, null, 2)}
-                                          </pre>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      {chain.decisions.map((decision) => (
-                        <div key={decision.id} className="flex items-center space-x-2">
-                          <div className="flex items-center space-x-2">
-                            {getDecisionStatusIcon(decision.status)}
-                            <span className="text-sm">{decision.step}</span>
-                          </div>
-                          <span className="text-xs text-muted-foreground">
-                            {decision.duration}ms
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="logs" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>审计日志查询</CardTitle>
-              <CardDescription>系统操作和用户行为的详细记录</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="flex-1">
-                  <Input
-                    placeholder="搜索日志..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-                <Select value={filterType} onValueChange={setFilterType}>
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">全部</SelectItem>
-                    <SelectItem value="strategy">策略操作</SelectItem>
-                    <SelectItem value="risk">风控操作</SelectItem>
-                    <SelectItem value="system">系统操作</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
+            <CardContent className="p-0">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -463,58 +419,37 @@ export default function AuditPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {auditLogs.map((log) => (
+                  {filteredLogs.map((log) => (
                     <TableRow key={log.id}>
-                      <TableCell>{log.timestamp}</TableCell>
-                      <TableCell>{log.userId}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">
-                          {log.action === "strategy_execution" ? "策略执行" :
-                           log.action === "risk_limit_update" ? "风控更新" :
-                           log.action === "strategy_parameter_update" ? "参数更新" : log.action}
-                        </Badge>
+                      <TableCell className="text-sm">
+                        {new Date(log.timestamp).toLocaleString()}
                       </TableCell>
-                      <TableCell>{log.resource}</TableCell>
                       <TableCell>
-                        <Badge variant={log.result === "success" ? "default" : "destructive"}>
-                          {log.result === "success" ? "成功" : "失败"}
-                        </Badge>
+                        <div className="flex items-center space-x-2">
+                          <User className="h-4 w-4 text-gray-400" />
+                          <span>{log.userId}</span>
+                        </div>
                       </TableCell>
-                      <TableCell>{log.ipAddress}</TableCell>
                       <TableCell>
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>日志详情</DialogTitle>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div>
-                                <Label>详细信息</Label>
-                                <Textarea
-                                  value={JSON.stringify(log.details, null, 2)}
-                                  readOnly
-                                  className="mt-2"
-                                  rows={6}
-                                />
-                              </div>
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                  <span className="font-medium">用户代理:</span>
-                                  <p className="text-muted-foreground">{log.userAgent}</p>
-                                </div>
-                                <div>
-                                  <span className="font-medium">IP地址:</span>
-                                  <p className="text-muted-foreground">{log.ipAddress}</p>
-                                </div>
-                              </div>
-                            </div>
-                          </DialogContent>
-                        </Dialog>
+                        <div className="flex items-center space-x-2">
+                          {getActionIcon(log.action)}
+                          <span>{log.action}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{log.resource}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          {getOutcomeIcon(log.outcome)}
+                          <Badge variant={log.outcome === 'success' ? 'default' : 'destructive'}>
+                            {log.outcome}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{log.ipAddress}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm">
+                          <Eye className="h-4 w-4" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -524,53 +459,86 @@ export default function AuditPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="performance" className="space-y-6">
+        <TabsContent value="decisions" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>性能监控</CardTitle>
-              <CardDescription>系统性能指标的实时监控</CardDescription>
+              <CardTitle>决策链追踪</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {performanceMetrics.map((metric) => (
-                  <Card key={metric.id} className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium">{metric.name}</p>
-                        <p className="text-2xl font-bold">
-                          {metric.value}{metric.unit}
-                        </p>
+              <div className="space-y-4">
+                {filteredChains.map((chain) => (
+                  <div key={chain.id} className="border rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline">{chain.type}</Badge>
+                        <span className="font-medium">{chain.trigger}</span>
                       </div>
-                      <Badge variant="outline">
-                        {metric.category === "system" ? "系统" :
-                         metric.category === "strategy" ? "策略" :
-                         metric.category === "market" ? "市场" : "风控"}
-                      </Badge>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-600">
+                          {new Date(chain.timestamp).toLocaleString()}
+                        </span>
+                        <Badge variant="default">{chain.outcome}</Badge>
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {metric.timestamp}
-                    </p>
-                  </Card>
+                    
+                    <div className="space-y-3">
+                      {chain.decisions.map((decision, index) => (
+                        <div key={index} className="flex items-start space-x-4 pb-3 border-b last:border-b-0">
+                          <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-sm font-medium text-blue-600">
+                            {decision.step}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-medium">{decision.description}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{decision.reasoning}</p>
+                            <div className="text-xs text-gray-500 mt-2">
+                              {new Date(decision.timestamp).toLocaleTimeString()}
+                            </div>
+                            {decision.parameters && (
+                              <details className="mt-2">
+                                <summary className="text-xs text-blue-600 cursor-pointer">查看参数</summary>
+                                <pre className="text-xs bg-gray-50 p-2 rounded mt-1 overflow-x-auto">
+                                  {JSON.stringify(decision.parameters, null, 2)}
+                                </pre>
+                              </details>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    {chain.metadata && (
+                      <details className="mt-4">
+                        <summary className="text-sm text-blue-600 cursor-pointer">查看元数据</summary>
+                        <pre className="text-xs bg-gray-50 p-2 rounded mt-1 overflow-x-auto">
+                          {JSON.stringify(chain.metadata, null, 2)}
+                        </pre>
+                      </details>
+                    )}
+                  </div>
                 ))}
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
 
+        <TabsContent value="reports" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>性能趋势</CardTitle>
-              <CardDescription>关键性能指标的历史趋势</CardDescription>
+              <CardTitle>审计报告</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>性能趋势图表功能开发中...</p>
-                <p className="text-sm">将显示CPU、内存、延迟等指标的历史趋势</p>
+              <div className="text-center py-8 text-gray-500">
+                <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>审计报告功能正在开发中...</p>
+                <Button variant="outline" className="mt-4" onClick={exportAuditReport}>
+                  <Download className="h-4 w-4 mr-2" />
+                  导出当前数据
+                </Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }

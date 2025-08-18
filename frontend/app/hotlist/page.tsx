@@ -1,430 +1,434 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Switch } from "@/components/ui/switch"
-import { TrendingUp, Star, Settings, Eye, EyeOff, AlertTriangle } from "lucide-react"
-
-interface HotSymbol {
-  symbol: string
-  name: string
-  score: number
-  rank: number
-  metrics: {
-    volJump: number
-    turnover: number
-    oiChange: number
-    fundingZ: number
-    regimeShift: number
-  }
-  risk: {
-    volatility: number
-    leverage: number
-    sentiment: number
-    overall: "low" | "medium" | "high"
-  }
-  status: "active" | "inactive" | "whitelist" | "blacklist"
-  lastUpdate: string
-  price: number
-  priceChange: number
-  volume24h: number
-}
-
-interface WhitelistItem {
-  symbol: string
-  name: string
-  addedBy: string
-  addedAt: string
-  reason: string
-  status: "active" | "inactive"
-}
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  Search, 
+  Plus, 
+  Check, 
+  X,
+  Zap,
+  AlertTriangle,
+  Star,
+  Flame,
+  Activity
+} from "lucide-react";
+import apiClient, { HotSymbol, WhitelistItem } from "@/lib/api";
 
 export default function HotlistPage() {
-  const [hotSymbols, setHotSymbols] = useState<HotSymbol[]>([])
-  const [whitelist, setWhitelist] = useState<WhitelistItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [autoEnable, setAutoEnable] = useState(false)
-  const [filterRank, setFilterRank] = useState<number>(10)
+  const [hotSymbols, setHotSymbols] = useState<HotSymbol[]>([]);
+  const [whitelist, setWhitelist] = useState<WhitelistItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [newSymbol, setNewSymbol] = useState("");
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        // 模拟热门币种数据
-        const mockHotSymbols: HotSymbol[] = [
-          {
-            symbol: "BTCUSDT",
-            name: "Bitcoin",
-            score: 85.6,
-            rank: 1,
-            metrics: {
-              volJump: 0.15,
-              turnover: 0.08,
-              oiChange: 0.12,
-              fundingZ: 1.2,
-              regimeShift: 0.25
-            },
-            risk: {
-              volatility: 0.6,
-              leverage: 0.3,
-              sentiment: 0.8,
-              overall: "medium"
-            },
-            status: "active",
-            lastUpdate: "2024-01-15 14:30:00",
-            price: 43250.50,
-            priceChange: 2.5,
-            volume24h: 2850000000
+    loadHotlistData();
+  }, []);
+
+  const loadHotlistData = async () => {
+    try {
+      setLoading(true);
+      
+      const [hotSymbolsData, whitelistData] = await Promise.all([
+        apiClient.getHotSymbols(),
+        apiClient.getWhitelist()
+      ]);
+      
+      setHotSymbols(hotSymbolsData);
+      setWhitelist(whitelistData);
+    } catch (error) {
+      console.error('Failed to load hotlist data:', error);
+      
+      // 设置模拟数据
+      const mockHotSymbols: HotSymbol[] = [
+        {
+          symbol: 'SUIUSDT',
+          score: 9.2,
+          rank: 1,
+          change24h: 15.5,
+          volume24h: 125000000,
+          marketCap: 2800000000,
+          indicators: {
+            momentum: 8.8,
+            volume: 9.5,
+            volatility: 7.2,
+            sentiment: 8.9
           },
-          {
-            symbol: "ETHUSDT",
-            name: "Ethereum",
-            score: 78.3,
-            rank: 2,
-            metrics: {
-              volJump: 0.12,
-              turnover: 0.06,
-              oiChange: 0.09,
-              fundingZ: 0.8,
-              regimeShift: 0.18
-            },
-            risk: {
-              volatility: 0.7,
-              leverage: 0.4,
-              sentiment: 0.7,
-              overall: "medium"
-            },
-            status: "active",
-            lastUpdate: "2024-01-15 14:30:00",
-            price: 2650.75,
-            priceChange: 1.8,
-            volume24h: 1850000000
+          lastUpdate: new Date().toISOString()
+        },
+        {
+          symbol: 'APTUSDT',
+          score: 8.7,
+          rank: 2,
+          change24h: 12.3,
+          volume24h: 89000000,
+          marketCap: 1950000000,
+          indicators: {
+            momentum: 8.2,
+            volume: 8.8,
+            volatility: 6.9,
+            sentiment: 8.1
           },
-          {
-            symbol: "SOLUSDT",
-            name: "Solana",
-            score: 92.1,
-            rank: 3,
-            metrics: {
-              volJump: 0.25,
-              turnover: 0.15,
-              oiChange: 0.20,
-              fundingZ: 1.8,
-              regimeShift: 0.35
-            },
-            risk: {
-              volatility: 0.9,
-              leverage: 0.6,
-              sentiment: 0.9,
-              overall: "high"
-            },
-            status: "whitelist",
-            lastUpdate: "2024-01-15 14:30:00",
-            price: 98.25,
-            priceChange: 8.5,
-            volume24h: 850000000
+          lastUpdate: new Date().toISOString()
+        },
+        {
+          symbol: 'INJUSDT',
+          score: 8.1,
+          rank: 3,
+          change24h: 8.9,
+          volume24h: 67000000,
+          marketCap: 1760000000,
+          indicators: {
+            momentum: 7.8,
+            volume: 8.2,
+            volatility: 7.8,
+            sentiment: 7.9
           },
-          {
-            symbol: "ADAUSDT",
-            name: "Cardano",
-            score: 65.4,
-            rank: 4,
-            metrics: {
-              volJump: 0.08,
-              turnover: 0.04,
-              oiChange: 0.06,
-              fundingZ: 0.5,
-              regimeShift: 0.12
-            },
-            risk: {
-              volatility: 0.5,
-              leverage: 0.2,
-              sentiment: 0.6,
-              overall: "low"
-            },
-            status: "inactive",
-            lastUpdate: "2024-01-15 14:30:00",
-            price: 0.485,
-            priceChange: -1.2,
-            volume24h: 320000000
-          }
-        ]
-
-        const mockWhitelist: WhitelistItem[] = [
-          {
-            symbol: "SOLUSDT",
-            name: "Solana",
-            addedBy: "admin",
-            addedAt: "2024-01-15 10:00:00",
-            reason: "高活跃度，符合策略要求",
-            status: "active"
+          lastUpdate: new Date().toISOString()
+        },
+        {
+          symbol: 'ARBUSDT',
+          score: 7.8,
+          rank: 4,
+          change24h: 6.7,
+          volume24h: 95000000,
+          marketCap: 3200000000,
+          indicators: {
+            momentum: 7.5,
+            volume: 8.9,
+            volatility: 6.2,
+            sentiment: 7.6
           },
-          {
-            symbol: "DOTUSDT",
-            name: "Polkadot",
-            addedBy: "trader_1",
-            addedAt: "2024-01-14 16:30:00",
-            reason: "技术面看好，波动率适中",
-            status: "active"
-          }
-        ]
-
-        setHotSymbols(mockHotSymbols)
-        setWhitelist(mockWhitelist)
-      } catch (error) {
-        console.error("Failed to fetch hotlist data:", error)
-      } finally {
-        setLoading(false)
-      }
+          lastUpdate: new Date().toISOString()
+        },
+        {
+          symbol: 'OPUSDT',
+          score: 7.5,
+          rank: 5,
+          change24h: 5.4,
+          volume24h: 78000000,
+          marketCap: 2100000000,
+          indicators: {
+            momentum: 7.1,
+            volume: 7.8,
+            volatility: 6.8,
+            sentiment: 7.3
+          },
+          lastUpdate: new Date().toISOString()
+        }
+      ];
+      
+      const mockWhitelist: WhitelistItem[] = [
+        {
+          symbol: 'BTCUSDT',
+          addedDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+          addedBy: 'system',
+          reason: '核心资产',
+          status: 'active'
+        },
+        {
+          symbol: 'ETHUSDT',
+          addedDate: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
+          addedBy: 'system',
+          reason: '核心资产',
+          status: 'active'
+        },
+        {
+          symbol: 'BNBUSDT',
+          addedDate: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+          addedBy: 'admin',
+          reason: '交易所代币',
+          status: 'active'
+        },
+        {
+          symbol: 'SOLUSDT',
+          addedDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+          addedBy: 'admin',
+          reason: '技术分析看好',
+          status: 'active'
+        }
+      ];
+      
+      setHotSymbols(mockHotSymbols);
+      setWhitelist(mockWhitelist);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    fetchData()
-  }, [])
-
-  const handleToggleSymbol = (symbol: string, newStatus: "active" | "inactive") => {
-    setHotSymbols(prev => prev.map(s => 
-      s.symbol === symbol ? { ...s, status: newStatus } : s
-    ))
-  }
-
-  const handleAddToWhitelist = (symbol: string, reason: string) => {
-    const symbolData = hotSymbols.find(s => s.symbol === symbol)
-    if (!symbolData) return
-
-    const newWhitelistItem: WhitelistItem = {
-      symbol,
-      name: symbolData.name,
-      addedBy: "current_user",
-      addedAt: new Date().toISOString(),
-      reason,
-      status: "active"
+  const approveSymbol = async (symbol: string) => {
+    try {
+      await apiClient.approveSymbol(symbol);
+      await loadHotlistData();
+      alert(`${symbol} 已添加到白名单`);
+    } catch (error) {
+      console.error('Failed to approve symbol:', error);
+      alert('操作失败，请重试');
     }
+  };
 
-    setWhitelist(prev => [...prev, newWhitelistItem])
-    setHotSymbols(prev => prev.map(s => 
-      s.symbol === symbol ? { ...s, status: "whitelist" } : s
-    ))
-  }
-
-  const getRiskColor = (risk: string) => {
-    switch (risk) {
-      case "low": return "text-green-600 bg-green-100"
-      case "medium": return "text-yellow-600 bg-yellow-100"
-      case "high": return "text-red-600 bg-red-100"
-      default: return "text-gray-600 bg-gray-100"
+  const addToWhitelist = async () => {
+    if (!newSymbol.trim()) return;
+    
+    try {
+      await apiClient.addToWhitelist(newSymbol.toUpperCase(), '手动添加');
+      setNewSymbol('');
+      await loadHotlistData();
+      alert(`${newSymbol.toUpperCase()} 已添加到白名单`);
+    } catch (error) {
+      console.error('Failed to add to whitelist:', error);
+      alert('添加失败，请检查交易对格式');
     }
-  }
+  };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active": return "text-green-600 bg-green-100"
-      case "inactive": return "text-gray-600 bg-gray-100"
-      case "whitelist": return "text-blue-600 bg-blue-100"
-      case "blacklist": return "text-red-600 bg-red-100"
-      default: return "text-gray-600 bg-gray-100"
+  const removeFromWhitelist = async (symbol: string) => {
+    if (!confirm(`确定要从白名单中移除 ${symbol} 吗？`)) return;
+    
+    try {
+      await apiClient.removeFromWhitelist(symbol);
+      await loadHotlistData();
+      alert(`${symbol} 已从白名单中移除`);
+    } catch (error) {
+      console.error('Failed to remove from whitelist:', error);
+      alert('移除失败，请重试');
     }
-  }
+  };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "active": return <Eye className="h-4 w-4" />
-      case "inactive": return <EyeOff className="h-4 w-4" />
-      case "whitelist": return <Star className="h-4 w-4" />
-      case "blacklist": return <AlertTriangle className="h-4 w-4" />
-      default: return <EyeOff className="h-4 w-4" />
-    }
-  }
+  const getScoreColor = (score: number) => {
+    if (score >= 8.5) return 'text-red-600';
+    if (score >= 7.0) return 'text-orange-600';
+    if (score >= 5.5) return 'text-yellow-600';
+    return 'text-green-600';
+  };
+
+  const getScoreBadge = (score: number) => {
+    if (score >= 8.5) return 'destructive';
+    if (score >= 7.0) return 'secondary';
+    return 'default';
+  };
+
+  const formatVolume = (volume: number) => {
+    if (volume >= 1e9) return `$${(volume / 1e9).toFixed(1)}B`;
+    if (volume >= 1e6) return `$${(volume / 1e6).toFixed(1)}M`;
+    if (volume >= 1e3) return `$${(volume / 1e3).toFixed(1)}K`;
+    return `$${volume.toFixed(0)}`;
+  };
+
+  const formatMarketCap = (marketCap: number) => {
+    if (marketCap >= 1e9) return `$${(marketCap / 1e9).toFixed(1)}B`;
+    if (marketCap >= 1e6) return `$${(marketCap / 1e6).toFixed(1)}M`;
+    return `$${marketCap.toFixed(0)}`;
+  };
+
+  const filteredHotSymbols = hotSymbols.filter(symbol =>
+    symbol.symbol.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const filteredWhitelist = whitelist.filter(item =>
+    item.symbol.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64">Loading...</div>
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p>加载热门币种数据...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
+      {/* 页面标题和搜索 */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">热门币种管理</h1>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <TrendingUp className="h-4 w-4 mr-2" />
-            刷新排行
-          </Button>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">热门币种</h1>
+          <p className="text-gray-600 mt-1">市场热点发现和交易白名单管理</p>
+        </div>
+        <div className="flex items-center space-x-4">
+          <div className="relative">
+            <Search className="h-4 w-4 absolute left-3 top-3 text-gray-400" />
+            <Input
+              placeholder="搜索交易对..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 w-64"
+            />
+          </div>
         </div>
       </div>
 
-      {/* 控制面板 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>控制面板</CardTitle>
-          <CardDescription>热门币种推荐系统配置</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  checked={autoEnable}
-                  onCheckedChange={setAutoEnable}
-                />
-                <Label>自动启用推荐</Label>
+      {/* 热点统计 */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">热门币种</p>
+                <p className="text-2xl font-bold">{hotSymbols.length}</p>
               </div>
-              <div className="flex items-center space-x-2">
-                <Label>显示前</Label>
-                <Select value={filterRank.toString()} onValueChange={(value) => setFilterRank(parseInt(value))}>
-                  <SelectTrigger className="w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5</SelectItem>
-                    <SelectItem value="10">10</SelectItem>
-                    <SelectItem value="20">20</SelectItem>
-                    <SelectItem value="50">50</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Label>名</Label>
-              </div>
+              <Flame className="h-8 w-8 text-red-500" />
             </div>
-            <div className="text-sm text-muted-foreground">
-              最后更新: {hotSymbols[0]?.lastUpdate}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Tabs defaultValue="ranking" className="w-full">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">白名单数量</p>
+                <p className="text-2xl font-bold">{whitelist.length}</p>
+              </div>
+              <Star className="h-8 w-8 text-yellow-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">最高评分</p>
+                <p className={`text-2xl font-bold ${getScoreColor(Math.max(...hotSymbols.map(s => s.score)))}`}>
+                  {Math.max(...hotSymbols.map(s => s.score)).toFixed(1)}
+                </p>
+              </div>
+              <Activity className="h-8 w-8 text-blue-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">平均涨幅</p>
+                <p className="text-2xl font-bold text-green-600">
+                  +{(hotSymbols.reduce((sum, s) => sum + s.change24h, 0) / hotSymbols.length).toFixed(1)}%
+                </p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-green-500" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Alert>
+        <AlertTriangle className="h-4 w-4" />
+        <AlertDescription>
+          热门币种推荐基于多维度分析，仅供参考。添加到白名单后才会被策略使用，请谨慎评估风险。
+        </AlertDescription>
+      </Alert>
+
+      <Tabs defaultValue="hotlist" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="ranking">排行榜</TabsTrigger>
-          <TabsTrigger value="metrics">评分维度</TabsTrigger>
-          <TabsTrigger value="whitelist">白名单</TabsTrigger>
-          <TabsTrigger value="settings">设置</TabsTrigger>
+          <TabsTrigger value="hotlist">热门排行</TabsTrigger>
+          <TabsTrigger value="whitelist">交易白名单</TabsTrigger>
+          <TabsTrigger value="analysis">分析报告</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="ranking" className="space-y-6">
+        <TabsContent value="hotlist" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>热门币种排行榜</CardTitle>
-              <CardDescription>基于多维度评分的币种排名</CardDescription>
+              <CardTitle className="flex items-center">
+                <Zap className="h-5 w-5 mr-2" />
+                热门币种排行榜
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>排名</TableHead>
-                    <TableHead>币种</TableHead>
-                    <TableHead>综合评分</TableHead>
-                    <TableHead>价格</TableHead>
+                    <TableHead>交易对</TableHead>
+                    <TableHead>热度评分</TableHead>
                     <TableHead>24h涨跌</TableHead>
-                    <TableHead>风险等级</TableHead>
-                    <TableHead>状态</TableHead>
+                    <TableHead>24h成交量</TableHead>
+                    <TableHead>市值</TableHead>
+                    <TableHead>指标分析</TableHead>
                     <TableHead>操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {hotSymbols.slice(0, filterRank).map((symbol) => (
+                  {filteredHotSymbols.map((symbol) => (
                     <TableRow key={symbol.symbol}>
                       <TableCell>
-                        <div className="flex items-center">
-                          <span className="font-bold">#{symbol.rank}</span>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-bold text-lg">#{symbol.rank}</span>
                           {symbol.rank <= 3 && (
-                            <TrendingUp className="h-4 w-4 ml-1 text-yellow-500" />
+                            <Flame className="h-4 w-4 text-red-500" />
                           )}
                         </div>
                       </TableCell>
+                      <TableCell className="font-medium">{symbol.symbol}</TableCell>
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{symbol.symbol}</div>
-                          <div className="text-sm text-muted-foreground">{symbol.name}</div>
-                        </div>
+                        <Badge variant={getScoreBadge(symbol.score)}>
+                          {symbol.score.toFixed(1)}
+                        </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <span className="font-bold">{symbol.score.toFixed(1)}</span>
-                          <Progress value={symbol.score} className="w-16 h-2" />
+                        <div className={`flex items-center ${symbol.change24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {symbol.change24h >= 0 ? (
+                            <TrendingUp className="h-4 w-4 mr-1" />
+                          ) : (
+                            <TrendingDown className="h-4 w-4 mr-1" />
+                          )}
+                          {symbol.change24h >= 0 ? '+' : ''}{symbol.change24h.toFixed(2)}%
                         </div>
                       </TableCell>
+                      <TableCell>{formatVolume(symbol.volume24h)}</TableCell>
+                      <TableCell>{formatMarketCap(symbol.marketCap)}</TableCell>
                       <TableCell>
-                        <div>
-                          <div className="font-medium">${symbol.price.toLocaleString()}</div>
-                          <div className="text-sm text-muted-foreground">
-                            ${symbol.volume24h.toLocaleString()}
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span>动量:</span>
+                            <span className={getScoreColor(symbol.indicators.momentum)}>
+                              {symbol.indicators.momentum.toFixed(1)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span>成交量:</span>
+                            <span className={getScoreColor(symbol.indicators.volume)}>
+                              {symbol.indicators.volume.toFixed(1)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-xs">
+                            <span>情绪:</span>
+                            <span className={getScoreColor(symbol.indicators.sentiment)}>
+                              {symbol.indicators.sentiment.toFixed(1)}
+                            </span>
                           </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className={symbol.priceChange >= 0 ? "text-green-600" : "text-red-600"}>
-                          {symbol.priceChange >= 0 ? "+" : ""}{symbol.priceChange.toFixed(2)}%
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={getRiskColor(symbol.risk.overall)}>
-                          {symbol.risk.overall === "low" ? "低" :
-                           symbol.risk.overall === "medium" ? "中" : "高"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={getStatusColor(symbol.status)}>
-                          {getStatusIcon(symbol.status)}
-                          <span className="ml-1">
-                            {symbol.status === "active" ? "启用" :
-                             symbol.status === "inactive" ? "禁用" :
-                             symbol.status === "whitelist" ? "白名单" : "黑名单"}
-                          </span>
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex space-x-1">
-                          {symbol.status === "inactive" ? (
-                            <Button
-                              size="sm"
-                              onClick={() => handleToggleSymbol(symbol.symbol, "active")}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => approveSymbol(symbol.symbol)}
+                          disabled={whitelist.some(w => w.symbol === symbol.symbol)}
+                        >
+                          {whitelist.some(w => w.symbol === symbol.symbol) ? (
+                            <>
+                              <Check className="h-4 w-4 mr-1" />
+                              已添加
+                            </>
                           ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleToggleSymbol(symbol.symbol, "inactive")}
-                            >
-                              <EyeOff className="h-4 w-4" />
-                            </Button>
+                            <>
+                              <Plus className="h-4 w-4 mr-1" />
+                              添加
+                            </>
                           )}
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                <Star className="h-4 w-4" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>添加到白名单</DialogTitle>
-                                <DialogDescription>
-                                  将 {symbol.symbol} 添加到白名单
-                                </DialogDescription>
-                              </DialogHeader>
-                              <div className="space-y-4">
-                                <div>
-                                  <Label>原因</Label>
-                                  <Input placeholder="请输入添加原因..." />
-                                </div>
-                                <div className="flex justify-end space-x-2">
-                                  <Button variant="outline">取消</Button>
-                                  <Button onClick={() => handleAddToWhitelist(symbol.symbol, "手动添加")}>
-                                    确认添加
-                                  </Button>
-                                </div>
-                              </div>
-                            </DialogContent>
-                          </Dialog>
-                        </div>
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -434,128 +438,62 @@ export default function HotlistPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="metrics" className="space-y-6">
+        <TabsContent value="whitelist" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>评分维度说明</CardTitle>
-              <CardDescription>多维度评分模型详解</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold mb-2">波动率跳跃 (VolJump)</h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      衡量价格波动率的突然变化，反映市场活跃度
-                    </p>
-                    <Progress value={75} className="h-2" />
-                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                      <span>低活跃</span>
-                      <span>高活跃</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold mb-2">换手率 (Turnover)</h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      24小时交易量与流通市值的比率
-                    </p>
-                    <Progress value={60} className="h-2" />
-                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                      <span>低换手</span>
-                      <span>高换手</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold mb-2">持仓量变化 (OIΔ)</h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      未平仓合约数量的变化率
-                    </p>
-                    <Progress value={80} className="h-2" />
-                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                      <span>减少</span>
-                      <span>增加</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="font-semibold mb-2">资金费率Z分数 (FundingZ)</h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      资金费率相对于历史均值的标准化分数
-                    </p>
-                    <Progress value={65} className="h-2" />
-                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                      <span>负费率</span>
-                      <span>正费率</span>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="font-semibold mb-2">市场状态切换 (RegimeShift)</h3>
-                    <p className="text-sm text-muted-foreground mb-2">
-                      市场状态从趋势到震荡或反之的概率
-                    </p>
-                    <Progress value={45} className="h-2" />
-                    <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                      <span>稳定</span>
-                      <span>切换</span>
-                    </div>
-                  </div>
-
-                  <Alert>
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      综合评分 = w1×VolJump + w2×Turnover + w3×OIΔ + w4×FundingZ + w5×RegimeShift
-                      <br />
-                      权重可根据策略需求调整
-                    </AlertDescription>
-                  </Alert>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center">
+                  <Star className="h-5 w-5 mr-2" />
+                  交易白名单
+                </CardTitle>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    placeholder="输入交易对，如 DOGEUSDT"
+                    value={newSymbol}
+                    onChange={(e) => setNewSymbol(e.target.value)}
+                    className="w-48"
+                    onKeyPress={(e) => e.key === 'Enter' && addToWhitelist()}
+                  />
+                  <Button onClick={addToWhitelist} disabled={!newSymbol.trim()}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    添加
+                  </Button>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="whitelist" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>白名单管理</CardTitle>
-              <CardDescription>手动添加的优先交易币种</CardDescription>
             </CardHeader>
             <CardContent>
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>币种</TableHead>
-                    <TableHead>添加人</TableHead>
-                    <TableHead>添加时间</TableHead>
-                    <TableHead>原因</TableHead>
+                    <TableHead>交易对</TableHead>
                     <TableHead>状态</TableHead>
+                    <TableHead>添加时间</TableHead>
+                    <TableHead>添加人</TableHead>
+                    <TableHead>原因</TableHead>
                     <TableHead>操作</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {whitelist.map((item) => (
+                  {filteredWhitelist.map((item) => (
                     <TableRow key={item.symbol}>
+                      <TableCell className="font-medium">{item.symbol}</TableCell>
                       <TableCell>
-                        <div>
-                          <div className="font-medium">{item.symbol}</div>
-                          <div className="text-sm text-muted-foreground">{item.name}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{item.addedBy}</TableCell>
-                      <TableCell>{item.addedAt}</TableCell>
-                      <TableCell className="max-w-xs truncate">{item.reason}</TableCell>
-                      <TableCell>
-                        <Badge variant={item.status === "active" ? "default" : "secondary"}>
-                          {item.status === "active" ? "启用" : "禁用"}
+                        <Badge variant={item.status === 'active' ? 'default' : 'secondary'}>
+                          {item.status === 'active' ? '活跃' : '待定'}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <Button variant="outline" size="sm">
+                        {new Date(item.addedDate).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>{item.addedBy}</TableCell>
+                      <TableCell>{item.reason}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeFromWhitelist(item.symbol)}
+                        >
+                          <X className="h-4 w-4 mr-1" />
                           移除
                         </Button>
                       </TableCell>
@@ -567,22 +505,19 @@ export default function HotlistPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="settings" className="space-y-6">
+        <TabsContent value="analysis" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>评分权重配置</CardTitle>
-              <CardDescription>调整各维度在综合评分中的权重</CardDescription>
+              <CardTitle>市场分析报告</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-muted-foreground">
-                <Settings className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>权重配置功能开发中...</p>
-                <p className="text-sm">将支持自定义各评分维度的权重</p>
+              <div className="text-center py-8 text-gray-500">
+                市场分析报告功能正在开发中...
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }

@@ -1,461 +1,438 @@
-"use client"
+"use client";
 
-import { useState } from "react" // 修复: 移除未使用的 useEffect
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog" // 修复: 移除未使用的 DialogTrigger
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { PieChart, BarChart3, TrendingUp, RefreshCw, Undo, AlertTriangle, CheckCircle } from "lucide-react"
-
-interface Portfolio {
-  totalValue: number
-  targetVolatility: number
-  currentVolatility: number
-  strategies: StrategyAllocation[]
-  rebalanceHistory: RebalanceRecord[]
-}
-
-interface StrategyAllocation {
-  id: string
-  name: string
-  targetWeight: number
-  currentWeight: number
-  currentValue: number
-  pnl: number
-  pnlPercent: number
-  riskScore: number
-  status: "active" | "inactive" | "suspended"
-}
-
-interface RebalanceRecord {
-  id: string
-  timestamp: string
-  type: "auto" | "manual"
-  changes: AllocationChange[]
-  status: "pending" | "completed" | "failed"
-  reason: string
-}
-
-interface AllocationChange {
-  strategyId: string
-  strategyName: string
-  oldWeight: number
-  newWeight: number
-  oldValue: number
-  newValue: number
-}
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { 
+  TrendingUp, 
+  TrendingDown, 
+  RefreshCw, 
+  PieChart, 
+  BarChart3,
+  DollarSign,
+  Target,
+  AlertTriangle
+} from "lucide-react";
+import apiClient, { Portfolio, StrategyAllocation } from "@/lib/api";
 
 export default function PortfolioPage() {
-  const [portfolio, setPortfolio] = useState<Portfolio>({
-    totalValue: 125000,
-    targetVolatility: 0.15,
-    currentVolatility: 0.142,
-    strategies: [
-      {
-        id: "strategy_1",
-        name: "趋势跟踪策略",
-        targetWeight: 0.4,
-        currentWeight: 0.38,
-        currentValue: 47500,
-        pnl: 2500,
-        pnlPercent: 5.56,
-        riskScore: 0.7,
-        status: "active"
-      },
-      {
-        id: "strategy_2",
-        name: "均值回归策略",
-        targetWeight: 0.35,
-        currentWeight: 0.36,
-        currentValue: 45000,
-        pnl: 1800,
-        pnlPercent: 4.17,
-        riskScore: 0.6,
-        status: "active"
-      },
-      {
-        id: "strategy_3",
-        name: "套利策略",
-        targetWeight: 0.25,
-        currentWeight: 0.26,
-        currentValue: 32500,
-        pnl: 950,
-        pnlPercent: 3.02,
-        riskScore: 0.4,
-        status: "active"
-      }
-    ],
-    rebalanceHistory: [
-      {
-        id: "rebalance_1",
-        timestamp: "2024-01-15 14:30:00",
-        type: "auto",
-        changes: [
+  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [allocations, setAllocations] = useState<StrategyAllocation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [rebalancing, setRebalancing] = useState(false);
+
+  useEffect(() => {
+    loadPortfolioData();
+  }, []);
+
+  const loadPortfolioData = async () => {
+    try {
+      setLoading(true);
+      
+      // 获取投资组合概览和分配数据
+      const [portfolioData, allocationData] = await Promise.all([
+        apiClient.getPortfolioOverview(),
+        apiClient.getPortfolioAllocations()
+      ]);
+      
+      setPortfolio(portfolioData);
+      setAllocations(allocationData);
+    } catch (error) {
+      console.error('Failed to load portfolio data:', error);
+      
+      // 设置模拟数据
+      const mockPortfolio: Portfolio = {
+        totalValue: 125000,
+        targetVolatility: 15.0,
+        currentVolatility: 12.8,
+        strategies: [],
+        rebalanceHistory: [
           {
-            strategyId: "strategy_1",
-            strategyName: "趋势跟踪策略",
-            oldWeight: 0.42,
-            newWeight: 0.4,
-            oldValue: 52500,
-            newValue: 50000
+            date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+            type: 'auto',
+            changes: [
+              { strategy: '趋势跟踪策略 Alpha', from: 35, to: 40 },
+              { strategy: '网格交易策略 Beta', from: 25, to: 20 }
+            ],
+            reason: '性能优化'
           }
-        ],
-        status: "completed",
-        reason: "波动率偏离目标"
-      }
-    ]
-  })
-
-  const [showRebalanceDialog, setShowRebalanceDialog] = useState(false)
-  const [rebalanceType, setRebalanceType] = useState<"auto" | "manual">("auto")
-
-  const handleRebalance = () => {
-    // 模拟重新平衡
-    const newRebalance: RebalanceRecord = {
-      id: `rebalance_${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      type: rebalanceType,
-      changes: portfolio.strategies.map(strategy => ({
-        strategyId: strategy.id,
-        strategyName: strategy.name,
-        oldWeight: strategy.currentWeight,
-        newWeight: strategy.targetWeight,
-        oldValue: strategy.currentValue,
-        newValue: portfolio.totalValue * strategy.targetWeight
-      })),
-      status: "pending",
-      reason: rebalanceType === "auto" ? "自动重新平衡" : "手动重新平衡"
-    }
-
-    setPortfolio(prev => ({
-      ...prev,
-      rebalanceHistory: [newRebalance, ...prev.rebalanceHistory]
-    }))
-
-    // 模拟重新平衡完成
-    setTimeout(() => {
-      setPortfolio(prev => ({
-        ...prev,
-        strategies: prev.strategies.map(strategy => ({
-          ...strategy,
-          currentWeight: strategy.targetWeight,
-          currentValue: prev.totalValue * strategy.targetWeight
-        })),
-        rebalanceHistory: prev.rebalanceHistory.map(r => 
-          r.id === newRebalance.id ? { ...r, status: "completed" } : r
-        )
-      }))
-    }, 2000)
-
-    setShowRebalanceDialog(false)
-  }
-
-  const handleRollback = (rebalanceId: string) => {
-    const rebalance = portfolio.rebalanceHistory.find(r => r.id === rebalanceId)
-    if (!rebalance) return
-
-    // 回滚到重新平衡前的状态
-    setPortfolio(prev => ({
-      ...prev,
-      strategies: prev.strategies.map(strategy => {
-        const change = rebalance.changes.find(c => c.strategyId === strategy.id)
-        if (change) {
-          return {
-            ...strategy,
-            currentWeight: change.oldWeight,
-            currentValue: change.oldValue
-          }
+        ]
+      };
+      
+      const mockAllocations: StrategyAllocation[] = [
+        {
+          id: '1',
+          name: '趋势跟踪策略 Alpha',
+          currentWeight: 40.5,
+          targetWeight: 40.0,
+          value: 50625,
+          pnl: 8250,
+          pnlPercent: 19.5
+        },
+        {
+          id: '2',
+          name: '网格交易策略 Beta',
+          currentWeight: 22.3,
+          targetWeight: 25.0,
+          value: 27875,
+          pnl: 2180,
+          pnlPercent: 8.5
+        },
+        {
+          id: '3',
+          name: '套利策略 Gamma',
+          currentWeight: 18.7,
+          targetWeight: 20.0,
+          value: 23375,
+          pnl: -850,
+          pnlPercent: -3.5
+        },
+        {
+          id: '4',
+          name: '均值回归策略 Delta',
+          currentWeight: 12.1,
+          targetWeight: 10.0,
+          value: 15125,
+          pnl: 750,
+          pnlPercent: 5.2
+        },
+        {
+          id: '5',
+          name: '动量突破策略 Epsilon',
+          currentWeight: 6.4,
+          targetWeight: 5.0,
+          value: 8000,
+          pnl: 420,
+          pnlPercent: 5.5
         }
-        return strategy
-      }),
-      rebalanceHistory: prev.rebalanceHistory.map(r => 
-        r.id === rebalanceId ? { ...r, status: "failed" } : r
-      )
-    }))
+      ];
+      
+      setPortfolio(mockPortfolio);
+      setAllocations(mockAllocations);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRebalance = async () => {
+    try {
+      setRebalancing(true);
+      await apiClient.rebalancePortfolio();
+      await loadPortfolioData();
+      alert('投资组合再平衡完成');
+    } catch (error) {
+      console.error('Failed to rebalance portfolio:', error);
+      alert('再平衡失败，请重试');
+    } finally {
+      setRebalancing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p>加载投资组合数据...</p>
+        </div>
+      </div>
+    );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active": return "text-green-600 bg-green-100"
-      case "inactive": return "text-gray-600 bg-gray-100"
-      case "suspended": return "text-red-600 bg-red-100"
-      default: return "text-gray-600 bg-gray-100"
-    }
+  if (!portfolio) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600">无法加载投资组合数据</p>
+          <Button onClick={loadPortfolioData} className="mt-4">
+            重试
+          </Button>
+        </div>
+      </div>
+    );
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "active": return <CheckCircle className="h-4 w-4" />
-      case "inactive": return <AlertTriangle className="h-4 w-4" />
-      case "suspended": return <AlertTriangle className="h-4 w-4" />
-      default: return <AlertTriangle className="h-4 w-4" />
-    }
-  }
+  const totalPnl = allocations.reduce((sum, allocation) => sum + allocation.pnl, 0);
+  const totalPnlPercent = (totalPnl / portfolio.totalValue) * 100;
+  const needsRebalancing = allocations.some(a => Math.abs(a.currentWeight - a.targetWeight) > 2);
 
   return (
     <div className="space-y-6">
+      {/* 页面标题和操作 */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">资金与仓位管理</h1>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowRebalanceDialog(true)}>
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">投资组合管理</h1>
+          <p className="text-gray-600 mt-1">资金分配和策略权重管理</p>
+        </div>
+        <div className="flex items-center space-x-4">
+          <Button variant="outline" onClick={loadPortfolioData}>
             <RefreshCw className="h-4 w-4 mr-2" />
-            重新平衡
+            刷新
+          </Button>
+          <Button 
+            onClick={handleRebalance}
+            disabled={rebalancing || !needsRebalancing}
+          >
+            {rebalancing ? (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                再平衡中...
+              </>
+            ) : (
+              <>
+                <Target className="h-4 w-4 mr-2" />
+                执行再平衡
+              </>
+            )}
           </Button>
         </div>
       </div>
 
-      {/* 总览卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {/* 概览指标 */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">总资产</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${portfolio.totalValue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">
-              总收益: +${portfolio.strategies.reduce((sum, s) => sum + s.pnl, 0).toFixed(2)}
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">目标波动率</CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{(portfolio.targetVolatility * 100).toFixed(1)}%</div>
-            <p className="text-xs text-muted-foreground">
-              当前: {(portfolio.currentVolatility * 100).toFixed(1)}%
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">偏离度</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {Math.abs(portfolio.currentVolatility - portfolio.targetVolatility) < 0.01 ? "正常" : "偏离"}
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">总资产价值</p>
+                <p className="text-2xl font-bold">${portfolio.totalValue.toLocaleString()}</p>
+              </div>
+              <DollarSign className="h-8 w-8 text-blue-500" />
             </div>
-            <p className="text-xs text-muted-foreground">
-              {Math.abs((portfolio.currentVolatility - portfolio.targetVolatility) * 100).toFixed(2)}%
-            </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">活跃策略</CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {portfolio.strategies.filter(s => s.status === "active").length}
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">总盈亏</p>
+                <p className={`text-2xl font-bold ${totalPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  ${totalPnl.toLocaleString()}
+                </p>
+                <p className={`text-sm ${totalPnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {totalPnlPercent >= 0 ? '+' : ''}{totalPnlPercent.toFixed(2)}%
+                </p>
+              </div>
+              {totalPnl >= 0 ? (
+                <TrendingUp className="h-8 w-8 text-green-500" />
+              ) : (
+                <TrendingDown className="h-8 w-8 text-red-500" />
+              )}
             </div>
-            <p className="text-xs text-muted-foreground">
-              共 {portfolio.strategies.length} 个策略
-            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">目标波动率</p>
+                <p className="text-2xl font-bold">{portfolio.targetVolatility.toFixed(1)}%</p>
+              </div>
+              <Target className="h-8 w-8 text-purple-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">当前波动率</p>
+                <p className={`text-2xl font-bold ${
+                  portfolio.currentVolatility <= portfolio.targetVolatility ? 'text-green-600' : 'text-orange-600'
+                }`}>
+                  {portfolio.currentVolatility.toFixed(1)}%
+                </p>
+              </div>
+              <BarChart3 className="h-8 w-8 text-orange-500" />
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 权重分配 */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <PieChart className="h-5 w-5 mr-2" />
-              权重分配
-            </CardTitle>
-            <CardDescription>目标权重 vs 实际权重对比</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {portfolio.strategies.map((strategy) => (
-                <div key={strategy.id} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium">{strategy.name}</span>
-                      <Badge variant="outline" className={getStatusColor(strategy.status)}>
-                        {getStatusIcon(strategy.status)}
-                        <span className="ml-1">{strategy.status}</span>
-                      </Badge>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium">
-                        ${strategy.currentValue.toLocaleString()}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {strategy.pnl >= 0 ? "+" : ""}${strategy.pnl.toFixed(2)} ({strategy.pnlPercent >= 0 ? "+" : ""}{strategy.pnlPercent.toFixed(2)}%)
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span>目标权重: {(strategy.targetWeight * 100).toFixed(1)}%</span>
-                      <span>实际权重: {(strategy.currentWeight * 100).toFixed(1)}%</span>
-                    </div>
-                    <div className="relative">
-                      <Progress value={strategy.targetWeight * 100} className="h-2" />
-                      <div 
-                        className="absolute top-0 h-2 bg-blue-500 opacity-50 rounded"
-                        style={{ width: `${strategy.currentWeight * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
+      {/* 再平衡提醒 */}
+      {needsRebalancing && (
+        <Card className="border-yellow-200 bg-yellow-50">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              <div>
+                <h4 className="font-medium text-yellow-800">建议执行再平衡</h4>
+                <p className="text-sm text-yellow-700">
+                  部分策略权重偏离目标配置较大，建议执行再平衡操作。
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
+      )}
 
-        {/* 调仓计划 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>调仓计划</CardTitle>
-            <CardDescription>建议的仓位调整</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>策略</TableHead>
-                  <TableHead>当前</TableHead>
-                  <TableHead>目标</TableHead>
-                  <TableHead>调整</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {portfolio.strategies.map((strategy) => {
-                  const adjustment = strategy.targetWeight - strategy.currentWeight
-                  const adjustmentValue = adjustment * portfolio.totalValue
-                  return (
-                    <TableRow key={strategy.id}>
-                      <TableCell className="font-medium">{strategy.name}</TableCell>
-                      <TableCell>{(strategy.currentWeight * 100).toFixed(1)}%</TableCell>
-                      <TableCell>{(strategy.targetWeight * 100).toFixed(1)}%</TableCell>
-                      <TableCell>
-                        <span className={adjustment > 0 ? "text-green-600" : "text-red-600"}>
-                          {adjustment > 0 ? "+" : ""}{(adjustment * 100).toFixed(1)}%
-                          ({adjustmentValue > 0 ? "+" : ""}${Math.abs(adjustmentValue).toFixed(0)})
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">配置概览</TabsTrigger>
+          <TabsTrigger value="performance">绩效分析</TabsTrigger>
+          <TabsTrigger value="history">历史记录</TabsTrigger>
+          <TabsTrigger value="settings">配置管理</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* 策略权重分布 */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <PieChart className="h-5 w-5 mr-2" />
+                  策略权重分布
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {allocations.map((allocation) => (
+                    <div key={allocation.id} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{allocation.name}</span>
+                        <div className="flex items-center space-x-2">
+                          <span>{allocation.currentWeight.toFixed(1)}%</span>
+                          <span className="text-gray-500">/ {allocation.targetWeight.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                      <div className="relative">
+                        <Progress value={allocation.currentWeight} className="h-2" />
+                        <div 
+                          className="absolute top-0 h-2 w-0.5 bg-red-500 rounded"
+                          style={{ left: `${allocation.targetWeight}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-500">
+                        <span>当前: {allocation.currentWeight.toFixed(1)}%</span>
+                        <span>目标: {allocation.targetWeight.toFixed(1)}%</span>
+                        <span className={`${Math.abs(allocation.currentWeight - allocation.targetWeight) > 2 ? 'text-orange-600' : 'text-green-600'}`}>
+                          偏差: {Math.abs(allocation.currentWeight - allocation.targetWeight).toFixed(1)}%
                         </span>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* 重新平衡历史 */}
-      <Card>
-        <CardHeader>
-          <CardTitle>重新平衡历史</CardTitle>
-          <CardDescription>最近的仓位调整记录</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {portfolio.rebalanceHistory.map((rebalance) => (
-              <div key={rebalance.id} className="border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
-                    <Badge variant={rebalance.type === "auto" ? "secondary" : "outline"}>
-                      {rebalance.type === "auto" ? "自动" : "手动"}
-                    </Badge>
-                    <Badge variant={rebalance.status === "completed" ? "default" : "secondary"}>
-                      {rebalance.status === "completed" ? "已完成" : 
-                       rebalance.status === "pending" ? "进行中" : "失败"}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(rebalance.timestamp).toLocaleString()}
-                    </span>
-                    {rebalance.status === "completed" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleRollback(rebalance.id)}
-                      >
-                        <Undo className="h-4 w-4 mr-1" />
-                        回滚
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                
-                <p className="text-sm text-muted-foreground mb-2">{rebalance.reason}</p>
-                
-                <div className="space-y-1">
-                  {rebalance.changes.map((change) => (
-                    <div key={change.strategyId} className="flex justify-between text-sm">
-                      <span>{change.strategyName}</span>
-                      <span>
-                        {(change.oldWeight * 100).toFixed(1)}% → {(change.newWeight * 100).toFixed(1)}%
-                        ({change.newWeight > change.oldWeight ? "+" : ""}{((change.newWeight - change.oldWeight) * 100).toFixed(1)}%)
-                      </span>
+                      </div>
                     </div>
                   ))}
                 </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
 
-      {/* 重新平衡对话框 */}
-      <Dialog open={showRebalanceDialog} onOpenChange={setShowRebalanceDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>重新平衡配置</DialogTitle>
-            <DialogDescription>
-              选择重新平衡类型和参数
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>重新平衡类型</Label>
-              <Select value={rebalanceType} onValueChange={(value: "auto" | "manual") => setRebalanceType(value)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="auto">自动重新平衡</SelectItem>
-                  <SelectItem value="manual">手动重新平衡</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                重新平衡将调整各策略的权重以达到目标配置。此操作可能需要一些时间完成。
-              </AlertDescription>
-            </Alert>
-            
-            <div className="flex justify-end space-x-2">
-              <Button variant="outline" onClick={() => setShowRebalanceDialog(false)}>
-                取消
-              </Button>
-              <Button onClick={handleRebalance}>
-                确认重新平衡
-              </Button>
-            </div>
+            {/* 策略表现 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>策略表现</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>策略</TableHead>
+                      <TableHead>价值</TableHead>
+                      <TableHead>盈亏</TableHead>
+                      <TableHead>收益率</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allocations.map((allocation) => (
+                      <TableRow key={allocation.id}>
+                        <TableCell className="font-medium">{allocation.name}</TableCell>
+                        <TableCell>${allocation.value.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <div className={`flex items-center ${allocation.pnl >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {allocation.pnl >= 0 ? (
+                              <TrendingUp className="h-4 w-4 mr-1" />
+                            ) : (
+                              <TrendingDown className="h-4 w-4 mr-1" />
+                            )}
+                            ${allocation.pnl.toLocaleString()}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className={allocation.pnlPercent >= 0 ? 'text-green-600' : 'text-red-600'}>
+                            {allocation.pnlPercent >= 0 ? '+' : ''}{allocation.pnlPercent.toFixed(2)}%
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           </div>
-        </DialogContent>
-      </Dialog>
+        </TabsContent>
+
+        <TabsContent value="performance" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>投资组合绩效分析</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64 flex items-center justify-center text-gray-500">
+                绩效分析图表将在此显示
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="history" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>再平衡历史</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {portfolio.rebalanceHistory.map((record, index) => (
+                  <div key={index} className="border rounded p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="outline">
+                          {record.type === 'auto' ? '自动' : '手动'}
+                        </Badge>
+                        <span className="text-sm text-gray-500">
+                          {new Date(record.date).toLocaleString()}
+                        </span>
+                      </div>
+                      <span className="text-sm text-gray-600">{record.reason}</span>
+                    </div>
+                    <div className="space-y-1">
+                      {record.changes.map((change, idx) => (
+                        <div key={idx} className="text-sm">
+                          <span className="font-medium">{change.strategy}</span>
+                          <span className="text-gray-600 ml-2">
+                            {change.from}% → {change.to}%
+                          </span>
+                          <span className={`ml-2 ${change.to > change.from ? 'text-green-600' : 'text-red-600'}`}>
+                            ({change.to > change.from ? '+' : ''}{(change.to - change.from).toFixed(1)}%)
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="settings" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>投资组合配置</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8 text-gray-500">
+                投资组合配置功能正在开发中...
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
-  )
+  );
 }
