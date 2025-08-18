@@ -95,21 +95,6 @@ setup_config() {
         export $(grep -v '^#' .env | xargs)
     fi
     
-    # 设置默认环境变量（如果未设置）
-    export QCAT_DATABASE_HOST=${QCAT_DATABASE_HOST:-localhost}
-    export QCAT_DATABASE_PORT=${QCAT_DATABASE_PORT:-5432}
-    export QCAT_DATABASE_USER=${QCAT_DATABASE_USER:-postgres}
-    export QCAT_DATABASE_PASSWORD=${QCAT_DATABASE_PASSWORD:-123}
-    export QCAT_DATABASE_NAME=${QCAT_DATABASE_NAME:-qcat}
-    export QCAT_REDIS_ENABLED=${QCAT_REDIS_ENABLED:-true}
-    export QCAT_REDIS_HOST=${QCAT_REDIS_HOST:-localhost}
-    export QCAT_REDIS_PORT=${QCAT_REDIS_PORT:-6379}
-    export QCAT_REDIS_PASSWORD=${QCAT_REDIS_PASSWORD:-}
-    export QCAT_JWT_SECRET_KEY=${QCAT_JWT_SECRET_KEY:-f31e8818003142e8ad518726cda4af31}
-    export QCAT_EXCHANGE_NAME=${QCAT_EXCHANGE_NAME:-binance}
-    export QCAT_EXCHANGE_TEST_NET=${QCAT_EXCHANGE_TEST_NET:-true}
-    export QCAT_APP_ENVIRONMENT=${QCAT_APP_ENVIRONMENT:-development}
-    
     log_success "环境配置完成"
 }
 
