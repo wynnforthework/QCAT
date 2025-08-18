@@ -1,0 +1,236 @@
+# 分布式优化配置
+distributed_optimization:
+  # 启用分布式优化
+  enabled: true
+  
+  # 优化模式
+  mode: "exploration"  # exploration: 随机探索模式, consistency: 一致性模式
+  
+  # 随机探索配置
+  exploration:
+    # 启用随机种子变化
+    random_seeds: true
+    # 种子变化范围（毫秒）
+    seed_variation_ms: 1000
+    # 最大探索次数
+    max_explorations: 100
+    # 探索间隔
+    exploration_interval: "5m"
+    
+  # 性能指标权重
+  performance_weights:
+    profit_rate: 0.4
+    sharpe_ratio: 0.3
+    max_drawdown: 0.2
+    win_rate: 0.1
+    
+  # 结果传播配置
+  result_propagation:
+    # 启用结果传播
+    enabled: true
+    # 传播方式: broadcast, pull, hybrid
+    method: "hybrid"
+    # 传播间隔
+    interval: "30s"
+    # 最大传播延迟
+    max_propagation_delay: "2m"
+    
+  # 结果采用配置
+  adoption:
+    # 自动采用阈值（性能提升百分比）
+    auto_adoption_threshold: 5.0
+    # 手动确认阈值（性能提升百分比）
+    manual_confirmation_threshold: 10.0
+    # 采用验证
+    validation_required: true
+    # 验证超时
+    validation_timeout: "5m"
+
+# 集群配置
+cluster:
+  # 节点发现
+  discovery:
+    # 发现方式: static, dynamic, service_registry
+    method: "dynamic"
+    # 静态节点列表
+    static_nodes:
+      - "node1:8080"
+      - "node2:8080"
+      - "node3:8080"
+    # 动态发现配置
+    dynamic:
+      # 心跳间隔
+      heartbeat_interval: "10s"
+      # 节点超时
+      node_timeout: "30s"
+      # 广播端口
+      broadcast_port: 8081
+      
+  # 网络配置
+  network:
+    # 节点间通信协议
+    protocol: "grpc"  # grpc, http, tcp
+    # 连接超时
+    connection_timeout: "5s"
+    # 重试次数
+    max_retries: 3
+    # 重试间隔
+    retry_interval: "1s"
+    
+  # 安全配置
+  security:
+    # 启用认证
+    authentication: true
+    # 启用加密
+    encryption: true
+    # 共享密钥
+    shared_secret: "your-secret-key"
+    # TLS配置
+    tls:
+      enabled: false
+      cert_file: ""
+      key_file: ""
+
+# 优化结果存储
+storage:
+  # 本地存储
+  local:
+    # 存储类型: memory, file, database
+    type: "file"
+    # 存储路径
+    path: "./data/optimization_results"
+    # 最大存储大小（MB）
+    max_size_mb: 1000
+    # 清理间隔
+    cleanup_interval: "1h"
+    
+  # 分布式存储
+  distributed:
+    # 存储类型: redis, etcd, consul
+    type: "redis"
+    # Redis配置
+    redis:
+      host: "localhost"
+      port: 6379
+      password: ""
+      database: 0
+      # 连接池配置
+      pool_size: 10
+      min_idle_conns: 5
+      # 键前缀
+      key_prefix: "qcat:optimization:"
+      
+  # 结果持久化
+  persistence:
+    # 启用持久化
+    enabled: true
+    # 持久化间隔
+    interval: "10m"
+    # 保留天数
+    retention_days: 30
+
+# 监控和告警
+monitoring:
+  # 性能监控
+  performance:
+    # 启用性能监控
+    enabled: true
+    # 监控指标
+    metrics:
+      - "optimization_speed"
+      - "result_quality"
+      - "adoption_rate"
+      - "cluster_health"
+    # 监控间隔
+    interval: "1m"
+    
+  # 告警配置
+  alerts:
+    # 启用告警
+    enabled: true
+    # 告警阈值
+    thresholds:
+      # 优化失败率
+      optimization_failure_rate: 0.1
+      # 结果质量下降
+      result_quality_decline: 0.05
+      # 集群节点离线
+      cluster_node_offline: 0.5
+    # 告警通知
+    notifications:
+      - type: "log"
+        level: "warn"
+      - type: "email"
+        recipients: ["admin@example.com"]
+      - type: "webhook"
+        url: "http://alertmanager:9093/api/v1/alerts"
+
+# 优化策略配置
+optimization_strategies:
+  # 网格搜索
+  grid_search:
+    enabled: true
+    max_combinations: 1000
+    parallel_jobs: 4
+    
+  # 随机搜索
+  random_search:
+    enabled: true
+    max_iterations: 100
+    parallel_jobs: 4
+    
+  # 贝叶斯优化
+  bayesian_optimization:
+    enabled: true
+    max_iterations: 50
+    acquisition_function: "ei"  # expected_improvement, probability_improvement, upper_confidence_bound
+    
+  # 遗传算法
+  genetic_algorithm:
+    enabled: false
+    population_size: 50
+    generations: 100
+    mutation_rate: 0.1
+    crossover_rate: 0.8
+
+# 结果验证配置
+validation:
+  # 交叉验证
+  cross_validation:
+    enabled: true
+    folds: 5
+    shuffle: true
+    
+  # 回测验证
+  backtest:
+    enabled: true
+    # 回测周期
+    periods:
+      - "1d"
+      - "1w"
+      - "1m"
+    # 回测数据比例
+    test_ratio: 0.2
+    
+  # 稳定性测试
+  stability:
+    enabled: true
+    # 多次运行测试
+    multiple_runs: 5
+    # 结果一致性阈值
+    consistency_threshold: 0.95
+
+# 日志配置
+logging:
+  # 日志级别
+  level: "info"
+  # 日志格式
+  format: "json"
+  # 日志输出
+  output: "stdout"
+  # 日志文件
+  file:
+    enabled: false
+    path: "./logs/distributed_optimization.log"
+    max_size_mb: 100
+    max_backups: 5

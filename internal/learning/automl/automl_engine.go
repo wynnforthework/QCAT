@@ -25,6 +25,7 @@ type AutoMLEngine struct {
 	ensembleBuilder       *EnsembleBuilder
 	modelDeployer         *ModelDeployer
 	consistencyManager    *ConsistencyManager
+	distributedOptimizer  *DistributedOptimizer
 	
 	// 运行状态
 	ctx        context.Context
@@ -543,9 +544,17 @@ func NewAutoMLEngine(cfg *config.Config) (*AutoMLEngine, error) {
 		return nil, fmt.Errorf("failed to create consistency manager: %w", err)
 	}
 	
+	// 创建分布式优化器
+	distributedOptimizer, err := NewDistributedOptimizer(cfg, consistencyManager)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to create distributed optimizer: %w", err)
+	}
+	
 	engine := &AutoMLEngine{
 		config:              cfg,
 		consistencyManager:  consistencyManager,
+		distributedOptimizer: distributedOptimizer,
 		dataPreprocessor:    NewDataPreprocessor(),
 		featureEngineer:     NewFeatureEngineer(),
 		modelFactory:        NewModelFactory(),
@@ -1049,6 +1058,36 @@ func (engine *AutoMLEngine) executeTask(task *MLTask) {
 	// 生成数据哈希用于一致性检查
 	dataHash := engine.generateDataHash(preprocessedData)
 	
+	// 尝试分布式优化 - 检查是否有全局最优结果
+	if engine.distributedOptimizer != nil {
+		optimizationResult, err := engine.distributedOptimizer.StartOptimization(
+			engine.ctx, 
+			task.ID, 
+			task.Name, 
+			dataHash,
+		)
+		if err == nil && optimizationResult != nil {
+			log.Printf("Found distributed optimization result for task %s, profit rate: %.2f%%", 
+				task.ID, optimizationResult.Performance.ProfitRate)
+			
+			// 采用分布式优化结果
+			err = engine.distributedOptimizer.AdoptBestResult(task.ID, optimizationResult)
+			if err != nil {
+				log.Printf("Failed to adopt distributed optimization result: %v", err)
+			} else {
+				// 转换为训练模型格式
+				task.BestModel = engine.convertOptimizationResultToModel(optimizationResult)
+				task.Status = "COMPLETED"
+				task.CompletedAt = time.Now()
+				task.Duration = task.CompletedAt.Sub(task.StartedAt)
+				task.Progress = 1.0
+				execution.Success = true
+				execution.BestScore = optimizationResult.Performance.ProfitRate
+				return
+			}
+		}
+	}
+	
 	// 检查是否有缓存的训练结果
 	if cachedResult, found := engine.consistencyManager.CheckModelCache(task.ID, task.TrainingConfig.Hyperparameters, dataHash); found {
 		log.Printf("Found cached training result for task %s, using cached model", task.ID)
@@ -1075,8 +1114,10 @@ func (engine *AutoMLEngine) executeTask(task *MLTask) {
 		return
 	}
 	
-	// 设置确定性随机种子
-	engine.consistencyManager.SetRandomSeed(task.ID, dataHash)
+	// 使用随机种子进行本地优化（允许随机探索）
+	randomSeed := time.Now().UnixNano()
+	rand.Seed(randomSeed)
+	log.Printf("Using random seed for local optimization: %d", randomSeed)
 	
 	task.Status = "TRAINING"
 	task.Progress = 0.3
@@ -1747,4 +1788,40 @@ func (engine *AutoMLEngine) GetModelPerformance(modelID string) (*ModelPerforman
 	}
 	
 	return nil, fmt.Errorf("model performance not found: %s", modelID)
+}
+
+// convertOptimizationResultToModel 将优化结果转换为训练模型
+func (engine *AutoMLEngine) convertOptimizationResultToModel(result *OptimizationResult) *TrainedModel {
+	return &TrainedModel{
+		ID:              fmt.Sprintf("opt-%s", result.TaskID),
+		Name:            result.StrategyName,
+		Algorithm:       result.StrategyName,
+		Version:         "1.0",
+		Status:          "TRAINED",
+		TrainingScore:   result.Performance.ProfitRate,
+		ValidationScore: result.Performance.SharpeRatio,
+		TestScore:       result.Performance.ProfitRate,
+		Metrics: map[string]float64{
+			"profit_rate":      result.Performance.ProfitRate,
+			"sharpe_ratio":     result.Performance.SharpeRatio,
+			"max_drawdown":     result.Performance.MaxDrawdown,
+			"win_rate":         result.Performance.WinRate,
+			"total_return":     result.Performance.TotalReturn,
+			"risk_adjusted_return": result.Performance.RiskAdjustedReturn,
+		},
+		TrainingTime:    time.Since(result.DiscoveredAt),
+		Hyperparameters: result.Parameters,
+		ModelPath:       "",
+		ModelSize:       0,
+		CreatedAt:       result.DiscoveredAt,
+		UpdatedAt:       time.Now(),
+		Metadata: map[string]interface{}{
+			"discovered_by":    result.DiscoveredBy,
+			"random_seed":      result.RandomSeed,
+			"data_hash":        result.DataHash,
+			"confidence":       result.Confidence,
+			"is_global_best":   result.IsGlobalBest,
+			"adoption_count":   result.AdoptionCount,
+		},
+	}
 }
