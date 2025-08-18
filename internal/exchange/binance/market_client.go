@@ -17,30 +17,8 @@ import (
 	"qcat/internal/types"
 )
 
-// Client represents a Binance API client
-type Client struct {
-	apiKey     string
-	apiSecret  string
-	baseURL    string
-	httpClient *http.Client
-}
-
-// NewClient creates a new Binance API client
-func NewClient(apiKey, apiSecret string, testnet bool) *Client {
-	baseURL := "https://api.binance.com"
-	if testnet {
-		baseURL = "https://testnet.binance.vision"
-	}
-
-	return &Client{
-		apiKey:    apiKey,
-		apiSecret: apiSecret,
-		baseURL:   baseURL,
-		httpClient: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-	}
-}
+// MarketClient extends the base Client with market-specific methods
+// The base Client struct and NewClient function are defined in client.go
 
 // GetKlines fetches historical kline data
 func (c *Client) GetKlines(ctx context.Context, symbol, interval string, startTime, endTime time.Time, limit int) ([]*types.Kline, error) {
@@ -325,8 +303,8 @@ func (c *Client) makeRequest(ctx context.Context, method, endpoint string, param
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	if c.apiKey != "" {
-		req.Header.Set("X-MBX-APIKEY", c.apiKey)
+	if c.BaseExchange.Config().APIKey != "" {
+		req.Header.Set("X-MBX-APIKEY", c.BaseExchange.Config().APIKey)
 	}
 
 	resp, err := c.httpClient.Do(req)
@@ -345,7 +323,7 @@ func (c *Client) makeRequest(ctx context.Context, method, endpoint string, param
 
 // sign creates HMAC SHA256 signature
 func (c *Client) sign(message string) string {
-	h := hmac.New(sha256.New, []byte(c.apiSecret))
+	h := hmac.New(sha256.New, []byte(c.BaseExchange.Config().APISecret))
 	h.Write([]byte(message))
 	return hex.EncodeToString(h.Sum(nil))
 }

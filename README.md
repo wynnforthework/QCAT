@@ -162,6 +162,15 @@ QCAT v2.0 是一个革命性的加密货币智能化自动交易平台，集成�
    npm run dev
    ```
    
+   **一键启动（推荐）:**
+   ```bash
+   # Linux/macOS
+   ./scripts/start_local.sh
+   
+   # Windows
+   scripts\start_local.bat
+   ```
+   
    **生产模式（推荐）:**
    ```bash
    # 构建完整系统
@@ -308,6 +317,51 @@ automation:
 
 ### 运行测试
 
+#### 使用Makefile
+```bash
+# 运行所有测试
+make test
+
+# 运行单元测试
+make test-unit
+
+# 运行集成测试
+make test-integration
+
+# 运行E2E测试
+make test-e2e
+
+# 生成测试覆盖率报告
+make test-coverage
+```
+
+#### 使用测试脚本
+```bash
+# 运行所有测试
+./scripts/run_tests.sh
+
+# 运行特定类型测试
+./scripts/run_tests.sh unit        # 单元测试
+./scripts/run_tests.sh coverage    # 覆盖率测试
+./scripts/run_tests.sh integration # 集成测试
+./scripts/run_tests.sh e2e         # E2E测试
+./scripts/run_tests.sh benchmark   # 基准测试
+./scripts/run_tests.sh quality     # 代码质量检查
+```
+
+#### 运行API测试
+```bash
+# 测试所有API端点
+./scripts/test_api.sh
+
+# 指定不同的基础URL
+./scripts/test_api.sh -u http://localhost:8080
+
+# 设置超时时间
+./scripts/test_api.sh -t 30
+```
+
+#### 传统方式
 ```bash
 # 运行所有测试
 go test ./...
@@ -473,6 +527,9 @@ go run scripts/deploy_model.go --model-path=models/your_model
 - [ ] 跨链智能套利系统
 - [ ] 元宇宙交易界面
 - [ ] 情感AI市场分析
+
+## 未测试
+功能设计上是支持github action、docker、make，但我没测试过
 
 ## 📄 许可证
 

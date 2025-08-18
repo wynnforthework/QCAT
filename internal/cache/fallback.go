@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -122,13 +123,18 @@ func (cm *CacheManager) Get(ctx context.Context, key string, dest interface{}) e
 			// Store in memory cache for future requests
 			cm.memory.Set(ctx, key, value, time.Hour)
 			cm.monitor.RecordHit("database")
-			return value, nil
+			// Set the destination value
+			destValue := reflect.ValueOf(dest)
+			if destValue.Kind() == reflect.Ptr {
+				destValue.Elem().Set(reflect.ValueOf(value))
+			}
+			return nil
 		}
 		cm.monitor.RecordFailure("database_get", err)
 	}
 
 	cm.monitor.RecordMiss(key)
-	return nil, fmt.Errorf("cache miss: key %s not found in any cache layer", key)
+	return fmt.Errorf("cache miss: key %s not found in any cache layer", key)
 }
 
 // Set stores a value in cache with fallback
@@ -594,6 +600,542 @@ func (cm *CacheManager) GetOrderBook(ctx context.Context, symbol string, dest in
 
 	// Fallback to memory cache
 	return cm.memory.GetOrderBook(ctx, symbol, dest)
+}
+
+// HDel removes fields from a hash
+func (cm *CacheManager) HDel(ctx context.Context, key string, fields ...string) error {
+	var redisErr error
+	
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		redisErr = cm.redis.HDel(ctx, key, fields...)
+		if redisErr == nil {
+			// Also remove from memory cache
+			cm.memory.HDel(ctx, key, fields...)
+			cm.monitor.RecordSuccess("redis_hdel")
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_hdel", redisErr)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_hdel_failure")
+		}
+	}
+
+	// Remove from memory cache
+	memErr := cm.memory.HDel(ctx, key, fields...)
+	if memErr == nil {
+		cm.monitor.RecordSuccess("memory_hdel")
+		return nil
+	}
+
+	// All cache layers failed
+	cm.monitor.RecordFailure("all_hdel", fmt.Errorf("redis: %v, memory: %v", redisErr, memErr))
+	return fmt.Errorf("failed to delete hash fields for %s: redis: %v, memory: %v", key, redisErr, memErr)
+}
+
+// HGet retrieves a field from a hash
+func (cm *CacheManager) HGet(ctx context.Context, key, field string, dest interface{}) error {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		err := cm.redis.HGet(ctx, key, field, dest)
+		if err == nil {
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_hget", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_hget_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.HGet(ctx, key, field, dest)
+}
+
+// HGetAll retrieves all fields from a hash
+func (cm *CacheManager) HGetAll(ctx context.Context, key string) (map[string]string, error) {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		result, err := cm.redis.HGetAll(ctx, key)
+		if err == nil {
+			return result, nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_hgetall", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_hgetall_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.HGetAll(ctx, key)
+}
+
+// HSet sets a field in a hash
+func (cm *CacheManager) HSet(ctx context.Context, key, field string, value interface{}) error {
+	var redisErr error
+	
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		redisErr = cm.redis.HSet(ctx, key, field, value)
+		if redisErr == nil {
+			// Also set in memory cache
+			cm.memory.HSet(ctx, key, field, value)
+			cm.monitor.RecordSuccess("redis_hset")
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_hset", redisErr)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_hset_failure")
+		}
+	}
+
+	// Set in memory cache
+	memErr := cm.memory.HSet(ctx, key, field, value)
+	if memErr == nil {
+		cm.monitor.RecordSuccess("memory_hset")
+		return nil
+	}
+
+	// All cache layers failed
+	cm.monitor.RecordFailure("all_hset", fmt.Errorf("redis: %v, memory: %v", redisErr, memErr))
+	return fmt.Errorf("failed to set hash field for %s:%s: redis: %v, memory: %v", key, field, redisErr, memErr)
+}
+
+// LPop pops a value from the left of a list
+func (cm *CacheManager) LPop(ctx context.Context, key string, dest interface{}) error {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		err := cm.redis.LPop(ctx, key, dest)
+		if err == nil {
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_lpop", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_lpop_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.LPop(ctx, key, dest)
+}
+
+// LPush pushes values to the left of a list
+func (cm *CacheManager) LPush(ctx context.Context, key string, values ...interface{}) error {
+	var redisErr error
+	
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		redisErr = cm.redis.LPush(ctx, key, values...)
+		if redisErr == nil {
+			// Also push to memory cache
+			cm.memory.LPush(ctx, key, values...)
+			cm.monitor.RecordSuccess("redis_lpush")
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_lpush", redisErr)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_lpush_failure")
+		}
+	}
+
+	// Push to memory cache
+	memErr := cm.memory.LPush(ctx, key, values...)
+	if memErr == nil {
+		cm.monitor.RecordSuccess("memory_lpush")
+		return nil
+	}
+
+	// All cache layers failed
+	cm.monitor.RecordFailure("all_lpush", fmt.Errorf("redis: %v, memory: %v", redisErr, memErr))
+	return fmt.Errorf("failed to push to list %s: redis: %v, memory: %v", key, redisErr, memErr)
+}
+
+// LRange gets a range of elements from a list
+func (cm *CacheManager) LRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		result, err := cm.redis.LRange(ctx, key, start, stop)
+		if err == nil {
+			return result, nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_lrange", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_lrange_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.LRange(ctx, key, start, stop)
+}
+
+// RPop pops a value from the right of a list
+func (cm *CacheManager) RPop(ctx context.Context, key string, dest interface{}) error {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		err := cm.redis.RPop(ctx, key, dest)
+		if err == nil {
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_rpop", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_rpop_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.RPop(ctx, key, dest)
+}
+
+// RPush pushes values to the right of a list
+func (cm *CacheManager) RPush(ctx context.Context, key string, values ...interface{}) error {
+	var redisErr error
+	
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		redisErr = cm.redis.RPush(ctx, key, values...)
+		if redisErr == nil {
+			// Also push to memory cache
+			cm.memory.RPush(ctx, key, values...)
+			cm.monitor.RecordSuccess("redis_rpush")
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_rpush", redisErr)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_rpush_failure")
+		}
+	}
+
+	// Push to memory cache
+	memErr := cm.memory.RPush(ctx, key, values...)
+	if memErr == nil {
+		cm.monitor.RecordSuccess("memory_rpush")
+		return nil
+	}
+
+	// All cache layers failed
+	cm.monitor.RecordFailure("all_rpush", fmt.Errorf("redis: %v, memory: %v", redisErr, memErr))
+	return fmt.Errorf("failed to push to list %s: redis: %v, memory: %v", key, redisErr, memErr)
+}
+
+// SAdd adds members to a set
+func (cm *CacheManager) SAdd(ctx context.Context, key string, members ...interface{}) error {
+	var redisErr error
+	
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		redisErr = cm.redis.SAdd(ctx, key, members...)
+		if redisErr == nil {
+			// Also add to memory cache
+			cm.memory.SAdd(ctx, key, members...)
+			cm.monitor.RecordSuccess("redis_sadd")
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_sadd", redisErr)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_sadd_failure")
+		}
+	}
+
+	// Add to memory cache
+	memErr := cm.memory.SAdd(ctx, key, members...)
+	if memErr == nil {
+		cm.monitor.RecordSuccess("memory_sadd")
+		return nil
+	}
+
+	// All cache layers failed
+	cm.monitor.RecordFailure("all_sadd", fmt.Errorf("redis: %v, memory: %v", redisErr, memErr))
+	return fmt.Errorf("failed to add to set %s: redis: %v, memory: %v", key, redisErr, memErr)
+}
+
+// SIsMember checks if a member exists in a set
+func (cm *CacheManager) SIsMember(ctx context.Context, key string, member interface{}) (bool, error) {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		result, err := cm.redis.SIsMember(ctx, key, member)
+		if err == nil {
+			return result, nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_sismember", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_sismember_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.SIsMember(ctx, key, member)
+}
+
+// SMembers gets all members of a set
+func (cm *CacheManager) SMembers(ctx context.Context, key string) ([]string, error) {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		result, err := cm.redis.SMembers(ctx, key)
+		if err == nil {
+			return result, nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_smembers", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_smembers_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.SMembers(ctx, key)
+}
+
+// SRem removes members from a set
+func (cm *CacheManager) SRem(ctx context.Context, key string, members ...interface{}) error {
+	var redisErr error
+	
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		redisErr = cm.redis.SRem(ctx, key, members...)
+		if redisErr == nil {
+			// Also remove from memory cache
+			cm.memory.SRem(ctx, key, members...)
+			cm.monitor.RecordSuccess("redis_srem")
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_srem", redisErr)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_srem_failure")
+		}
+	}
+
+	// Remove from memory cache
+	memErr := cm.memory.SRem(ctx, key, members...)
+	if memErr == nil {
+		cm.monitor.RecordSuccess("memory_srem")
+		return nil
+	}
+
+	// All cache layers failed
+	cm.monitor.RecordFailure("all_srem", fmt.Errorf("redis: %v, memory: %v", redisErr, memErr))
+	return fmt.Errorf("failed to remove from set %s: redis: %v, memory: %v", key, redisErr, memErr)
+}
+
+// TTL returns time to live for a key
+func (cm *CacheManager) TTL(ctx context.Context, key string) (time.Duration, error) {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		result, err := cm.redis.TTL(ctx, key)
+		if err == nil {
+			return result, nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_ttl", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_ttl_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.TTL(ctx, key)
+}
+
+// ZAdd adds members to a sorted set
+func (cm *CacheManager) ZAdd(ctx context.Context, key string, score float64, member interface{}) error {
+	var redisErr error
+	
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		redisErr = cm.redis.ZAdd(ctx, key, score, member)
+		if redisErr == nil {
+			// Also add to memory cache
+			cm.memory.ZAdd(ctx, key, score, member)
+			cm.monitor.RecordSuccess("redis_zadd")
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_zadd", redisErr)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_zadd_failure")
+		}
+	}
+
+	// Add to memory cache
+	memErr := cm.memory.ZAdd(ctx, key, score, member)
+	if memErr == nil {
+		cm.monitor.RecordSuccess("memory_zadd")
+		return nil
+	}
+
+	// All cache layers failed
+	cm.monitor.RecordFailure("all_zadd", fmt.Errorf("redis: %v, memory: %v", redisErr, memErr))
+	return fmt.Errorf("failed to add to sorted set %s: redis: %v, memory: %v", key, redisErr, memErr)
+}
+
+// ZRange gets a range of members from a sorted set
+func (cm *CacheManager) ZRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		result, err := cm.redis.ZRange(ctx, key, start, stop)
+		if err == nil {
+			return result, nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_zrange", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_zrange_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.ZRange(ctx, key, start, stop)
+}
+
+// ZRangeByScore gets members from a sorted set by score range
+func (cm *CacheManager) ZRangeByScore(ctx context.Context, key string, min, max string) ([]string, error) {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		result, err := cm.redis.ZRangeByScore(ctx, key, min, max)
+		if err == nil {
+			return result, nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_zrangebyscore", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_zrangebyscore_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.ZRangeByScore(ctx, key, min, max)
+}
+
+// ZRem removes members from a sorted set
+func (cm *CacheManager) ZRem(ctx context.Context, key string, members ...interface{}) error {
+	var redisErr error
+	
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		redisErr = cm.redis.ZRem(ctx, key, members...)
+		if redisErr == nil {
+			// Also remove from memory cache
+			cm.memory.ZRem(ctx, key, members...)
+			cm.monitor.RecordSuccess("redis_zrem")
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_zrem", redisErr)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_zrem_failure")
+		}
+	}
+
+	// Remove from memory cache
+	memErr := cm.memory.ZRem(ctx, key, members...)
+	if memErr == nil {
+		cm.monitor.RecordSuccess("memory_zrem")
+		return nil
+	}
+
+	// All cache layers failed
+	cm.monitor.RecordFailure("all_zrem", fmt.Errorf("redis: %v, memory: %v", redisErr, memErr))
+	return fmt.Errorf("failed to remove from sorted set %s: redis: %v, memory: %v", key, redisErr, memErr)
 }
 
 // Expire sets a timeout on a key

@@ -399,3 +399,115 @@ func (mc *MemoryCache) HDel(ctx context.Context, key string, fields ...string) e
 	delete(mc.items, key)
 	return nil
 }
+
+// HGet retrieves a field from a hash
+func (mc *MemoryCache) HGet(ctx context.Context, key, field string, dest interface{}) error {
+	// For simplicity, we'll just use the key as the hash key
+	// In a real implementation, you'd want to handle individual hash fields
+	return mc.Get(ctx, key+":"+field, dest)
+}
+
+// HGetAll retrieves all fields from a hash
+func (mc *MemoryCache) HGetAll(ctx context.Context, key string) (map[string]string, error) {
+	// For simplicity, we'll return an empty map
+	// In a real implementation, you'd want to handle hash structure properly
+	return make(map[string]string), nil
+}
+
+// HSet sets a field in a hash
+func (mc *MemoryCache) HSet(ctx context.Context, key, field string, value interface{}) error {
+	// For simplicity, we'll just use the key as the hash key
+	// In a real implementation, you'd want to handle individual hash fields
+	return mc.Set(ctx, key+":"+field, value, time.Hour)
+}
+
+// LPop pops a value from the left of a list
+func (mc *MemoryCache) LPop(ctx context.Context, key string, dest interface{}) error {
+	// For simplicity, we'll just return an error
+	// In a real implementation, you'd want to handle list operations properly
+	return fmt.Errorf("LPop not implemented in memory cache")
+}
+
+// LPush pushes values to the left of a list
+func (mc *MemoryCache) LPush(ctx context.Context, key string, values ...interface{}) error {
+	// For simplicity, we'll just return an error
+	// In a real implementation, you'd want to handle list operations properly
+	return fmt.Errorf("LPush not implemented in memory cache")
+}
+
+// LRange gets a range of elements from a list
+func (mc *MemoryCache) LRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
+	// For simplicity, we'll just return an empty slice
+	// In a real implementation, you'd want to handle list operations properly
+	return []string{}, nil
+}
+
+// RPop pops a value from the right of a list
+func (mc *MemoryCache) RPop(ctx context.Context, key string, dest interface{}) error {
+	// For simplicity, we'll just return an error
+	// In a real implementation, you'd want to handle list operations properly
+	return fmt.Errorf("RPop not implemented in memory cache")
+}
+
+// RPush pushes values to the right of a list
+func (mc *MemoryCache) RPush(ctx context.Context, key string, values ...interface{}) error {
+	// For simplicity, we'll just return an error
+	// In a real implementation, you'd want to handle list operations properly
+	return fmt.Errorf("RPush not implemented in memory cache")
+}
+
+// SAdd adds members to a set
+func (mc *MemoryCache) SAdd(ctx context.Context, key string, members ...interface{}) error {
+	// For simplicity, we'll just return an error
+	// In a real implementation, you'd want to handle set operations properly
+	return fmt.Errorf("SAdd not implemented in memory cache")
+}
+
+// SIsMember checks if a member exists in a set
+func (mc *MemoryCache) SIsMember(ctx context.Context, key string, member interface{}) (bool, error) {
+	// For simplicity, we'll just return false
+	// In a real implementation, you'd want to handle set operations properly
+	return false, nil
+}
+
+// SMembers gets all members of a set
+func (mc *MemoryCache) SMembers(ctx context.Context, key string) ([]string, error) {
+	// For simplicity, we'll just return an empty slice
+	// In a real implementation, you'd want to handle set operations properly
+	return []string{}, nil
+}
+
+// SRem removes members from a set
+func (mc *MemoryCache) SRem(ctx context.Context, key string, members ...interface{}) error {
+	// For simplicity, we'll just return an error
+	// In a real implementation, you'd want to handle set operations properly
+	return fmt.Errorf("SRem not implemented in memory cache")
+}
+
+// ZAdd adds members to a sorted set
+func (mc *MemoryCache) ZAdd(ctx context.Context, key string, score float64, member interface{}) error {
+	// For simplicity, we'll just return an error
+	// In a real implementation, you'd want to handle sorted set operations properly
+	return fmt.Errorf("ZAdd not implemented in memory cache")
+}
+
+// ZRange gets a range of members from a sorted set
+func (mc *MemoryCache) ZRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
+	// For simplicity, we'll just return an empty slice
+	// In a real implementation, you'd want to handle sorted set operations properly
+	return []string{}, nil
+}
+
+// ZRangeByScore gets members from a sorted set by score range
+func (mc *MemoryCache) ZRangeByScore(ctx context.Context, key string, min, max string) ([]string, error) {
+	// For simplicity, we'll just return an empty slice
+	// In a real implementation, you'd want to handle sorted set operations properly
+	return []string{}, nil
+}
+
+// ZRem removes members from a sorted set
+func (mc *MemoryCache) ZRem(ctx context.Context, key string, members ...interface{}) error {
+	// For simplicity, we'll just return an error
+	// In a real implementation, you'd want to handle sorted set operations properly
+	return fmt.Errorf("ZRem not implemented in memory cache")
+}

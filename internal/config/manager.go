@@ -71,7 +71,7 @@ func (w *Watcher) watch() {
 				w.events <- FileEvent{
 					Type: "modified",
 					Path: w.filePath,
-				})
+				}
 			}
 		}
 	}

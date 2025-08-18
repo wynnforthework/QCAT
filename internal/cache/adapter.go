@@ -22,24 +22,26 @@ func NewCacheAdapter(manager *CacheManager) *CacheAdapter {
 
 // Get retrieves a value and unmarshals it into dest
 func (ca *CacheAdapter) Get(ctx context.Context, key string, dest interface{}) error {
-	value, err := ca.manager.Get(ctx, key)
+	// Create a temporary interface{} to hold the raw value
+	var rawValue interface{}
+	err := ca.manager.Get(ctx, key, &rawValue)
 	if err != nil {
 		return err
 	}
 
 	// If dest is a pointer to interface{}, just assign the value
 	if destPtr, ok := dest.(*interface{}); ok {
-		*destPtr = value
+		*destPtr = rawValue
 		return nil
 	}
 
 	// Try to unmarshal JSON if value is a string
-	if valueStr, ok := value.(string); ok {
+	if valueStr, ok := rawValue.(string); ok {
 		return json.Unmarshal([]byte(valueStr), dest)
 	}
 
 	// Try to marshal and unmarshal to convert types
-	valueBytes, err := json.Marshal(value)
+	valueBytes, err := json.Marshal(rawValue)
 	if err != nil {
 		return fmt.Errorf("failed to marshal cached value: %w", err)
 	}
@@ -78,7 +80,8 @@ func (ca *CacheAdapter) HSet(ctx context.Context, key, field string, value inter
 func (ca *CacheAdapter) HGetAll(ctx context.Context, key string) (map[string]string, error) {
 	// This is a simplified implementation
 	// In a real implementation, you might want to store hash structure differently
-	value, err := ca.manager.Get(ctx, key)
+	var value interface{}
+	err := ca.manager.Get(ctx, key, &value)
 	if err != nil {
 		return nil, err
 	}
@@ -329,7 +332,8 @@ func (ca *CacheAdapter) ZRem(ctx context.Context, key string, members ...interfa
 // Expire sets expiration for a key
 func (ca *CacheAdapter) Expire(ctx context.Context, key string, expiration time.Duration) error {
 	// Get current value and reset with new expiration
-	value, err := ca.manager.Get(ctx, key)
+	var value interface{}
+	err := ca.manager.Get(ctx, key, &value)
 	if err != nil {
 		return err
 	}
@@ -424,7 +428,8 @@ func (ca *CacheAdapter) GetOrderBook(ctx context.Context, symbol string, dest in
 // Helper methods
 
 func (ca *CacheAdapter) getList(ctx context.Context, key string) ([]interface{}, error) {
-	value, err := ca.manager.Get(ctx, key)
+	var value interface{}
+	err := ca.manager.Get(ctx, key, &value)
 	if err != nil {
 		return []interface{}{}, err
 	}
@@ -437,7 +442,8 @@ func (ca *CacheAdapter) getList(ctx context.Context, key string) ([]interface{},
 }
 
 func (ca *CacheAdapter) getSet(ctx context.Context, key string) (map[string]bool, error) {
-	value, err := ca.manager.Get(ctx, key)
+	var value interface{}
+	err := ca.manager.Get(ctx, key, &value)
 	if err != nil {
 		return make(map[string]bool), err
 	}
