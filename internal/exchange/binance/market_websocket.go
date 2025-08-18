@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"qcat/internal/types"
-
-	"github.com/gorilla/websocket"
 )
 
 // WSClient represents a Binance WebSocket client

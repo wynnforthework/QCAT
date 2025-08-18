@@ -34,7 +34,7 @@ type OptimizerHandler struct {
 func NewOptimizerHandler(db *database.DB, redis *cache.RedisCache, metrics *monitor.MetricsCollector) *OptimizerHandler {
 	// 新增：使用工厂创建优化器实例
 	factory := optimizer.NewFactory()
-	orchestrator := factory.CreateOrchestrator()
+	orchestrator := factory.CreateOrchestrator(db.DB)
 
 	return &OptimizerHandler{
 		db:        db,

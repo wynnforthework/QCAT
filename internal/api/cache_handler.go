@@ -71,7 +71,7 @@ func (h *CacheHandler) handleCacheMetrics(c *gin.Context) {
 	}
 
 	stats := h.cacheManager.GetStats()
-	monitorStats := h.cacheManager.monitor.GetStats()
+	monitorStats := h.cacheManager.GetMonitor().GetStats()
 	
 	c.JSON(http.StatusOK, gin.H{
 		"cache_stats":   stats,
@@ -97,7 +97,7 @@ func (h *CacheHandler) handleCacheEvents(c *gin.Context) {
 		}
 	}
 
-	events := h.cacheManager.monitor.GetRecentEvents(limit)
+	events := h.cacheManager.GetMonitor().GetRecentEvents(limit)
 	c.JSON(http.StatusOK, gin.H{
 		"events":    events,
 		"count":     len(events),
@@ -131,9 +131,9 @@ func (h *CacheHandler) handleForceFallback(c *gin.Context) {
 	}
 
 	// Force fallback by simulating failures
-	h.cacheManager.monitor.RecordFailure("manual_fallback", nil)
-	h.cacheManager.monitor.RecordFailure("manual_fallback", nil)
-	h.cacheManager.monitor.RecordFailure("manual_fallback", nil)
+	h.cacheManager.GetMonitor().RecordFailure("manual_fallback", nil)
+	h.cacheManager.GetMonitor().RecordFailure("manual_fallback", nil)
+	h.cacheManager.GetMonitor().RecordFailure("manual_fallback", nil)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -151,7 +151,7 @@ func (h *CacheHandler) handleResetCounters(c *gin.Context) {
 		return
 	}
 
-	h.cacheManager.monitor.ResetCounters()
+	h.cacheManager.GetMonitor().ResetCounters()
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -168,7 +168,7 @@ func (h *CacheHandler) handleCacheConfig(c *gin.Context) {
 		return
 	}
 
-	config := h.cacheManager.config
+	config := h.cacheManager.GetConfig()
 	c.JSON(http.StatusOK, gin.H{
 		"config":    config,
 		"timestamp": time.Now(),
@@ -207,7 +207,8 @@ func (h *CacheHandler) handleTestCache(c *gin.Context) {
 
 	// Test get operation
 	getStart := time.Now()
-	retrievedValue, err := h.cacheManager.Get(ctx, testKey)
+	var retrievedValue interface{}
+	err = h.cacheManager.Get(ctx, testKey, &retrievedValue)
 	getDuration := time.Since(getStart)
 
 	if err != nil {

@@ -954,7 +954,7 @@ func (pm *ProcessManager) runStrategyProcess(process *Process) {
 	sandbox := sandbox.NewSandbox(defaultStrategy, strategyConfig, exchangeConn)
 
 	// 新增：创建行情采集器
-	marketIngestor := market.NewIngestor(db.DB)
+	marketIngestor := market.NewIngestor(db.DB, "", "", false)
 
 	// 新增：创建策略执行器
 	strategyRunner := live.NewRunner(sandbox, marketIngestor, orderManager, positionManager, riskManager)
@@ -1047,7 +1047,7 @@ func (pm *ProcessManager) runOptimizerProcess(process *Process) {
 	factory := optimizer.NewFactory()
 
 	// 新增：创建优化器编排器
-	optimizerOrchestrator := factory.CreateOrchestrator()
+	optimizerOrchestrator := factory.CreateOrchestrator(db.DB)
 
 	// 新增：配置优化器
 	if algorithm, ok := process.Config["algorithm"].(string); ok {
@@ -1157,7 +1157,7 @@ func (pm *ProcessManager) runMarketProcess(process *Process) {
 	}
 
 	// 新增：创建行情采集器
-	marketIngestor := market.NewIngestor(db.DB)
+	marketIngestor := market.NewIngestor(db.DB, "", "", false)
 
 	// 新增：配置交易对
 	symbols := []string{"BTCUSDT", "ETHUSDT"}

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"qcat/internal/exchange"
 	"qcat/internal/exchange/binance"
 	"qcat/internal/market/quality"
 	"qcat/internal/market/storage"
@@ -54,6 +55,9 @@ type Ingestor struct {
 	// Metrics and monitoring
 	stats         map[string]*IngestorStats
 	lastUpdate    time.Time
+	latencyHistory []time.Duration
+	dataGaps      []time.Time
+	outliers      []interface{}
 }
 
 // IngestorStats represents ingestion statistics
@@ -69,8 +73,19 @@ type IngestorStats struct {
 
 // NewIngestor creates a new market data ingestor with real Binance integration
 func NewIngestor(db *sql.DB, apiKey, apiSecret string, testnet bool) *Ingestor {
+	// Create exchange config
+	config := &exchange.ExchangeConfig{
+		Name:      "binance",
+		APIKey:    apiKey,
+		APISecret: apiSecret,
+		TestNet:   testnet,
+	}
+	
+	// Create rate limiter (using nil cache for now)
+	rateLimiter := exchange.NewRateLimiter(nil, 1*time.Second) // 1 second default wait
+	
 	// Create Binance clients
-	binanceClient := binance.NewClient(apiKey, apiSecret, testnet)
+	binanceClient := binance.NewClient(config, rateLimiter)
 	binanceWS := binance.NewWSClient(testnet)
 	
 	// Create storage and quality monitor
@@ -368,12 +383,12 @@ func (i *Ingestor) SubscribeFundingRates(ctx context.Context, symbol string) (<-
 	}
 
 	// 新增：连接到WebSocket并订阅
-	if err := i.wsClient.Connect(ctx); err != nil {
+	if err := i.binanceWS.Connect(ctx); err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to connect WebSocket: %w", err)
 	}
 
-	if err := i.wsClient.Subscribe(wsSub, handler); err != nil {
+	if err := i.binanceWS.Subscribe(wsSub, handler); err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to subscribe to funding rates: %w", err)
 	}

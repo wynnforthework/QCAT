@@ -10,12 +10,14 @@ import (
 	"syscall"
 	"time"
 	"unsafe"
+
+	"golang.org/x/sys/windows"
 )
 
 var (
-	kernel32                = syscall.NewLazyDLL("kernel32.dll")
+	kernel32                = windows.NewLazyDLL("kernel32.dll")
 	procGetProcessTimes     = kernel32.NewProc("GetProcessTimes")
-	procGetProcessMemoryInfo = kernel32.NewLazyDLL("psapi.dll").NewProc("GetProcessMemoryInfo")
+	procGetProcessMemoryInfo = windows.NewLazyDLL("psapi.dll").NewProc("GetProcessMemoryInfo")
 )
 
 // FILETIME represents a 64-bit value representing the number of 100-nanosecond intervals since January 1, 1601 (UTC).
@@ -41,7 +43,7 @@ type PROCESS_MEMORY_COUNTERS struct {
 // getCPUUsageByPID gets CPU usage for a process by PID on Windows
 func getCPUUsageByPID(pid int) float64 {
 	// Try to get process handle
-	handle, err := syscall.OpenProcess(syscall.PROCESS_QUERY_INFORMATION, false, uint32(pid))
+	handle, err := syscall.OpenProcess(windows.PROCESS_QUERY_INFORMATION, false, uint32(pid))
 	if err != nil {
 		// Fallback to PowerShell command
 		return getCPUUsageByPIDPowerShell(pid)
@@ -102,7 +104,7 @@ func getCPUUsageByPIDPowerShell(pid int) float64 {
 // getMemoryUsageByPID gets memory usage for a process by PID on Windows
 func getMemoryUsageByPID(pid int) int64 {
 	// Try to get process handle
-	handle, err := syscall.OpenProcess(syscall.PROCESS_QUERY_INFORMATION|syscall.PROCESS_VM_READ, false, uint32(pid))
+	handle, err := syscall.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, uint32(pid))
 	if err != nil {
 		// Fallback to PowerShell command
 		return getMemoryUsageByPIDPowerShell(pid)

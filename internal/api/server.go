@@ -384,6 +384,7 @@ func initializeAuditLogger(cfg *config.Config) (*security.AuditLogger, error) {
 	// This would be expanded based on your config structure
 	
 	return security.NewAuditLogger(auditConfig)
+}
 
 // setupRoutes configures all API routes
 func (s *Server) setupRoutes() {

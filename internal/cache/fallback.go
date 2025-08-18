@@ -1245,3 +1245,13 @@ type CacheStats struct {
 	MemoryStats  *MemoryCacheStats      `json:"memory_stats"`
 	MonitorStats *CacheMonitorStats     `json:"monitor_stats"`
 }
+
+// GetMonitor returns the cache monitor
+func (cm *CacheManager) GetMonitor() *CacheMonitor {
+	return cm.monitor
+}
+
+// GetConfig returns the cache configuration
+func (cm *CacheManager) GetConfig() *FallbackConfig {
+	return cm.config
+}

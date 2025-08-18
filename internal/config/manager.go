@@ -84,13 +84,13 @@ const FileModified = "modified"
 type Manager struct {
 	configs    map[string]interface{}
 	watchers   map[string]*Watcher
-	validators map[string]Validator
+	validators map[string]ConfigValidator
 	mu         sync.RWMutex
 	basePath   string
 }
 
-// Validator defines the interface for configuration validation
-type Validator interface {
+// ConfigValidator defines the interface for configuration validation
+type ConfigValidator interface {
 	Validate(config interface{}) error
 }
 
@@ -104,7 +104,7 @@ func NewManager(basePath string) *Manager {
 	return &Manager{
 		configs:    make(map[string]interface{}),
 		watchers:   make(map[string]*Watcher),
-		validators: make(map[string]Validator),
+		validators: make(map[string]ConfigValidator),
 		basePath:   basePath,
 	}
 }
@@ -161,7 +161,7 @@ func (m *Manager) SetConfig(name string, config interface{}) error {
 }
 
 // RegisterValidator registers a validator for a configuration
-func (m *Manager) RegisterValidator(name string, validator Validator) {
+func (m *Manager) RegisterValidator(name string, validator ConfigValidator) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

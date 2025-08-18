@@ -79,6 +79,8 @@ type ExchangeConfig struct {
 	APIKey    string
 	APISecret string
 	TestNet   bool
+	BaseURL   string
+	FuturesBaseURL string
 }
 
 // NewBaseExchange creates a new base exchange

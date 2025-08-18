@@ -12,15 +12,15 @@ import (
 // ProcessMonitor monitors the health of managed processes
 type ProcessMonitor struct {
 	manager     *ProcessManager
-	healthChecks map[string]*HealthChecker
+	healthChecks map[string]*ProcessHealthChecker
 	mu          sync.RWMutex
 	ctx         context.Context
 	cancel      context.CancelFunc
 	wg          sync.WaitGroup
 }
 
-// HealthChecker performs health checks for a specific process
-type HealthChecker struct {
+// ProcessHealthChecker performs health checks for a specific process
+type ProcessHealthChecker struct {
 	process       *Process
 	config        HealthCheckConfig
 	failures      int
@@ -36,7 +36,7 @@ func NewProcessMonitor(manager *ProcessManager) *ProcessMonitor {
 	
 	monitor := &ProcessMonitor{
 		manager:      manager,
-		healthChecks: make(map[string]*HealthChecker),
+		healthChecks: make(map[string]*ProcessHealthChecker),
 		mu:           sync.RWMutex{},
 		ctx:          ctx,
 		cancel:       cancel,
@@ -58,7 +58,7 @@ func (pm *ProcessMonitor) AddHealthCheck(process *Process) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	
-	checker := &HealthChecker{
+	checker := &ProcessHealthChecker{
 		process: process,
 		config:  process.Config.HealthCheck,
 		httpClient: &http.Client{
@@ -97,7 +97,7 @@ func (pm *ProcessMonitor) monitoringLoop() {
 // performHealthChecks performs health checks for all monitored processes
 func (pm *ProcessMonitor) performHealthChecks() {
 	pm.mu.RLock()
-	checkers := make([]*HealthChecker, 0, len(pm.healthChecks))
+	checkers := make([]*ProcessHealthChecker, 0, len(pm.healthChecks))
 	for _, checker := range pm.healthChecks {
 		checkers = append(checkers, checker)
 	}
@@ -107,7 +107,7 @@ func (pm *ProcessMonitor) performHealthChecks() {
 	var wg sync.WaitGroup
 	for _, checker := range checkers {
 		wg.Add(1)
-		go func(c *HealthChecker) {
+		go func(c *ProcessHealthChecker) {
 			defer wg.Done()
 			pm.performHealthCheck(c)
 		}(checker)
@@ -116,7 +116,7 @@ func (pm *ProcessMonitor) performHealthChecks() {
 }
 
 // performHealthCheck performs a health check for a single process
-func (pm *ProcessMonitor) performHealthCheck(checker *HealthChecker) {
+func (pm *ProcessMonitor) performHealthCheck(checker *ProcessHealthChecker) {
 	checker.mu.Lock()
 	defer checker.mu.Unlock()
 	
@@ -165,7 +165,7 @@ func (pm *ProcessMonitor) isProcessRunning(process *Process) bool {
 }
 
 // performHTTPHealthCheck performs an HTTP health check
-func (pm *ProcessMonitor) performHTTPHealthCheck(checker *HealthChecker) error {
+func (pm *ProcessMonitor) performHTTPHealthCheck(checker *ProcessHealthChecker) error {
 	ctx, cancel := context.WithTimeout(pm.ctx, checker.config.Timeout)
 	defer cancel()
 	
@@ -188,7 +188,7 @@ func (pm *ProcessMonitor) performHTTPHealthCheck(checker *HealthChecker) error {
 }
 
 // handleHealthCheckFailure handles a health check failure
-func (pm *ProcessMonitor) handleHealthCheckFailure(checker *HealthChecker, err error) {
+func (pm *ProcessMonitor) handleHealthCheckFailure(checker *ProcessHealthChecker, err error) {
 	fmt.Printf("Health check failed for process %s: %v (failures: %d/%d)\n",
 		checker.process.ID, err, checker.failures, checker.config.FailureThreshold)
 	
@@ -212,14 +212,14 @@ func (pm *ProcessMonitor) handleHealthCheckFailure(checker *HealthChecker, err e
 }
 
 // GetHealthStatus returns the health status of all monitored processes
-func (pm *ProcessMonitor) GetHealthStatus() map[string]HealthStatus {
+func (pm *ProcessMonitor) GetHealthStatus() map[string]ProcessHealthStatus {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
 	
-	status := make(map[string]HealthStatus)
+	status := make(map[string]ProcessHealthStatus)
 	for processID, checker := range pm.healthChecks {
 		checker.mu.RLock()
-		status[processID] = HealthStatus{
+		status[processID] = ProcessHealthStatus{
 			ProcessID:   processID,
 			Healthy:     checker.lastStatus,
 			Failures:    checker.failures,
@@ -238,8 +238,8 @@ func (pm *ProcessMonitor) Stop() {
 	pm.wg.Wait()
 }
 
-// HealthStatus represents the health status of a process
-type HealthStatus struct {
+// ProcessHealthStatus represents the health status of a process
+type ProcessHealthStatus struct {
 	ProcessID string    `json:"process_id"`
 	Healthy   bool      `json:"healthy"`
 	Failures  int       `json:"failures"`
@@ -282,22 +282,22 @@ func (pm *ProcessMonitor) GetProcessMetrics() map[string]ProcessMetrics {
 // getCPUUsage gets CPU usage for a process
 func (pm *ProcessMonitor) getCPUUsage(process *Process) float64 {
 	// Get system information for the process
-	if process.Handle == nil {
+	if process.PID == 0 {
 		return 0.0
 	}
 	
-	pid := process.Handle.Pid
+	pid := process.PID
 	return pm.getCPUUsageByPID(pid)
 }
 
 // getMemoryUsage gets memory usage for a process in bytes
 func (pm *ProcessMonitor) getMemoryUsage(process *Process) int64 {
 	// Get system information for the process
-	if process.Handle == nil {
+	if process.PID == 0 {
 		return 0
 	}
 	
-	pid := process.Handle.Pid
+	pid := process.PID
 	return pm.getMemoryUsageByPID(pid)
 }
 

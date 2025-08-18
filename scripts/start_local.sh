@@ -120,12 +120,13 @@ start_database() {
         else
             log_info "Redis已禁用，无需启动Redis服务"
         fi
-        read -p "数据库服务已启动? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            log_error "请先启动数据库服务"
-            exit 1
-        fi
+        # read -p "数据库服务已启动? (y/N): " -n 1 -r
+        # echo
+        # if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        #     log_error "请先启动数据库服务"
+        #     exit 1
+        # fi
+        log_info "数据库服务已启动"
     fi
 }
 

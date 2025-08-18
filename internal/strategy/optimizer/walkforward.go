@@ -90,6 +90,8 @@ type Window struct {
 	OutSampleEnd   int
 }
 
+
+
 // WindowResult represents optimization result for a window
 type WindowResult struct {
 	Window     Window
@@ -104,7 +106,7 @@ func (o *WalkForwardOptimizer) optimizeWindow(ctx context.Context, data *DataSet
 	inSampleData := &DataSet{
 		Returns: data.Returns[window.InSampleStart:window.InSampleEnd],
 		Prices:  data.Prices[window.InSampleStart:window.InSampleEnd],
-		Volume:  data.Volume[window.InSampleStart:window.InSampleEnd],
+		Volumes: data.Volumes[window.InSampleStart:window.InSampleEnd],
 	}
 
 	// 使用网格搜索找到最优参数
@@ -121,7 +123,7 @@ func (o *WalkForwardOptimizer) optimizeWindow(ctx context.Context, data *DataSet
 	outSampleData := &DataSet{
 		Returns: data.Returns[window.OutSampleStart:window.OutSampleEnd],
 		Prices:  data.Prices[window.OutSampleStart:window.OutSampleEnd],
-		Volume:  data.Volume[window.OutSampleStart:window.OutSampleEnd],
+		Volumes: data.Volumes[window.OutSampleStart:window.OutSampleEnd],
 	}
 	outSampleStats := backtest.CalculatePerformanceStats(outSampleData.Returns)
 

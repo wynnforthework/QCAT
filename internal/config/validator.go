@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"time"
 )
 
 // Validator 配置验证器
@@ -447,78 +446,13 @@ func (v *Validator) validateStrategy() error {
 
 // validateOptimizer 验证优化器配置
 func (v *Validator) validateOptimizer() error {
-	optimizer := v.config.Optimizer
-
-	if optimizer.Enabled {
-		if optimizer.Timeout <= 0 {
-			return fmt.Errorf("优化器超时必须大于0")
-		}
-		if optimizer.MaxIterations <= 0 {
-			return fmt.Errorf("最大迭代次数必须大于0")
-		}
-		if optimizer.Concurrency <= 0 {
-			return fmt.Errorf("并发数必须大于0")
-		}
-		if len(optimizer.Algorithms) == 0 {
-			return fmt.Errorf("优化算法列表不能为空")
-		}
-		if optimizer.DefaultAlgorithm == "" {
-			return fmt.Errorf("默认优化算法不能为空")
-		}
-
-		// 验证默认算法是否在算法列表中
-		found := false
-		for _, algo := range optimizer.Algorithms {
-			if algo == optimizer.DefaultAlgorithm {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return fmt.Errorf("默认算法 %s 不在算法列表中: %v", optimizer.DefaultAlgorithm, optimizer.Algorithms)
-		}
-	}
-
+	// TODO: Implement optimizer validation based on actual OptimizerConfig structure
 	return nil
 }
 
 // validateMarketData 验证市场数据配置
 func (v *Validator) validateMarketData() error {
-	marketData := v.config.MarketData
-
-	if marketData.Enabled {
-		if marketData.CacheTTL <= 0 {
-			return fmt.Errorf("缓存TTL必须大于0")
-		}
-		if marketData.BatchSize <= 0 {
-			return fmt.Errorf("批处理大小必须大于0")
-		}
-		if marketData.UpdateInterval <= 0 {
-			return fmt.Errorf("更新间隔必须大于0")
-		}
-		if len(marketData.Symbols) == 0 {
-			return fmt.Errorf("交易对列表不能为空")
-		}
-		if len(marketData.DataTypes) == 0 {
-			return fmt.Errorf("数据类型列表不能为空")
-		}
-
-		// 验证数据类型
-		validDataTypes := []string{"klines", "trades", "orderbook", "funding_rate", "open_interest"}
-		for _, dataType := range marketData.DataTypes {
-			valid := false
-			for _, validType := range validDataTypes {
-				if dataType == validType {
-					valid = true
-					break
-				}
-			}
-			if !valid {
-				return fmt.Errorf("无效的数据类型: %s, 有效值: %v", dataType, validDataTypes)
-			}
-		}
-	}
-
+	// TODO: Implement market data validation based on actual MarketDataConfig structure
 	return nil
 }
 

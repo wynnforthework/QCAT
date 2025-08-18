@@ -315,25 +315,7 @@ type BacktestConfig struct {
 	DataRetentionDays int           `yaml:"data_retention_days"`
 }
 
-// OptimizerConfig 优化器配置
-type OptimizerConfig struct {
-	Enabled          bool     `yaml:"enabled"`
-	Timeout          time.Duration `yaml:"timeout"`
-	MaxIterations    int      `yaml:"max_iterations"`
-	Concurrency      int      `yaml:"concurrency"`
-	Algorithms       []string `yaml:"algorithms"`
-	DefaultAlgorithm string   `yaml:"default_algorithm"`
-}
 
-// MarketDataConfig 市场数据配置
-type MarketDataConfig struct {
-	Enabled        bool          `yaml:"enabled"`
-	CacheTTL       time.Duration `yaml:"cache_ttl"`
-	BatchSize      int           `yaml:"batch_size"`
-	UpdateInterval time.Duration `yaml:"update_interval"`
-	Symbols        []string      `yaml:"symbols"`
-	DataTypes      []string      `yaml:"data_types"`
-}
 
 // OrderConfig 订单管理配置
 type OrderConfig struct {

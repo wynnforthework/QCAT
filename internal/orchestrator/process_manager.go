@@ -2,7 +2,6 @@ package orchestrator
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -47,6 +46,7 @@ type Process struct {
 // ProcessConfig holds configuration for a process
 type ProcessConfig struct {
 	Name        string            `json:"name"`
+	Type        ProcessType       `json:"type"`
 	Executable  string            `json:"executable"`
 	Args        []string          `json:"args"`
 	Env         map[string]string `json:"env"`

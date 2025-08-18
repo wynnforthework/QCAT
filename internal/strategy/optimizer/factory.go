@@ -1,6 +1,7 @@
 package optimizer
 
 import (
+	"database/sql"
 	"time"
 )
 
@@ -47,10 +48,10 @@ func (f *Factory) CreateOverfitDetector() *OverfitDetector {
 }
 
 // 新增：CreateOrchestrator creates a new orchestrator with all dependencies
-func (f *Factory) CreateOrchestrator() *Orchestrator {
+func (f *Factory) CreateOrchestrator(db *sql.DB) *Orchestrator {
 	triggerChecker := f.CreateTriggerChecker()
 	walkForwardOptimizer := f.CreateWalkForwardOptimizer()
 	overfitDetector := f.CreateOverfitDetector()
 
-	return NewOrchestrator(triggerChecker, walkForwardOptimizer, overfitDetector)
+	return NewOrchestrator(triggerChecker, walkForwardOptimizer, overfitDetector, db)
 }
