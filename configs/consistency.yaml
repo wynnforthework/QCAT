@@ -1,0 +1,161 @@
+# 训练结果一致性配置
+consistency:
+  # 确定性训练配置
+  deterministic:
+    enabled: true
+    global_seed: 42
+    use_task_based_seed: true
+    seed_generation_method: "md5_hash"  # md5_hash, timestamp, custom
+    
+  # 模型缓存配置
+  cache:
+    enabled: true
+    ttl_hours: 24
+    max_cache_size: 1000
+    cleanup_interval_minutes: 60
+    cache_key_method: "task_params_data"  # task_params_data, task_only, params_only
+    
+  # 模型共享配置
+  sharing:
+    enabled: true
+    cluster_mode: true
+    broadcast_interval_seconds: 30
+    query_timeout_seconds: 10
+    max_retries: 3
+    
+  # 共识验证配置
+  consensus:
+    enabled: true
+    tolerance_percentage: 1.0  # 1%的容差
+    min_consensus_nodes: 2
+    validation_interval_seconds: 300
+    confidence_threshold: 0.8
+    
+  # 分布式协调配置
+  distributed:
+    node_id_generation: "timestamp_random"
+    heartbeat_interval_seconds: 30
+    node_timeout_seconds: 120
+    leader_election: true
+    consensus_algorithm: "raft"  # raft, paxos, simple
+    
+  # 数据哈希配置
+  data_hash:
+    method: "md5"
+    include_features: true
+    include_target: false
+    include_metadata: true
+    hash_length: 32
+    
+  # 性能监控配置
+  monitoring:
+    track_cache_hits: true
+    track_sharing_efficiency: true
+    track_consistency_violations: true
+    alert_on_inconsistency: true
+    metrics_export_interval_seconds: 60
+    
+  # 日志配置
+  logging:
+    level: "info"  # debug, info, warn, error
+    log_cache_operations: true
+    log_sharing_operations: true
+    log_consensus_operations: true
+    log_performance_metrics: true
+
+# 集群配置
+cluster:
+  # 节点发现
+  discovery:
+    method: "static"  # static, dns, consul, etcd
+    static_nodes:
+      - "node1:8080"
+      - "node2:8080"
+      - "node3:8080"
+    
+  # 网络配置
+  network:
+    bind_address: "0.0.0.0"
+    port: 8080
+    max_connections: 100
+    connection_timeout_seconds: 30
+    
+  # 安全配置
+  security:
+    enable_tls: false
+    certificate_path: ""
+    private_key_path: ""
+    ca_certificate_path: ""
+    client_authentication: false
+
+# 存储配置
+storage:
+  # 模型存储
+  model_storage:
+    type: "local"  # local, s3, gcs, azure
+    local_path: "/models"
+    retention_days: 30
+    compression: true
+    
+  # 缓存存储
+  cache_storage:
+    type: "memory"  # memory, redis, memcached
+    redis:
+      addr: "localhost:6379"
+      password: ""
+      db: 0
+      pool_size: 10
+      
+  # 元数据存储
+  metadata_storage:
+    type: "database"  # database, file, etcd
+    database:
+      table_name: "training_results"
+      auto_migrate: true
+
+# 回测一致性配置
+backtest_consistency:
+  # 数据一致性
+  data:
+    use_same_data_source: true
+    data_versioning: true
+    data_checksum_validation: true
+    
+  # 参数一致性
+  parameters:
+    parameter_validation: true
+    parameter_normalization: true
+    parameter_constraints: true
+    
+  # 执行一致性
+  execution:
+    deterministic_execution: true
+    order_independent: true
+    floating_point_precision: 64
+    
+  # 结果验证
+  validation:
+    result_comparison: true
+    statistical_validation: true
+    outlier_detection: true
+    confidence_intervals: true
+
+# 策略优化一致性配置
+strategy_optimization:
+  # 优化算法一致性
+  algorithm:
+    deterministic_optimization: true
+    seed_management: true
+    convergence_criteria: true
+    
+  # 评估一致性
+  evaluation:
+    same_evaluation_metrics: true
+    same_validation_split: true
+    same_test_data: true
+    
+  # 结果一致性
+  results:
+    result_caching: true
+    result_sharing: true
+    result_validation: true

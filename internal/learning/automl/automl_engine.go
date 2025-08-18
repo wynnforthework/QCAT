@@ -24,6 +24,7 @@ type AutoMLEngine struct {
 	modelEvaluator        *ModelEvaluator
 	ensembleBuilder       *EnsembleBuilder
 	modelDeployer         *ModelDeployer
+	consistencyManager    *ConsistencyManager
 	
 	// 运行状态
 	ctx        context.Context
@@ -535,8 +536,16 @@ type TaskExecution struct {
 func NewAutoMLEngine(cfg *config.Config) (*AutoMLEngine, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	
+	// 创建一致性管理器
+	consistencyManager, err := NewConsistencyManager(cfg)
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("failed to create consistency manager: %w", err)
+	}
+	
 	engine := &AutoMLEngine{
 		config:              cfg,
+		consistencyManager:  consistencyManager,
 		dataPreprocessor:    NewDataPreprocessor(),
 		featureEngineer:     NewFeatureEngineer(),
 		modelFactory:        NewModelFactory(),
@@ -1037,6 +1046,38 @@ func (engine *AutoMLEngine) executeTask(task *MLTask) {
 		return
 	}
 	
+	// 生成数据哈希用于一致性检查
+	dataHash := engine.generateDataHash(preprocessedData)
+	
+	// 检查是否有缓存的训练结果
+	if cachedResult, found := engine.consistencyManager.CheckModelCache(task.ID, task.TrainingConfig.Hyperparameters, dataHash); found {
+		log.Printf("Found cached training result for task %s, using cached model", task.ID)
+		task.BestModel = engine.convertCachedResultToModel(cachedResult)
+		task.Status = "COMPLETED"
+		task.CompletedAt = time.Now()
+		task.Duration = task.CompletedAt.Sub(task.StartedAt)
+		task.Progress = 1.0
+		execution.Success = true
+		execution.BestScore = cachedResult.Performance["test_score"]
+		return
+	}
+	
+	// 检查是否有共享的训练结果
+	if sharedResult, found := engine.consistencyManager.GetSharedModelResult(task.ID, task.TrainingConfig.Hyperparameters, dataHash); found {
+		log.Printf("Found shared training result for task %s, using shared model", task.ID)
+		task.BestModel = engine.convertCachedResultToModel(sharedResult)
+		task.Status = "COMPLETED"
+		task.CompletedAt = time.Now()
+		task.Duration = task.CompletedAt.Sub(task.StartedAt)
+		task.Progress = 1.0
+		execution.Success = true
+		execution.BestScore = sharedResult.Performance["test_score"]
+		return
+	}
+	
+	// 设置确定性随机种子
+	engine.consistencyManager.SetRandomSeed(task.ID, dataHash)
+	
 	task.Status = "TRAINING"
 	task.Progress = 0.3
 	
@@ -1101,6 +1142,44 @@ func (engine *AutoMLEngine) executeTask(task *MLTask) {
 	engine.mu.Lock()
 	engine.trainedModels[bestModel.ID] = bestModel
 	engine.mu.Unlock()
+	
+	// 缓存训练结果
+	trainingResult := &TrainingResult{
+		TaskID:           task.ID,
+		ModelID:          bestModel.ID,
+		Parameters:       task.TrainingConfig.Hyperparameters,
+		DataHash:         dataHash,
+		Performance:      bestModel.Metrics,
+		TrainingMetrics:  map[string]float64{"score": bestModel.TrainingScore},
+		ValidationMetrics: map[string]float64{"score": bestModel.ValidationScore},
+		TestMetrics:      map[string]float64{"score": bestModel.TestScore},
+		TrainingTime:     bestModel.TrainingTime,
+		ModelSize:        0, // TODO: 计算实际模型大小
+		CreatedAt:        time.Now(),
+		NodeID:           engine.consistencyManager.nodeID,
+		ConsensusHash:    "",
+	}
+	
+	// 缓存结果
+	engine.consistencyManager.CacheModelResult(task.ID, task.TrainingConfig.Hyperparameters, dataHash, trainingResult)
+	
+	// 共享结果到集群
+	go func() {
+		err := engine.consistencyManager.ShareModelResult(trainingResult)
+		if err != nil {
+			log.Printf("Failed to share model result: %v", err)
+		}
+	}()
+	
+	// 验证结果一致性
+	go func() {
+		report, err := engine.consistencyManager.ValidateResultConsistency(task.ID, trainingResult)
+		if err != nil {
+			log.Printf("Failed to validate result consistency: %v", err)
+		} else if !report.IsConsistent {
+			log.Printf("Result consistency warning for task %s: confidence=%.2f", task.ID, report.Confidence)
+		}
+	}()
 	
 	log.Printf("ML task completed: %s (best score: %.4f)", task.ID, execution.BestScore)
 }
@@ -1526,6 +1605,41 @@ func (engine *AutoMLEngine) generateTaskID() string {
 
 func (engine *AutoMLEngine) generateModelID() string {
 	return fmt.Sprintf("MODEL_%d", time.Now().UnixNano())
+}
+
+// generateDataHash 生成数据哈希
+func (engine *AutoMLEngine) generateDataHash(data *PreprocessedData) string {
+	// 基于数据特征和大小生成哈希
+	dataStr := fmt.Sprintf("%d_%d_%v", len(data.Features), len(data.FeatureColumns), data.FeatureColumns)
+	hash := md5.Sum([]byte(dataStr))
+	return hex.EncodeToString(hash[:])
+}
+
+// convertCachedResultToModel 将缓存结果转换为模型
+func (engine *AutoMLEngine) convertCachedResultToModel(result *TrainingResult) *TrainedModel {
+	return &TrainedModel{
+		ID:               result.ModelID,
+		TaskID:           result.TaskID,
+		Name:             fmt.Sprintf("Cached_%s", result.ModelID),
+		Algorithm:        "cached",
+		Version:          "1.0",
+		ModelType:        "cached",
+		Hyperparameters:  result.Parameters,
+		FeatureColumns:   []string{}, // 从缓存中恢复
+		TargetColumn:     "",
+		TrainingScore:    result.TrainingMetrics["score"],
+		ValidationScore:  result.ValidationMetrics["score"],
+		TestScore:        result.TestMetrics["score"],
+		Metrics:          result.Performance,
+		ModelPath:        fmt.Sprintf("/models/cached_%s.pkl", result.ModelID),
+		TrainingTime:     result.TrainingTime,
+		TrainingDataSize: 0,
+		FeatureCount:     0,
+		CreatedAt:        result.CreatedAt,
+		TrainedBy:        "consistency_manager",
+		Tags:             []string{"cached", "shared"},
+		Metadata:         make(map[string]interface{}),
+	}
 }
 
 func (engine *AutoMLEngine) generateMockHyperparameters(modelType string) map[string]interface{} {

@@ -399,7 +399,9 @@ func (s *OptimizerService) randomSearch(paramSpace map[string][2]float64, req *o
 	bestParams := make(map[string]float64)
 	bestScore := math.Inf(-1)
 	
-	rand.Seed(time.Now().UnixNano())
+	// 使用确定性随机种子
+	seed := int64(42) // 固定种子确保可重现性
+	rand.Seed(seed)
 
 	for i := 0; i < maxIterations; i++ {
 		// Generate random parameters
@@ -440,7 +442,9 @@ func (s *OptimizerService) bayesianOptimization(paramSpace map[string][2]float64
 	observations := make([]map[string]float64, 0)
 	scores := make([]float64, 0)
 	
-	rand.Seed(time.Now().UnixNano())
+	// 使用确定性随机种子
+	seed := int64(42) // 固定种子确保可重现性
+	rand.Seed(seed)
 
 	// Exploration phase
 	for i := 0; i < explorationSteps; i++ {
