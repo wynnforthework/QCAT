@@ -19,7 +19,13 @@ import {
   Home,
   Target,
   BookOpen,
-  Zap
+  Zap,
+  Share2,
+  List,
+  ChevronDown,
+  User,
+  Bell,
+  HelpCircle
 } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -56,10 +62,28 @@ const navigation = [
     description: "市场热点和白名单管理"
   },
   {
+    name: "分享结果",
+    href: "/share-result",
+    icon: Share2,
+    description: "分享您的策略结果"
+  },
+  {
+    name: "浏览结果",
+    href: "/shared-results",
+    icon: List,
+    description: "查看其他用户分享的结果"
+  },
+  {
     name: "审计日志",
     href: "/audit",
     icon: BookOpen,
     description: "操作记录和决策链追踪"
+  },
+  {
+    name: "系统设置",
+    href: "/settings",
+    icon: Settings,
+    description: "系统配置和个性化设置"
   }
 ];
 
@@ -74,7 +98,7 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" className="h-full">
       <head>
-        <title>QCAT - 量化交易系统</title>
+        <title>QCAT</title>
         <meta name="description" content="全自动化加密货币合约量化交易平台" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="icon" href="/favicon.ico" />
@@ -226,11 +250,7 @@ export default function RootLayout({
                       <span className="text-blue-600">低风险</span>
                     </div>
                   </div>
-                  
-                  <Button variant="outline" size="sm">
-                    <Settings className="h-4 w-4 mr-2" />
-                    设置
-                  </Button>
+
                 </div>
               </div>
             </header>

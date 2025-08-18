@@ -101,7 +101,8 @@ export default function ShareResultPage() {
         test_end: ''
       },
       walk_forward: false,
-      oos_periods: [] as string[]
+      oos_periods: [] as string[],
+      market_conditions: [] as string[]
     },
     
     // 实盘信息（可选）
@@ -313,8 +314,6 @@ export default function ShareResultPage() {
           performance: {
             total_return: 0,
             annual_return: 0,
-            monthly_return: 0,
-            daily_return: 0,
             max_drawdown: 0,
             volatility: 0,
             sharpe_ratio: 0,
@@ -327,10 +326,10 @@ export default function ShareResultPage() {
             average_loss: 0,
             largest_win: 0,
             largest_loss: 0,
-            best_month: '',
-            worst_month: '',
-            consecutive_wins: 0,
-            consecutive_losses: 0
+            expectancy: 0,
+            holding_time_avg: 0,
+            skewness: 0,
+            kurtosis: 0
           },
           reproducibility: {
             random_seed: 0,
@@ -355,13 +354,23 @@ export default function ShareResultPage() {
           backtest_info: {
             start_date: '',
             end_date: '',
-            duration: '',
-            data_points: 0,
-            market_conditions: [],
             commission: 0,
             slippage: 0,
             initial_capital: 0,
-            final_capital: 0
+            final_capital: 0,
+            timezone: 'UTC',
+            currency: 'USD',
+            data_split: {
+              train_start: '',
+              train_end: '',
+              val_start: '',
+              val_end: '',
+              test_start: '',
+              test_end: ''
+            },
+            walk_forward: false,
+            oos_periods: [],
+            market_conditions: []
           },
           live_trading_info: {
             start_date: '',

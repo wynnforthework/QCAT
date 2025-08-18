@@ -287,10 +287,7 @@ export default function SharedResultsPage() {
             <Upload className="w-4 h-4 mr-2" />
             导入结果
           </Button>
-          <Button>
-            <Share2 className="w-4 h-4 mr-2" />
-            分享结果
-          </Button>
+
         </div>
       </div>
 
@@ -491,10 +488,7 @@ export default function SharedResultsPage() {
                 : '还没有人分享策略结果，成为第一个分享者吧！'
               }
             </p>
-            <Button>
-              <Share2 className="w-4 h-4 mr-2" />
-              分享第一个结果
-            </Button>
+
           </CardContent>
         </Card>
       )}

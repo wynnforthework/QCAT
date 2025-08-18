@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { RealTimeMonitor } from "@/components/dashboard/real-time-monitor"
-import { TrendingUp, TrendingDown, Activity, Shield, AlertTriangle, DollarSign, Share2, List } from "lucide-react"
+import { TrendingUp, TrendingDown, Activity, Shield, AlertTriangle, DollarSign } from "lucide-react"
 import Link from "next/link"
 import apiClient, { DashboardData } from "@/lib/api"
 
@@ -100,33 +100,6 @@ export default function HomePage() {
 
   return (
     <div className="space-y-8">
-
-        {/* 策略结果分享快捷入口 */}
-        <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 mb-2">策略结果分享系统</h2>
-                <p className="text-gray-600">分享您的优秀策略结果，发现他人的成功经验</p>
-              </div>
-              <div className="flex space-x-3">
-                <Link href="/share-result">
-                  <Button className="bg-blue-600 hover:bg-blue-700">
-                    <Share2 className="mr-2 h-4 w-4" />
-                    分享结果
-                  </Button>
-                </Link>
-                <Link href="/shared-results">
-                  <Button variant="outline">
-                    <List className="mr-2 h-4 w-4" />
-                    浏览结果
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* 核心指标卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* 账户权益 */}
