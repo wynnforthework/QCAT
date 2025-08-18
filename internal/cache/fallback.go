@@ -88,18 +88,18 @@ func DefaultFallbackConfig() *FallbackConfig {
 }
 
 // Get retrieves a value from cache with fallback
-func (cm *CacheManager) Get(ctx context.Context, key string) (interface{}, error) {
+func (cm *CacheManager) Get(ctx context.Context, key string, dest interface{}) error {
 	cm.mu.RLock()
 	inFallback := cm.fallback
 	cm.mu.RUnlock()
 
 	// Try Redis first if not in fallback mode
 	if !inFallback && cm.redis != nil {
-		value, err := cm.redis.Get(ctx, key)
+		err := cm.redis.Get(ctx, key, dest)
 		if err == nil {
 			// Cache hit in Redis, also store in memory for future fallback
-			cm.memory.Set(ctx, key, value, time.Hour)
-			return value, nil
+			cm.memory.Set(ctx, key, dest, time.Hour)
+			return nil
 		}
 		
 		// Redis error, check if we should enable fallback
@@ -110,9 +110,9 @@ func (cm *CacheManager) Get(ctx context.Context, key string) (interface{}, error
 	}
 
 	// Try memory cache
-	if value, err := cm.memory.Get(ctx, key); err == nil {
+	if err := cm.memory.Get(ctx, key, dest); err == nil {
 		cm.monitor.RecordHit("memory")
-		return value, nil
+		return nil
 	}
 
 	// Try database as last resort
@@ -367,7 +367,8 @@ func (cm *CacheManager) syncMemoryToRedis() {
 	defer cancel()
 
 	for _, key := range keys {
-		if value, err := cm.memory.Get(ctx, key); err == nil {
+		var value interface{}
+		if err := cm.memory.Get(ctx, key, &value); err == nil {
 			// Try to set in Redis, but don't fail if it doesn't work
 			cm.redis.Set(ctx, key, value, time.Hour)
 		}
@@ -386,6 +387,283 @@ func (cm *CacheManager) GetStats() *CacheStats {
 		MemoryStats:   cm.memory.GetStats(),
 		MonitorStats:  cm.monitor.GetStats(),
 	}
+}
+
+// CheckRateLimit checks if a rate limit has been exceeded
+func (cm *CacheManager) CheckRateLimit(ctx context.Context, key string, limit int, window time.Duration) (bool, error) {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		allowed, err := cm.redis.CheckRateLimit(ctx, key, limit, window)
+		if err == nil {
+			return allowed, nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_rate_limit", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_rate_limit_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.CheckRateLimit(ctx, key, limit, window)
+}
+
+// GetFundingRate retrieves funding rate from cache
+func (cm *CacheManager) GetFundingRate(ctx context.Context, symbol string, dest interface{}) error {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		err := cm.redis.GetFundingRate(ctx, symbol, dest)
+		if err == nil {
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_get_funding_rate", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_get_funding_rate_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.GetFundingRate(ctx, symbol, dest)
+}
+
+// SetFundingRate stores funding rate in cache
+func (cm *CacheManager) SetFundingRate(ctx context.Context, symbol string, rate interface{}, expiration time.Duration) error {
+	var redisErr error
+	
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		redisErr = cm.redis.SetFundingRate(ctx, symbol, rate, expiration)
+		if redisErr == nil {
+			// Also store in memory cache
+			cm.memory.SetFundingRate(ctx, symbol, rate, expiration)
+			cm.monitor.RecordSuccess("redis_set_funding_rate")
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_set_funding_rate", redisErr)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_set_funding_rate_failure")
+		}
+	}
+
+	// Store in memory cache
+	memErr := cm.memory.SetFundingRate(ctx, symbol, rate, expiration)
+	if memErr == nil {
+		cm.monitor.RecordSuccess("memory_set_funding_rate")
+		return nil
+	}
+
+	// All cache layers failed
+	cm.monitor.RecordFailure("all_set_funding_rate", fmt.Errorf("redis: %v, memory: %v", redisErr, memErr))
+	return fmt.Errorf("failed to set funding rate for %s: redis: %v, memory: %v", symbol, redisErr, memErr)
+}
+
+// GetIndexPrice retrieves index price from cache
+func (cm *CacheManager) GetIndexPrice(ctx context.Context, symbol string, dest interface{}) error {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		err := cm.redis.GetIndexPrice(ctx, symbol, dest)
+		if err == nil {
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_get_index_price", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_get_index_price_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.GetIndexPrice(ctx, symbol, dest)
+}
+
+// SetIndexPrice stores index price in cache
+func (cm *CacheManager) SetIndexPrice(ctx context.Context, symbol string, price interface{}, expiration time.Duration) error {
+	var redisErr error
+	
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		redisErr = cm.redis.SetIndexPrice(ctx, symbol, price, expiration)
+		if redisErr == nil {
+			// Also store in memory cache
+			cm.memory.SetIndexPrice(ctx, symbol, price, expiration)
+			cm.monitor.RecordSuccess("redis_set_index_price")
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_set_index_price", redisErr)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_set_index_price_failure")
+		}
+	}
+
+	// Store in memory cache
+	memErr := cm.memory.SetIndexPrice(ctx, symbol, price, expiration)
+	if memErr == nil {
+		cm.monitor.RecordSuccess("memory_set_index_price")
+		return nil
+	}
+
+	// All cache layers failed
+	cm.monitor.RecordFailure("all_set_index_price", fmt.Errorf("redis: %v, memory: %v", redisErr, memErr))
+	return fmt.Errorf("failed to set index price for %s: redis: %v, memory: %v", symbol, redisErr, memErr)
+}
+
+// SetOrderBook stores order book in cache
+func (cm *CacheManager) SetOrderBook(ctx context.Context, symbol string, snapshot interface{}, expiration time.Duration) error {
+	var redisErr error
+	
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		redisErr = cm.redis.SetOrderBook(ctx, symbol, snapshot, expiration)
+		if redisErr == nil {
+			// Also store in memory cache
+			cm.memory.SetOrderBook(ctx, symbol, snapshot, expiration)
+			cm.monitor.RecordSuccess("redis_set_orderbook")
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_set_orderbook", redisErr)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_set_orderbook_failure")
+		}
+	}
+
+	// Store in memory cache
+	memErr := cm.memory.SetOrderBook(ctx, symbol, snapshot, expiration)
+	if memErr == nil {
+		cm.monitor.RecordSuccess("memory_set_orderbook")
+		return nil
+	}
+
+	// All cache layers failed
+	cm.monitor.RecordFailure("all_set_orderbook", fmt.Errorf("redis: %v, memory: %v", redisErr, memErr))
+	return fmt.Errorf("failed to set order book for %s: redis: %v, memory: %v", symbol, redisErr, memErr)
+}
+
+// GetOrderBook retrieves order book from cache
+func (cm *CacheManager) GetOrderBook(ctx context.Context, symbol string, dest interface{}) error {
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		err := cm.redis.GetOrderBook(ctx, symbol, dest)
+		if err == nil {
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_get_orderbook", err)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_get_orderbook_failure")
+		}
+	}
+
+	// Fallback to memory cache
+	return cm.memory.GetOrderBook(ctx, symbol, dest)
+}
+
+// Expire sets a timeout on a key
+func (cm *CacheManager) Expire(ctx context.Context, key string, expiration time.Duration) error {
+	var redisErr error
+	
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		redisErr = cm.redis.Expire(ctx, key, expiration)
+		if redisErr == nil {
+			// Also set in memory cache
+			cm.memory.Expire(ctx, key, expiration)
+			cm.monitor.RecordSuccess("redis_expire")
+			return nil
+		}
+		
+		// Redis error, check if we should enable fallback
+		cm.monitor.RecordFailure("redis_expire", redisErr)
+		if cm.shouldEnableFallback() {
+			cm.enableFallback("redis_expire_failure")
+		}
+	}
+
+	// Set in memory cache
+	memErr := cm.memory.Expire(ctx, key, expiration)
+	if memErr == nil {
+		cm.monitor.RecordSuccess("memory_expire")
+		return nil
+	}
+
+	// All cache layers failed
+	cm.monitor.RecordFailure("all_expire", fmt.Errorf("redis: %v, memory: %v", redisErr, memErr))
+	return fmt.Errorf("failed to expire key %s: redis: %v, memory: %v", key, redisErr, memErr)
+}
+
+// Flush removes all items from the cache
+func (cm *CacheManager) Flush(ctx context.Context) error {
+	var errors []error
+
+	cm.mu.RLock()
+	inFallback := cm.fallback
+	cm.mu.RUnlock()
+
+	// Try Redis first if not in fallback mode
+	if !inFallback && cm.redis != nil {
+		if err := cm.redis.Flush(ctx); err != nil {
+			errors = append(errors, fmt.Errorf("redis: %w", err))
+			cm.monitor.RecordFailure("redis_flush", err)
+		} else {
+			cm.monitor.RecordSuccess("redis_flush")
+		}
+	}
+
+	// Flush memory cache
+	if err := cm.memory.Flush(ctx); err != nil {
+		errors = append(errors, fmt.Errorf("memory: %w", err))
+		cm.monitor.RecordFailure("memory_flush", err)
+	} else {
+		cm.monitor.RecordSuccess("memory_flush")
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("flush errors: %v", errors)
+	}
+
+	return nil
 }
 
 // Close closes the cache manager and all its resources

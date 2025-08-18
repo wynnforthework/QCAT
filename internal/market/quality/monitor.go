@@ -1,13 +1,12 @@
 package quality
 
 import (
-	"context"
 	"fmt"
 	"math"
 	"sync"
 	"time"
 
-	"qcat/internal/market"
+	"qcat/internal/types"
 )
 
 // QualityMetrics represents data quality metrics
@@ -82,7 +81,7 @@ func (m *Monitor) SetIssueCallback(callback func(QualityIssue)) {
 }
 
 // CheckTrade validates and monitors trade data quality
-func (m *Monitor) CheckTrade(trade *market.Trade) error {
+func (m *Monitor) CheckTrade(trade *types.Trade) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -182,7 +181,7 @@ func (m *Monitor) CheckTrade(trade *market.Trade) error {
 }
 
 // CheckKline validates and monitors kline data quality
-func (m *Monitor) CheckKline(kline *market.Kline) error {
+func (m *Monitor) CheckKline(kline *types.Kline) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -246,7 +245,7 @@ func (m *Monitor) CheckKline(kline *market.Kline) error {
 }
 
 // CheckOrderBook validates and monitors order book data quality
-func (m *Monitor) CheckOrderBook(orderBook *market.OrderBook) error {
+func (m *Monitor) CheckOrderBook(orderBook *types.OrderBook) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -308,7 +307,7 @@ func (m *Monitor) CheckOrderBook(orderBook *market.OrderBook) error {
 }
 
 // validateTrade validates trade data
-func (m *Monitor) validateTrade(trade *market.Trade) error {
+func (m *Monitor) validateTrade(trade *types.Trade) error {
 	if trade.Symbol == "" {
 		return fmt.Errorf("missing symbol")
 	}
@@ -331,7 +330,7 @@ func (m *Monitor) validateTrade(trade *market.Trade) error {
 }
 
 // validateKline validates kline data
-func (m *Monitor) validateKline(kline *market.Kline) error {
+func (m *Monitor) validateKline(kline *types.Kline) error {
 	if kline.Symbol == "" {
 		return fmt.Errorf("missing symbol")
 	}
@@ -354,7 +353,7 @@ func (m *Monitor) validateKline(kline *market.Kline) error {
 }
 
 // validateOrderBook validates order book data
-func (m *Monitor) validateOrderBook(orderBook *market.OrderBook) error {
+func (m *Monitor) validateOrderBook(orderBook *types.OrderBook) error {
 	if orderBook.Symbol == "" {
 		return fmt.Errorf("missing symbol")
 	}

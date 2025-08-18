@@ -147,7 +147,6 @@ func (km *KeyMonitor) GetKeyUsageStats(keyID string, period time.Duration) (*Key
 	// Count usage in the specified period
 	cutoff := time.Now().Add(-period)
 	var periodUsage int64
-	var dailyUsage []int64
 
 	for _, event := range km.events {
 		if event.KeyID == keyID && event.Type == "key_validated" && event.Timestamp.After(cutoff) {

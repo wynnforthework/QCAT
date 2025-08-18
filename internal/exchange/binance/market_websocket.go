@@ -8,14 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"qcat/internal/market"
+	"qcat/internal/types"
 
 	"github.com/gorilla/websocket"
 )
 
 // WSClient represents a Binance WebSocket client
 type WSClient struct {
-	*market.WSClient
+	*types.WSClient
 	baseURL string
 }
 
@@ -26,7 +26,7 @@ func NewWSClient(testnet bool) *WSClient {
 		baseURL = "wss://testnet.binance.vision/ws"
 	}
 
-	wsClient := market.NewWSClient(baseURL)
+	wsClient := types.NewWSClient(baseURL)
 	
 	return &WSClient{
 		WSClient: wsClient,
@@ -35,17 +35,17 @@ func NewWSClient(testnet bool) *WSClient {
 }
 
 // SubscribeOrderBook subscribes to order book updates
-func (c *WSClient) SubscribeOrderBook(ctx context.Context, symbol string, speed string) (<-chan *market.OrderBook, error) {
-	ch := make(chan *market.OrderBook, 1000)
+func (c *WSClient) SubscribeOrderBook(ctx context.Context, symbol string, speed string) (<-chan *types.OrderBook, error) {
+	ch := make(chan *types.OrderBook, 1000)
 	
 	// Normalize symbol (lowercase for Binance WebSocket)
 	symbol = strings.ToLower(symbol)
 	
 	// Create subscription
 	stream := fmt.Sprintf("%s@depth20@%s", symbol, speed)
-	sub := market.WSSubscription{
+	sub := types.WSSubscription{
 		Symbol:     symbol,
-		MarketType: market.MarketTypeSpot,
+		MarketType: types.MarketTypeSpot,
 		Channels:   []string{stream},
 	}
 
@@ -80,17 +80,17 @@ func (c *WSClient) SubscribeOrderBook(ctx context.Context, symbol string, speed 
 }
 
 // SubscribeTrades subscribes to trade updates
-func (c *WSClient) SubscribeTrades(ctx context.Context, symbol string) (<-chan *market.Trade, error) {
-	ch := make(chan *market.Trade, 1000)
+func (c *WSClient) SubscribeTrades(ctx context.Context, symbol string) (<-chan *types.Trade, error) {
+	ch := make(chan *types.Trade, 1000)
 	
 	// Normalize symbol (lowercase for Binance WebSocket)
 	symbol = strings.ToLower(symbol)
 	
 	// Create subscription
 	stream := fmt.Sprintf("%s@trade", symbol)
-	sub := market.WSSubscription{
+	sub := types.WSSubscription{
 		Symbol:     symbol,
-		MarketType: market.MarketTypeSpot,
+		MarketType: types.MarketTypeSpot,
 		Channels:   []string{stream},
 	}
 
@@ -125,17 +125,17 @@ func (c *WSClient) SubscribeTrades(ctx context.Context, symbol string) (<-chan *
 }
 
 // SubscribeKlines subscribes to kline updates
-func (c *WSClient) SubscribeKlines(ctx context.Context, symbol, interval string) (<-chan *market.Kline, error) {
-	ch := make(chan *market.Kline, 1000)
+func (c *WSClient) SubscribeKlines(ctx context.Context, symbol, interval string) (<-chan *types.Kline, error) {
+	ch := make(chan *types.Kline, 1000)
 	
 	// Normalize symbol (lowercase for Binance WebSocket)
 	symbol = strings.ToLower(symbol)
 	
 	// Create subscription
 	stream := fmt.Sprintf("%s@kline_%s", symbol, interval)
-	sub := market.WSSubscription{
+	sub := types.WSSubscription{
 		Symbol:     symbol,
-		MarketType: market.MarketTypeSpot,
+		MarketType: types.MarketTypeSpot,
 		Channels:   []string{stream},
 	}
 
@@ -170,17 +170,17 @@ func (c *WSClient) SubscribeKlines(ctx context.Context, symbol, interval string)
 }
 
 // SubscribeTicker subscribes to ticker updates
-func (c *WSClient) SubscribeTicker(ctx context.Context, symbol string) (<-chan *market.Ticker, error) {
-	ch := make(chan *market.Ticker, 1000)
+func (c *WSClient) SubscribeTicker(ctx context.Context, symbol string) (<-chan *types.Ticker, error) {
+	ch := make(chan *types.Ticker, 1000)
 	
 	// Normalize symbol (lowercase for Binance WebSocket)
 	symbol = strings.ToLower(symbol)
 	
 	// Create subscription
 	stream := fmt.Sprintf("%s@ticker", symbol)
-	sub := market.WSSubscription{
+	sub := types.WSSubscription{
 		Symbol:     symbol,
-		MarketType: market.MarketTypeSpot,
+		MarketType: types.MarketTypeSpot,
 		Channels:   []string{stream},
 	}
 
@@ -215,7 +215,7 @@ func (c *WSClient) SubscribeTicker(ctx context.Context, symbol string) (<-chan *
 }
 
 // parseOrderBookMessage parses Binance order book message
-func (c *WSClient) parseOrderBookMessage(data map[string]interface{}) (*market.OrderBook, error) {
+func (c *WSClient) parseOrderBookMessage(data map[string]interface{}) (*types.OrderBook, error) {
 	symbol, ok := data["s"].(string)
 	if !ok {
 		return nil, fmt.Errorf("missing symbol")
@@ -231,11 +231,11 @@ func (c *WSClient) parseOrderBookMessage(data map[string]interface{}) (*market.O
 		return nil, fmt.Errorf("missing asks data")
 	}
 
-	orderBook := &market.OrderBook{
+	orderBook := &types.OrderBook{
 		Symbol:    strings.ToUpper(symbol),
 		UpdatedAt: time.Now(),
-		Bids:      make([]market.Level, 0, len(bidsData)),
-		Asks:      make([]market.Level, 0, len(asksData)),
+		Bids:      make([]types.Level, 0, len(bidsData)),
+		Asks:      make([]types.Level, 0, len(asksData)),
 	}
 
 	// Parse bids
@@ -263,7 +263,7 @@ func (c *WSClient) parseOrderBookMessage(data map[string]interface{}) (*market.O
 			continue
 		}
 
-		orderBook.Bids = append(orderBook.Bids, market.Level{
+		orderBook.Bids = append(orderBook.Bids, types.Level{
 			Price:    price,
 			Quantity: quantity,
 		})
@@ -294,7 +294,7 @@ func (c *WSClient) parseOrderBookMessage(data map[string]interface{}) (*market.O
 			continue
 		}
 
-		orderBook.Asks = append(orderBook.Asks, market.Level{
+		orderBook.Asks = append(orderBook.Asks, types.Level{
 			Price:    price,
 			Quantity: quantity,
 		})
@@ -304,7 +304,7 @@ func (c *WSClient) parseOrderBookMessage(data map[string]interface{}) (*market.O
 }
 
 // parseTradeMessage parses Binance trade message
-func (c *WSClient) parseTradeMessage(data map[string]interface{}) (*market.Trade, error) {
+func (c *WSClient) parseTradeMessage(data map[string]interface{}) (*types.Trade, error) {
 	symbol, ok := data["s"].(string)
 	if !ok {
 		return nil, fmt.Errorf("missing symbol")
@@ -350,7 +350,7 @@ func (c *WSClient) parseTradeMessage(data map[string]interface{}) (*market.Trade
 		side = "SELL"
 	}
 
-	trade := &market.Trade{
+	trade := &types.Trade{
 		ID:        strconv.FormatInt(int64(tradeID), 10),
 		Symbol:    strings.ToUpper(symbol),
 		Price:     price,
@@ -363,7 +363,7 @@ func (c *WSClient) parseTradeMessage(data map[string]interface{}) (*market.Trade
 }
 
 // parseKlineMessage parses Binance kline message
-func (c *WSClient) parseKlineMessage(data map[string]interface{}) (*market.Kline, error) {
+func (c *WSClient) parseKlineMessage(data map[string]interface{}) (*types.Kline, error) {
 	klineData, ok := data["k"].(map[string]interface{})
 	if !ok {
 		return nil, fmt.Errorf("missing kline data")
@@ -444,7 +444,7 @@ func (c *WSClient) parseKlineMessage(data map[string]interface{}) (*market.Kline
 		return nil, fmt.Errorf("invalid volume: %w", err)
 	}
 
-	kline := &market.Kline{
+	kline := &types.Kline{
 		Symbol:    strings.ToUpper(symbol),
 		Interval:  interval,
 		OpenTime:  time.UnixMilli(int64(openTime)),
@@ -461,7 +461,7 @@ func (c *WSClient) parseKlineMessage(data map[string]interface{}) (*market.Kline
 }
 
 // parseTickerMessage parses Binance ticker message
-func (c *WSClient) parseTickerMessage(data map[string]interface{}) (*market.Ticker, error) {
+func (c *WSClient) parseTickerMessage(data map[string]interface{}) (*types.Ticker, error) {
 	symbol, ok := data["s"].(string)
 	if !ok {
 		return nil, fmt.Errorf("missing symbol")
@@ -527,7 +527,7 @@ func (c *WSClient) parseTickerMessage(data map[string]interface{}) (*market.Tick
 	lowPrice, _ := strconv.ParseFloat(lowPriceStr, 64)
 	volume, _ := strconv.ParseFloat(volumeStr, 64)
 
-	ticker := &market.Ticker{
+	ticker := &types.Ticker{
 		Symbol:             strings.ToUpper(symbol),
 		PriceChange:        priceChange,
 		PriceChangePercent: priceChangePercent,

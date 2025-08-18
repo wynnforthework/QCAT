@@ -84,6 +84,31 @@ type JWTConfig struct {
 type MonitoringConfig struct {
 	PrometheusEnabled bool   `yaml:"prometheus_enabled"`
 	PrometheusPath    string `yaml:"prometheus_path"`
+	Alerts            AlertsConfig      `yaml:"alerts"`
+	HealthCheck       HealthCheckConfig `yaml:"health_check"`
+	Metrics           MetricsMonConfig  `yaml:"metrics"`
+}
+
+// AlertsConfig represents alerts configuration
+type AlertsConfig struct {
+	HighLatencyMs      int     `yaml:"high_latency_ms"`
+	ErrorRatePercent   float64 `yaml:"error_rate_percent"`
+	MemoryUsagePercent float64 `yaml:"memory_usage_percent"`
+	CPUUsagePercent    float64 `yaml:"cpu_usage_percent"`
+}
+
+// HealthCheckConfig represents health check configuration
+type HealthCheckConfig struct {
+	IntervalSeconds int `yaml:"interval_seconds"`
+	TimeoutSeconds  int `yaml:"timeout_seconds"`
+	RetryCount      int `yaml:"retry_count"`
+}
+
+// MetricsMonConfig represents metrics monitoring configuration
+type MetricsMonConfig struct {
+	CollectionIntervalSeconds int      `yaml:"collection_interval_seconds"`
+	RetentionHours            int      `yaml:"retention_hours"`
+	AggregationIntervals      []string `yaml:"aggregation_intervals"`
 }
 
 // CORSConfig CORS配置
@@ -174,9 +199,20 @@ type ApprovalConfig struct {
 
 // LoggingConfig 日志配置
 type LoggingConfig struct {
-	Level  string `yaml:"level"`
-	Format string `yaml:"format"`
-	Output string `yaml:"output"`
+	Level  string       `yaml:"level"`
+	Format string       `yaml:"format"`
+	Output string       `yaml:"output"`
+	Levels map[string]string `yaml:"levels"`
+	OutputConfig OutputConfig `yaml:"output_config"`
+}
+
+// OutputConfig represents log output configuration
+type OutputConfig struct {
+	ConsoleEnabled   bool   `yaml:"console_enabled"`
+	FileEnabled      bool   `yaml:"file_enabled"`
+	FilePath         string `yaml:"file_path"`
+	MaxFileSizeMB    int    `yaml:"max_file_size_mb"`
+	MaxBackupFiles   int    `yaml:"max_backup_files"`
 }
 
 // MemoryConfig 内存管理配置

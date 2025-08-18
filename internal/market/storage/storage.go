@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"qcat/internal/market"
+	"qcat/internal/types"
 )
 
 // Storage handles market data persistence
@@ -21,7 +21,7 @@ func NewStorage(db *sql.DB) *Storage {
 }
 
 // SaveKline saves kline data to database
-func (s *Storage) SaveKline(ctx context.Context, kline *market.Kline) error {
+func (s *Storage) SaveKline(ctx context.Context, kline *types.Kline) error {
 	query := `
 		INSERT INTO market_data (symbol, interval, timestamp, open, high, low, close, volume, complete, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -57,7 +57,7 @@ func (s *Storage) SaveKline(ctx context.Context, kline *market.Kline) error {
 }
 
 // SaveTrade saves trade data to database
-func (s *Storage) SaveTrade(ctx context.Context, trade *market.Trade) error {
+func (s *Storage) SaveTrade(ctx context.Context, trade *types.Trade) error {
 	query := `
 		INSERT INTO trades (id, symbol, price, size, side, fee, fee_currency, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -83,7 +83,7 @@ func (s *Storage) SaveTrade(ctx context.Context, trade *market.Trade) error {
 }
 
 // SaveOrderBook saves order book data to database
-func (s *Storage) SaveOrderBook(ctx context.Context, orderBook *market.OrderBook) error {
+func (s *Storage) SaveOrderBook(ctx context.Context, orderBook *types.OrderBook) error {
 	bidsJSON, err := json.Marshal(orderBook.Bids)
 	if err != nil {
 		return fmt.Errorf("failed to marshal bids: %w", err)
@@ -120,7 +120,7 @@ func (s *Storage) SaveOrderBook(ctx context.Context, orderBook *market.OrderBook
 }
 
 // SaveFundingRate saves funding rate data to database
-func (s *Storage) SaveFundingRate(ctx context.Context, fundingRate *market.FundingRate) error {
+func (s *Storage) SaveFundingRate(ctx context.Context, fundingRate *types.FundingRate) error {
 	query := `
 		INSERT INTO funding_rates (symbol, rate, next_rate, next_time, created_at)
 		VALUES ($1, $2, $3, $4, $5)
@@ -142,7 +142,7 @@ func (s *Storage) SaveFundingRate(ctx context.Context, fundingRate *market.Fundi
 }
 
 // SaveOpenInterest saves open interest data to database
-func (s *Storage) SaveOpenInterest(ctx context.Context, openInterest *market.OpenInterest) error {
+func (s *Storage) SaveOpenInterest(ctx context.Context, openInterest *types.OpenInterest) error {
 	query := `
 		INSERT INTO open_interest (symbol, value, notional, timestamp, created_at)
 		VALUES ($1, $2, $3, $4, $5)
@@ -164,7 +164,7 @@ func (s *Storage) SaveOpenInterest(ctx context.Context, openInterest *market.Ope
 }
 
 // SaveTicker saves ticker data to database
-func (s *Storage) SaveTicker(ctx context.Context, ticker *market.Ticker) error {
+func (s *Storage) SaveTicker(ctx context.Context, ticker *types.Ticker) error {
 	query := `
 		INSERT INTO tickers (
 			symbol, price_change, price_change_percent, weighted_avg_price,
@@ -229,7 +229,7 @@ func (s *Storage) SaveTicker(ctx context.Context, ticker *market.Ticker) error {
 }
 
 // GetLatestKlines retrieves the latest klines for a symbol
-func (s *Storage) GetLatestKlines(ctx context.Context, symbol, interval string, limit int) ([]*market.Kline, error) {
+func (s *Storage) GetLatestKlines(ctx context.Context, symbol, interval string, limit int) ([]*types.Kline, error) {
 	query := `
 		SELECT symbol, interval, timestamp, open, high, low, close, volume, complete
 		FROM market_data
@@ -244,9 +244,9 @@ func (s *Storage) GetLatestKlines(ctx context.Context, symbol, interval string, 
 	}
 	defer rows.Close()
 
-	var klines []*market.Kline
+	var klines []*types.Kline
 	for rows.Next() {
-		var k market.Kline
+		var k types.Kline
 		if err := rows.Scan(
 			&k.Symbol,
 			&k.Interval,
@@ -271,7 +271,7 @@ func (s *Storage) GetLatestKlines(ctx context.Context, symbol, interval string, 
 }
 
 // GetLatestTrades retrieves the latest trades for a symbol
-func (s *Storage) GetLatestTrades(ctx context.Context, symbol string, limit int) ([]*market.Trade, error) {
+func (s *Storage) GetLatestTrades(ctx context.Context, symbol string, limit int) ([]*types.Trade, error) {
 	query := `
 		SELECT id, symbol, price, size, side, fee, fee_currency, created_at
 		FROM trades
@@ -286,9 +286,9 @@ func (s *Storage) GetLatestTrades(ctx context.Context, symbol string, limit int)
 	}
 	defer rows.Close()
 
-	var trades []*market.Trade
+	var trades []*types.Trade
 	for rows.Next() {
-		var t market.Trade
+		var t types.Trade
 		if err := rows.Scan(
 			&t.ID,
 			&t.Symbol,
@@ -312,7 +312,7 @@ func (s *Storage) GetLatestTrades(ctx context.Context, symbol string, limit int)
 }
 
 // GetLatestOrderBook retrieves the latest order book for a symbol
-func (s *Storage) GetLatestOrderBook(ctx context.Context, symbol string) (*market.OrderBook, error) {
+func (s *Storage) GetLatestOrderBook(ctx context.Context, symbol string) (*types.OrderBook, error) {
 	query := `
 		SELECT symbol, bids, asks, updated_at
 		FROM order_books
@@ -321,7 +321,7 @@ func (s *Storage) GetLatestOrderBook(ctx context.Context, symbol string) (*marke
 		LIMIT 1
 	`
 
-	var orderBook market.OrderBook
+	var orderBook types.OrderBook
 	var bidsJSON, asksJSON []byte
 
 	err := s.db.QueryRowContext(ctx, query, symbol).Scan(
@@ -333,10 +333,10 @@ func (s *Storage) GetLatestOrderBook(ctx context.Context, symbol string) (*marke
 
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return &market.OrderBook{
+			return &types.OrderBook{
 				Symbol:    symbol,
-				Bids:      []market.Level{},
-				Asks:      []market.Level{},
+				Bids:      []types.Level{},
+				Asks:      []types.Level{},
 				UpdatedAt: time.Now(),
 			}, nil
 		}
@@ -355,7 +355,7 @@ func (s *Storage) GetLatestOrderBook(ctx context.Context, symbol string) (*marke
 }
 
 // GetLatestTicker retrieves the latest ticker for a symbol
-func (s *Storage) GetLatestTicker(ctx context.Context, symbol string) (*market.Ticker, error) {
+func (s *Storage) GetLatestTicker(ctx context.Context, symbol string) (*types.Ticker, error) {
 	query := `
 		SELECT 
 			symbol, price_change, price_change_percent, weighted_avg_price,
@@ -368,7 +368,7 @@ func (s *Storage) GetLatestTicker(ctx context.Context, symbol string) (*market.T
 		LIMIT 1
 	`
 
-	var ticker market.Ticker
+	var ticker types.Ticker
 	err := s.db.QueryRowContext(ctx, query, symbol).Scan(
 		&ticker.Symbol,
 		&ticker.PriceChange,

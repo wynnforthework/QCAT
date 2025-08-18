@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"qcat/internal/market"
+	"qcat/internal/types"
 )
 
 // Client represents a Binance API client
@@ -43,7 +43,7 @@ func NewClient(apiKey, apiSecret string, testnet bool) *Client {
 }
 
 // GetKlines fetches historical kline data
-func (c *Client) GetKlines(ctx context.Context, symbol, interval string, startTime, endTime time.Time, limit int) ([]*market.Kline, error) {
+func (c *Client) GetKlines(ctx context.Context, symbol, interval string, startTime, endTime time.Time, limit int) ([]*types.Kline, error) {
 	params := url.Values{}
 	params.Set("symbol", strings.ToUpper(symbol))
 	params.Set("interval", interval)
@@ -64,7 +64,7 @@ func (c *Client) GetKlines(ctx context.Context, symbol, interval string, startTi
 		return nil, fmt.Errorf("failed to decode klines response: %w", err)
 	}
 
-	klines := make([]*market.Kline, 0, len(rawKlines))
+	klines := make([]*types.Kline, 0, len(rawKlines))
 	for _, raw := range rawKlines {
 		if len(raw) < 11 {
 			continue
@@ -78,7 +78,7 @@ func (c *Client) GetKlines(ctx context.Context, symbol, interval string, startTi
 		volume, _ := strconv.ParseFloat(raw[5].(string), 64)
 		closeTime, _ := raw[6].(float64)
 
-		kline := &market.Kline{
+		kline := &types.Kline{
 			Symbol:    symbol,
 			Interval:  interval,
 			OpenTime:  time.UnixMilli(int64(openTime)),
@@ -97,7 +97,7 @@ func (c *Client) GetKlines(ctx context.Context, symbol, interval string, startTi
 }
 
 // GetTrades fetches historical trade data
-func (c *Client) GetTrades(ctx context.Context, symbol string, limit int) ([]*market.Trade, error) {
+func (c *Client) GetTrades(ctx context.Context, symbol string, limit int) ([]*types.Trade, error) {
 	params := url.Values{}
 	params.Set("symbol", strings.ToUpper(symbol))
 	if limit > 0 {
@@ -124,7 +124,7 @@ func (c *Client) GetTrades(ctx context.Context, symbol string, limit int) ([]*ma
 		return nil, fmt.Errorf("failed to decode trades response: %w", err)
 	}
 
-	trades := make([]*market.Trade, 0, len(rawTrades))
+	trades := make([]*types.Trade, 0, len(rawTrades))
 	for _, raw := range rawTrades {
 		price, _ := strconv.ParseFloat(raw.Price, 64)
 		quantity, _ := strconv.ParseFloat(raw.Qty, 64)
@@ -134,7 +134,7 @@ func (c *Client) GetTrades(ctx context.Context, symbol string, limit int) ([]*ma
 			side = "SELL"
 		}
 
-		trade := &market.Trade{
+		trade := &types.Trade{
 			ID:        strconv.FormatInt(raw.ID, 10),
 			Symbol:    symbol,
 			Price:     price,
@@ -149,7 +149,7 @@ func (c *Client) GetTrades(ctx context.Context, symbol string, limit int) ([]*ma
 }
 
 // GetOrderBook fetches current order book
-func (c *Client) GetOrderBook(ctx context.Context, symbol string, limit int) (*market.OrderBook, error) {
+func (c *Client) GetOrderBook(ctx context.Context, symbol string, limit int) (*types.OrderBook, error) {
 	params := url.Values{}
 	params.Set("symbol", strings.ToUpper(symbol))
 	if limit > 0 {
@@ -172,18 +172,18 @@ func (c *Client) GetOrderBook(ctx context.Context, symbol string, limit int) (*m
 		return nil, fmt.Errorf("failed to decode order book response: %w", err)
 	}
 
-	orderBook := &market.OrderBook{
+	orderBook := &types.OrderBook{
 		Symbol:    symbol,
 		UpdatedAt: time.Now(),
-		Bids:      make([]market.Level, 0, len(rawOrderBook.Bids)),
-		Asks:      make([]market.Level, 0, len(rawOrderBook.Asks)),
+		Bids:      make([]types.Level, 0, len(rawOrderBook.Bids)),
+		Asks:      make([]types.Level, 0, len(rawOrderBook.Asks)),
 	}
 
 	for _, bid := range rawOrderBook.Bids {
 		if len(bid) >= 2 {
 			price, _ := strconv.ParseFloat(bid[0], 64)
 			quantity, _ := strconv.ParseFloat(bid[1], 64)
-			orderBook.Bids = append(orderBook.Bids, market.Level{
+			orderBook.Bids = append(orderBook.Bids, types.Level{
 				Price:    price,
 				Quantity: quantity,
 			})
@@ -194,7 +194,7 @@ func (c *Client) GetOrderBook(ctx context.Context, symbol string, limit int) (*m
 		if len(ask) >= 2 {
 			price, _ := strconv.ParseFloat(ask[0], 64)
 			quantity, _ := strconv.ParseFloat(ask[1], 64)
-			orderBook.Asks = append(orderBook.Asks, market.Level{
+			orderBook.Asks = append(orderBook.Asks, types.Level{
 				Price:    price,
 				Quantity: quantity,
 			})
@@ -205,7 +205,7 @@ func (c *Client) GetOrderBook(ctx context.Context, symbol string, limit int) (*m
 }
 
 // GetFundingRate fetches current funding rate for futures
-func (c *Client) GetFundingRate(ctx context.Context, symbol string) (*market.FundingRate, error) {
+func (c *Client) GetFundingRate(ctx context.Context, symbol string) (*types.FundingRate, error) {
 	params := url.Values{}
 	params.Set("symbol", strings.ToUpper(symbol))
 
@@ -246,7 +246,7 @@ func (c *Client) GetFundingRate(ctx context.Context, symbol string) (*market.Fun
 	rate, _ := strconv.ParseFloat(rawFunding.LastFundingRate, 64)
 	interestRate, _ := strconv.ParseFloat(rawFunding.InterestRate, 64)
 
-	fundingRate := &market.FundingRate{
+	fundingRate := &types.FundingRate{
 		Symbol:      symbol,
 		Rate:        rate,
 		NextRate:    interestRate, // Use interest rate as next rate approximation
@@ -258,7 +258,7 @@ func (c *Client) GetFundingRate(ctx context.Context, symbol string) (*market.Fun
 }
 
 // GetOpenInterest fetches open interest data for futures
-func (c *Client) GetOpenInterest(ctx context.Context, symbol string) (*market.OpenInterest, error) {
+func (c *Client) GetOpenInterest(ctx context.Context, symbol string) (*types.OpenInterest, error) {
 	params := url.Values{}
 	params.Set("symbol", strings.ToUpper(symbol))
 
@@ -293,7 +293,7 @@ func (c *Client) GetOpenInterest(ctx context.Context, symbol string) (*market.Op
 
 	value, _ := strconv.ParseFloat(rawOI.OpenInterest, 64)
 
-	openInterest := &market.OpenInterest{
+	openInterest := &types.OpenInterest{
 		Symbol:    symbol,
 		Value:     value,
 		Notional:  value, // Simplified - in real implementation, multiply by contract size and price

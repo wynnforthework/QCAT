@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sync"
 	"time"
 )
@@ -52,25 +53,38 @@ func NewMemoryCache(maxSize int) *MemoryCache {
 }
 
 // Get retrieves a value from memory cache
-func (mc *MemoryCache) Get(ctx context.Context, key string) (interface{}, error) {
+func (mc *MemoryCache) Get(ctx context.Context, key string, dest interface{}) error {
 	mc.mu.RLock()
 	defer mc.mu.RUnlock()
 
 	item, exists := mc.items[key]
 	if !exists {
-		return nil, fmt.Errorf("key not found: %s", key)
+		return fmt.Errorf("key not found: %s", key)
 	}
 
 	// Check if item has expired
 	if time.Now().After(item.expiration) {
 		// Item expired, remove it
 		go mc.deleteExpired(key)
-		return nil, fmt.Errorf("key expired: %s", key)
+		return fmt.Errorf("key expired: %s", key)
 	}
 
 	// Update access time
 	item.accessed = time.Now()
-	return item.value, nil
+	
+	// Use reflection to set the destination
+	destValue := reflect.ValueOf(dest)
+	if destValue.Kind() != reflect.Ptr {
+		return fmt.Errorf("dest must be a pointer")
+	}
+
+	itemValue := reflect.ValueOf(item.value)
+	if itemValue.Type().AssignableTo(destValue.Elem().Type()) {
+		destValue.Elem().Set(itemValue)
+		return nil
+	}
+
+	return fmt.Errorf("type mismatch: cannot assign %v to %v", itemValue.Type(), destValue.Elem().Type())
 }
 
 // Set stores a value in memory cache
@@ -300,5 +314,88 @@ func (mc *MemoryCache) Expire(ctx context.Context, key string, expiration time.D
 	}
 
 	item.expiration = time.Now().Add(expiration)
+	return nil
+}
+
+// CheckRateLimit checks if a rate limit has been exceeded
+func (mc *MemoryCache) CheckRateLimit(ctx context.Context, key string, limit int, window time.Duration) (bool, error) {
+	mc.mu.Lock()
+	defer mc.mu.Unlock()
+
+	now := time.Now()
+	rateKey := fmt.Sprintf("rate_limit:%s", key)
+	
+	// Get current rate limit data
+	var rateData []time.Time
+	if item, exists := mc.items[rateKey]; exists {
+		if data, ok := item.value.([]time.Time); ok {
+			rateData = data
+		}
+	}
+
+	// Remove expired entries
+	cutoff := now.Add(-window)
+	validEntries := make([]time.Time, 0)
+	for _, entry := range rateData {
+		if entry.After(cutoff) {
+			validEntries = append(validEntries, entry)
+		}
+	}
+
+	// Check if limit exceeded
+	if len(validEntries) >= limit {
+		return false, nil // Rate limit exceeded
+	}
+
+	// Add current request
+	validEntries = append(validEntries, now)
+	
+	// Update cache
+	mc.items[rateKey] = &memoryItem{
+		value:      validEntries,
+		expiration: now.Add(window),
+	}
+
+	return true, nil // Request allowed
+}
+
+// GetFundingRate retrieves funding rate from cache
+func (mc *MemoryCache) GetFundingRate(ctx context.Context, symbol string, dest interface{}) error {
+	return mc.Get(ctx, "funding_rate:"+symbol, dest)
+}
+
+// SetFundingRate stores funding rate in cache
+func (mc *MemoryCache) SetFundingRate(ctx context.Context, symbol string, rate interface{}, expiration time.Duration) error {
+	return mc.Set(ctx, "funding_rate:"+symbol, rate, expiration)
+}
+
+// GetIndexPrice retrieves index price from cache
+func (mc *MemoryCache) GetIndexPrice(ctx context.Context, symbol string, dest interface{}) error {
+	return mc.Get(ctx, "index_price:"+symbol, dest)
+}
+
+// SetIndexPrice stores index price in cache
+func (mc *MemoryCache) SetIndexPrice(ctx context.Context, symbol string, price interface{}, expiration time.Duration) error {
+	return mc.Set(ctx, "index_price:"+symbol, price, expiration)
+}
+
+// SetOrderBook stores order book in cache
+func (mc *MemoryCache) SetOrderBook(ctx context.Context, symbol string, snapshot interface{}, expiration time.Duration) error {
+	return mc.Set(ctx, "orderbook:"+symbol, snapshot, expiration)
+}
+
+// GetOrderBook retrieves order book from cache
+func (mc *MemoryCache) GetOrderBook(ctx context.Context, symbol string, dest interface{}) error {
+	return mc.Get(ctx, "orderbook:"+symbol, dest)
+}
+
+// HDel removes fields from a hash
+func (mc *MemoryCache) HDel(ctx context.Context, key string, fields ...string) error {
+	mc.mu.Lock()
+	defer mc.mu.Unlock()
+
+	// For simplicity, we'll just delete the entire key
+	// In a real implementation, you'd want to handle individual hash fields
+	delete(mc.items, key)
 	return nil
 }

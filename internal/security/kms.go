@@ -283,24 +283,11 @@ func (k *KMS) decrypt(encryptedData string) (string, error) {
 	return string(plaintext), nil
 }
 
-// 生成密钥ID
-func generateKeyID() string {
-	bytes := make([]byte, 16)
-	rand.Read(bytes)
-	return fmt.Sprintf("key_%x", bytes)
-}
-
 // 生成随机密钥
 func generateRandomKey(length int) string {
 	bytes := make([]byte, length)
 	rand.Read(bytes)
 	return base64.StdEncoding.EncodeToString(bytes)
-}
-
-// HashPassword 哈希密码
-func HashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	return string(bytes), err
 }
 
 // CheckPassword 验证密码

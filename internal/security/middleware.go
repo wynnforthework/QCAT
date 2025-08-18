@@ -239,7 +239,7 @@ func (sm *SecurityMiddleware) DetectSuspiciousActivity() gin.HandlerFunc {
 		}
 
 		// Check for SQL injection patterns in query parameters
-		for key, values := range c.Request.URL.Query() {
+		for _, values := range c.Request.URL.Query() {
 			for _, value := range values {
 				if sm.containsSQLInjectionPattern(value) {
 					suspicious = true

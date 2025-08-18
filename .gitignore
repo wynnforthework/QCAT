@@ -56,3 +56,4 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 configs/config.yaml
+scripts/start_local.sh

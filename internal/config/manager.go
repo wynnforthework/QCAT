@@ -1,7 +1,6 @@
 package config
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -12,6 +11,74 @@ import (
 
 	"gopkg.in/yaml.v3"
 )
+
+// FileEvent represents a file system event
+type FileEvent struct {
+	Type string
+	Path string
+}
+
+// Watcher watches a file for changes
+type Watcher struct {
+	filePath string
+	events   chan FileEvent
+	stop     chan struct{}
+}
+
+// NewWatcher creates a new file watcher
+func NewWatcher(filePath string) (*Watcher, error) {
+	watcher := &Watcher{
+		filePath: filePath,
+		events:   make(chan FileEvent, 10),
+		stop:     make(chan struct{}),
+	}
+	
+	// Start watching in background
+	go watcher.watch()
+	
+	return watcher, nil
+}
+
+// Events returns the events channel
+func (w *Watcher) Events() <-chan FileEvent {
+	return w.events
+}
+
+// Stop stops the watcher
+func (w *Watcher) Stop() {
+	close(w.stop)
+}
+
+// watch monitors the file for changes
+func (w *Watcher) watch() {
+	ticker := time.NewTicker(1 * time.Second)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-w.stop:
+			return
+		case <-ticker.C:
+			// Check file modification time
+			info, err := ioutil.ReadFile(w.filePath)
+			if err != nil {
+				continue
+			}
+			
+			// Simple check - in a real implementation you'd use fsnotify
+			// For now, just check if file exists and has content
+			if len(info) > 0 {
+				w.events <- FileEvent{
+					Type: "modified",
+					Path: w.filePath,
+				})
+			}
+		}
+	}
+}
+
+// FileModified represents a file modification event
+const FileModified = "modified"
 
 // Manager manages configuration with hot reload support
 type Manager struct {

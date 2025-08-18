@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"qcat/internal/market/binance"
+	"qcat/internal/exchange/binance"
 	"qcat/internal/market/quality"
 	"qcat/internal/market/storage"
 )
