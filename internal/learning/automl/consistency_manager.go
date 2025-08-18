@@ -1,7 +1,6 @@
 package automl
 
 import (
-	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
@@ -16,106 +15,106 @@ import (
 
 // ConsistencyManager 训练一致性管理器
 type ConsistencyManager struct {
-	config     *config.Config
-	mu         sync.RWMutex
-	
+	config *config.Config
+	mu     sync.RWMutex
+
 	// 全局随机种子管理
 	globalSeed int64
 	seeds      map[string]int64 // 任务ID -> 种子映射
-	
+
 	// 模型结果缓存和共享
 	modelCache     map[string]*CachedModel
 	resultRegistry map[string]*TrainingResult
-	
+
 	// 分布式协调
 	nodeID         string
 	clusterNodes   map[string]*ClusterNode
 	consensusState *ConsensusState
-	
+
 	// 配置
 	enableDeterministic bool
 	enableModelSharing  bool
 	enableConsensus     bool
-	cacheTTL           time.Duration
+	cacheTTL            time.Duration
 }
 
 // CachedModel 缓存的模型
 type CachedModel struct {
-	ModelID       string                 `json:"model_id"`
-	TaskID        string                 `json:"task_id"`
-	Parameters    map[string]interface{} `json:"parameters"`
-	DataHash      string                 `json:"data_hash"`
-	Result        *TrainingResult        `json:"result"`
-	CreatedAt     time.Time              `json:"created_at"`
-	LastAccessed  time.Time              `json:"last_accessed"`
-	AccessCount   int                    `json:"access_count"`
-	IsValid       bool                   `json:"is_valid"`
+	ModelID      string                 `json:"model_id"`
+	TaskID       string                 `json:"task_id"`
+	Parameters   map[string]interface{} `json:"parameters"`
+	DataHash     string                 `json:"data_hash"`
+	Result       *TrainingResult        `json:"result"`
+	CreatedAt    time.Time              `json:"created_at"`
+	LastAccessed time.Time              `json:"last_accessed"`
+	AccessCount  int                    `json:"access_count"`
+	IsValid      bool                   `json:"is_valid"`
 }
 
 // TrainingResult 训练结果
 type TrainingResult struct {
-	TaskID           string                 `json:"task_id"`
-	ModelID          string                 `json:"model_id"`
-	Parameters       map[string]interface{} `json:"parameters"`
-	DataHash         string                 `json:"data_hash"`
-	Performance      map[string]float64     `json:"performance"`
-	TrainingMetrics  map[string]float64     `json:"training_metrics"`
-	ValidationMetrics map[string]float64    `json:"validation_metrics"`
-	TestMetrics      map[string]float64     `json:"test_metrics"`
-	TrainingTime     time.Duration          `json:"training_time"`
-	ModelSize        int64                  `json:"model_size"`
-	CreatedAt        time.Time              `json:"created_at"`
-	NodeID           string                 `json:"node_id"`
-	ConsensusHash    string                 `json:"consensus_hash"`
+	TaskID            string                 `json:"task_id"`
+	ModelID           string                 `json:"model_id"`
+	Parameters        map[string]interface{} `json:"parameters"`
+	DataHash          string                 `json:"data_hash"`
+	Performance       map[string]float64     `json:"performance"`
+	TrainingMetrics   map[string]float64     `json:"training_metrics"`
+	ValidationMetrics map[string]float64     `json:"validation_metrics"`
+	TestMetrics       map[string]float64     `json:"test_metrics"`
+	TrainingTime      time.Duration          `json:"training_time"`
+	ModelSize         int64                  `json:"model_size"`
+	CreatedAt         time.Time              `json:"created_at"`
+	NodeID            string                 `json:"node_id"`
+	ConsensusHash     string                 `json:"consensus_hash"`
 }
 
 // ClusterNode 集群节点信息
 type ClusterNode struct {
-	NodeID      string    `json:"node_id"`
-	Address     string    `json:"address"`
-	LastSeen    time.Time `json:"last_seen"`
-	IsActive    bool      `json:"is_active"`
-	ModelCount  int       `json:"model_count"`
-	LoadFactor  float64   `json:"load_factor"`
+	NodeID     string    `json:"node_id"`
+	Address    string    `json:"address"`
+	LastSeen   time.Time `json:"last_seen"`
+	IsActive   bool      `json:"is_active"`
+	ModelCount int       `json:"model_count"`
+	LoadFactor float64   `json:"load_factor"`
 }
 
 // ConsensusState 共识状态
 type ConsensusState struct {
-	CurrentTerm    int64                    `json:"current_term"`
-	LeaderID       string                   `json:"leader_id"`
-	VotedFor       string                   `json:"voted_for"`
-	LogIndex       int64                    `json:"log_index"`
-	CommitIndex    int64                    `json:"commit_index"`
-	AppliedIndex   int64                    `json:"applied_index"`
-	LastHeartbeat  time.Time                `json:"last_heartbeat"`
-	ClusterConfig  map[string]*ClusterNode  `json:"cluster_config"`
+	CurrentTerm   int64                   `json:"current_term"`
+	LeaderID      string                  `json:"leader_id"`
+	VotedFor      string                  `json:"voted_for"`
+	LogIndex      int64                   `json:"log_index"`
+	CommitIndex   int64                   `json:"commit_index"`
+	AppliedIndex  int64                   `json:"applied_index"`
+	LastHeartbeat time.Time               `json:"last_heartbeat"`
+	ClusterConfig map[string]*ClusterNode `json:"cluster_config"`
 }
 
 // NewConsistencyManager 创建一致性管理器
 func NewConsistencyManager(cfg *config.Config) (*ConsistencyManager, error) {
 	cm := &ConsistencyManager{
-		config:             cfg,
-		globalSeed:         time.Now().UnixNano(),
-		seeds:              make(map[string]int64),
-		modelCache:         make(map[string]*CachedModel),
-		resultRegistry:     make(map[string]*TrainingResult),
-		nodeID:             generateNodeID(),
-		clusterNodes:       make(map[string]*ClusterNode),
-		consensusState:     &ConsensusState{},
+		config:              cfg,
+		globalSeed:          time.Now().UnixNano(),
+		seeds:               make(map[string]int64),
+		modelCache:          make(map[string]*CachedModel),
+		resultRegistry:      make(map[string]*TrainingResult),
+		nodeID:              generateNodeID(),
+		clusterNodes:        make(map[string]*ClusterNode),
+		consensusState:      &ConsensusState{},
 		enableDeterministic: true,
 		enableModelSharing:  true,
 		enableConsensus:     true,
-		cacheTTL:           24 * time.Hour,
+		cacheTTL:            24 * time.Hour,
 	}
-	
+
 	// 从配置文件读取一致性设置
 	if cfg != nil {
 		// TODO: 从配置文件读取一致性参数
 	}
-	
+
 	// 启动后台任务
 	go cm.startBackgroundTasks()
-	
+
 	return cm, nil
 }
 
@@ -123,19 +122,19 @@ func NewConsistencyManager(cfg *config.Config) (*ConsistencyManager, error) {
 func (cm *ConsistencyManager) GetDeterministicSeed(taskID string, dataHash string) int64 {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	// 生成基于任务ID和数据哈希的确定性种子
 	seedKey := fmt.Sprintf("%s_%s", taskID, dataHash)
-	
+
 	if seed, exists := cm.seeds[seedKey]; exists {
 		return seed
 	}
-	
+
 	// 使用MD5哈希生成种子
 	hash := md5.Sum([]byte(seedKey))
 	seed := int64(hash[0])<<56 | int64(hash[1])<<48 | int64(hash[2])<<40 | int64(hash[3])<<32 |
 		int64(hash[4])<<24 | int64(hash[5])<<16 | int64(hash[6])<<8 | int64(hash[7])
-	
+
 	cm.seeds[seedKey] = seed
 	return seed
 }
@@ -151,9 +150,9 @@ func (cm *ConsistencyManager) SetRandomSeed(taskID string, dataHash string) {
 func (cm *ConsistencyManager) CheckModelCache(taskID string, parameters map[string]interface{}, dataHash string) (*TrainingResult, bool) {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
-	
+
 	cacheKey := cm.generateCacheKey(taskID, parameters, dataHash)
-	
+
 	if cached, exists := cm.modelCache[cacheKey]; exists && cached.IsValid {
 		// 检查缓存是否过期
 		if time.Since(cached.LastAccessed) < cm.cacheTTL {
@@ -164,7 +163,7 @@ func (cm *ConsistencyManager) CheckModelCache(taskID string, parameters map[stri
 			cached.AccessCount++
 			cm.mu.Unlock()
 			cm.mu.RLock()
-			
+
 			log.Printf("Cache hit for task %s, returning cached result", taskID)
 			return cached.Result, true
 		} else {
@@ -172,7 +171,7 @@ func (cm *ConsistencyManager) CheckModelCache(taskID string, parameters map[stri
 			cached.IsValid = false
 		}
 	}
-	
+
 	return nil, false
 }
 
@@ -180,9 +179,9 @@ func (cm *ConsistencyManager) CheckModelCache(taskID string, parameters map[stri
 func (cm *ConsistencyManager) CacheModelResult(taskID string, parameters map[string]interface{}, dataHash string, result *TrainingResult) {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	cacheKey := cm.generateCacheKey(taskID, parameters, dataHash)
-	
+
 	cached := &CachedModel{
 		ModelID:      result.ModelID,
 		TaskID:       taskID,
@@ -194,10 +193,10 @@ func (cm *ConsistencyManager) CacheModelResult(taskID string, parameters map[str
 		AccessCount:  1,
 		IsValid:      true,
 	}
-	
+
 	cm.modelCache[cacheKey] = cached
 	cm.resultRegistry[result.ModelID] = result
-	
+
 	log.Printf("Cached model result for task %s, cache key: %s", taskID, cacheKey)
 }
 
@@ -206,10 +205,10 @@ func (cm *ConsistencyManager) ShareModelResult(result *TrainingResult) error {
 	if !cm.enableModelSharing {
 		return nil
 	}
-	
+
 	// 生成共识哈希
 	result.ConsensusHash = cm.generateConsensusHash(result)
-	
+
 	// 广播到其他节点
 	for nodeID, node := range cm.clusterNodes {
 		if nodeID != cm.nodeID && node.IsActive {
@@ -219,7 +218,7 @@ func (cm *ConsistencyManager) ShareModelResult(result *TrainingResult) error {
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -228,7 +227,7 @@ func (cm *ConsistencyManager) GetSharedModelResult(taskID string, parameters map
 	if !cm.enableModelSharing {
 		return nil, false
 	}
-	
+
 	// 从其他节点查询
 	for nodeID, node := range cm.clusterNodes {
 		if nodeID != cm.nodeID && node.IsActive {
@@ -241,25 +240,25 @@ func (cm *ConsistencyManager) GetSharedModelResult(taskID string, parameters map
 			}
 		}
 	}
-	
+
 	return nil, false
 }
 
 // ValidateResultConsistency 验证结果一致性
 func (cm *ConsistencyManager) ValidateResultConsistency(taskID string, localResult *TrainingResult) (*ConsistencyReport, error) {
 	report := &ConsistencyReport{
-		TaskID:        taskID,
-		LocalResult:   localResult,
+		TaskID:           taskID,
+		LocalResult:      localResult,
 		ConsensusResults: make([]*TrainingResult, 0),
-		IsConsistent:  true,
-		Confidence:    1.0,
-		CreatedAt:     time.Now(),
+		IsConsistent:     true,
+		Confidence:       1.0,
+		CreatedAt:        time.Now(),
 	}
-	
+
 	if !cm.enableConsensus {
 		return report, nil
 	}
-	
+
 	// 收集其他节点的结果
 	for nodeID, node := range cm.clusterNodes {
 		if nodeID != cm.nodeID && node.IsActive {
@@ -269,25 +268,25 @@ func (cm *ConsistencyManager) ValidateResultConsistency(taskID string, localResu
 			}
 		}
 	}
-	
+
 	// 计算一致性
 	if len(report.ConsensusResults) > 0 {
 		report.IsConsistent = cm.calculateConsistency(localResult, report.ConsensusResults)
 		report.Confidence = cm.calculateConfidence(report.ConsensusResults)
 	}
-	
+
 	return report, nil
 }
 
 // ConsistencyReport 一致性报告
 type ConsistencyReport struct {
-	TaskID           string            `json:"task_id"`
-	LocalResult      *TrainingResult   `json:"local_result"`
-	ConsensusResults []*TrainingResult `json:"consensus_results"`
-	IsConsistent     bool              `json:"is_consistent"`
-	Confidence       float64           `json:"confidence"`
+	TaskID           string             `json:"task_id"`
+	LocalResult      *TrainingResult    `json:"local_result"`
+	ConsensusResults []*TrainingResult  `json:"consensus_results"`
+	IsConsistent     bool               `json:"is_consistent"`
+	Confidence       float64            `json:"confidence"`
 	Variance         map[string]float64 `json:"variance"`
-	CreatedAt        time.Time         `json:"created_at"`
+	CreatedAt        time.Time          `json:"created_at"`
 }
 
 // Helper methods
@@ -309,23 +308,23 @@ func (cm *ConsistencyManager) calculateConsistency(local *TrainingResult, others
 	if len(others) == 0 {
 		return true
 	}
-	
+
 	// 检查性能指标的一致性
 	tolerance := 0.01 // 1%的容差
-	
+
 	for _, other := range others {
 		for metric, localValue := range local.Performance {
 			if otherValue, exists := other.Performance[metric]; exists {
 				diff := abs(localValue - otherValue)
 				if diff > tolerance {
-					log.Printf("Inconsistency detected for metric %s: local=%.4f, remote=%.4f, diff=%.4f", 
+					log.Printf("Inconsistency detected for metric %s: local=%.4f, remote=%.4f, diff=%.4f",
 						metric, localValue, otherValue, diff)
 					return false
 				}
 			}
 		}
 	}
-	
+
 	return true
 }
 
@@ -333,7 +332,7 @@ func (cm *ConsistencyManager) calculateConfidence(results []*TrainingResult) flo
 	if len(results) == 0 {
 		return 1.0
 	}
-	
+
 	// 基于结果数量和一致性计算置信度
 	consistentCount := 0
 	for _, result := range results {
@@ -341,7 +340,7 @@ func (cm *ConsistencyManager) calculateConfidence(results []*TrainingResult) flo
 			consistentCount++
 		}
 	}
-	
+
 	return float64(consistentCount) / float64(len(results))
 }
 
@@ -362,17 +361,17 @@ func (cm *ConsistencyManager) startBackgroundTasks() {
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
-		
+
 		for range ticker.C {
 			cm.cleanupExpiredCache()
 		}
 	}()
-	
+
 	// 定期同步集群状态
 	go func() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
-		
+
 		for range ticker.C {
 			cm.syncClusterState()
 		}
@@ -382,20 +381,20 @@ func (cm *ConsistencyManager) startBackgroundTasks() {
 func (cm *ConsistencyManager) cleanupExpiredCache() {
 	cm.mu.Lock()
 	defer cm.mu.Unlock()
-	
+
 	now := time.Now()
 	expiredKeys := make([]string, 0)
-	
+
 	for key, cached := range cm.modelCache {
 		if now.Sub(cached.LastAccessed) > cm.cacheTTL {
 			expiredKeys = append(expiredKeys, key)
 		}
 	}
-	
+
 	for _, key := range expiredKeys {
 		delete(cm.modelCache, key)
 	}
-	
+
 	if len(expiredKeys) > 0 {
 		log.Printf("Cleaned up %d expired cache entries", len(expiredKeys))
 	}

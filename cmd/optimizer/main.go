@@ -2,22 +2,16 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math"
 	"math/rand"
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"sort"
-	"strconv"
-	"strings"
 	"syscall"
 	"time"
 
@@ -38,10 +32,10 @@ type OptimizerService struct {
 
 // Config holds the optimizer service configuration
 type Config struct {
-	Port         int    `json:"port"`
-	MessageQueue string `json:"message_queue"`
-	RedisAddr    string `json:"redis_addr,omitempty"`
-	LogLevel     string `json:"log_level"`
+	Port          int                         `json:"port"`
+	MessageQueue  string                      `json:"message_queue"`
+	RedisAddr     string                      `json:"redis_addr,omitempty"`
+	LogLevel      string                      `json:"log_level"`
 	ResultSharing *automl.ResultSharingConfig `json:"result_sharing" yaml:"result_sharing"`
 }
 
@@ -95,7 +89,8 @@ func NewOptimizerService(config *Config) (*OptimizerService, error) {
 	}
 
 	// Create optimizer
-	optimizerInstance := optimizer.NewOrchestrator()
+	factory := optimizer.NewFactory()
+	optimizerInstance := factory.CreateOrchestrator(nil) // Pass nil for DB since we don't have one in standalone mode
 
 	// Create result sharing manager
 	var resultSharingMgr *automl.ResultSharingManager
@@ -236,8 +231,8 @@ func (s *OptimizerService) metricsHandler(w http.ResponseWriter, r *http.Request
 		"optimizations_total":  0, // Would track actual metrics
 		"optimizations_active": 0,
 		"memory_usage":         0,
-		"cpu_usage":           0,
-		"timestamp":           time.Now(),
+		"cpu_usage":            0,
+		"timestamp":            time.Now(),
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -273,16 +268,23 @@ func (s *OptimizerService) processOptimizationRequest(req *orchestrator.Optimiza
 	// Check for shared results first
 	if s.resultSharingMgr != nil {
 		if sharedResult := s.resultSharingMgr.GetBestSharedResult(req.RequestID, req.StrategyID); sharedResult != nil {
-			log.Printf("Found shared result for request %s, profit rate: %.2f%%", 
+			log.Printf("Found shared result for request %s, profit rate: %.2f%%",
 				req.RequestID, sharedResult.Performance.ProfitRate)
-			
+
 			// Convert shared result to optimization result
 			result.Status = "completed"
 			result.BestParameters = sharedResult.Parameters
-			result.Performance = sharedResult.Performance
+			// Convert automl.PerformanceMetrics to orchestrator.PerformanceMetrics
+			result.Performance = orchestrator.PerformanceMetrics{
+				TotalReturn: sharedResult.Performance.TotalReturn,
+				SharpeRatio: sharedResult.Performance.SharpeRatio,
+				MaxDrawdown: sharedResult.Performance.MaxDrawdown,
+				WinRate:     sharedResult.Performance.WinRate,
+				TradeCount:  0, // Not available in automl.PerformanceMetrics
+			}
 			result.Duration = time.Duration(0) // Shared results don't have duration
-			result.Iterations = 0 // Shared results don't have iterations
-			
+			result.Iterations = 0              // Shared results don't have iterations
+
 			log.Printf("Using shared result for request %s", req.RequestID)
 			return result
 		}
@@ -309,7 +311,7 @@ func (s *OptimizerService) processOptimizationRequest(req *orchestrator.Optimiza
 		go s.shareOptimizationResult(req, optimizationResult)
 	}
 
-	log.Printf("Completed optimization request %s with %d iterations in %v", 
+	log.Printf("Completed optimization request %s with %d iterations in %v",
 		req.RequestID, result.Iterations, result.Duration)
 	return result
 }
@@ -317,7 +319,7 @@ func (s *OptimizerService) processOptimizationRequest(req *orchestrator.Optimiza
 // runOptimization performs the actual optimization process
 func (s *OptimizerService) runOptimization(req *orchestrator.OptimizationRequest) (*OptimizationResult, error) {
 	startTime := time.Now()
-	
+
 	// Validate optimization request
 	if req.Parameters == nil || len(req.Parameters) == 0 {
 		return nil, fmt.Errorf("no parameters specified for optimization")
@@ -381,11 +383,11 @@ func (s *OptimizerService) runOptimization(req *orchestrator.OptimizationRequest
 
 // OptimizationResult represents the result of an optimization
 type OptimizationResult struct {
-	BestParameters map[string]interface{}           `json:"best_parameters"`
+	BestParameters map[string]interface{}          `json:"best_parameters"`
 	Performance    orchestrator.PerformanceMetrics `json:"performance"`
-	Duration       time.Duration                    `json:"duration"`
-	Iterations     int                              `json:"iterations"`
-	BestScore      float64                          `json:"best_score"`
+	Duration       time.Duration                   `json:"duration"`
+	Iterations     int                             `json:"iterations"`
+	BestScore      float64                         `json:"best_score"`
 }
 
 // gridSearch performs grid search optimization
@@ -398,7 +400,7 @@ func (s *OptimizerService) gridSearch(paramSpace map[string][2]float64, req *orc
 	// Generate grid points
 	var paramNames []string
 	var grids [][]float64
-	
+
 	for name, bounds := range paramSpace {
 		paramNames = append(paramNames, name)
 		grid := make([]float64, gridSize)
@@ -414,10 +416,10 @@ func (s *OptimizerService) gridSearch(paramSpace map[string][2]float64, req *orc
 	iterations := 0
 
 	// Perform grid search
-	err := s.iterateGrid(grids, paramNames, 0, make([]float64, len(paramNames)), 
+	err := s.iterateGrid(grids, paramNames, 0, make([]float64, len(paramNames)),
 		func(params []float64) {
 			iterations++
-			
+
 			// Create parameter map
 			paramMap := make(map[string]float64)
 			for i, name := range paramNames {
@@ -426,7 +428,7 @@ func (s *OptimizerService) gridSearch(paramSpace map[string][2]float64, req *orc
 
 			// Evaluate objective function
 			score := s.evaluateObjective(paramMap, req)
-			
+
 			if score > bestScore {
 				bestScore = score
 				bestParams = make(map[string]float64)
@@ -448,7 +450,7 @@ func (s *OptimizerService) randomSearch(paramSpace map[string][2]float64, req *o
 
 	bestParams := make(map[string]float64)
 	bestScore := math.Inf(-1)
-	
+
 	// 使用随机种子确保每台服务器的训练都不重复
 	seed := time.Now().UnixNano() + int64(len(req.StrategyID)*1000) + int64(req.MaxIterations*100)
 	rand.Seed(seed)
@@ -462,7 +464,7 @@ func (s *OptimizerService) randomSearch(paramSpace map[string][2]float64, req *o
 
 		// Evaluate objective function
 		score := s.evaluateObjective(params, req)
-		
+
 		if score > bestScore {
 			bestScore = score
 			bestParams = make(map[string]float64)
@@ -485,13 +487,13 @@ func (s *OptimizerService) bayesianOptimization(paramSpace map[string][2]float64
 	// Start with random exploration
 	explorationRatio := 0.3
 	explorationSteps := int(float64(maxIterations) * explorationRatio)
-	
+
 	bestParams := make(map[string]float64)
 	bestScore := math.Inf(-1)
-	
+
 	observations := make([]map[string]float64, 0)
 	scores := make([]float64, 0)
-	
+
 	// 使用随机种子确保每台服务器的训练都不重复
 	seed := time.Now().UnixNano() + int64(len(req.StrategyID)*1000) + int64(req.MaxIterations*100)
 	rand.Seed(seed)
@@ -504,10 +506,10 @@ func (s *OptimizerService) bayesianOptimization(paramSpace map[string][2]float64
 		}
 
 		score := s.evaluateObjective(params, req)
-		
+
 		observations = append(observations, params)
 		scores = append(scores, score)
-		
+
 		if score > bestScore {
 			bestScore = score
 			bestParams = make(map[string]float64)
@@ -521,14 +523,14 @@ func (s *OptimizerService) bayesianOptimization(paramSpace map[string][2]float64
 	for i := explorationSteps; i < maxIterations; i++ {
 		// Find top 20% of observations
 		topIndices := s.getTopIndices(scores, 0.2)
-		
+
 		// Sample around best regions
 		params := s.sampleAroundBest(observations, topIndices, paramSpace)
 		score := s.evaluateObjective(params, req)
-		
+
 		observations = append(observations, params)
 		scores = append(scores, score)
-		
+
 		if score > bestScore {
 			bestScore = score
 			bestParams = make(map[string]float64)
@@ -565,26 +567,26 @@ func (s *OptimizerService) getTopIndices(scores []float64, ratio float64) []int 
 		score float64
 		index int
 	}
-	
+
 	var sortedScores []scoreIndex
 	for i, score := range scores {
 		sortedScores = append(sortedScores, scoreIndex{score, i})
 	}
-	
+
 	sort.Slice(sortedScores, func(i, j int) bool {
 		return sortedScores[i].score > sortedScores[j].score
 	})
-	
+
 	topCount := int(float64(len(scores)) * ratio)
 	if topCount < 1 {
 		topCount = 1
 	}
-	
+
 	var indices []int
 	for i := 0; i < topCount && i < len(sortedScores); i++ {
 		indices = append(indices, sortedScores[i].index)
 	}
-	
+
 	return indices
 }
 
@@ -597,18 +599,18 @@ func (s *OptimizerService) sampleAroundBest(observations []map[string]float64, t
 		}
 		return params
 	}
-	
+
 	// Pick a random top observation
 	baseIdx := topIndices[rand.Intn(len(topIndices))]
 	baseParams := observations[baseIdx]
-	
+
 	// Add gaussian noise around the base parameters
 	params := make(map[string]float64)
 	for name, bounds := range paramSpace {
 		baseValue := baseParams[name]
 		rangeSize := bounds[1] - bounds[0]
 		noise := rand.NormFloat64() * rangeSize * 0.1 // 10% of range as std dev
-		
+
 		newValue := baseValue + noise
 		// Clamp to bounds
 		if newValue < bounds[0] {
@@ -617,10 +619,10 @@ func (s *OptimizerService) sampleAroundBest(observations []map[string]float64, t
 		if newValue > bounds[1] {
 			newValue = bounds[1]
 		}
-		
+
 		params[name] = newValue
 	}
-	
+
 	return params
 }
 
@@ -628,26 +630,26 @@ func (s *OptimizerService) sampleAroundBest(observations []map[string]float64, t
 func (s *OptimizerService) evaluateObjective(params map[string]float64, req *orchestrator.OptimizationRequest) float64 {
 	// For now, use a simplified evaluation based on parameter values
 	// In a real implementation, this would run backtest with the parameters
-	
+
 	// Simulate sharpe ratio calculation based on parameters
 	score := 0.0
 	paramCount := 0
-	
+
 	for _, value := range params {
 		// Normalize parameter contribution (assuming reasonable ranges)
 		normalizedValue := math.Min(math.Max(value/100.0, 0), 2.0)
 		score += normalizedValue
 		paramCount++
 	}
-	
+
 	if paramCount > 0 {
 		score = score / float64(paramCount)
 	}
-	
+
 	// Add some randomness to simulate real market variability
 	noise := (rand.Float64() - 0.5) * 0.2
 	score += noise
-	
+
 	// Simulate realistic Sharpe ratio range
 	return math.Max(score, -2.0)
 }
@@ -656,16 +658,16 @@ func (s *OptimizerService) evaluateObjective(params map[string]float64, req *orc
 func (s *OptimizerService) calculatePerformanceMetrics(score float64, iterations int) orchestrator.PerformanceMetrics {
 	// Convert optimization score to realistic trading metrics
 	sharpeRatio := score
-	
+
 	// Derive other metrics from Sharpe ratio
 	totalReturn := sharpeRatio * 0.15 // Assume 15% volatility
 	maxDrawdown := math.Max(-0.05, -math.Abs(sharpeRatio*0.08))
-	winRate := 0.5 + (sharpeRatio * 0.1) // Better Sharpe -> higher win rate
+	winRate := 0.5 + (sharpeRatio * 0.1)            // Better Sharpe -> higher win rate
 	winRate = math.Min(math.Max(winRate, 0.3), 0.8) // Clamp between 30-80%
-	
+
 	// Estimate trade count based on iterations (proxy for complexity)
 	tradeCount := int(50 + float64(iterations)*0.5)
-	
+
 	return orchestrator.PerformanceMetrics{
 		TotalReturn: totalReturn,
 		SharpeRatio: sharpeRatio,
@@ -687,14 +689,21 @@ func (s *OptimizerService) shareOptimizationResult(req *orchestrator.Optimizatio
 		TaskID:       req.RequestID,
 		StrategyName: req.StrategyID,
 		Parameters:   optResult.BestParameters,
-		Performance:  optResult.Performance,
-		RandomSeed:   time.Now().UnixNano(),
-		DataHash:     fmt.Sprintf("%s_%s", req.RequestID, req.StrategyID),
-		DiscoveredBy: "optimizer-service",
-		DiscoveredAt: time.Now(),
-		ShareMethod:  "optimization",
+		Performance: &automl.PerformanceMetrics{
+			ProfitRate:         optResult.Performance.TotalReturn,
+			SharpeRatio:        optResult.Performance.SharpeRatio,
+			MaxDrawdown:        optResult.Performance.MaxDrawdown,
+			WinRate:            optResult.Performance.WinRate,
+			TotalReturn:        optResult.Performance.TotalReturn,
+			RiskAdjustedReturn: optResult.Performance.SharpeRatio,
+		},
+		RandomSeed:    time.Now().UnixNano(),
+		DataHash:      fmt.Sprintf("%s_%s", req.RequestID, req.StrategyID),
+		DiscoveredBy:  "optimizer-service",
+		DiscoveredAt:  time.Now(),
+		ShareMethod:   "optimization",
 		AdoptionCount: 0,
-		IsGlobalBest: false,
+		IsGlobalBest:  false,
 	}
 
 	// Share the result
@@ -713,10 +722,10 @@ func (s *OptimizerService) sharedResultsHandler(w http.ResponseWriter, r *http.R
 	}
 
 	results := s.resultSharingMgr.GetAllSharedResults()
-	
+
 	response := map[string]interface{}{
-		"results": results,
-		"count":   len(results),
+		"results":   results,
+		"count":     len(results),
 		"timestamp": time.Now(),
 	}
 
@@ -760,9 +769,9 @@ func (s *OptimizerService) shareResultHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	response := map[string]interface{}{
-		"status":  "success",
-		"message": "Result shared successfully",
-		"id":      sharedResult.ID,
+		"status":    "success",
+		"message":   "Result shared successfully",
+		"id":        sharedResult.ID,
 		"timestamp": time.Now(),
 	}
 

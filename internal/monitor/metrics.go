@@ -221,13 +221,13 @@ func NewMetricsCollector() *MetricsCollector {
 
 		// 新增：API相关指标
 		apiRequestsTotal: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name: "api_requests_total",
-			Help: "Total number of API requests",
+			Name: "monitor_api_requests_total",
+			Help: "Total number of API requests (from monitor)",
 		}, []string{"endpoint", "method", "status"}),
 
 		apiErrorsTotal: promauto.NewCounterVec(prometheus.CounterOpts{
-			Name: "api_errors_total",
-			Help: "Total number of API errors",
+			Name: "monitor_api_errors_total",
+			Help: "Total number of API errors (from monitor)",
 		}, []string{"endpoint", "error_type"}),
 
 		apiResponseTime: promauto.NewHistogramVec(prometheus.HistogramOpts{

@@ -23,6 +23,9 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+// Global metrics collector to avoid duplicate registration
+var globalMetricsCollector *monitor.MetricsCollector
+
 // Server represents the API server
 type Server struct {
 	config     *config.Config
@@ -43,8 +46,8 @@ type Server struct {
 	shutdown         *stability.GracefulShutdownManager
 
 	// Security services
-	keyManager      *security.KeyManager
-	auditLogger     *security.AuditLogger
+	keyManager  *security.KeyManager
+	auditLogger *security.AuditLogger
 }
 
 // Handlers contains all API handlers
@@ -242,7 +245,15 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 	jwtManager := auth.NewJWTManager(cfg.JWT.SecretKey, cfg.JWT.Duration)
 	metrics := monitoring.NewMetrics()
-	metricsCollector := monitor.NewMetricsCollector()
+
+	// Create metrics collector only once to avoid duplicate registration
+	var metricsCollector *monitor.MetricsCollector
+	if globalMetricsCollector == nil {
+		metricsCollector = monitor.NewMetricsCollector()
+		globalMetricsCollector = metricsCollector
+	} else {
+		metricsCollector = globalMetricsCollector
+	}
 	// Initialize memory manager with configuration
 	memoryConfig := &stability.MemoryConfig{
 		MonitorInterval:      cfg.Memory.MonitorInterval,
@@ -320,7 +331,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	// Store cache manager reference for cache handler
 	var cacheManagerRef *cache.CacheManager
 	if cacheAdapter, ok := redis.(*cache.CacheAdapter); ok {
-		cacheManagerRef = cacheAdapter.manager
+		cacheManagerRef = cacheAdapter.GetManager()
 	}
 
 	// Set up database connection pool monitoring
@@ -369,20 +380,20 @@ func NewServer(cfg *config.Config) (*Server, error) {
 // initializeKeyManager initializes the key manager
 func initializeKeyManager(cfg *config.Config) (*security.KeyManager, error) {
 	keyManagerConfig := security.DefaultKeyManagerConfig()
-	
+
 	// Override with config values if available
 	// This would be expanded based on your config structure
-	
+
 	return security.NewKeyManager(keyManagerConfig)
 }
 
 // initializeAuditLogger initializes the audit logger
 func initializeAuditLogger(cfg *config.Config) (*security.AuditLogger, error) {
 	auditConfig := security.DefaultAuditConfig()
-	
+
 	// Override with config values if available
 	// This would be expanded based on your config structure
-	
+
 	return security.NewAuditLogger(auditConfig)
 }
 
@@ -952,7 +963,7 @@ func (s *Server) RegisterOrchestratorHandler(handler *OrchestratorHandler) {
 	v1 := s.router.Group("/api/v1")
 	protected := v1.Group("")
 	protected.Use(s.jwtManager.AuthMiddleware())
-	
+
 	orchestrator := protected.Group("/orchestrator")
 	{
 		orchestrator.GET("/status", handler.handleStatus)

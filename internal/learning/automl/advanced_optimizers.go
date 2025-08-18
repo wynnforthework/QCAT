@@ -19,23 +19,23 @@ type AdvancedOptimizer interface {
 
 // ParameterRange 参数范围
 type ParameterRange struct {
-	Min     float64
-	Max     float64
-	Step    float64
-	Type    string // "continuous", "discrete", "integer"
+	Min  float64
+	Max  float64
+	Step float64
+	Type string // "continuous", "discrete", "integer"
 }
 
 // GeneticAlgorithm 遗传算法优化器
 type GeneticAlgorithm struct {
-	PopulationSize    int
-	Generations       int
-	MutationRate      float64
-	CrossoverRate     float64
-	EliteSize         int
-	ParameterRanges   map[string]ParameterRange
-	FitnessHistory    []float64
-	BestIndividual    *Individual
-	mu                sync.RWMutex
+	PopulationSize  int
+	Generations     int
+	MutationRate    float64
+	CrossoverRate   float64
+	EliteSize       int
+	ParameterRanges map[string]ParameterRange
+	FitnessHistory  []float64
+	BestIndividual  *Individual
+	mu              sync.RWMutex
 }
 
 // Individual 个体（参数组合）
@@ -43,6 +43,15 @@ type Individual struct {
 	Parameters map[string]float64
 	Fitness    float64
 	Age        int
+}
+
+// convertFloatMapToInterface converts map[string]float64 to map[string]interface{}
+func convertFloatMapToInterface(floatMap map[string]float64) map[string]interface{} {
+	result := make(map[string]interface{})
+	for k, v := range floatMap {
+		result[k] = v
+	}
+	return result
 }
 
 // NewGeneticAlgorithm 创建遗传算法优化器
@@ -75,10 +84,10 @@ func (ga *GeneticAlgorithm) GetDescription() string {
 // Optimize 执行遗传算法优化
 func (ga *GeneticAlgorithm) Optimize(ctx context.Context, strategyName string, dataHash string, seed int64) (*OptimizationResult, error) {
 	rand.Seed(seed)
-	
+
 	// 初始化种群
 	population := ga.initializePopulation()
-	
+
 	// 进化过程
 	for generation := 0; generation < ga.Generations; generation++ {
 		select {
@@ -86,28 +95,28 @@ func (ga *GeneticAlgorithm) Optimize(ctx context.Context, strategyName string, d
 			return nil, ctx.Err()
 		default:
 		}
-		
+
 		// 评估适应度
 		ga.evaluateFitness(population, strategyName, dataHash)
-		
+
 		// 记录最佳个体
 		ga.updateBestIndividual(population)
-		
+
 		// 记录适应度历史
 		ga.mu.Lock()
 		ga.FitnessHistory = append(ga.FitnessHistory, ga.BestIndividual.Fitness)
 		ga.mu.Unlock()
-		
+
 		// 选择、交叉、变异
 		newPopulation := ga.evolve(population)
 		population = newPopulation
-		
+
 		// 每10代输出一次进度
 		if generation%10 == 0 {
 			fmt.Printf("GA Generation %d: Best Fitness = %.4f\n", generation, ga.BestIndividual.Fitness)
 		}
 	}
-	
+
 	// 返回最佳结果
 	return ga.createOptimizationResult(strategyName, dataHash, seed), nil
 }
@@ -115,14 +124,14 @@ func (ga *GeneticAlgorithm) Optimize(ctx context.Context, strategyName string, d
 // initializePopulation 初始化种群
 func (ga *GeneticAlgorithm) initializePopulation() []*Individual {
 	population := make([]*Individual, ga.PopulationSize)
-	
+
 	for i := 0; i < ga.PopulationSize; i++ {
 		individual := &Individual{
 			Parameters: make(map[string]float64),
 			Fitness:    0,
 			Age:        0,
 		}
-		
+
 		// 随机生成参数
 		for paramName, paramRange := range ga.ParameterRanges {
 			switch paramRange.Type {
@@ -136,27 +145,27 @@ func (ga *GeneticAlgorithm) initializePopulation() []*Individual {
 				individual.Parameters[paramName] = paramRange.Min + float64(step)*paramRange.Step
 			}
 		}
-		
+
 		population[i] = individual
 	}
-	
+
 	return population
 }
 
 // evaluateFitness 评估种群适应度
 func (ga *GeneticAlgorithm) evaluateFitness(population []*Individual, strategyName string, dataHash string) {
 	var wg sync.WaitGroup
-	
+
 	for _, individual := range population {
 		wg.Add(1)
 		go func(ind *Individual) {
 			defer wg.Done()
-			
+
 			// 模拟训练和评估
 			ind.Fitness = ga.simulateTraining(ind.Parameters, strategyName, dataHash)
 		}(individual)
 	}
-	
+
 	wg.Wait()
 }
 
@@ -164,22 +173,22 @@ func (ga *GeneticAlgorithm) evaluateFitness(population []*Individual, strategyNa
 func (ga *GeneticAlgorithm) simulateTraining(params map[string]float64, strategyName string, dataHash string) float64 {
 	// 基于参数计算一个模拟的收益率
 	baseProfit := 0.05 // 基础收益率5%
-	
+
 	// 参数影响
 	learningRateEffect := (params["learning_rate"] - 0.05) * 100 // 学习率影响
 	batchSizeEffect := (params["batch_size"] - 100) / 1000       // 批次大小影响
 	epochsEffect := (params["epochs"] - 50) / 1000               // 训练轮数影响
 	dropoutEffect := (0.3 - params["dropout"]) * 50              // Dropout影响
 	momentumEffect := (params["momentum"] - 0.9) * 100           // 动量影响
-	
+
 	// 添加随机性
 	randomFactor := (rand.Float64() - 0.5) * 0.1
-	
+
 	profit := baseProfit + learningRateEffect + batchSizeEffect + epochsEffect + dropoutEffect + momentumEffect + randomFactor
-	
+
 	// 确保收益率在合理范围内
 	profit = math.Max(-0.2, math.Min(0.3, profit))
-	
+
 	return profit
 }
 
@@ -187,7 +196,7 @@ func (ga *GeneticAlgorithm) simulateTraining(params map[string]float64, strategy
 func (ga *GeneticAlgorithm) updateBestIndividual(population []*Individual) {
 	ga.mu.Lock()
 	defer ga.mu.Unlock()
-	
+
 	for _, individual := range population {
 		if ga.BestIndividual == nil || individual.Fitness > ga.BestIndividual.Fitness {
 			ga.BestIndividual = &Individual{
@@ -209,15 +218,15 @@ func (ga *GeneticAlgorithm) evolve(population []*Individual) []*Individual {
 	sort.Slice(population, func(i, j int) bool {
 		return population[i].Fitness > population[j].Fitness
 	})
-	
+
 	newPopulation := make([]*Individual, ga.PopulationSize)
-	
+
 	// 精英保留
 	for i := 0; i < ga.EliteSize; i++ {
 		newPopulation[i] = ga.cloneIndividual(population[i])
 		newPopulation[i].Age++
 	}
-	
+
 	// 生成新个体
 	for i := ga.EliteSize; i < ga.PopulationSize; i++ {
 		if rand.Float64() < ga.CrossoverRate {
@@ -225,12 +234,12 @@ func (ga *GeneticAlgorithm) evolve(population []*Individual) []*Individual {
 			parent1 := ga.tournamentSelection(population)
 			parent2 := ga.tournamentSelection(population)
 			child := ga.crossover(parent1, parent2)
-			
+
 			// 变异
 			if rand.Float64() < ga.MutationRate {
 				ga.mutate(child)
 			}
-			
+
 			newPopulation[i] = child
 		} else {
 			// 直接复制
@@ -238,7 +247,7 @@ func (ga *GeneticAlgorithm) evolve(population []*Individual) []*Individual {
 			newPopulation[i].Age++
 		}
 	}
-	
+
 	return newPopulation
 }
 
@@ -246,14 +255,14 @@ func (ga *GeneticAlgorithm) evolve(population []*Individual) []*Individual {
 func (ga *GeneticAlgorithm) tournamentSelection(population []*Individual) *Individual {
 	tournamentSize := 3
 	best := population[rand.Intn(len(population))]
-	
+
 	for i := 1; i < tournamentSize; i++ {
 		candidate := population[rand.Intn(len(population))]
 		if candidate.Fitness > best.Fitness {
 			best = candidate
 		}
 	}
-	
+
 	return best
 }
 
@@ -264,7 +273,7 @@ func (ga *GeneticAlgorithm) crossover(parent1, parent2 *Individual) *Individual 
 		Fitness:    0,
 		Age:        0,
 	}
-	
+
 	for paramName := range ga.ParameterRanges {
 		if rand.Float64() < 0.5 {
 			child.Parameters[paramName] = parent1.Parameters[paramName]
@@ -272,7 +281,7 @@ func (ga *GeneticAlgorithm) crossover(parent1, parent2 *Individual) *Individual 
 			child.Parameters[paramName] = parent2.Parameters[paramName]
 		}
 	}
-	
+
 	return child
 }
 
@@ -307,11 +316,11 @@ func (ga *GeneticAlgorithm) cloneIndividual(individual *Individual) *Individual 
 		Fitness:    individual.Fitness,
 		Age:        individual.Age,
 	}
-	
+
 	for k, v := range individual.Parameters {
 		clone.Parameters[k] = v
 	}
-	
+
 	return clone
 }
 
@@ -319,17 +328,17 @@ func (ga *GeneticAlgorithm) cloneIndividual(individual *Individual) *Individual 
 func (ga *GeneticAlgorithm) createOptimizationResult(strategyName string, dataHash string, seed int64) *OptimizationResult {
 	ga.mu.RLock()
 	defer ga.mu.RUnlock()
-	
+
 	if ga.BestIndividual == nil {
 		return nil
 	}
-	
+
 	return &OptimizationResult{
-		TaskID:        fmt.Sprintf("ga_%d", time.Now().Unix()),
-		StrategyName:  strategyName,
-		DataHash:      dataHash,
-		RandomSeed:    seed,
-		Parameters:    ga.BestIndividual.Parameters,
+		TaskID:       fmt.Sprintf("ga_%d", time.Now().Unix()),
+		StrategyName: strategyName,
+		DataHash:     dataHash,
+		RandomSeed:   seed,
+		Parameters:   convertFloatMapToInterface(ga.BestIndividual.Parameters),
 		Performance: &PerformanceMetrics{
 			ProfitRate:         ga.BestIndividual.Fitness * 100,
 			SharpeRatio:        ga.BestIndividual.Fitness * 2,
@@ -343,13 +352,6 @@ func (ga *GeneticAlgorithm) createOptimizationResult(strategyName string, dataHa
 		Confidence:    0.85,
 		IsGlobalBest:  false,
 		AdoptionCount: 0,
-		Metadata: map[string]interface{}{
-			"algorithm":        "GeneticAlgorithm",
-			"generations":      ga.Generations,
-			"population_size":  ga.PopulationSize,
-			"best_fitness":     ga.BestIndividual.Fitness,
-			"fitness_history":  ga.FitnessHistory,
-		},
 	}
 }
 
@@ -405,10 +407,10 @@ func (pso *ParticleSwarmOptimization) GetDescription() string {
 // Optimize 执行粒子群优化
 func (pso *ParticleSwarmOptimization) Optimize(ctx context.Context, strategyName string, dataHash string, seed int64) (*OptimizationResult, error) {
 	rand.Seed(seed)
-	
+
 	// 初始化粒子群
 	pso.initializeParticles()
-	
+
 	// 迭代优化
 	for iteration := 0; iteration < pso.Iterations; iteration++ {
 		select {
@@ -416,22 +418,22 @@ func (pso *ParticleSwarmOptimization) Optimize(ctx context.Context, strategyName
 			return nil, ctx.Err()
 		default:
 		}
-		
+
 		// 评估所有粒子
 		pso.evaluateParticles(strategyName, dataHash)
-		
+
 		// 更新全局最优
 		pso.updateGlobalBest()
-		
+
 		// 更新粒子速度和位置
 		pso.updateParticles()
-		
+
 		// 每10次迭代输出一次进度
 		if iteration%10 == 0 {
 			fmt.Printf("PSO Iteration %d: Global Best Fitness = %.4f\n", iteration, pso.GlobalBest.BestFitness)
 		}
 	}
-	
+
 	// 返回最佳结果
 	return pso.createOptimizationResult(strategyName, dataHash, seed), nil
 }
@@ -439,7 +441,7 @@ func (pso *ParticleSwarmOptimization) Optimize(ctx context.Context, strategyName
 // initializeParticles 初始化粒子群
 func (pso *ParticleSwarmOptimization) initializeParticles() {
 	pso.Particles = make([]*Particle, pso.ParticleCount)
-	
+
 	for i := 0; i < pso.ParticleCount; i++ {
 		particle := &Particle{
 			Position:     make(map[string]float64),
@@ -447,20 +449,20 @@ func (pso *ParticleSwarmOptimization) initializeParticles() {
 			BestPosition: make(map[string]float64),
 			BestFitness:  -math.MaxFloat64,
 		}
-		
+
 		// 初始化位置和速度
 		for paramName, paramRange := range pso.ParameterRanges {
 			// 随机位置
 			position := paramRange.Min + rand.Float64()*(paramRange.Max-paramRange.Min)
 			particle.Position[paramName] = position
 			particle.BestPosition[paramName] = position
-			
+
 			// 随机速度
 			maxVelocity := (paramRange.Max - paramRange.Min) * 0.1
 			velocity := (rand.Float64() - 0.5) * maxVelocity
 			particle.Velocity[paramName] = velocity
 		}
-		
+
 		pso.Particles[i] = particle
 	}
 }
@@ -468,15 +470,15 @@ func (pso *ParticleSwarmOptimization) initializeParticles() {
 // evaluateParticles 评估所有粒子
 func (pso *ParticleSwarmOptimization) evaluateParticles(strategyName string, dataHash string) {
 	var wg sync.WaitGroup
-	
+
 	for _, particle := range pso.Particles {
 		wg.Add(1)
 		go func(p *Particle) {
 			defer wg.Done()
-			
+
 			// 模拟训练和评估
 			p.Fitness = pso.simulateTraining(p.Position, strategyName, dataHash)
-			
+
 			// 更新个体最优
 			if p.Fitness > p.BestFitness {
 				p.BestFitness = p.Fitness
@@ -486,25 +488,25 @@ func (pso *ParticleSwarmOptimization) evaluateParticles(strategyName string, dat
 			}
 		}(particle)
 	}
-	
+
 	wg.Wait()
 }
 
 // simulateTraining 模拟训练过程（与GA相同）
 func (pso *ParticleSwarmOptimization) simulateTraining(params map[string]float64, strategyName string, dataHash string) float64 {
 	baseProfit := 0.05
-	
+
 	learningRateEffect := (params["learning_rate"] - 0.05) * 100
 	batchSizeEffect := (params["batch_size"] - 100) / 1000
 	epochsEffect := (params["epochs"] - 50) / 1000
 	dropoutEffect := (0.3 - params["dropout"]) * 50
 	momentumEffect := (params["momentum"] - 0.9) * 100
-	
+
 	randomFactor := (rand.Float64() - 0.5) * 0.1
-	
+
 	profit := baseProfit + learningRateEffect + batchSizeEffect + epochsEffect + dropoutEffect + momentumEffect + randomFactor
 	profit = math.Max(-0.2, math.Min(0.3, profit))
-	
+
 	return profit
 }
 
@@ -512,7 +514,7 @@ func (pso *ParticleSwarmOptimization) simulateTraining(params map[string]float64
 func (pso *ParticleSwarmOptimization) updateGlobalBest() {
 	pso.mu.Lock()
 	defer pso.mu.Unlock()
-	
+
 	for _, particle := range pso.Particles {
 		if pso.GlobalBest == nil || particle.BestFitness > pso.GlobalBest.BestFitness {
 			if pso.GlobalBest == nil {
@@ -522,7 +524,7 @@ func (pso *ParticleSwarmOptimization) updateGlobalBest() {
 					BestPosition: make(map[string]float64),
 				}
 			}
-			
+
 			pso.GlobalBest.BestFitness = particle.BestFitness
 			for k, v := range particle.BestPosition {
 				pso.GlobalBest.BestPosition[k] = v
@@ -536,26 +538,26 @@ func (pso *ParticleSwarmOptimization) updateParticles() {
 	pso.mu.RLock()
 	globalBest := pso.GlobalBest
 	pso.mu.RUnlock()
-	
+
 	if globalBest == nil {
 		return
 	}
-	
+
 	for _, particle := range pso.Particles {
 		for paramName, paramRange := range pso.ParameterRanges {
 			// 更新速度
 			cognitive := pso.CognitiveWeight * rand.Float64() * (particle.BestPosition[paramName] - particle.Position[paramName])
 			social := pso.SocialWeight * rand.Float64() * (globalBest.BestPosition[paramName] - particle.Position[paramName])
-			
+
 			particle.Velocity[paramName] = pso.InertiaWeight*particle.Velocity[paramName] + cognitive + social
-			
+
 			// 限制速度
 			maxVelocity := (paramRange.Max - paramRange.Min) * 0.1
 			particle.Velocity[paramName] = math.Max(-maxVelocity, math.Min(maxVelocity, particle.Velocity[paramName]))
-			
+
 			// 更新位置
 			particle.Position[paramName] += particle.Velocity[paramName]
-			
+
 			// 边界处理
 			particle.Position[paramName] = math.Max(paramRange.Min, math.Min(paramRange.Max, particle.Position[paramName]))
 		}
@@ -566,17 +568,17 @@ func (pso *ParticleSwarmOptimization) updateParticles() {
 func (pso *ParticleSwarmOptimization) createOptimizationResult(strategyName string, dataHash string, seed int64) *OptimizationResult {
 	pso.mu.RLock()
 	defer pso.mu.RUnlock()
-	
+
 	if pso.GlobalBest == nil {
 		return nil
 	}
-	
+
 	return &OptimizationResult{
-		TaskID:        fmt.Sprintf("pso_%d", time.Now().Unix()),
-		StrategyName:  strategyName,
-		DataHash:      dataHash,
-		RandomSeed:    seed,
-		Parameters:    pso.GlobalBest.BestPosition,
+		TaskID:       fmt.Sprintf("pso_%d", time.Now().Unix()),
+		StrategyName: strategyName,
+		DataHash:     dataHash,
+		RandomSeed:   seed,
+		Parameters:   convertFloatMapToInterface(pso.GlobalBest.BestPosition),
 		Performance: &PerformanceMetrics{
 			ProfitRate:         pso.GlobalBest.BestFitness * 100,
 			SharpeRatio:        pso.GlobalBest.BestFitness * 2,
@@ -590,12 +592,6 @@ func (pso *ParticleSwarmOptimization) createOptimizationResult(strategyName stri
 		Confidence:    0.88,
 		IsGlobalBest:  false,
 		AdoptionCount: 0,
-		Metadata: map[string]interface{}{
-			"algorithm":       "ParticleSwarmOptimization",
-			"iterations":      pso.Iterations,
-			"particle_count":  pso.ParticleCount,
-			"best_fitness":    pso.GlobalBest.BestFitness,
-		},
 	}
 }
 
@@ -617,7 +613,7 @@ type Observation struct {
 // NewBayesianOptimization 创建贝叶斯优化器
 func NewBayesianOptimization() *BayesianOptimization {
 	return &BayesianOptimization{
-		MaxIterations: 50,
+		MaxIterations:   50,
 		AcquisitionFunc: "ei", // Expected Improvement
 		ParameterRanges: map[string]ParameterRange{
 			"learning_rate": {Min: 0.001, Max: 0.1, Step: 0.001, Type: "continuous"},
@@ -641,10 +637,10 @@ func (bo *BayesianOptimization) GetDescription() string {
 // Optimize 执行贝叶斯优化
 func (bo *BayesianOptimization) Optimize(ctx context.Context, strategyName string, dataHash string, seed int64) (*OptimizationResult, error) {
 	rand.Seed(seed)
-	
+
 	// 初始化随机观测点
 	bo.initializeRandomObservations(5, strategyName, dataHash)
-	
+
 	// 贝叶斯优化迭代
 	for iteration := 0; iteration < bo.MaxIterations; iteration++ {
 		select {
@@ -652,13 +648,13 @@ func (bo *BayesianOptimization) Optimize(ctx context.Context, strategyName strin
 			return nil, ctx.Err()
 		default:
 		}
-		
+
 		// 选择下一个观测点
 		nextPoint := bo.selectNextPoint()
-		
+
 		// 评估新点
 		fitness := bo.simulateTraining(nextPoint, strategyName, dataHash)
-		
+
 		// 添加观测点
 		bo.mu.Lock()
 		bo.Observations = append(bo.Observations, &Observation{
@@ -666,14 +662,14 @@ func (bo *BayesianOptimization) Optimize(ctx context.Context, strategyName strin
 			Fitness:    fitness,
 		})
 		bo.mu.Unlock()
-		
+
 		// 每5次迭代输出一次进度
 		if iteration%5 == 0 {
 			bestFitness := bo.getBestFitness()
 			fmt.Printf("BO Iteration %d: Best Fitness = %.4f\n", iteration, bestFitness)
 		}
 	}
-	
+
 	// 返回最佳结果
 	return bo.createOptimizationResult(strategyName, dataHash, seed), nil
 }
@@ -682,7 +678,7 @@ func (bo *BayesianOptimization) Optimize(ctx context.Context, strategyName strin
 func (bo *BayesianOptimization) initializeRandomObservations(count int, strategyName string, dataHash string) {
 	for i := 0; i < count; i++ {
 		params := make(map[string]float64)
-		
+
 		for paramName, paramRange := range bo.ParameterRanges {
 			switch paramRange.Type {
 			case "continuous":
@@ -695,9 +691,9 @@ func (bo *BayesianOptimization) initializeRandomObservations(count int, strategy
 				params[paramName] = paramRange.Min + float64(step)*paramRange.Step
 			}
 		}
-		
+
 		fitness := bo.simulateTraining(params, strategyName, dataHash)
-		
+
 		bo.Observations = append(bo.Observations, &Observation{
 			Parameters: params,
 			Fitness:    fitness,
@@ -709,19 +705,19 @@ func (bo *BayesianOptimization) initializeRandomObservations(count int, strategy
 func (bo *BayesianOptimization) selectNextPoint() map[string]float64 {
 	bo.mu.RLock()
 	defer bo.mu.RUnlock()
-	
+
 	// 简化的采集函数：随机采样 + 基于历史观测的启发式
 	if len(bo.Observations) < 3 {
 		// 随机采样
 		return bo.randomSample()
 	}
-	
+
 	// 基于历史观测的启发式选择
 	bestObs := bo.getBestObservation()
 	if bestObs == nil {
 		return bo.randomSample()
 	}
-	
+
 	// 在最优解附近探索
 	explorationParams := make(map[string]float64)
 	for paramName, paramRange := range bo.ParameterRanges {
@@ -730,14 +726,14 @@ func (bo *BayesianOptimization) selectNextPoint() map[string]float64 {
 		newValue := baseValue + exploration
 		explorationParams[paramName] = math.Max(paramRange.Min, math.Min(paramRange.Max, newValue))
 	}
-	
+
 	return explorationParams
 }
 
 // randomSample 随机采样
 func (bo *BayesianOptimization) randomSample() map[string]float64 {
 	params := make(map[string]float64)
-	
+
 	for paramName, paramRange := range bo.ParameterRanges {
 		switch paramRange.Type {
 		case "continuous":
@@ -750,7 +746,7 @@ func (bo *BayesianOptimization) randomSample() map[string]float64 {
 			params[paramName] = paramRange.Min + float64(step)*paramRange.Step
 		}
 	}
-	
+
 	return params
 }
 
@@ -759,14 +755,14 @@ func (bo *BayesianOptimization) getBestObservation() *Observation {
 	if len(bo.Observations) == 0 {
 		return nil
 	}
-	
+
 	best := bo.Observations[0]
 	for _, obs := range bo.Observations {
 		if obs.Fitness > best.Fitness {
 			best = obs
 		}
 	}
-	
+
 	return best
 }
 
@@ -782,18 +778,18 @@ func (bo *BayesianOptimization) getBestFitness() float64 {
 // simulateTraining 模拟训练过程（与GA相同）
 func (bo *BayesianOptimization) simulateTraining(params map[string]float64, strategyName string, dataHash string) float64 {
 	baseProfit := 0.05
-	
+
 	learningRateEffect := (params["learning_rate"] - 0.05) * 100
 	batchSizeEffect := (params["batch_size"] - 100) / 1000
 	epochsEffect := (params["epochs"] - 50) / 1000
 	dropoutEffect := (0.3 - params["dropout"]) * 50
 	momentumEffect := (params["momentum"] - 0.9) * 100
-	
+
 	randomFactor := (rand.Float64() - 0.5) * 0.1
-	
+
 	profit := baseProfit + learningRateEffect + batchSizeEffect + epochsEffect + dropoutEffect + momentumEffect + randomFactor
 	profit = math.Max(-0.2, math.Min(0.3, profit))
-	
+
 	return profit
 }
 
@@ -801,18 +797,18 @@ func (bo *BayesianOptimization) simulateTraining(params map[string]float64, stra
 func (bo *BayesianOptimization) createOptimizationResult(strategyName string, dataHash string, seed int64) *OptimizationResult {
 	bo.mu.RLock()
 	defer bo.mu.RUnlock()
-	
+
 	bestObs := bo.getBestObservation()
 	if bestObs == nil {
 		return nil
 	}
-	
+
 	return &OptimizationResult{
-		TaskID:        fmt.Sprintf("bo_%d", time.Now().Unix()),
-		StrategyName:  strategyName,
-		DataHash:      dataHash,
-		RandomSeed:    seed,
-		Parameters:    bestObs.Parameters,
+		TaskID:       fmt.Sprintf("bo_%d", time.Now().Unix()),
+		StrategyName: strategyName,
+		DataHash:     dataHash,
+		RandomSeed:   seed,
+		Parameters:   convertFloatMapToInterface(bestObs.Parameters),
 		Performance: &PerformanceMetrics{
 			ProfitRate:         bestObs.Fitness * 100,
 			SharpeRatio:        bestObs.Fitness * 2,
@@ -826,13 +822,6 @@ func (bo *BayesianOptimization) createOptimizationResult(strategyName string, da
 		Confidence:    0.92,
 		IsGlobalBest:  false,
 		AdoptionCount: 0,
-		Metadata: map[string]interface{}{
-			"algorithm":        "BayesianOptimization",
-			"iterations":       bo.MaxIterations,
-			"acquisition_func": bo.AcquisitionFunc,
-			"best_fitness":     bestObs.Fitness,
-			"observations":     len(bo.Observations),
-		},
 	}
 }
 
@@ -847,12 +836,12 @@ func NewOptimizationAlgorithmRegistry() *OptimizationAlgorithmRegistry {
 	registry := &OptimizationAlgorithmRegistry{
 		algorithms: make(map[string]AdvancedOptimizer),
 	}
-	
+
 	// 注册默认算法
 	registry.Register("genetic", NewGeneticAlgorithm())
 	registry.Register("pso", NewParticleSwarmOptimization())
 	registry.Register("bayesian", NewBayesianOptimization())
-	
+
 	return registry
 }
 
@@ -875,12 +864,12 @@ func (r *OptimizationAlgorithmRegistry) Get(name string) (AdvancedOptimizer, boo
 func (r *OptimizationAlgorithmRegistry) List() []string {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	
+
 	names := make([]string, 0, len(r.algorithms))
 	for name := range r.algorithms {
 		names = append(names, name)
 	}
-	
+
 	return names
 }
 
@@ -890,7 +879,7 @@ func (r *OptimizationAlgorithmRegistry) GetAlgorithmInfo(name string) map[string
 	if !exists {
 		return nil
 	}
-	
+
 	return map[string]string{
 		"name":        algorithm.GetName(),
 		"description": algorithm.GetDescription(),

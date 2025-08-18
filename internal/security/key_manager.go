@@ -21,16 +21,16 @@ type KeyManager struct {
 
 // KeyInfo represents information about an API key
 type KeyInfo struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	KeyHash     string    `json:"key_hash"`
-	Permissions []string  `json:"permissions"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	ExpiresAt   time.Time `json:"expires_at"`
-	LastUsed    time.Time `json:"last_used"`
-	UsageCount  int64     `json:"usage_count"`
-	Status      KeyStatus `json:"status"`
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	KeyHash     string                 `json:"key_hash"`
+	Permissions []string               `json:"permissions"`
+	CreatedAt   time.Time              `json:"created_at"`
+	UpdatedAt   time.Time              `json:"updated_at"`
+	ExpiresAt   time.Time              `json:"expires_at"`
+	LastUsed    time.Time              `json:"last_used"`
+	UsageCount  int64                  `json:"usage_count"`
+	Status      KeyStatus              `json:"status"`
 	Metadata    map[string]interface{} `json:"metadata"`
 }
 
@@ -38,22 +38,22 @@ type KeyInfo struct {
 type KeyStatus string
 
 const (
-	KeyStatusActive    KeyStatus = "active"
-	KeyStatusInactive  KeyStatus = "inactive"
-	KeyStatusExpired   KeyStatus = "expired"
-	KeyStatusRevoked   KeyStatus = "revoked"
-	KeyStatusRotating  KeyStatus = "rotating"
+	KeyStatusActive   KeyStatus = "active"
+	KeyStatusInactive KeyStatus = "inactive"
+	KeyStatusExpired  KeyStatus = "expired"
+	KeyStatusRevoked  KeyStatus = "revoked"
+	KeyStatusRotating KeyStatus = "rotating"
 )
 
 // KeyPermission represents different permission levels
 type KeyPermission string
 
 const (
-	PermissionRead      KeyPermission = "read"
-	PermissionWrite     KeyPermission = "write"
-	PermissionTrade     KeyPermission = "trade"
-	PermissionAdmin     KeyPermission = "admin"
-	PermissionWithdraw  KeyPermission = "withdraw"
+	PermissionRead     KeyPermission = "read"
+	PermissionWrite    KeyPermission = "write"
+	PermissionTrade    KeyPermission = "trade"
+	PermissionAdmin    KeyPermission = "admin"
+	PermissionWithdraw KeyPermission = "withdraw"
 )
 
 // NewKeyManager creates a new key manager
@@ -168,7 +168,7 @@ func (km *KeyManager) ValidateKey(keyString string) (*KeyInfo, error) {
 		// Mark as expired
 		keyInfo.Status = KeyStatusExpired
 		km.vault.UpdateKey(keyInfo.ID, keyInfo)
-		
+
 		km.monitor.LogKeyEvent(KeyEvent{
 			Type:      "key_expired",
 			KeyID:     keyInfo.ID,
@@ -287,6 +287,33 @@ func (km *KeyManager) CheckPermission(keyInfo *KeyInfo, permission KeyPermission
 	return false
 }
 
+// GetKey retrieves a key by ID from the vault
+func (km *KeyManager) GetKey(keyID string) (*KeyInfo, error) {
+	km.mu.RLock()
+	defer km.mu.RUnlock()
+	return km.vault.GetKey(keyID)
+}
+
+// GetRotationSchedule gets the rotation schedule for a key
+func (km *KeyManager) GetRotationSchedule(keyInfo *KeyInfo) interface{} {
+	return km.rotator.GetRotationSchedule(keyInfo)
+}
+
+// GetAlerts gets security alerts from the monitor
+func (km *KeyManager) GetAlerts(acknowledged bool) []SecurityAlert {
+	return km.monitor.GetAlerts(acknowledged)
+}
+
+// AcknowledgeAlert acknowledges a security alert
+func (km *KeyManager) AcknowledgeAlert(alertID, userID string) error {
+	return km.monitor.AcknowledgeAlert(alertID, userID)
+}
+
+// GetRecentEvents gets recent key events from the monitor
+func (km *KeyManager) GetRecentEvents(limit int) []KeyEvent {
+	return km.monitor.GetRecentEvents(limit)
+}
+
 // startAutoRotation starts automatic key rotation
 func (km *KeyManager) startAutoRotation() {
 	ticker := time.NewTicker(km.rotator.config.CheckInterval)
@@ -366,10 +393,10 @@ func permissionsToStrings(permissions []KeyPermission) []string {
 
 // KeyManagerConfig represents key manager configuration
 type KeyManagerConfig struct {
-	VaultConfig     *VaultConfig     `json:"vault_config"`
-	RotationConfig  *RotationConfig  `json:"rotation_config"`
-	MonitorConfig   *MonitorConfig   `json:"monitor_config"`
-	EncryptionKey   string           `json:"encryption_key"`
+	VaultConfig    *VaultConfig    `json:"vault_config"`
+	RotationConfig *RotationConfig `json:"rotation_config"`
+	MonitorConfig  *MonitorConfig  `json:"monitor_config"`
+	EncryptionKey  string          `json:"encryption_key"`
 }
 
 // DefaultKeyManagerConfig returns default configuration
@@ -390,10 +417,10 @@ func generateDefaultEncryptionKey() string {
 
 // KeyFilter represents filtering options for listing keys
 type KeyFilter struct {
-	Status      KeyStatus `json:"status,omitempty"`
-	Name        string    `json:"name,omitempty"`
-	Permission  string    `json:"permission,omitempty"`
-	CreatedAfter time.Time `json:"created_after,omitempty"`
+	Status        KeyStatus `json:"status,omitempty"`
+	Name          string    `json:"name,omitempty"`
+	Permission    string    `json:"permission,omitempty"`
+	CreatedAfter  time.Time `json:"created_after,omitempty"`
 	CreatedBefore time.Time `json:"created_before,omitempty"`
 }
 

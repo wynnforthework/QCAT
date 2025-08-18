@@ -24,14 +24,14 @@ type Response struct {
 // OptimizerHandler handles optimizer-related API requests
 type OptimizerHandler struct {
 	db      *database.DB
-	redis   *cache.RedisCache
+	redis   cache.Cacher
 	metrics *monitor.MetricsCollector
 	// 新增：优化器实例
 	optimizer *optimizer.Orchestrator
 }
 
 // NewOptimizerHandler creates a new optimizer handler
-func NewOptimizerHandler(db *database.DB, redis *cache.RedisCache, metrics *monitor.MetricsCollector) *OptimizerHandler {
+func NewOptimizerHandler(db *database.DB, redis cache.Cacher, metrics *monitor.MetricsCollector) *OptimizerHandler {
 	// 新增：使用工厂创建优化器实例
 	factory := optimizer.NewFactory()
 	orchestrator := factory.CreateOrchestrator(db.DB)
@@ -253,14 +253,14 @@ func (h *OptimizerHandler) GetResults(c *gin.Context) {
 // StrategyHandler handles strategy-related API requests
 type StrategyHandler struct {
 	db      *database.DB
-	redis   *cache.RedisCache
+	redis   cache.Cacher
 	metrics *monitor.MetricsCollector
 	// 新增：策略管理器
 	strategyManager interface{} // 新增：策略管理器接口
 }
 
 // NewStrategyHandler creates a new strategy handler
-func NewStrategyHandler(db *database.DB, redis *cache.RedisCache, metrics *monitor.MetricsCollector) *StrategyHandler {
+func NewStrategyHandler(db *database.DB, redis cache.Cacher, metrics *monitor.MetricsCollector) *StrategyHandler {
 	return &StrategyHandler{
 		db:              db,
 		redis:           redis,
@@ -734,14 +734,14 @@ func (h *StrategyHandler) RunBacktest(c *gin.Context) {
 // PortfolioHandler handles portfolio-related API requests
 type PortfolioHandler struct {
 	db      *database.DB
-	redis   *cache.RedisCache
+	redis   cache.Cacher
 	metrics *monitor.MetricsCollector
 	// 新增：投资组合管理器
 	portfolioManager interface{} // 新增：投资组合管理器接口
 }
 
 // NewPortfolioHandler creates a new portfolio handler
-func NewPortfolioHandler(db *database.DB, redis *cache.RedisCache, metrics *monitor.MetricsCollector) *PortfolioHandler {
+func NewPortfolioHandler(db *database.DB, redis cache.Cacher, metrics *monitor.MetricsCollector) *PortfolioHandler {
 	return &PortfolioHandler{
 		db:               db,
 		redis:            redis,
@@ -1020,14 +1020,14 @@ func (h *PortfolioHandler) GetHistory(c *gin.Context) {
 // RiskHandler handles risk-related API requests
 type RiskHandler struct {
 	db      *database.DB
-	redis   *cache.RedisCache
+	redis   cache.Cacher
 	metrics *monitor.MetricsCollector
 	// 新增：风控管理器
 	riskManager interface{} // 新增：风控管理器接口
 }
 
 // NewRiskHandler creates a new risk handler
-func NewRiskHandler(db *database.DB, redis *cache.RedisCache, metrics *monitor.MetricsCollector) *RiskHandler {
+func NewRiskHandler(db *database.DB, redis cache.Cacher, metrics *monitor.MetricsCollector) *RiskHandler {
 	return &RiskHandler{
 		db:          db,
 		redis:       redis,
@@ -1449,14 +1449,14 @@ func (h *RiskHandler) GetViolations(c *gin.Context) {
 // HotlistHandler handles hotlist-related API requests
 type HotlistHandler struct {
 	db      *database.DB
-	redis   *cache.RedisCache
+	redis   cache.Cacher
 	metrics *monitor.MetricsCollector
 	// 新增：热门币种管理器
 	hotlistManager interface{} // 新增：热门币种管理器接口
 }
 
 // NewHotlistHandler creates a new hotlist handler
-func NewHotlistHandler(db *database.DB, redis *cache.RedisCache, metrics *monitor.MetricsCollector) *HotlistHandler {
+func NewHotlistHandler(db *database.DB, redis cache.Cacher, metrics *monitor.MetricsCollector) *HotlistHandler {
 	return &HotlistHandler{
 		db:             db,
 		redis:          redis,

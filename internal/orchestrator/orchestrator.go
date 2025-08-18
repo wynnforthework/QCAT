@@ -34,13 +34,13 @@ type ServiceConfig struct {
 // NewOrchestrator creates a new orchestrator
 func NewOrchestrator() *Orchestrator {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Create message queue
 	msgQueue := NewInMemoryMessageQueue(1000)
-	
+
 	// Create process manager
 	processManager := NewProcessManager(msgQueue)
-	
+
 	orchestrator := &Orchestrator{
 		processManager: processManager,
 		msgQueue:       msgQueue,
@@ -49,13 +49,13 @@ func NewOrchestrator() *Orchestrator {
 		ctx:            ctx,
 		cancel:         cancel,
 	}
-	
+
 	// Setup default services
 	orchestrator.setupDefaultServices()
-	
+
 	// Setup message handlers
 	orchestrator.setupMessageHandlers()
-	
+
 	return orchestrator
 }
 
@@ -65,7 +65,7 @@ func (o *Orchestrator) setupDefaultServices() {
 	o.services["optimizer"] = &ServiceConfig{
 		Name:       "optimizer",
 		Type:       ProcessTypeOptimizer,
-		Executable: "./bin/optimizer",
+		Executable: "./bin/optimizer.exe",
 		Args:       []string{"--port=8081", "--log-level=info"},
 		Env: map[string]string{
 			"QCAT_SERVICE": "optimizer",
@@ -81,7 +81,7 @@ func (o *Orchestrator) setupDefaultServices() {
 			HealthEndpoint:   "http://localhost:8081/health",
 		},
 	}
-	
+
 	// Market data ingestor service
 	o.services["ingestor"] = &ServiceConfig{
 		Name:       "ingestor",
@@ -92,7 +92,7 @@ func (o *Orchestrator) setupDefaultServices() {
 			"QCAT_SERVICE": "ingestor",
 		},
 		Port:        8082,
-		AutoStart:   true,
+		AutoStart:   false, // Disabled for now since we don't have a standalone ingestor
 		AutoRestart: true,
 		HealthCheck: HealthCheckConfig{
 			Enabled:          true,
@@ -102,7 +102,7 @@ func (o *Orchestrator) setupDefaultServices() {
 			HealthEndpoint:   "http://localhost:8082/health",
 		},
 	}
-	
+
 	// Trading service
 	o.services["trader"] = &ServiceConfig{
 		Name:       "trader",
@@ -129,13 +129,13 @@ func (o *Orchestrator) setupDefaultServices() {
 func (o *Orchestrator) setupMessageHandlers() {
 	// Handle optimization results
 	o.msgQueue.Subscribe("optimization.result", o.handleOptimizationResult)
-	
+
 	// Handle process exit notifications
 	o.msgQueue.Subscribe("process.exit", o.handleProcessExit)
-	
+
 	// Handle trade signals
 	o.msgQueue.Subscribe("trade.signal", o.handleTradeSignal)
-	
+
 	// Handle market data updates
 	o.msgQueue.Subscribe("market.data", o.handleMarketData)
 }
@@ -143,7 +143,7 @@ func (o *Orchestrator) setupMessageHandlers() {
 // Start starts the orchestrator and all auto-start services
 func (o *Orchestrator) Start() error {
 	log.Println("Starting QCAT Orchestrator...")
-	
+
 	// Start auto-start services
 	for name, config := range o.services {
 		if config.AutoStart {
@@ -153,7 +153,7 @@ func (o *Orchestrator) Start() error {
 			}
 		}
 	}
-	
+
 	log.Println("QCAT Orchestrator started successfully")
 	return nil
 }
@@ -163,11 +163,11 @@ func (o *Orchestrator) StartService(serviceName string) error {
 	o.mu.RLock()
 	config, exists := o.services[serviceName]
 	o.mu.RUnlock()
-	
+
 	if !exists {
 		return fmt.Errorf("service %s not found", serviceName)
 	}
-	
+
 	// Check if service is already running
 	processes := o.processManager.GetProcessesByType(config.Type)
 	for _, process := range processes {
@@ -175,7 +175,7 @@ func (o *Orchestrator) StartService(serviceName string) error {
 			return fmt.Errorf("service %s is already running", serviceName)
 		}
 	}
-	
+
 	// Create process config
 	processConfig := ProcessConfig{
 		Name:        config.Name,
@@ -187,18 +187,18 @@ func (o *Orchestrator) StartService(serviceName string) error {
 		MaxRetries:  3,
 		HealthCheck: config.HealthCheck,
 	}
-	
+
 	// Start the process
 	process, err := o.processManager.StartProcess(processConfig)
 	if err != nil {
 		return fmt.Errorf("failed to start service %s: %w", serviceName, err)
 	}
-	
+
 	log.Printf("Started service %s with process ID %s (PID: %d)", serviceName, process.ID, process.PID)
-	
+
 	// Add health check
 	o.processManager.monitor.AddHealthCheck(process)
-	
+
 	return nil
 }
 
@@ -207,11 +207,11 @@ func (o *Orchestrator) StopService(serviceName string) error {
 	o.mu.RLock()
 	config, exists := o.services[serviceName]
 	o.mu.RUnlock()
-	
+
 	if !exists {
 		return fmt.Errorf("service %s not found", serviceName)
 	}
-	
+
 	// Find running processes for this service
 	processes := o.processManager.GetProcessesByType(config.Type)
 	for _, process := range processes {
@@ -219,15 +219,15 @@ func (o *Orchestrator) StopService(serviceName string) error {
 			if err := o.processManager.StopProcess(process.ID); err != nil {
 				return fmt.Errorf("failed to stop service %s: %w", serviceName, err)
 			}
-			
+
 			// Remove health check
 			o.processManager.monitor.RemoveHealthCheck(process.ID)
-			
+
 			log.Printf("Stopped service %s", serviceName)
 			return nil
 		}
 	}
-	
+
 	return fmt.Errorf("service %s is not running", serviceName)
 }
 
@@ -238,10 +238,10 @@ func (o *Orchestrator) RestartService(serviceName string) error {
 		// If service is not running, that's okay
 		log.Printf("Service %s was not running: %v", serviceName, err)
 	}
-	
+
 	// Wait a moment for cleanup
 	time.Sleep(2 * time.Second)
-	
+
 	// Start the service
 	return o.StartService(serviceName)
 }
@@ -249,14 +249,14 @@ func (o *Orchestrator) RestartService(serviceName string) error {
 // GetServiceStatus returns the status of all services
 func (o *Orchestrator) GetServiceStatus() map[string]ServiceStatus {
 	status := make(map[string]ServiceStatus)
-	
+
 	for serviceName, config := range o.services {
 		serviceStatus := ServiceStatus{
 			Name:   serviceName,
 			Type:   string(config.Type),
 			Status: "stopped",
 		}
-		
+
 		// Find running processes for this service
 		processes := o.processManager.GetProcessesByType(config.Type)
 		for _, process := range processes {
@@ -267,10 +267,10 @@ func (o *Orchestrator) GetServiceStatus() map[string]ServiceStatus {
 				break
 			}
 		}
-		
+
 		status[serviceName] = serviceStatus
 	}
-	
+
 	return status
 }
 
@@ -280,7 +280,7 @@ func (o *Orchestrator) RequestOptimization(req *OptimizationRequest) error {
 	if err := o.ensureServiceRunning("optimizer"); err != nil {
 		return fmt.Errorf("optimizer service not available: %w", err)
 	}
-	
+
 	// Publish optimization request
 	return o.msgQueue.Publish("optimization.request", req)
 }
@@ -289,15 +289,15 @@ func (o *Orchestrator) RequestOptimization(req *OptimizationRequest) error {
 func (o *Orchestrator) ensureServiceRunning(serviceName string) error {
 	status := o.GetServiceStatus()
 	serviceStatus, exists := status[serviceName]
-	
+
 	if !exists {
 		return fmt.Errorf("service %s not configured", serviceName)
 	}
-	
+
 	if serviceStatus.Status != "running" {
 		return o.StartService(serviceName)
 	}
-	
+
 	return nil
 }
 
@@ -332,26 +332,26 @@ func (o *Orchestrator) handleMarketData(topic string, message []byte) error {
 // Shutdown gracefully shuts down the orchestrator
 func (o *Orchestrator) Shutdown() error {
 	log.Println("Shutting down QCAT Orchestrator...")
-	
+
 	o.cancel()
-	
+
 	// Stop all services
 	for serviceName := range o.services {
 		if err := o.StopService(serviceName); err != nil {
 			log.Printf("Error stopping service %s: %v", serviceName, err)
 		}
 	}
-	
+
 	// Shutdown process manager
 	if err := o.processManager.Shutdown(); err != nil {
 		log.Printf("Error shutting down process manager: %v", err)
 	}
-	
+
 	// Close message queue
 	if err := o.msgQueue.Close(); err != nil {
 		log.Printf("Error closing message queue: %v", err)
 	}
-	
+
 	log.Println("QCAT Orchestrator shutdown complete")
 	return nil
 }

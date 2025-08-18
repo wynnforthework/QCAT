@@ -151,7 +151,7 @@ func (ca *CacheAdapter) LPop(ctx context.Context, key string, dest interface{}) 
 
 	// Get first element
 	value := list[0]
-	
+
 	// Update list without first element
 	newList := list[1:]
 	if err := ca.Set(ctx, key, newList, time.Hour); err != nil {
@@ -175,7 +175,7 @@ func (ca *CacheAdapter) RPop(ctx context.Context, key string, dest interface{}) 
 
 	// Get last element
 	value := list[len(list)-1]
-	
+
 	// Update list without last element
 	newList := list[:len(list)-1]
 	if err := ca.Set(ctx, key, newList, time.Hour); err != nil {
@@ -286,7 +286,7 @@ func (ca *CacheAdapter) ZAdd(ctx context.Context, key string, score float64, mem
 	zsetKey := fmt.Sprintf("zset:%s", key)
 	memberStr := fmt.Sprintf("%v", member)
 	scoreKey := fmt.Sprintf("%s:score:%s", zsetKey, memberStr)
-	
+
 	// Store the score
 	if err := ca.Set(ctx, scoreKey, score, time.Hour); err != nil {
 		return err
@@ -313,7 +313,7 @@ func (ca *CacheAdapter) ZRangeByScore(ctx context.Context, key string, min, max 
 // ZRem removes members from a sorted set
 func (ca *CacheAdapter) ZRem(ctx context.Context, key string, members ...interface{}) error {
 	zsetKey := fmt.Sprintf("zset:%s", key)
-	
+
 	// Remove from set
 	if err := ca.SRem(ctx, zsetKey, members...); err != nil {
 		return err
@@ -364,6 +364,11 @@ func (ca *CacheAdapter) Close() error {
 	return ca.manager.Close()
 }
 
+// GetManager returns the underlying cache manager
+func (ca *CacheAdapter) GetManager() *CacheManager {
+	return ca.manager
+}
+
 // SetFundingRate sets funding rate for a symbol
 func (ca *CacheAdapter) SetFundingRate(ctx context.Context, symbol string, rate interface{}, expiration time.Duration) error {
 	key := fmt.Sprintf("funding_rate:%s", symbol)
@@ -391,7 +396,7 @@ func (ca *CacheAdapter) GetIndexPrice(ctx context.Context, symbol string, dest i
 // CheckRateLimit checks rate limit for a key
 func (ca *CacheAdapter) CheckRateLimit(ctx context.Context, key string, limit int, window time.Duration) (bool, error) {
 	rateLimitKey := fmt.Sprintf("rate_limit:%s", key)
-	
+
 	// Get current count
 	var count int
 	err := ca.Get(ctx, rateLimitKey, &count)

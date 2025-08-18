@@ -22,7 +22,6 @@ import (
 	"qcat/internal/exchange/position"
 	"qcat/internal/exchange/risk"
 	"qcat/internal/market"
-	"qcat/internal/monitor"
 	"qcat/internal/strategy"
 	"qcat/internal/strategy/live"
 	"qcat/internal/strategy/optimizer"
@@ -888,8 +887,8 @@ func (pm *ProcessManager) runStrategyProcess(process *Process) {
 		return
 	}
 
-	// 新增：初始化指标收集器
-	metricsCollector := monitor.NewMetricsCollector()
+	// 新增：获取全局指标收集器（避免重复注册）
+	// metricsCollector := monitor.NewMetricsCollector() // 注释掉，避免重复注册
 
 	// 新增：创建交易所连接器
 	exchangeConfig := &exchange.ExchangeConfig{
@@ -964,8 +963,8 @@ func (pm *ProcessManager) runStrategyProcess(process *Process) {
 	process.Status = "running"
 
 	// 新增：记录组件初始化成功
-	log.Printf("Strategy process components initialized: database=%v, redis=%v, metrics=%v, runner=%v",
-		db != nil, redisCache != nil, metricsCollector != nil, strategyRunner != nil)
+	log.Printf("Strategy process components initialized: database=%v, redis=%v, runner=%v",
+		db != nil, redisCache != nil, strategyRunner != nil)
 
 	log.Printf("Strategy process started successfully: %s", process.Name)
 
@@ -1040,8 +1039,8 @@ func (pm *ProcessManager) runOptimizerProcess(process *Process) {
 		return
 	}
 
-	// 新增：初始化指标收集器
-	metricsCollector := monitor.NewMetricsCollector()
+	// 新增：获取全局指标收集器（避免重复注册）
+	// metricsCollector := monitor.NewMetricsCollector() // 注释掉，避免重复注册
 
 	// 新增：创建优化器工厂
 	factory := optimizer.NewFactory()
@@ -1071,8 +1070,8 @@ func (pm *ProcessManager) runOptimizerProcess(process *Process) {
 	process.Status = "running"
 
 	// 新增：记录组件初始化成功
-	log.Printf("Optimizer process components initialized: database=%v, redis=%v, metrics=%v, orchestrator=%v",
-		db != nil, redisCache != nil, metricsCollector != nil, optimizerOrchestrator != nil)
+	log.Printf("Optimizer process components initialized: database=%v, redis=%v, orchestrator=%v",
+		db != nil, redisCache != nil, optimizerOrchestrator != nil)
 
 	log.Printf("Optimizer process started successfully: %s", process.Name)
 

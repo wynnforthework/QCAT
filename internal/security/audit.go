@@ -11,11 +11,11 @@ import (
 
 // AuditLogger provides secure audit logging with integrity verification
 type AuditLogger struct {
-	storage    AuditStorage
-	encryptor  *Encryptor
-	config     *AuditConfig
-	chain      *AuditChain
-	mu         sync.RWMutex
+	storage   AuditStorage
+	encryptor *Encryptor
+	config    *AuditConfig
+	chain     *AuditChain
+	mu        sync.RWMutex
 }
 
 // AuditStorage defines the interface for audit log storage
@@ -28,30 +28,30 @@ type AuditStorage interface {
 
 // AuditConfig represents audit configuration
 type AuditConfig struct {
-	EnableEncryption    bool          `json:"enable_encryption"`
-	EnableIntegrityCheck bool         `json:"enable_integrity_check"`
-	RetentionPeriod     time.Duration `json:"retention_period"`
-	MaxEntries          int           `json:"max_entries"`
-	StorageType         string        `json:"storage_type"`
-	StoragePath         string        `json:"storage_path"`
-	AlertOnTampering    bool          `json:"alert_on_tampering"`
+	EnableEncryption     bool          `json:"enable_encryption"`
+	EnableIntegrityCheck bool          `json:"enable_integrity_check"`
+	RetentionPeriod      time.Duration `json:"retention_period"`
+	MaxEntries           int           `json:"max_entries"`
+	StorageType          string        `json:"storage_type"`
+	StoragePath          string        `json:"storage_path"`
+	AlertOnTampering     bool          `json:"alert_on_tampering"`
 }
 
 // AuditEntry represents a single audit log entry
 type AuditEntry struct {
-	ID          string                 `json:"id"`
-	Timestamp   time.Time              `json:"timestamp"`
-	UserID      string                 `json:"user_id"`
-	Action      string                 `json:"action"`
-	Resource    string                 `json:"resource"`
-	Details     map[string]interface{} `json:"details"`
-	IPAddress   string                 `json:"ip_address"`
-	UserAgent   string                 `json:"user_agent"`
-	Success     bool                   `json:"success"`
-	ErrorMsg    string                 `json:"error_msg,omitempty"`
-	Hash        string                 `json:"hash"`
-	PrevHash    string                 `json:"prev_hash"`
-	Signature   string                 `json:"signature,omitempty"`
+	ID        string                 `json:"id"`
+	Timestamp time.Time              `json:"timestamp"`
+	UserID    string                 `json:"user_id"`
+	Action    string                 `json:"action"`
+	Resource  string                 `json:"resource"`
+	Details   map[string]interface{} `json:"details"`
+	IPAddress string                 `json:"ip_address"`
+	UserAgent string                 `json:"user_agent"`
+	Success   bool                   `json:"success"`
+	ErrorMsg  string                 `json:"error_msg,omitempty"`
+	Hash      string                 `json:"hash"`
+	PrevHash  string                 `json:"prev_hash"`
+	Signature string                 `json:"signature,omitempty"`
 }
 
 // AuditChain maintains the integrity chain of audit logs
@@ -62,14 +62,14 @@ type AuditChain struct {
 
 // AuditFilter represents filtering options for audit logs
 type AuditFilter struct {
-	UserID      string    `json:"user_id,omitempty"`
-	Action      string    `json:"action,omitempty"`
-	Resource    string    `json:"resource,omitempty"`
-	StartTime   time.Time `json:"start_time,omitempty"`
-	EndTime     time.Time `json:"end_time,omitempty"`
-	Success     *bool     `json:"success,omitempty"`
-	IPAddress   string    `json:"ip_address,omitempty"`
-	Limit       int       `json:"limit,omitempty"`
+	UserID    string    `json:"user_id,omitempty"`
+	Action    string    `json:"action,omitempty"`
+	Resource  string    `json:"resource,omitempty"`
+	StartTime time.Time `json:"start_time,omitempty"`
+	EndTime   time.Time `json:"end_time,omitempty"`
+	Success   *bool     `json:"success,omitempty"`
+	IPAddress string    `json:"ip_address,omitempty"`
+	Limit     int       `json:"limit,omitempty"`
 }
 
 // NewAuditLogger creates a new audit logger
@@ -216,6 +216,14 @@ func (al *AuditLogger) GetEntries(filter *AuditFilter) ([]*AuditEntry, error) {
 	return al.storage.List(filter)
 }
 
+// GetEntry retrieves a specific audit entry by ID
+func (al *AuditLogger) GetEntry(id string) (*AuditEntry, error) {
+	al.mu.RLock()
+	defer al.mu.RUnlock()
+
+	return al.storage.Retrieve(id)
+}
+
 // VerifyIntegrity verifies the integrity of the audit log chain
 func (al *AuditLogger) VerifyIntegrity() (*IntegrityReport, error) {
 	if !al.config.EnableIntegrityCheck {
@@ -320,7 +328,7 @@ func (al *AuditLogger) startCleanupRoutine() {
 // cleanup removes old audit entries
 func (al *AuditLogger) cleanup() {
 	cutoff := time.Now().Add(-al.config.RetentionPeriod)
-	
+
 	entries, err := al.storage.List(&AuditFilter{EndTime: cutoff})
 	if err != nil {
 		return
@@ -336,7 +344,7 @@ func (al *AuditLogger) exportToCSV(entries []*AuditEntry) ([]byte, error) {
 	// This is a simplified CSV export
 	// In production, you'd want a proper CSV library
 	csv := "ID,Timestamp,UserID,Action,Resource,Success,IPAddress,ErrorMsg\n"
-	
+
 	for _, entry := range entries {
 		csv += fmt.Sprintf("%s,%s,%s,%s,%s,%t,%s,%s\n",
 			entry.ID,

@@ -7,13 +7,14 @@ import (
 	"time"
 
 	"qcat/internal/security"
+
 	"github.com/gin-gonic/gin"
 )
 
 // SecurityHandler handles security-related API requests
 type SecurityHandler struct {
-	keyManager   *security.KeyManager
-	auditLogger  *security.AuditLogger
+	keyManager  *security.KeyManager
+	auditLogger *security.AuditLogger
 }
 
 // NewSecurityHandler creates a new security handler
@@ -62,14 +63,14 @@ func (h *SecurityHandler) RegisterRoutes(router *gin.RouterGroup) {
 // createAPIKey creates a new API key
 func (h *SecurityHandler) createAPIKey(c *gin.Context) {
 	var req struct {
-		Name        string                    `json:"name" binding:"required"`
+		Name        string                   `json:"name" binding:"required"`
 		Permissions []security.KeyPermission `json:"permissions" binding:"required"`
 		ExpiresAt   time.Time                `json:"expires_at"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request format",
+			"error":   "Invalid request format",
 			"details": err.Error(),
 		})
 		return
@@ -84,7 +85,7 @@ func (h *SecurityHandler) createAPIKey(c *gin.Context) {
 	keyInfo, keyString, err := h.keyManager.GenerateKey(req.Name, req.Permissions, req.ExpiresAt)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to create API key",
+			"error":   "Failed to create API key",
 			"details": err.Error(),
 		})
 		return
@@ -93,16 +94,16 @@ func (h *SecurityHandler) createAPIKey(c *gin.Context) {
 	// Log the action
 	userID := getUserID(c)
 	h.auditLogger.LogUserAction(userID, "create_api_key", keyInfo.ID, map[string]interface{}{
-		"key_name": req.Name,
+		"key_name":    req.Name,
 		"permissions": req.Permissions,
-		"expires_at": req.ExpiresAt,
+		"expires_at":  req.ExpiresAt,
 	}, true, "")
 
 	c.JSON(http.StatusCreated, gin.H{
-		"success": true,
+		"success":  true,
 		"key_info": keyInfo,
-		"api_key": keyString, // Only returned once
-		"message": "API key created successfully",
+		"api_key":  keyString, // Only returned once
+		"message":  "API key created successfully",
 	})
 }
 
@@ -110,7 +111,7 @@ func (h *SecurityHandler) createAPIKey(c *gin.Context) {
 func (h *SecurityHandler) listAPIKeys(c *gin.Context) {
 	// Parse query parameters for filtering
 	filter := &security.KeyFilter{}
-	
+
 	if status := c.Query("status"); status != "" {
 		filter.Status = security.KeyStatus(status)
 	}
@@ -124,7 +125,7 @@ func (h *SecurityHandler) listAPIKeys(c *gin.Context) {
 	keys, err := h.keyManager.ListKeys(filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to list API keys",
+			"error":   "Failed to list API keys",
 			"details": err.Error(),
 		})
 		return
@@ -132,8 +133,8 @@ func (h *SecurityHandler) listAPIKeys(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"keys": keys,
-		"count": len(keys),
+		"keys":    keys,
+		"count":   len(keys),
 	})
 }
 
@@ -147,17 +148,17 @@ func (h *SecurityHandler) getAPIKey(c *gin.Context) {
 		return
 	}
 
-	keyInfo, err := h.keyManager.vault.GetKey(keyID)
+	keyInfo, err := h.keyManager.GetKey(keyID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"error": "API key not found",
+			"error":   "API key not found",
 			"details": err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+		"success":  true,
 		"key_info": keyInfo,
 	})
 }
@@ -175,7 +176,7 @@ func (h *SecurityHandler) rotateAPIKey(c *gin.Context) {
 	newKeyInfo, newKeyString, err := h.keyManager.RotateKey(keyID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to rotate API key",
+			"error":   "Failed to rotate API key",
 			"details": err.Error(),
 		})
 		return
@@ -188,10 +189,10 @@ func (h *SecurityHandler) rotateAPIKey(c *gin.Context) {
 	}, true, "")
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"key_info": newKeyInfo,
+		"success":     true,
+		"key_info":    newKeyInfo,
 		"new_api_key": newKeyString, // Only returned once
-		"message": "API key rotated successfully",
+		"message":     "API key rotated successfully",
 	})
 }
 
@@ -216,7 +217,7 @@ func (h *SecurityHandler) revokeAPIKey(c *gin.Context) {
 	err := h.keyManager.RevokeKey(keyID, req.Reason)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to revoke API key",
+			"error":   "Failed to revoke API key",
 			"details": err.Error(),
 		})
 		return
@@ -249,7 +250,7 @@ func (h *SecurityHandler) getKeyUsage(c *gin.Context) {
 	period, err := time.ParseDuration(periodStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid period format",
+			"error":   "Invalid period format",
 			"details": err.Error(),
 		})
 		return
@@ -258,16 +259,16 @@ func (h *SecurityHandler) getKeyUsage(c *gin.Context) {
 	stats, err := h.keyManager.GetKeyUsageStats(keyID, period)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Usage statistics not found",
+			"error":   "Usage statistics not found",
 			"details": err.Error(),
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+		"success":     true,
 		"usage_stats": stats,
-		"period": periodStr,
+		"period":      periodStr,
 	})
 }
 
@@ -281,19 +282,19 @@ func (h *SecurityHandler) getRotationSchedule(c *gin.Context) {
 		return
 	}
 
-	keyInfo, err := h.keyManager.vault.GetKey(keyID)
+	keyInfo, err := h.keyManager.GetKey(keyID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"error": "API key not found",
+			"error":   "API key not found",
 			"details": err.Error(),
 		})
 		return
 	}
 
-	schedule := h.keyManager.rotator.GetRotationSchedule(keyInfo)
+	schedule := h.keyManager.GetRotationSchedule(keyInfo)
 
 	c.JSON(http.StatusOK, gin.H{
-		"success": true,
+		"success":  true,
 		"schedule": schedule,
 	})
 }
@@ -331,7 +332,7 @@ func (h *SecurityHandler) getAuditLogs(c *gin.Context) {
 	entries, err := h.auditLogger.GetEntries(filter)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to get audit logs",
+			"error":   "Failed to get audit logs",
 			"details": err.Error(),
 		})
 		return
@@ -340,7 +341,7 @@ func (h *SecurityHandler) getAuditLogs(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"entries": entries,
-		"count": len(entries),
+		"count":   len(entries),
 	})
 }
 
@@ -354,10 +355,10 @@ func (h *SecurityHandler) getAuditLog(c *gin.Context) {
 		return
 	}
 
-	entry, err := h.auditLogger.storage.Retrieve(id)
+	entry, err := h.auditLogger.GetEntry(id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Audit log entry not found",
+			"error":   "Audit log entry not found",
 			"details": err.Error(),
 		})
 		return
@@ -365,7 +366,7 @@ func (h *SecurityHandler) getAuditLog(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"entry": entry,
+		"entry":   entry,
 	})
 }
 
@@ -373,12 +374,12 @@ func (h *SecurityHandler) getAuditLog(c *gin.Context) {
 func (h *SecurityHandler) exportAuditLogs(c *gin.Context) {
 	var req struct {
 		Filter *security.AuditFilter `json:"filter"`
-		Format string               `json:"format"`
+		Format string                `json:"format"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request format",
+			"error":   "Invalid request format",
 			"details": err.Error(),
 		})
 		return
@@ -391,7 +392,7 @@ func (h *SecurityHandler) exportAuditLogs(c *gin.Context) {
 	data, err := h.auditLogger.ExportLogs(req.Filter, req.Format)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to export audit logs",
+			"error":   "Failed to export audit logs",
 			"details": err.Error(),
 		})
 		return
@@ -418,7 +419,7 @@ func (h *SecurityHandler) verifyIntegrity(c *gin.Context) {
 	report, err := h.auditLogger.VerifyIntegrity()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to verify integrity",
+			"error":   "Failed to verify integrity",
 			"details": err.Error(),
 		})
 		return
@@ -431,7 +432,7 @@ func (h *SecurityHandler) verifyIntegrity(c *gin.Context) {
 
 	c.JSON(statusCode, gin.H{
 		"success": report.IntegrityValid,
-		"report": report,
+		"report":  report,
 	})
 }
 
@@ -440,12 +441,12 @@ func (h *SecurityHandler) getSecurityAlerts(c *gin.Context) {
 	acknowledgedStr := c.DefaultQuery("acknowledged", "false")
 	acknowledged := acknowledgedStr == "true"
 
-	alerts := h.keyManager.monitor.GetAlerts(acknowledged)
+	alerts := h.keyManager.GetAlerts(acknowledged)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"alerts": alerts,
-		"count": len(alerts),
+		"alerts":  alerts,
+		"count":   len(alerts),
 	})
 }
 
@@ -460,10 +461,10 @@ func (h *SecurityHandler) acknowledgeAlert(c *gin.Context) {
 	}
 
 	userID := getUserID(c)
-	err := h.keyManager.monitor.AcknowledgeAlert(alertID, userID)
+	err := h.keyManager.AcknowledgeAlert(alertID, userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Failed to acknowledge alert",
+			"error":   "Failed to acknowledge alert",
 			"details": err.Error(),
 		})
 		return
@@ -488,12 +489,12 @@ func (h *SecurityHandler) getSecurityEvents(c *gin.Context) {
 		limit = 100
 	}
 
-	events := h.keyManager.monitor.GetRecentEvents(limit)
+	events := h.keyManager.GetRecentEvents(limit)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"events": events,
-		"count": len(events),
+		"events":  events,
+		"count":   len(events),
 	})
 }
 

@@ -10,23 +10,24 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/yaml.v3"
 	"qcat/internal/config"
 	"qcat/internal/logger"
+
+	"gopkg.in/yaml.v3"
 )
 
 // DistributedOptimizer 分布式优化器
 type DistributedOptimizer struct {
-	config           *config.Config
-	logger           *logger.Logger
-	consistencyMgr   *ConsistencyManager
-	optimizationHub  *OptimizationHub
-	performanceDB    *PerformanceDatabase
-	clusterManager   *ClusterManager
+	config            *config.Config
+	logger            logger.Logger
+	consistencyMgr    *ConsistencyManager
+	optimizationHub   *OptimizationHub
+	performanceDB     *PerformanceDatabase
+	clusterManager    *ClusterManager
 	adaptiveOptimizer *AdaptiveOptimizer
-	conf             *distributedOptConfig
-	backtestRunner   BacktestRunner
-	mu               sync.RWMutex
+	conf              *distributedOptConfig
+	backtestRunner    BacktestRunner
+	mu                sync.RWMutex
 }
 
 // OptimizationHub 优化结果中心
@@ -39,46 +40,46 @@ type OptimizationHub struct {
 
 // OptimizationResult 优化结果
 type OptimizationResult struct {
-	TaskID          string                 `json:"task_id"`
-	StrategyName    string                 `json:"strategy_name"`
-	Parameters      map[string]interface{} `json:"parameters"`
-	Performance     *PerformanceMetrics    `json:"performance"`
-	RandomSeed      int64                  `json:"random_seed"`
-	DataHash        string                 `json:"data_hash"`
-	ModelData       []byte                 `json:"model_data"`
-	DiscoveredBy    string                 `json:"discovered_by"` // 发现此结果的节点ID
-	DiscoveredAt    time.Time              `json:"discovered_at"`
-	Confidence      float64                `json:"confidence"`
-	IsGlobalBest    bool                   `json:"is_global_best"`
-	AdoptionCount   int                    `json:"adoption_count"` // 被其他节点采用的次数
+	TaskID        string                 `json:"task_id"`
+	StrategyName  string                 `json:"strategy_name"`
+	Parameters    map[string]interface{} `json:"parameters"`
+	Performance   *PerformanceMetrics    `json:"performance"`
+	RandomSeed    int64                  `json:"random_seed"`
+	DataHash      string                 `json:"data_hash"`
+	ModelData     []byte                 `json:"model_data"`
+	DiscoveredBy  string                 `json:"discovered_by"` // 发现此结果的节点ID
+	DiscoveredAt  time.Time              `json:"discovered_at"`
+	Confidence    float64                `json:"confidence"`
+	IsGlobalBest  bool                   `json:"is_global_best"`
+	AdoptionCount int                    `json:"adoption_count"` // 被其他节点采用的次数
 }
 
 // PerformanceMetrics 性能指标
 type PerformanceMetrics struct {
-	ProfitRate      float64 `json:"profit_rate"`
-	SharpeRatio     float64 `json:"sharpe_ratio"`
-	MaxDrawdown     float64 `json:"max_drawdown"`
-	WinRate         float64 `json:"win_rate"`
-	TotalReturn     float64 `json:"total_return"`
+	ProfitRate         float64 `json:"profit_rate"`
+	SharpeRatio        float64 `json:"sharpe_ratio"`
+	MaxDrawdown        float64 `json:"max_drawdown"`
+	WinRate            float64 `json:"win_rate"`
+	TotalReturn        float64 `json:"total_return"`
 	RiskAdjustedReturn float64 `json:"risk_adjusted_return"`
 }
 
 // NodeInfo 节点信息
 type NodeInfo struct {
-	NodeID      string    `json:"node_id"`
-	LastSeen    time.Time `json:"last_seen"`
-	Status      string    `json:"status"` // active, inactive, optimizing
-	CurrentTask string    `json:"current_task"`
+	NodeID      string              `json:"node_id"`
+	LastSeen    time.Time           `json:"last_seen"`
+	Status      string              `json:"status"` // active, inactive, optimizing
+	CurrentTask string              `json:"current_task"`
 	BestResult  *OptimizationResult `json:"best_result"`
 }
 
 // OptimizationEvent 优化事件
 type OptimizationEvent struct {
-	Timestamp   time.Time           `json:"timestamp"`
-	EventType   string              `json:"event_type"` // new_best, adoption, node_join, node_leave
-	NodeID      string              `json:"node_id"`
-	TaskID      string              `json:"task_id"`
-	Description string              `json:"description"`
+	Timestamp   time.Time              `json:"timestamp"`
+	EventType   string                 `json:"event_type"` // new_best, adoption, node_join, node_leave
+	NodeID      string                 `json:"node_id"`
+	TaskID      string                 `json:"task_id"`
+	Description string                 `json:"description"`
 	Data        map[string]interface{} `json:"data"`
 }
 
@@ -110,8 +111,8 @@ type NodeDiscoverer struct {
 
 // NewDistributedOptimizer 创建分布式优化器
 func NewDistributedOptimizer(cfg *config.Config, consistencyMgr *ConsistencyManager) (*DistributedOptimizer, error) {
-	logger := logger.GetLogger()
-	
+	logger := logger.GetGlobalLogger()
+
 	optimizer := &DistributedOptimizer{
 		config:         cfg,
 		logger:         logger,
@@ -157,8 +158,8 @@ func (do *DistributedOptimizer) StartOptimization(ctx context.Context, taskID st
 
 	// 1. 检查是否已有全局最优结果
 	if bestResult := do.getGlobalBestResult(taskID); bestResult != nil {
-		do.logger.Info("发现全局最优结果，直接采用", 
-			"task_id", taskID, 
+		do.logger.Info("发现全局最优结果，直接采用",
+			"task_id", taskID,
 			"profit_rate", bestResult.Performance.ProfitRate,
 			"discovered_by", bestResult.DiscoveredBy)
 		return bestResult, nil
@@ -167,7 +168,7 @@ func (do *DistributedOptimizer) StartOptimization(ctx context.Context, taskID st
 	// 2. 使用随机种子进行本地优化
 	randomSeed := time.Now().UnixNano()
 	rand.Seed(randomSeed)
-	
+
 	do.logger.Info("使用随机种子进行本地优化", "task_id", taskID, "seed", randomSeed)
 
 	var localResult *OptimizationResult
@@ -189,13 +190,13 @@ func (do *DistributedOptimizer) StartOptimization(ctx context.Context, taskID st
 
 	// 4. 检查是否为新的全局最优
 	if do.isNewGlobalBest(taskID, localResult) {
-		do.logger.Info("发现新的全局最优结果", 
-			"task_id", taskID, 
+		do.logger.Info("发现新的全局最优结果",
+			"task_id", taskID,
 			"profit_rate", localResult.Performance.ProfitRate)
-		
+
 		// 广播给其他节点
 		go do.broadcastBestResult(localResult)
-		
+
 		// 更新全局最优
 		do.updateGlobalBestResult(taskID, localResult)
 	}
@@ -205,8 +206,8 @@ func (do *DistributedOptimizer) StartOptimization(ctx context.Context, taskID st
 
 // AdoptBestResult 采用最优结果
 func (do *DistributedOptimizer) AdoptBestResult(taskID string, result *OptimizationResult) error {
-	do.logger.Info("采用最优结果", 
-		"task_id", taskID, 
+	do.logger.Info("采用最优结果",
+		"task_id", taskID,
 		"profit_rate", result.Performance.ProfitRate,
 		"discovered_by", result.DiscoveredBy)
 
@@ -227,14 +228,14 @@ func (do *DistributedOptimizer) AdoptBestResult(taskID string, result *Optimizat
 
 	// 4. 记录采用事件
 	do.recordOptimizationEvent(&OptimizationEvent{
-		Timestamp:   time.Now(),
-		EventType:   "adoption",
-		NodeID:      do.getNodeID(),
-		TaskID:      taskID,
-		Description: fmt.Sprintf("采用来自节点 %s 的最优结果，收益率: %.2f%%", 
+		Timestamp: time.Now(),
+		EventType: "adoption",
+		NodeID:    do.getNodeID(),
+		TaskID:    taskID,
+		Description: fmt.Sprintf("采用来自节点 %s 的最优结果，收益率: %.2f%%",
 			result.DiscoveredBy, result.Performance.ProfitRate),
 		Data: map[string]interface{}{
-			"profit_rate": result.Performance.ProfitRate,
+			"profit_rate":   result.Performance.ProfitRate,
 			"discovered_by": result.DiscoveredBy,
 		},
 	})
@@ -251,7 +252,7 @@ func (do *DistributedOptimizer) validateByBacktest(result *OptimizationResult) e
 	if do.backtestRunner != nil && do.conf != nil && do.conf.Validation.Backtest.Enabled {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
-		stats, err := do.backtestRunner.Run(ctx, result.TaskID, result.StrategyName, toFloatParams(result.Parameters), result.DataHash)
+		stats, err := do.backtestRunner.Run(ctx, result.TaskID, result.StrategyName, result.Parameters, result.DataHash)
 		if err != nil {
 			return fmt.Errorf("真实回测失败: %w", err)
 		}
@@ -271,7 +272,7 @@ func (do *DistributedOptimizer) validateByBacktest(result *OptimizationResult) e
 	// 配置
 	runs := 5
 	maxAllowedDrawdown := 10.0 // %
-	minMeanRetention := 0.8     // 平均收益需至少达到原结果的80%
+	minMeanRetention := 0.8    // 平均收益需至少达到原结果的80%
 	if do.conf != nil {
 		if do.conf.Validation.Backtest.Runs > 0 {
 			runs = do.conf.Validation.Backtest.Runs
@@ -323,7 +324,7 @@ func (do *DistributedOptimizer) validateByBacktest(result *OptimizationResult) e
 		EventType: "backtest_validation",
 		NodeID:    do.getNodeID(),
 		TaskID:    result.TaskID,
-		Description: fmt.Sprintf("回测通过: mean=%.2f%%, var=%.4f, maxDD=%.2f%%", 
+		Description: fmt.Sprintf("回测通过: mean=%.2f%%, var=%.4f, maxDD=%.2f%%",
 			meanProfit, variance, maxDD),
 		Data: map[string]interface{}{
 			"mean_profit": meanProfit,
@@ -351,10 +352,10 @@ func (do *DistributedOptimizer) GetOptimizationStatus(taskID string) *Optimizati
 
 // OptimizationStatus 优化状态
 type OptimizationStatus struct {
-	TaskID           string                 `json:"task_id"`
-	ActiveNodes      int                    `json:"active_nodes"`
-	GlobalBestResult *OptimizationResult    `json:"global_best_result"`
-	OptimizationLog  []*OptimizationEvent   `json:"optimization_log"`
+	TaskID           string               `json:"task_id"`
+	ActiveNodes      int                  `json:"active_nodes"`
+	GlobalBestResult *OptimizationResult  `json:"global_best_result"`
+	OptimizationLog  []*OptimizationEvent `json:"optimization_log"`
 }
 
 // 私有方法
@@ -362,13 +363,13 @@ type OptimizationStatus struct {
 func (do *DistributedOptimizer) performLocalOptimization(taskID, strategyName, dataHash string, seed int64) (*OptimizationResult, error) {
 	// 这里应该调用实际的AutoML引擎进行训练
 	// 为了演示，我们生成一个模拟结果
-	
+
 	// 使用种子生成可重现的随机结果
 	rand.Seed(seed)
-	
+
 	// 模拟训练过程
 	time.Sleep(100 * time.Millisecond) // 模拟训练时间
-	
+
 	// 生成模拟性能指标
 	profitRate := 5.0 + rand.Float64()*10.0 // 5-15% 的收益率
 	sharpeRatio := 0.5 + rand.Float64()*2.0 // 0.5-2.5 的夏普比率
@@ -384,20 +385,20 @@ func (do *DistributedOptimizer) performLocalOptimization(taskID, strategyName, d
 			"epochs":        100 + rand.Intn(200),
 		},
 		Performance: &PerformanceMetrics{
-			ProfitRate:          profitRate,
-			SharpeRatio:         sharpeRatio,
-			MaxDrawdown:         maxDrawdown,
-			WinRate:             winRate,
-			TotalReturn:         profitRate,
-			RiskAdjustedReturn:  profitRate / (1 + maxDrawdown),
+			ProfitRate:         profitRate,
+			SharpeRatio:        sharpeRatio,
+			MaxDrawdown:        maxDrawdown,
+			WinRate:            winRate,
+			TotalReturn:        profitRate,
+			RiskAdjustedReturn: profitRate / (1 + maxDrawdown),
 		},
-		RandomSeed:   seed,
-		DataHash:     dataHash,
-		ModelData:    []byte("simulated_model_data"),
-		DiscoveredBy: do.getNodeID(),
-		DiscoveredAt: time.Now(),
-		Confidence:   0.8 + rand.Float64()*0.2,
-		IsGlobalBest: false,
+		RandomSeed:    seed,
+		DataHash:      dataHash,
+		ModelData:     []byte("simulated_model_data"),
+		DiscoveredBy:  do.getNodeID(),
+		DiscoveredAt:  time.Now(),
+		Confidence:    0.8 + rand.Float64()*0.2,
+		IsGlobalBest:  false,
 		AdoptionCount: 0,
 	}
 
@@ -433,7 +434,7 @@ func (do *DistributedOptimizer) updateGlobalBestResult(taskID string, result *Op
 		TaskID:      taskID,
 		Description: fmt.Sprintf("发现新的全局最优结果，收益率: %.2f%%", result.Performance.ProfitRate),
 		Data: map[string]interface{}{
-			"profit_rate": result.Performance.ProfitRate,
+			"profit_rate":  result.Performance.ProfitRate,
 			"sharpe_ratio": result.Performance.SharpeRatio,
 		},
 	})
@@ -448,10 +449,10 @@ func (do *DistributedOptimizer) getGlobalBestResult(taskID string) *Optimization
 func (do *DistributedOptimizer) broadcastBestResult(result *OptimizationResult) {
 	// 这里应该实现实际的网络广播
 	// 为了演示，我们只是记录日志
-	do.logger.Info("广播最优结果", 
+	do.logger.Info("广播最优结果",
 		"task_id", result.TaskID,
 		"profit_rate", result.Performance.ProfitRate)
-	
+
 	// TODO: 实现实际的网络广播逻辑
 	// 可以使用 gRPC、HTTP、消息队列等方式
 }
@@ -484,11 +485,11 @@ func (do *DistributedOptimizer) applyOptimalResult(result *OptimizationResult) e
 	// 1. 加载模型数据
 	// 2. 应用最优参数
 	// 3. 更新策略配置
-	
-	do.logger.Info("应用最优结果", 
+
+	do.logger.Info("应用最优结果",
 		"task_id", result.TaskID,
 		"parameters", result.Parameters)
-	
+
 	// TODO: 实现实际的应用逻辑
 	return nil
 }
@@ -498,7 +499,7 @@ func (do *DistributedOptimizer) recordOptimizationEvent(event *OptimizationEvent
 	defer do.mu.Unlock()
 
 	do.optimizationHub.optimizationLog = append(do.optimizationHub.optimizationLog, event)
-	
+
 	// 保持日志数量在合理范围内
 	if len(do.optimizationHub.optimizationLog) > 1000 {
 		do.optimizationHub.optimizationLog = do.optimizationHub.optimizationLog[100:]
@@ -530,10 +531,10 @@ func (do *DistributedOptimizer) getNodeID() string {
 func (do *DistributedOptimizer) startBackgroundTasks() {
 	// 启动节点发现
 	go do.clusterManager.discoverer.startDiscovery()
-	
+
 	// 启动结果同步
 	go do.syncResultsPeriodically()
-	
+
 	// 启动性能监控
 	go do.monitorPerformance()
 }
@@ -595,9 +596,9 @@ type BacktestRunner interface {
 
 // BacktestStats 回测关键指标
 type BacktestStats struct {
-	TotalReturn   float64
-	MaxDrawdown   float64
-	SharpeRatio   float64
+	TotalReturn float64
+	MaxDrawdown float64
+	SharpeRatio float64
 }
 
 // SetBacktestRunner 注入回测执行器
@@ -620,10 +621,10 @@ func (do *DistributedOptimizer) EnsureDefaultBacktestRunner() {
 type distributedOptConfig struct {
 	Validation struct {
 		Backtest struct {
-			Enabled           bool    `yaml:"enabled"`
-			Runs              int     `yaml:"runs"`
-			MaxDrawdown       float64 `yaml:"max_drawdown"`
-			MinMeanRetention  float64 `yaml:"min_mean_retention"`
+			Enabled          bool    `yaml:"enabled"`
+			Runs             int     `yaml:"runs"`
+			MaxDrawdown      float64 `yaml:"max_drawdown"`
+			MinMeanRetention float64 `yaml:"min_mean_retention"`
 		} `yaml:"backtest"`
 	} `yaml:"validation"`
 }
