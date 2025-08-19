@@ -14,6 +14,9 @@ import (
 	"qcat/internal/cache"
 	"qcat/internal/config"
 	"qcat/internal/database"
+	"qcat/internal/exchange"
+	"qcat/internal/exchange/account"
+	"qcat/internal/exchange/binance"
 	"qcat/internal/monitor"
 	"qcat/internal/monitoring"
 	"qcat/internal/security"
@@ -397,6 +400,31 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		auditLogger = nil
 	}
 
+	// Initialize exchange client and account manager
+	var accountManager *account.Manager
+	if cfg.Exchange.APIKey != "" && cfg.Exchange.APISecret != "" {
+		// Create Binance client
+		exchangeConfig := &exchange.ExchangeConfig{
+			Name:           cfg.Exchange.Name,
+			APIKey:         cfg.Exchange.APIKey,
+			APISecret:      cfg.Exchange.APISecret,
+			TestNet:        cfg.Exchange.TestNet,
+			BaseURL:        cfg.Exchange.BaseURL,
+			FuturesBaseURL: cfg.Exchange.FuturesBaseURL,
+		}
+
+		exchangeClient, err := binance.NewClient(exchangeConfig)
+		if err != nil {
+			log.Printf("Warning: Failed to initialize Binance client: %v", err)
+		} else {
+			// Create account manager
+			accountManager = account.NewManager(db.DB, redis, exchangeClient)
+			log.Printf("Account manager initialized successfully")
+		}
+	} else {
+		log.Printf("Warning: Binance API credentials not configured, using mock data")
+	}
+
 	// Initialize handlers with dependencies
 	server.handlers = &Handlers{
 		Optimizer: NewOptimizerHandler(db, redis, metricsCollector),
@@ -410,7 +438,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		Auth:      NewAuthHandler(jwtManager, db),
 		Cache:     NewCacheHandler(cacheManagerRef),
 		Security:  NewSecurityHandler(keyManager, auditLogger),
-		Dashboard: NewDashboardHandler(db, metricsCollector),
+		Dashboard: NewDashboardHandler(db, metricsCollector, accountManager),
 		Market:    NewMarketHandler(db, metricsCollector),
 		Trading:   NewTradingHandler(db, metricsCollector),
 	}

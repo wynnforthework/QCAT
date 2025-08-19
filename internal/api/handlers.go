@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"qcat/internal/cache"
 	"qcat/internal/common"
 	"qcat/internal/database"
+	"qcat/internal/exchange/account"
 	"qcat/internal/monitor"
 	"qcat/internal/strategy/optimizer"
 
@@ -2281,8 +2283,9 @@ func generateUUID() string {
 
 // DashboardHandler handles dashboard-related API requests
 type DashboardHandler struct {
-	db      *database.DB
-	metrics *monitor.MetricsCollector
+	db             *database.DB
+	metrics        *monitor.MetricsCollector
+	accountManager *account.Manager
 }
 
 // MarketHandler handles market data requests
@@ -2298,10 +2301,11 @@ type TradingHandler struct {
 }
 
 // NewDashboardHandler creates a new dashboard handler
-func NewDashboardHandler(db *database.DB, metrics *monitor.MetricsCollector) *DashboardHandler {
+func NewDashboardHandler(db *database.DB, metrics *monitor.MetricsCollector, accountManager *account.Manager) *DashboardHandler {
 	return &DashboardHandler{
-		db:      db,
-		metrics: metrics,
+		db:             db,
+		metrics:        metrics,
+		accountManager: accountManager,
 	}
 }
 
@@ -2437,17 +2441,56 @@ func (h *TradingHandler) GetTradingActivity(c *gin.Context) {
 
 // getAccountData retrieves account information
 func (h *DashboardHandler) getAccountData() map[string]interface{} {
-	// 实际应该从账户服务或数据库获取
-	// 这里使用模拟数据，但添加了一些动态变化
-	baseEquity := 125000.50
-	variation := float64(time.Now().Unix()%1000) / 10.0 // 0-100的变化
+	// 如果账户管理器不可用，返回模拟数据
+	if h.accountManager == nil {
+		baseEquity := 125000.50
+		variation := float64(time.Now().Unix()%1000) / 10.0 // 0-100的变化
+
+		return map[string]interface{}{
+			"equity":      baseEquity + variation,
+			"pnl":         8250.30 + variation*0.1,
+			"pnlPercent":  7.05 + variation*0.01,
+			"drawdown":    2.35,
+			"maxDrawdown": 5.20,
+		}
+	}
+
+	// 获取真实账户数据
+	ctx := context.Background()
+	balances, err := h.accountManager.GetAllBalances(ctx)
+	if err != nil {
+		// 如果获取失败，返回模拟数据
+		return map[string]interface{}{
+			"equity":      0.0,
+			"pnl":         0.0,
+			"pnlPercent":  0.0,
+			"drawdown":    0.0,
+			"maxDrawdown": 0.0,
+			"error":       err.Error(),
+		}
+	}
+
+	// 计算总权益和PnL
+	totalEquity := 0.0
+	totalUnrealizedPnL := 0.0
+
+	for _, balance := range balances {
+		totalEquity += balance.Total
+		totalUnrealizedPnL += balance.UnrealizedPnL
+	}
+
+	// 计算PnL百分比
+	pnlPercent := 0.0
+	if totalEquity > 0 {
+		pnlPercent = (totalUnrealizedPnL / totalEquity) * 100
+	}
 
 	return map[string]interface{}{
-		"equity":      baseEquity + variation,
-		"pnl":         8250.30 + variation*0.1,
-		"pnlPercent":  7.05 + variation*0.01,
-		"drawdown":    2.35,
-		"maxDrawdown": 5.20,
+		"equity":      totalEquity,
+		"pnl":         totalUnrealizedPnL,
+		"pnlPercent":  pnlPercent,
+		"drawdown":    0.0, // TODO: 从历史数据计算
+		"maxDrawdown": 0.0, // TODO: 从历史数据计算
 	}
 }
 
