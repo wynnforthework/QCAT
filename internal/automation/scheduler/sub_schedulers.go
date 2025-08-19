@@ -12,6 +12,7 @@ import (
 	"qcat/internal/config"
 	"qcat/internal/database"
 	"qcat/internal/exchange/account"
+	"qcat/internal/hotlist"
 	"qcat/internal/monitor"
 )
 
@@ -154,17 +155,37 @@ func (ps *PositionScheduler) HandleMultiStrategyHedging(ctx context.Context, tas
 
 // DataScheduler 数据调度器
 type DataScheduler struct {
-	config    *config.Config
-	db        *database.DB
-	isRunning bool
-	mu        sync.RWMutex
+	config               *config.Config
+	db                   *database.DB
+	isRunning            bool
+	mu                   sync.RWMutex
+	recommendationEngine *hotlist.RecommendationEngine
 }
 
 // NewDataScheduler 创建数据调度器
 func NewDataScheduler(cfg *config.Config, db *database.DB) *DataScheduler {
+	// 创建推荐引擎的依赖组件
+	scorer := hotlist.NewScorer(nil, nil, nil, &hotlist.ScorerConfig{
+		VolJumpWindow:    24,
+		VolJumpThreshold: 0.02,
+		TurnoverWindow:   24,
+		OIChangeWindow:   24,
+		FundingZWindow:   168,
+		RegimeWindow:     48,
+	})
+
+	detector := hotlist.NewDetector(scorer, &hotlist.DetectorConfig{
+		MinScore:        50.0,
+		TopN:            20,
+		ApprovalTimeout: time.Hour * 4,
+	})
+
+	recommendationEngine := hotlist.NewRecommendationEngine(cfg, db, scorer, detector)
+
 	return &DataScheduler{
-		config: cfg,
-		db:     db,
+		config:               cfg,
+		db:                   db,
+		recommendationEngine: recommendationEngine,
 	}
 }
 
@@ -655,49 +676,31 @@ func (ds *DataScheduler) determineRiskLevel(totalScore float64, data *MarketData
 
 // generateRecommendations 生成推荐列表
 func (ds *DataScheduler) generateRecommendations(ctx context.Context, hotScores []*HotScore) ([]*Recommendation, error) {
-	var recommendations []*Recommendation
-
-	// 只推荐前10个最热门的币种
-	maxRecommendations := 10
-	if len(hotScores) < maxRecommendations {
-		maxRecommendations = len(hotScores)
+	// 转换为符号列表
+	symbols := make([]string, len(hotScores))
+	for i, score := range hotScores {
+		symbols[i] = score.Symbol
 	}
 
-	for i := 0; i < maxRecommendations; i++ {
-		score := hotScores[i]
+	// 使用推荐引擎生成增强推荐
+	enhancedRecs, err := ds.recommendationEngine.GenerateRecommendations(ctx, symbols)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate enhanced recommendations: %w", err)
+	}
 
-		// 只推荐分数超过阈值的币种
-		if score.TotalScore < 50 {
-			continue
-		}
-
+	// 转换为旧格式以保持兼容性
+	var recommendations []*Recommendation
+	for _, enhancedRec := range enhancedRecs {
 		recommendation := &Recommendation{
-			Symbol:    score.Symbol,
-			Score:     score.TotalScore,
-			RiskLevel: score.RiskLevel,
-			Timestamp: time.Now(),
+			Symbol:          enhancedRec.Symbol,
+			Score:           enhancedRec.Score,
+			RiskLevel:       enhancedRec.RiskLevel,
+			PriceRange:      enhancedRec.PriceRange,
+			SafeLeverage:    enhancedRec.SafeLeverage,
+			MarketSentiment: enhancedRec.MarketSentiment,
+			Reason:          enhancedRec.Reason,
+			Timestamp:       enhancedRec.Timestamp,
 		}
-
-		// 计算价格范围 (基于当前价格和波动率)
-		// 这里需要获取当前价格，简化处理
-		currentPrice := 50000.0 // 简化处理，实际应该从市场数据获取
-		volatility := 0.05      // 简化处理
-
-		priceRange := [2]float64{
-			currentPrice * (1 - volatility),
-			currentPrice * (1 + volatility),
-		}
-		recommendation.PriceRange = priceRange
-
-		// 计算安全杠杆倍数
-		recommendation.SafeLeverage = ds.calculateSafeLeverage(score.RiskLevel)
-
-		// 确定市场情绪
-		recommendation.MarketSentiment = ds.determineMarketSentiment(score)
-
-		// 生成推荐理由
-		recommendation.Reason = ds.generateRecommendationReason(score)
-
 		recommendations = append(recommendations, recommendation)
 	}
 
