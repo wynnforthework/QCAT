@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"qcat/internal/automation/bridge"
 	"qcat/internal/automation/executor"
 	"qcat/internal/automation/scheduler"
 	"qcat/internal/config"
@@ -27,8 +28,10 @@ type AutomationSystem struct {
 	metrics        *monitor.MetricsCollector
 
 	// 核心组件
-	scheduler *scheduler.AutomationScheduler
-	executor  *executor.RealtimeExecutor
+	scheduler         *scheduler.AutomationScheduler
+	executor          *executor.RealtimeExecutor
+	bridge            *bridge.MonitorResponseBridge
+	monitorIntegrator *bridge.MonitorIntegration
 
 	// 运行状态
 	ctx       context.Context
@@ -79,16 +82,28 @@ func NewAutomationSystem(
 		cfg, db, exchange, accountManager, metrics,
 	)
 
+	// 创建监控-响应桥接器
+	monitorBridge := bridge.NewMonitorResponseBridge(
+		cfg, realtimeExecutor, metrics,
+	)
+
+	// 创建监控集成器（暂时不使用外部AlertManager和HealthChecker）
+	monitorIntegrator := bridge.NewMonitorIntegration(
+		monitorBridge, metrics, nil, nil,
+	)
+
 	return &AutomationSystem{
-		config:         cfg,
-		db:             db,
-		exchange:       exchange,
-		accountManager: accountManager,
-		metrics:        metrics,
-		scheduler:      automationScheduler,
-		executor:       realtimeExecutor,
-		ctx:            ctx,
-		cancel:         cancel,
+		config:            cfg,
+		db:                db,
+		exchange:          exchange,
+		accountManager:    accountManager,
+		metrics:           metrics,
+		scheduler:         automationScheduler,
+		executor:          realtimeExecutor,
+		bridge:            monitorBridge,
+		monitorIntegrator: monitorIntegrator,
+		ctx:               ctx,
+		cancel:            cancel,
 		status: &SystemStatus{
 			StartTime:   time.Now(),
 			HealthScore: 1.0,
@@ -117,6 +132,21 @@ func (as *AutomationSystem) Start() error {
 	if err := as.scheduler.Start(); err != nil {
 		as.executor.Stop() // 清理
 		return fmt.Errorf("failed to start scheduler: %w", err)
+	}
+
+	// 启动监控-响应桥接器
+	if err := as.bridge.Start(); err != nil {
+		as.executor.Stop()  // 清理
+		as.scheduler.Stop() // 清理
+		return fmt.Errorf("failed to start monitor bridge: %w", err)
+	}
+
+	// 启动监控集成器
+	if err := as.monitorIntegrator.Start(); err != nil {
+		as.executor.Stop()  // 清理
+		as.scheduler.Stop() // 清理
+		as.bridge.Stop()    // 清理
+		return fmt.Errorf("failed to start monitor integrator: %w", err)
 	}
 
 	// 启动监控循环
@@ -155,6 +185,11 @@ func (as *AutomationSystem) Stop() error {
 	// 停止调度器
 	if err := as.scheduler.Stop(); err != nil {
 		log.Printf("Warning: failed to stop scheduler: %v", err)
+	}
+
+	// 停止监控-响应桥接器
+	if err := as.bridge.Stop(); err != nil {
+		log.Printf("Warning: failed to stop monitor bridge: %v", err)
 	}
 
 	// 停止执行器
@@ -354,4 +389,27 @@ func (as *AutomationSystem) GetExecutor() *executor.RealtimeExecutor {
 // GetScheduler 获取自动化调度器
 func (as *AutomationSystem) GetScheduler() *scheduler.AutomationScheduler {
 	return as.scheduler
+}
+
+// GetBridge 获取监控-响应桥接器
+func (as *AutomationSystem) GetBridge() *bridge.MonitorResponseBridge {
+	return as.bridge
+}
+
+// GetMonitorIntegrator 获取监控集成器
+func (as *AutomationSystem) GetMonitorIntegrator() *bridge.MonitorIntegration {
+	return as.monitorIntegrator
+}
+
+// ProcessMonitorEvent 处理监控事件
+func (as *AutomationSystem) ProcessMonitorEvent(eventType, source, severity, message string, metadata map[string]interface{}) error {
+	event := &bridge.MonitorEvent{
+		Type:     bridge.EventType(eventType),
+		Source:   source,
+		Severity: bridge.EventSeverity(severity),
+		Message:  message,
+		Metadata: metadata,
+	}
+
+	return as.bridge.ProcessEvent(event)
 }
