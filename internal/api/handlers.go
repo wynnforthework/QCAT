@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -125,7 +127,7 @@ func (h *OptimizerHandler) GetTasks(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var tasks []map[string]interface{}
+	tasks := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var task struct {
 			ID         string    `db:"id"`
@@ -295,7 +297,8 @@ func (h *StrategyHandler) ListStrategies(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var strategies []map[string]interface{}
+	// 初始化为空数组而不是 nil，确保即使没有数据也返回空数组
+	strategies := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var strategy struct {
 			ID          string    `db:"id"`
@@ -845,7 +848,7 @@ func (h *PortfolioHandler) GetAllocations(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var allocations []map[string]interface{}
+	allocations := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var allocation struct {
 			StrategyID   string    `db:"strategy_id"`
@@ -988,7 +991,7 @@ func (h *PortfolioHandler) GetHistory(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var history []map[string]interface{}
+	history := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var snapshot struct {
 			Equity        float64   `db:"equity"`
@@ -1134,7 +1137,7 @@ func (h *RiskHandler) GetLimits(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var limits []map[string]interface{}
+	limits := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var limit struct {
 			Symbol                  string    `db:"symbol"`
@@ -1260,7 +1263,7 @@ func (h *RiskHandler) GetCircuitBreakers(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var breakers []map[string]interface{}
+	breakers := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var breaker struct {
 			ID          string     `db:"id"`
@@ -1410,7 +1413,7 @@ func (h *RiskHandler) GetViolations(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var violations []map[string]interface{}
+	violations := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var violation struct {
 			ID          string    `db:"id"`
@@ -1496,7 +1499,7 @@ func (h *HotlistHandler) GetHotSymbols(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var symbols []map[string]interface{}
+	symbols := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var symbol struct {
 			Symbol           string    `db:"symbol"`
@@ -1631,7 +1634,7 @@ func (h *HotlistHandler) GetWhitelist(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var whitelist []map[string]interface{}
+	whitelist := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var item struct {
 			Symbol     string    `db:"symbol"`
@@ -1981,7 +1984,7 @@ func (h *AuditHandler) GetLogs(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var logs []map[string]interface{}
+	logs := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var log struct {
 			ID        string                 `db:"id"`
@@ -2075,7 +2078,7 @@ func (h *AuditHandler) GetDecisionChains(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var chains []map[string]interface{}
+	chains := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var chain struct {
 			ID              string                 `db:"id"`
@@ -2140,7 +2143,7 @@ func (h *AuditHandler) GetPerformanceMetrics(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var metrics []map[string]interface{}
+	metrics := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var metric struct {
 			StrategyID       string    `db:"strategy_id"`
@@ -2401,7 +2404,7 @@ func (h *MarketHandler) GetMarketData(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var marketData []map[string]interface{}
+	marketData := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var symbol string
 		var price, change24h, volume24h float64
@@ -2486,7 +2489,7 @@ func (h *TradingHandler) GetTradingActivity(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	var activities []map[string]interface{}
+	activities := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var id, symbol, side, status, orderType string
 		var quantity, price float64
@@ -2826,4 +2829,178 @@ func (h *DashboardHandler) getPerformanceData() map[string]interface{} {
 		"strategies":  strategyCount,
 		"source":      "performance_table",
 	}
+}
+
+// GenerateStrategy 自动生成策略
+func (h *StrategyHandler) GenerateStrategy(c *gin.Context) {
+	ctx := c.Request.Context()
+
+	// 解析请求参数
+	var req struct {
+		Symbol     string `json:"symbol" binding:"required"`
+		Exchange   string `json:"exchange"`
+		TimeRange  string `json:"time_range"`  // "7d", "30d", "90d"
+		Objective  string `json:"objective"`   // "profit", "sharpe", "drawdown"
+		RiskLevel  string `json:"risk_level"`  // "low", "medium", "high"
+		MarketType string `json:"market_type"` // "trending", "ranging", "volatile"
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Success: false,
+			Error:   "Invalid request parameters: " + err.Error(),
+		})
+		return
+	}
+
+	// 设置默认值
+	if req.Exchange == "" {
+		req.Exchange = "binance"
+	}
+	if req.TimeRange == "" {
+		req.TimeRange = "30d"
+	}
+	if req.Objective == "" {
+		req.Objective = "sharpe"
+	}
+	if req.RiskLevel == "" {
+		req.RiskLevel = "medium"
+	}
+
+	// 生成策略名称
+	strategyName := fmt.Sprintf("Auto_%s_%s_%d", req.Symbol, req.RiskLevel, time.Now().Unix())
+
+	// 基于请求参数生成策略配置
+	var expectedReturn, expectedSharpe, expectedDrawdown, confidence float64
+	var parameters map[string]interface{}
+
+	// 根据风险等级设置参数
+	switch req.RiskLevel {
+	case "low":
+		expectedReturn = 0.08
+		expectedSharpe = 1.2
+		expectedDrawdown = 0.05
+		confidence = 0.8
+		parameters = map[string]interface{}{
+			"stop_loss":     0.02,
+			"take_profit":   0.04,
+			"position_size": 0.1,
+			"ma_period":     30,
+			"rsi_period":    21,
+		}
+	case "high":
+		expectedReturn = 0.18
+		expectedSharpe = 0.9
+		expectedDrawdown = 0.15
+		confidence = 0.65
+		parameters = map[string]interface{}{
+			"stop_loss":     0.05,
+			"take_profit":   0.10,
+			"position_size": 0.4,
+			"ma_period":     10,
+			"rsi_period":    7,
+		}
+	default: // medium
+		expectedReturn = 0.12
+		expectedSharpe = 1.1
+		expectedDrawdown = 0.08
+		confidence = 0.75
+		parameters = map[string]interface{}{
+			"stop_loss":     0.03,
+			"take_profit":   0.06,
+			"position_size": 0.2,
+			"ma_period":     20,
+			"rsi_period":    14,
+		}
+	}
+
+	// 根据市场类型调整参数
+	if req.MarketType == "volatile" {
+		expectedReturn *= 0.9
+		expectedDrawdown *= 1.2
+		if stopLoss, ok := parameters["stop_loss"].(float64); ok {
+			parameters["stop_loss"] = stopLoss * 1.5
+		}
+	} else if req.MarketType == "trending" {
+		expectedReturn *= 1.1
+		expectedDrawdown *= 0.9
+		if takeProfit, ok := parameters["take_profit"].(float64); ok {
+			parameters["take_profit"] = takeProfit * 1.3
+		}
+	}
+
+	// 保存生成的策略到数据库
+	strategyID := generateUUID()
+	now := time.Now()
+
+	query := `
+		INSERT INTO strategies (
+			id, name, type, status, description,
+			performance, sharpe_ratio, max_drawdown,
+			optimization_config, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		RETURNING id
+	`
+
+	description := fmt.Sprintf("Auto-generated strategy for %s with %s risk level", req.Symbol, req.RiskLevel)
+	optimizationConfig := map[string]interface{}{
+		"auto_generated":    true,
+		"symbol":            req.Symbol,
+		"risk_level":        req.RiskLevel,
+		"market_type":       req.MarketType,
+		"confidence":        confidence,
+		"expected_return":   expectedReturn,
+		"expected_sharpe":   expectedSharpe,
+		"expected_drawdown": expectedDrawdown,
+		"parameters":        parameters,
+	}
+	optimizationJSON, _ := json.Marshal(optimizationConfig)
+
+	var savedID string
+	err := h.db.QueryRowContext(ctx, query,
+		strategyID,
+		strategyName,
+		"auto_generated",
+		"inactive",
+		description,
+		expectedReturn,
+		expectedSharpe,
+		expectedDrawdown,
+		string(optimizationJSON),
+		now,
+		now,
+	).Scan(&savedID)
+
+	if err != nil {
+		log.Printf("Failed to save generated strategy: %v", err)
+		c.JSON(http.StatusInternalServerError, Response{
+			Success: false,
+			Error:   "Failed to save generated strategy: " + err.Error(),
+		})
+		return
+	}
+
+	// 记录指标
+	h.metrics.IncrementCounter("strategies_generated", map[string]string{
+		"symbol":     req.Symbol,
+		"risk_level": req.RiskLevel,
+	})
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data: map[string]interface{}{
+			"strategy_id":       savedID,
+			"strategy_name":     strategyName,
+			"symbol":            req.Symbol,
+			"exchange":          req.Exchange,
+			"risk_level":        req.RiskLevel,
+			"market_type":       req.MarketType,
+			"expected_return":   expectedReturn,
+			"expected_sharpe":   expectedSharpe,
+			"expected_drawdown": expectedDrawdown,
+			"confidence":        confidence,
+			"parameters":        parameters,
+			"description":       description,
+		},
+	})
 }
