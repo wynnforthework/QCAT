@@ -28,35 +28,8 @@ export default function HomePage() {
         setError(null)
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error)
-        setError('无法获取仪表板数据')
-        // 设置模拟数据以便开发和测试
-        setDashboardData({
-          account: {
-            equity: 125000.50,
-            pnl: 8250.30,
-            pnlPercent: 7.05,
-            drawdown: 2.35,
-            maxDrawdown: 5.20
-          },
-          strategies: {
-            total: 15,
-            running: 8,
-            stopped: 5,
-            error: 2
-          },
-          risk: {
-            level: "低风险",
-            exposure: 45000.00,
-            limit: 100000.00,
-            violations: 0
-          },
-          performance: {
-            sharpe: 1.85,
-            sortino: 2.12,
-            calmar: 3.45,
-            winRate: 68.5
-          }
-        })
+        setError('无法获取仪表板数据，请检查后端服务是否正常运行')
+        setDashboardData(null)
       } finally {
         setLoading(false)
       }

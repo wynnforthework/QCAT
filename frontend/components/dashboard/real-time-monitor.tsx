@@ -3,11 +3,7 @@
 import { useState, useEffect } from "react"
 import { useClientOnly } from "@/lib/use-client-only"
 import { SafeTimeDisplay } from "@/components/ui/client-only"
-import {
-  generateMockSystemStatus,
-  generateMockMarketData,
-  generateMockTradingActivity
-} from "@/lib/mock-data-generator"
+import apiClient, { type SystemMetrics, type MarketData, type TradingActivity } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -38,25 +34,6 @@ interface SystemStatus {
   }
 }
 
-interface MarketData {
-  symbol: string
-  price: number
-  change24h: number
-  volume: number
-  lastUpdate: string
-}
-
-interface TradingActivity {
-  id: string
-  type: "order" | "fill" | "cancel"
-  symbol: string
-  side: "BUY" | "SELL"
-  amount: number
-  price?: number
-  timestamp: string
-  status: "success" | "pending" | "failed"
-}
-
 export function RealTimeMonitor() {
   const [systemStatus, setSystemStatus] = useState<SystemStatus[]>([])
   const [marketData, setMarketData] = useState<MarketData[]>([])
@@ -71,45 +48,86 @@ export function RealTimeMonitor() {
     setLastUpdate(new Date())
 
     // 初始化数据
-    updateSystemStatus()
-    updateMarketData()
-    updateTradingActivity()
+    const initializeData = async () => {
+      await Promise.all([
+        updateSystemStatus(),
+        updateMarketData(),
+        updateTradingActivity()
+      ])
+    }
 
-    // 模拟实时数据更新
-    const interval = setInterval(() => {
-      updateSystemStatus()
-      updateMarketData()
-      updateTradingActivity()
+    initializeData()
+
+    // 实时数据更新
+    const interval = setInterval(async () => {
+      await Promise.all([
+        updateSystemStatus(),
+        updateMarketData(),
+        updateTradingActivity()
+      ])
       setLastUpdate(new Date())
-    }, 2000)
+    }, 5000) // 改为5秒更新一次，减少API调用频率
 
     return () => clearInterval(interval)
   }, [isClient])
 
-  const updateSystemStatus = () => {
+  const updateSystemStatus = async () => {
     if (!isClient) return
 
-    const newStatus = generateMockSystemStatus()
-    setSystemStatus(newStatus)
-    setIsConnected(Math.random() > 0.05) // 95% 连接率
+    try {
+      const systemMetrics = await apiClient.getSystemMetrics()
+      // 将SystemMetrics转换为SystemStatus格式
+      const components = [
+        {
+          component: "交易引擎",
+          status: systemMetrics.cpu < 80 ? "healthy" : systemMetrics.cpu < 90 ? "warning" : "error" as const,
+          message: systemMetrics.cpu < 80 ? "运行正常" : systemMetrics.cpu < 90 ? "性能警告" : "服务异常",
+          lastUpdate: new Date().toISOString(),
+          metrics: {
+            cpu: systemMetrics.cpu,
+            memory: systemMetrics.memory,
+            latency: 0
+          }
+        },
+        {
+          component: "数据库",
+          status: systemMetrics.memory < 80 ? "healthy" : systemMetrics.memory < 90 ? "warning" : "error" as const,
+          message: systemMetrics.memory < 80 ? "运行正常" : systemMetrics.memory < 90 ? "性能警告" : "服务异常",
+          lastUpdate: new Date().toISOString(),
+          metrics: {
+            cpu: systemMetrics.cpu,
+            memory: systemMetrics.memory,
+            latency: 0
+          }
+        }
+      ]
+      setSystemStatus(components)
+      setIsConnected(true)
+    } catch (error) {
+      console.error('Failed to fetch system metrics:', error)
+      setIsConnected(false)
+    }
   }
 
-  const updateMarketData = () => {
+  const updateMarketData = async () => {
     if (!isClient) return
 
-    const newMarketData = generateMockMarketData()
-    setMarketData(newMarketData)
+    try {
+      const newMarketData = await apiClient.getMarketData()
+      setMarketData(newMarketData)
+    } catch (error) {
+      console.error('Failed to fetch market data:', error)
+    }
   }
 
-  const updateTradingActivity = () => {
+  const updateTradingActivity = async () => {
     if (!isClient) return
 
-    // 30% 概率生成新活动
-    if (Math.random() > 0.7) {
-      const newActivities = generateMockTradingActivity(1)
-      if (newActivities.length > 0) {
-        setTradingActivity(prev => [newActivities[0], ...prev.slice(0, 9)]) // 保持最新10条
-      }
+    try {
+      const newActivities = await apiClient.getTradingActivity(10)
+      setTradingActivity(newActivities)
+    } catch (error) {
+      console.error('Failed to fetch trading activity:', error)
     }
   }
 

@@ -1,7 +1,18 @@
 /**
- * 模拟数据生成器
+ * 模拟数据生成器 - 仅用于开发和测试
+ *
+ * ⚠️ 警告：此文件仅用于开发和测试目的
+ * 生产环境应使用实际的API数据，不应依赖此文件中的模拟数据
+ *
  * 所有随机数据生成都应该在客户端执行，避免 hydration 错误
  */
+
+// 检查是否在开发环境
+const isDevelopment = process.env.NODE_ENV === 'development'
+
+if (!isDevelopment) {
+  console.warn('⚠️ Mock data generator should only be used in development environment')
+}
 
 // 基础随机数生成器（使用种子确保一致性）
 class SeededRandom {
@@ -45,8 +56,13 @@ export function resetSeededRandom(seed?: number): void {
   globalRandom = new SeededRandom(seed)
 }
 
-// 生成模拟交易数据
-export function generateMockTrades(count: number = 50, strategyId: string = "default"): any[] {
+// 生成模拟交易数据 - 仅用于开发测试
+export function generateMockTrades(count: number = 50, strategyId: string = "default"): unknown[] {
+  if (!isDevelopment) {
+    console.warn('generateMockTrades should only be used in development')
+    return []
+  }
+
   const random = getSeededRandom()
   const trades = []
   
@@ -102,8 +118,13 @@ export function generateMockTrades(count: number = 50, strategyId: string = "def
   return trades.sort((a, b) => new Date(b.openTime).getTime() - new Date(a.openTime).getTime())
 }
 
-// 生成模拟市场数据
-export function generateMockMarketData(): any[] {
+// 生成模拟市场数据 - 仅用于开发测试
+export function generateMockMarketData(): unknown[] {
+  if (!isDevelopment) {
+    console.warn('generateMockMarketData should only be used in development')
+    return []
+  }
+
   const random = getSeededRandom()
   const symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT"]
   
@@ -126,8 +147,13 @@ export function generateMockMarketData(): any[] {
   })
 }
 
-// 生成模拟系统状态
-export function generateMockSystemStatus(): any[] {
+// 生成模拟系统状态 - 仅用于开发测试
+export function generateMockSystemStatus(): unknown[] {
+  if (!isDevelopment) {
+    console.warn('generateMockSystemStatus should only be used in development')
+    return []
+  }
+
   const random = getSeededRandom()
 
   const components = [
@@ -171,8 +197,13 @@ export function generateMockSystemStatus(): any[] {
   })
 }
 
-// 生成模拟交易活动
-export function generateMockTradingActivity(maxCount: number = 10): any[] {
+// 生成模拟交易活动 - 仅用于开发测试
+export function generateMockTradingActivity(maxCount: number = 10): unknown[] {
+  if (!isDevelopment) {
+    console.warn('generateMockTradingActivity should only be used in development')
+    return []
+  }
+
   const random = getSeededRandom()
   const activities = []
   

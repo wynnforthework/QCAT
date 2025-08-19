@@ -8,6 +8,25 @@ interface ApiResponse<T> {
   message?: string;
 }
 
+// 认证相关接口
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+  user_id: string;
+  username: string;
+  role: string;
+}
+
+export interface RefreshTokenRequest {
+  refresh_token: string;
+}
+
 class ApiClient {
   private baseURL: string;
 
@@ -15,15 +34,71 @@ class ApiClient {
     this.baseURL = baseURL;
   }
 
+  private getAuthToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('accessToken');
+  }
+
+  private getRefreshToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('refreshToken');
+  }
+
+  private isTokenExpired(): boolean {
+    if (typeof window === 'undefined') return true;
+    const expiresAt = localStorage.getItem('tokenExpiresAt');
+    if (!expiresAt) return true;
+    return new Date(expiresAt) <= new Date();
+  }
+
+  private async refreshTokenIfNeeded(): Promise<void> {
+    if (!this.isTokenExpired()) return;
+
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) {
+      throw new Error('UNAUTHORIZED');
+    }
+
+    try {
+      const authData = await this.refreshToken({ refresh_token: refreshToken });
+      // 更新本地存储
+      localStorage.setItem('accessToken', authData.access_token);
+      localStorage.setItem('refreshToken', authData.refresh_token);
+      localStorage.setItem('tokenExpiresAt', authData.expires_at);
+    } catch (error) {
+      // 刷新失败，清除所有token
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('tokenExpiresAt');
+      throw new Error('UNAUTHORIZED');
+    }
+  }
+
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    skipAuth: boolean = false
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
-    
+
+    // 如果不跳过认证，尝试刷新token
+    if (!skipAuth) {
+      try {
+        await this.refreshTokenIfNeeded();
+      } catch (error) {
+        if (error instanceof Error && error.message === 'UNAUTHORIZED') {
+          throw error;
+        }
+      }
+    }
+
+    // 获取认证token
+    const token = this.getAuthToken();
+
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
+        ...(token && !skipAuth && { 'Authorization': `Bearer ${token}` }),
         ...options.headers,
       },
       ...options,
@@ -31,22 +106,41 @@ class ApiClient {
 
     try {
       const response = await fetch(url, config);
-      
+
       if (!response.ok) {
+        // 如果是401错误，可能需要刷新token
+        if (response.status === 401) {
+          throw new Error('UNAUTHORIZED');
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
+
       const result: ApiResponse<T> = await response.json();
-      
+
       if (!result.success) {
         throw new Error(result.error || 'API request failed');
       }
-      
+
       return result.data as T;
     } catch (error) {
       console.error('API request failed:', error);
       throw error;
     }
+  }
+
+  // 认证相关方法
+  async login(credentials: LoginRequest): Promise<AuthResponse> {
+    return this.request<AuthResponse>('/api/v1/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    }, true); // 跳过认证检查
+  }
+
+  async refreshToken(refreshTokenRequest: RefreshTokenRequest): Promise<AuthResponse> {
+    return this.request<AuthResponse>('/api/v1/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify(refreshTokenRequest),
+    }, true); // 跳过认证检查
   }
 
   // Dashboard API
@@ -211,6 +305,33 @@ class ApiClient {
   async getPerformanceMetrics(): Promise<PerformanceMetrics> {
     return this.request<PerformanceMetrics>('/api/v1/metrics/performance');
   }
+
+  // Market Data API
+  async getMarketData(): Promise<MarketData[]> {
+    return this.request<MarketData[]>('/api/v1/market/data');
+  }
+
+  // Trading Activity API
+  async getTradingActivity(limit?: number): Promise<TradingActivity[]> {
+    const params = limit ? `?limit=${limit}` : '';
+    return this.request<TradingActivity[]>(`/api/v1/trading/activity${params}`);
+  }
+
+  // Trade History API
+  async getTradeHistory(strategyId?: string, filters?: TradeHistoryFilters): Promise<TradeHistoryItem[]> {
+    const params = new URLSearchParams();
+    if (strategyId) params.append('strategyId', strategyId);
+    if (filters) {
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          params.append(key, String(value));
+        }
+      });
+    }
+    const queryString = params.toString();
+    const endpoint = queryString ? `/api/v1/trading/history?${queryString}` : '/api/v1/trading/history';
+    return this.request<TradeHistoryItem[]>(endpoint);
+  }
 }
 
 // Type definitions
@@ -246,9 +367,10 @@ export interface Strategy {
   id: string;
   name: string;
   description: string;
-  status: "running" | "stopped" | "error";
-  version: string;
-  performance: {
+  status: "running" | "stopped" | "error" | "inactive";
+  type?: string;
+  version?: string;
+  performance?: {
     pnl: number;
     pnlPercent: number;
     sharpe: number;
@@ -256,13 +378,15 @@ export interface Strategy {
     winRate: number;
     totalTrades: number;
   };
-  risk: {
+  risk?: {
     exposure: number;
     limit: number;
     violations: number;
   };
-  lastUpdate: string;
-  symbols: string[];
+  lastUpdate?: string;
+  symbols?: string[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Portfolio {
@@ -357,7 +481,7 @@ export interface OptimizationTask {
 
 export interface OptimizationResult {
   taskId: string;
-  bestParameters: Record<string, any>;
+  bestParameters: Record<string, unknown>;
   performance: {
     sharpe: number;
     sortino: number;
@@ -377,7 +501,7 @@ export interface BacktestConfig {
   startDate: string;
   endDate: string;
   initialCapital: number;
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
 }
 
 export interface BacktestResult {
@@ -434,7 +558,7 @@ export interface AuditLog {
   action: string;
   resource: string;
   outcome: "success" | "failure";
-  details: Record<string, any>;
+  details: Record<string, unknown>;
   ipAddress: string;
 }
 
@@ -455,14 +579,14 @@ export interface DecisionChain {
   trigger: string;
   decisions: Decision[];
   outcome: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export interface Decision {
   step: number;
   description: string;
   reasoning: string;
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
   timestamp: string;
 }
 
@@ -523,6 +647,53 @@ export interface PerformanceMetrics {
   throughput: number;
   errorRate: number;
   activeConnections: number;
+}
+
+export interface MarketData {
+  symbol: string;
+  price: number;
+  change24h: number;
+  volume: number;
+  lastUpdate: string;
+}
+
+export interface TradingActivity {
+  id: string;
+  type: "order" | "fill" | "cancel";
+  symbol: string;
+  side: "BUY" | "SELL";
+  amount: number;
+  price?: number;
+  timestamp: string;
+  status: "success" | "pending" | "failed";
+}
+
+export interface TradeHistoryItem {
+  id: string;
+  symbol: string;
+  side: "BUY" | "SELL";
+  type: "MARKET" | "LIMIT" | "STOP";
+  quantity: number;
+  price: number;
+  executedPrice: number;
+  pnl: number;
+  pnlPercent: number;
+  fee: number;
+  status: "FILLED" | "PARTIAL" | "CANCELLED";
+  openTime: string;
+  closeTime?: string;
+  duration?: number;
+  strategy: string;
+  tags: string[];
+}
+
+export interface TradeHistoryFilters {
+  symbol?: string;
+  side?: "BUY" | "SELL";
+  status?: "FILLED" | "PARTIAL" | "CANCELLED";
+  startTime?: string;
+  endTime?: string;
+  limit?: number;
 }
 
 // Create and export a default instance

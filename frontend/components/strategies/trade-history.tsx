@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import apiClient, { type TradeHistoryItem, type TradeHistoryFilters } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -11,24 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Search, Filter, Download, TrendingUp, TrendingDown, BarChart3 } from "lucide-react"
 
-interface Trade {
-  id: string
-  symbol: string
-  side: "BUY" | "SELL"
-  type: "MARKET" | "LIMIT" | "STOP"
-  quantity: number
-  price: number
-  executedPrice: number
-  pnl: number
-  pnlPercent: number
-  fee: number
-  status: "FILLED" | "PARTIAL" | "CANCELLED"
-  openTime: string
-  closeTime?: string
-  duration?: number
-  strategy: string
-  tags: string[]
-}
+// 使用API中定义的TradeHistoryItem类型
+type Trade = TradeHistoryItem
 
 interface TradeHistoryProps {
   strategyId: string
@@ -36,11 +21,34 @@ interface TradeHistoryProps {
 }
 
 export function TradeHistory({ strategyId, strategyName }: TradeHistoryProps) {
-  const [trades] = useState<Trade[]>(generateMockTrades(strategyId))
+  const [trades, setTrades] = useState<Trade[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterSide, setFilterSide] = useState<string>("all")
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null)
+
+  useEffect(() => {
+    const fetchTrades = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const filters: TradeHistoryFilters = {
+          limit: 100 // 获取最近100条交易记录
+        }
+        const tradeData = await apiClient.getTradeHistory(strategyId, filters)
+        setTrades(tradeData)
+      } catch (error) {
+        console.error('Failed to fetch trade history:', error)
+        setError('无法获取交易历史数据')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchTrades()
+  }, [strategyId])
 
   const filteredTrades = useMemo(() => {
     return trades.filter(trade => {
@@ -102,6 +110,28 @@ export function TradeHistory({ strategyId, strategyName }: TradeHistoryProps) {
     } as const
     
     return <Badge variant={variants[status as keyof typeof variants] || "secondary"}>{status}</Badge>
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p>加载交易历史...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>重试</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -410,58 +440,3 @@ function getStatusBadge(status: string) {
   return <Badge variant={variants[status as keyof typeof variants] || "secondary"}>{status}</Badge>
 }
 
-// 生成模拟交易数据
-function generateMockTrades(strategyId: string): Trade[] {
-  const symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT"]
-  const sides: ("BUY" | "SELL")[] = ["BUY", "SELL"]
-  const types: ("MARKET" | "LIMIT" | "STOP")[] = ["MARKET", "LIMIT", "STOP"]
-  const statuses: ("FILLED" | "PARTIAL" | "CANCELLED")[] = ["FILLED", "PARTIAL", "CANCELLED"]
-  
-  const trades: Trade[] = []
-  
-  for (let i = 0; i < 50; i++) {
-    const symbol = symbols[Math.floor(Math.random() * symbols.length)]
-    const side = sides[Math.floor(Math.random() * sides.length)]
-    const type = types[Math.floor(Math.random() * types.length)]
-    const status = statuses[Math.floor(Math.random() * statuses.length)]
-    
-    const quantity = Math.random() * 10 + 0.1
-    const price = Math.random() * 50000 + 20000
-    const executedPrice = price + (Math.random() - 0.5) * 100
-    
-    const pnlPercent = (Math.random() - 0.4) * 20 // -8% to +12%
-    const pnl = quantity * executedPrice * (pnlPercent / 100)
-    const fee = quantity * executedPrice * 0.001 // 0.1% fee
-    
-    const openTime = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000)
-    const duration = Math.floor(Math.random() * 3600) // 0-1 hour
-    const closeTime = status === "FILLED" ? new Date(openTime.getTime() + duration * 1000) : undefined
-    
-    const tags = []
-    if (pnl > 0) tags.push("盈利")
-    if (pnl < 0) tags.push("亏损")
-    if (Math.abs(pnlPercent) > 5) tags.push("大幅波动")
-    if (type === "STOP") tags.push("止损")
-    
-    trades.push({
-      id: `trade_${i.toString().padStart(3, '0')}`,
-      symbol,
-      side,
-      type,
-      quantity,
-      price,
-      executedPrice,
-      pnl,
-      pnlPercent,
-      fee,
-      status,
-      openTime: openTime.toISOString(),
-      closeTime: closeTime?.toISOString(),
-      duration,
-      strategy: strategyId,
-      tags
-    })
-  }
-  
-  return trades.sort((a, b) => new Date(b.openTime).getTime() - new Date(a.openTime).getTime())
-}

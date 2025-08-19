@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { SafeTimeDisplay } from "@/components/ui/client-only";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import {
   Activity,
   BarChart3,
@@ -26,7 +28,8 @@ import {
   ChevronDown,
   User,
   Bell,
-  HelpCircle
+  HelpCircle,
+  LogOut
 } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -85,27 +88,29 @@ const navigation = [
     href: "/settings",
     icon: Settings,
     description: "系统配置和个性化设置"
+  },
+  {
+    name: "API测试",
+    href: "/api-test",
+    icon: Target,
+    description: "接口测试和调试工具"
   }
 ];
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+// 主布局内容组件
+function LayoutContent({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
+  const { user, logout } = useAuth();
+
+  // 如果是登录页面，直接渲染内容
+  if (pathname === '/login') {
+    return <>{children}</>;
+  }
 
   return (
-    <html lang="zh-CN" className="h-full">
-      <head>
-        <title>QCAT</title>
-        <meta name="description" content="全自动化加密货币合约量化交易平台" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="icon" href="/favicon.ico" />
-      </head>
-      <body className={cn(inter.className, "h-full bg-gray-50")}>
-        <div className="flex h-full">
+    <ProtectedRoute>
+      <div className="flex h-full">
           {/* 移动端侧边栏遮罩 */}
           {sidebarOpen && (
             <div
@@ -221,18 +226,41 @@ export default function RootLayout({
                   >
                     <Menu className="h-5 w-5" />
                   </Button>
-                  
+
                   {/* 面包屑导航 */}
                   <nav className="flex items-center space-x-2 text-sm">
                     <span className="text-gray-500">QCAT</span>
                     <span className="text-gray-400">/</span>
                     <span className="text-gray-900 font-medium">
-                      {navigation.find(item => 
-                        pathname === item.href || 
+                      {navigation.find(item =>
+                        pathname === item.href ||
                         (item.href !== "/" && pathname.startsWith(item.href))
                       )?.name || "仪表板"}
                     </span>
                   </nav>
+                </div>
+
+                {/* 用户信息和操作 */}
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
+                      <User className="h-4 w-4 text-white" />
+                    </div>
+                    <div className="hidden md:block">
+                      <p className="text-sm font-medium text-gray-900">{user?.username}</p>
+                      <p className="text-xs text-gray-500">{user?.role}</p>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={logout}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span className="hidden md:inline ml-2">退出</span>
+                  </Button>
                 </div>
 
                 <div className="flex items-center space-x-4">
@@ -264,6 +292,27 @@ export default function RootLayout({
             </main>
           </div>
         </div>
+      </ProtectedRoute>
+    );
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  return (
+    <html lang="zh-CN" className="h-full">
+      <head>
+        <title>QCAT</title>
+        <meta name="description" content="全自动化加密货币合约量化交易平台" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href="/favicon.ico" />
+      </head>
+      <body className={cn(inter.className, "h-full bg-gray-50")}>
+        <AuthProvider>
+          <LayoutContent>{children}</LayoutContent>
+        </AuthProvider>
       </body>
     </html>
   );

@@ -2,14 +2,14 @@ package api
 
 import (
 	"bytes"
-	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"qcat/internal/config"
 	"qcat/internal/testutils"
+
+	"github.com/gin-gonic/gin"
 )
 
 func TestAPIServer(t *testing.T) {
@@ -29,8 +29,6 @@ func TestAPIServer(t *testing.T) {
 		},
 		Server: config.ServerConfig{
 			Port:           testutils.GetAvailablePort(),
-			Host:           "localhost",
-			Debug:          true,
 			ReadTimeout:    30 * time.Second,
 			WriteTimeout:   30 * time.Second,
 			MaxHeaderBytes: 1 << 20,
@@ -81,19 +79,19 @@ func TestStrategyAPI(t *testing.T) {
 
 	t.Run("create strategy", func(t *testing.T) {
 		strategy := mockData.GenerateStrategy()
-		
+
 		resp := httpHelper.POST("/api/v1/strategy", strategy, map[string]string{
 			"Authorization": "Bearer test-token",
 		})
-		
+
 		resp.AssertStatus(http.StatusCreated)
-		
+
 		var response map[string]interface{}
 		err := resp.GetJSON(&response)
 		if err != nil {
 			t.Fatalf("Failed to parse response: %v", err)
 		}
-		
+
 		if response["success"] != true {
 			t.Error("Expected success to be true")
 		}
@@ -103,15 +101,15 @@ func TestStrategyAPI(t *testing.T) {
 		resp := httpHelper.GET("/api/v1/strategy", map[string]string{
 			"Authorization": "Bearer test-token",
 		})
-		
+
 		resp.AssertStatus(http.StatusOK)
-		
+
 		var response map[string]interface{}
 		err := resp.GetJSON(&response)
 		if err != nil {
 			t.Fatalf("Failed to parse response: %v", err)
 		}
-		
+
 		if strategies, ok := response["data"].([]interface{}); ok {
 			if len(strategies) == 0 {
 				t.Log("No strategies found (expected for test)")
@@ -123,7 +121,7 @@ func TestStrategyAPI(t *testing.T) {
 		resp := httpHelper.GET("/api/v1/strategy/test-id", map[string]string{
 			"Authorization": "Bearer test-token",
 		})
-		
+
 		// 可能返回404，这在测试中是正常的
 		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNotFound {
 			t.Errorf("Expected status 200 or 404, got %d", resp.StatusCode)
@@ -133,14 +131,93 @@ func TestStrategyAPI(t *testing.T) {
 	t.Run("invalid request", func(t *testing.T) {
 		// 发送无效的JSON
 		invalidJSON := `{"invalid": json}`
-		
+
 		req := bytes.NewReader([]byte(invalidJSON))
 		resp := httpHelper.Request("POST", "/api/v1/strategy", req, map[string]string{
 			"Authorization": "Bearer test-token",
 			"Content-Type":  "application/json",
 		})
-		
+
 		resp.AssertStatus(http.StatusBadRequest)
+	})
+}
+
+func TestPortfolioAPI(t *testing.T) {
+	suite := testutils.NewTestSuite(t, nil)
+	defer suite.TearDown()
+
+	httpHelper := testutils.NewHTTPTestHelper(suite)
+	setupTestRoutes(httpHelper.Router, suite)
+
+	t.Run("get portfolio allocations", func(t *testing.T) {
+		resp := httpHelper.GET("/api/v1/portfolio/allocations", map[string]string{
+			"Authorization": "Bearer test-token",
+		})
+
+		resp.AssertStatus(http.StatusOK)
+
+		var response map[string]interface{}
+		err := resp.GetJSON(&response)
+		if err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+
+		if response["success"] != true {
+			t.Error("Expected success to be true")
+		}
+
+		// Data can be null if no allocations exist
+		if data, ok := response["data"]; ok {
+			if data != nil {
+				if allocations, ok := data.([]interface{}); ok {
+					t.Logf("Found %d portfolio allocations", len(allocations))
+				}
+			} else {
+				t.Log("No portfolio allocations found (expected for test)")
+			}
+		}
+	})
+
+	t.Run("portfolio rebalance", func(t *testing.T) {
+		rebalanceRequest := map[string]interface{}{
+			"mode": "bandit",
+		}
+
+		resp := httpHelper.POST("/api/v1/portfolio/rebalance", rebalanceRequest, map[string]string{
+			"Authorization": "Bearer test-token",
+		})
+
+		resp.AssertStatus(http.StatusOK)
+
+		var response map[string]interface{}
+		err := resp.GetJSON(&response)
+		if err != nil {
+			t.Fatalf("Failed to parse response: %v", err)
+		}
+
+		if response["success"] != true {
+			t.Error("Expected success to be true")
+		}
+
+		if data, ok := response["data"].(map[string]interface{}); ok {
+			if rebalanceID, exists := data["rebalance_id"]; exists {
+				if rebalanceID == "" {
+					t.Error("Expected rebalance_id to be non-empty")
+				}
+			} else {
+				t.Error("Expected rebalance_id in response data")
+			}
+
+			if mode, exists := data["mode"]; exists {
+				if mode != "bandit" {
+					t.Errorf("Expected mode to be 'bandit', got '%v'", mode)
+				}
+			} else {
+				t.Error("Expected mode in response data")
+			}
+		} else {
+			t.Error("Expected data object in response")
+		}
 	})
 }
 
@@ -224,7 +301,7 @@ func TestRateLimiting(t *testing.T) {
 	// 快速发送多个请求测试限流
 	t.Run("rate limiting", func(t *testing.T) {
 		rateLimitExceeded := false
-		
+
 		for i := 0; i < 100; i++ {
 			resp := httpHelper.GET("/health", nil)
 			if resp.StatusCode == http.StatusTooManyRequests {
@@ -232,7 +309,7 @@ func TestRateLimiting(t *testing.T) {
 				break
 			}
 		}
-		
+
 		// 注意：这个测试可能不会触发限流，取决于限流配置
 		if rateLimitExceeded {
 			t.Log("Rate limiting is working")
@@ -267,7 +344,7 @@ func setupTestRoutes(router *gin.Engine, suite *testutils.TestSuite) {
 
 	// API路由组
 	api := router.Group("/api/v1")
-	
+
 	// 简单的认证中间件（测试用）
 	api.Use(func(c *gin.Context) {
 		auth := c.GetHeader("Authorization")
@@ -288,20 +365,20 @@ func setupTestRoutes(router *gin.Engine, suite *testutils.TestSuite) {
 				"data":    []interface{}{},
 			})
 		})
-		
+
 		strategies.POST("", func(c *gin.Context) {
 			var strategy map[string]interface{}
 			if err := c.ShouldBindJSON(&strategy); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			
+
 			c.JSON(http.StatusCreated, gin.H{
 				"success": true,
 				"data":    strategy,
 			})
 		})
-		
+
 		strategies.GET("/:id", func(c *gin.Context) {
 			id := c.Param("id")
 			if id == "test-id" {
@@ -327,13 +404,13 @@ func setupTestRoutes(router *gin.Engine, suite *testutils.TestSuite) {
 				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 				return
 			}
-			
+
 			c.JSON(http.StatusAccepted, gin.H{
 				"success": true,
 				"task_id": "test-task-id",
 			})
 		})
-		
+
 		optimizer.GET("/tasks", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"success": true,

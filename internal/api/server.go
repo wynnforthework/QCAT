@@ -64,6 +64,8 @@ type Handlers struct {
 	Cache     *CacheHandler
 	Security  *SecurityHandler
 	Dashboard *DashboardHandler
+	Market    *MarketHandler
+	Trading   *TradingHandler
 }
 
 // RateLimiter 速率限制器结构
@@ -367,6 +369,8 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		Cache:     NewCacheHandler(cacheManagerRef),
 		Security:  NewSecurityHandler(keyManager, auditLogger),
 		Dashboard: NewDashboardHandler(db, metricsCollector),
+		Market:    NewMarketHandler(db, metricsCollector),
+		Trading:   NewTradingHandler(db, metricsCollector),
 	}
 
 	// Store security components for middleware
@@ -421,7 +425,7 @@ func (s *Server) setupRoutes() {
 	// API v1 group
 	v1 := s.router.Group("/api/v1")
 	{
-		// Public routes (no authentication required)
+		// Public routes (no authentication required) - only auth endpoints
 		auth := v1.Group("/auth")
 		{
 			auth.POST("/login", s.handlers.Auth.Login)
@@ -429,27 +433,26 @@ func (s *Server) setupRoutes() {
 			auth.POST("/refresh", s.handlers.Auth.RefreshToken)
 		}
 
-		// Dashboard routes (public for now, can be moved to protected later)
-		v1.GET("/dashboard", s.handlers.Dashboard.GetDashboardData)
-
 		// Protected routes (authentication required)
 		protected := v1.Group("")
 		protected.Use(s.jwtManager.AuthMiddleware())
 		{
+			// Dashboard routes (now protected)
+			protected.GET("/dashboard", s.handlers.Dashboard.GetDashboardData)
 
-			// Optimizer routes
-			optimizer := protected.Group("/optimizer")
-			{
-				optimizer.POST("/run", s.handlers.Optimizer.RunOptimization)
-				optimizer.GET("/tasks", s.handlers.Optimizer.GetTasks)
-				optimizer.GET("/tasks/:id", s.handlers.Optimizer.GetTask)
-				optimizer.GET("/results/:id", s.handlers.Optimizer.GetResults)
-			}
+			// Market data routes (now protected)
+			protected.GET("/market/data", s.handlers.Market.GetMarketData)
 
-			// Strategy routes
+			// Trading activity routes (now protected)
+			protected.GET("/trading/activity", s.handlers.Trading.GetTradingActivity)
+
+			// System metrics (now protected)
+			protected.GET("/metrics/system", s.handlers.Metrics.GetSystemMetrics)
+
+			// Strategy routes (all protected)
 			strategy := protected.Group("/strategy")
 			{
-				strategy.GET("/", s.handlers.Strategy.ListStrategies)
+				strategy.GET("/", s.handlers.Strategy.ListStrategies) // 移到受保护路由
 				strategy.GET("/:id", s.handlers.Strategy.GetStrategy)
 				strategy.POST("/", s.handlers.Strategy.CreateStrategy)
 				strategy.PUT("/:id", s.handlers.Strategy.UpdateStrategy)
@@ -458,6 +461,15 @@ func (s *Server) setupRoutes() {
 				strategy.POST("/:id/start", s.handlers.Strategy.StartStrategy)
 				strategy.POST("/:id/stop", s.handlers.Strategy.StopStrategy)
 				strategy.POST("/:id/backtest", s.handlers.Strategy.RunBacktest)
+			}
+
+			// Optimizer routes
+			optimizer := protected.Group("/optimizer")
+			{
+				optimizer.POST("/run", s.handlers.Optimizer.RunOptimization)
+				optimizer.GET("/tasks", s.handlers.Optimizer.GetTasks)
+				optimizer.GET("/tasks/:id", s.handlers.Optimizer.GetTask)
+				optimizer.GET("/results/:id", s.handlers.Optimizer.GetResults)
 			}
 
 			// Portfolio routes
@@ -494,7 +506,6 @@ func (s *Server) setupRoutes() {
 			metrics := protected.Group("/metrics")
 			{
 				metrics.GET("/strategy/:id", s.handlers.Metrics.GetStrategyMetrics)
-				metrics.GET("/system", s.handlers.Metrics.GetSystemMetrics)
 				metrics.GET("/performance", s.handlers.Metrics.GetPerformanceMetrics)
 			}
 

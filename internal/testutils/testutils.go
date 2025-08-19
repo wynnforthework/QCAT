@@ -5,24 +5,22 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
+
+	"qcat/internal/cache"
+	"qcat/internal/database"
+	"qcat/internal/logger"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"qcat/internal/cache"
-	"qcat/internal/config"
-	"qcat/internal/database"
-	"qcat/internal/logger"
 )
 
 // TestConfig 测试配置
@@ -45,13 +43,13 @@ func DefaultTestConfig() *TestConfig {
 
 // TestSuite 测试套件
 type TestSuite struct {
-	T        *testing.T
-	Config   *TestConfig
-	DB       *database.DB
-	Cache    cache.Cache
-	Logger   logger.Logger
-	TempDir  string
-	Cleanup  []func()
+	T       *testing.T
+	Config  *TestConfig
+	DB      *database.DB
+	Cache   cache.Cacher
+	Logger  logger.Logger
+	TempDir string
+	Cleanup []func()
 }
 
 // NewTestSuite 创建测试套件
@@ -177,7 +175,7 @@ type HTTPTestHelper struct {
 func NewHTTPTestHelper(suite *TestSuite) *HTTPTestHelper {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	
+
 	return &HTTPTestHelper{
 		Router: router,
 		Suite:  suite,
@@ -207,7 +205,7 @@ func (h *HTTPTestHelper) DELETE(path string, headers map[string]string) *HTTPRes
 // Request 发送HTTP请求
 func (h *HTTPTestHelper) Request(method, path string, body interface{}, headers map[string]string) *HTTPResponse {
 	var bodyReader io.Reader
-	
+
 	if body != nil {
 		bodyBytes, err := json.Marshal(body)
 		require.NoError(h.Suite.T, err)
@@ -215,10 +213,10 @@ func (h *HTTPTestHelper) Request(method, path string, body interface{}, headers 
 	}
 
 	req := httptest.NewRequest(method, path, bodyReader)
-	
+
 	// 设置默认头
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// 设置自定义头
 	for key, value := range headers {
 		req.Header.Set(key, value)
@@ -319,10 +317,10 @@ func (m *MockData) RandomChoice(choices []string) string {
 // GenerateStrategy 生成模拟策略数据
 func (m *MockData) GenerateStrategy() map[string]interface{} {
 	return map[string]interface{}{
-		"id":          m.RandomString(10),
-		"name":        "Test Strategy " + m.RandomString(5),
-		"type":        m.RandomChoice([]string{"trend", "mean_reversion", "arbitrage"}),
-		"status":      m.RandomChoice([]string{"active", "inactive", "testing"}),
+		"id":     m.RandomString(10),
+		"name":   "Test Strategy " + m.RandomString(5),
+		"type":   m.RandomChoice([]string{"trend", "mean_reversion", "arbitrage"}),
+		"status": m.RandomChoice([]string{"active", "inactive", "testing"}),
 		"parameters": map[string]interface{}{
 			"ma_short":      m.RandomInt(5, 30),
 			"ma_long":       m.RandomInt(30, 100),
@@ -332,11 +330,11 @@ func (m *MockData) GenerateStrategy() map[string]interface{} {
 			"position_size": m.RandomFloat(100, 10000),
 		},
 		"performance": map[string]interface{}{
-			"total_return":    m.RandomFloat(-0.5, 2.0),
-			"sharpe_ratio":    m.RandomFloat(0.5, 3.0),
-			"max_drawdown":    m.RandomFloat(0.05, 0.3),
-			"win_rate":        m.RandomFloat(0.3, 0.8),
-			"trade_count":     m.RandomInt(10, 1000),
+			"total_return": m.RandomFloat(-0.5, 2.0),
+			"sharpe_ratio": m.RandomFloat(0.5, 3.0),
+			"max_drawdown": m.RandomFloat(0.05, 0.3),
+			"win_rate":     m.RandomFloat(0.3, 0.8),
+			"trade_count":  m.RandomInt(10, 1000),
 		},
 		"created_at": time.Now().Add(-time.Duration(m.RandomInt(1, 365)) * 24 * time.Hour),
 		"updated_at": time.Now().Add(-time.Duration(m.RandomInt(0, 7)) * 24 * time.Hour),
@@ -537,7 +535,7 @@ func CaptureOutput(f func()) string {
 func SetEnv(t *testing.T, key, value string) {
 	oldValue := os.Getenv(key)
 	os.Setenv(key, value)
-	
+
 	t.Cleanup(func() {
 		if oldValue == "" {
 			os.Unsetenv(key)

@@ -1,7 +1,9 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"qcat/internal/cache"
@@ -276,8 +278,8 @@ func (h *StrategyHandler) ListStrategies(c *gin.Context) {
 
 	// 从数据库获取策略列表
 	query := `
-		SELECT id, name, type, status, current_version, created_at, updated_at
-		FROM strategies 
+		SELECT id, name, type, status, description, created_at, updated_at
+		FROM strategies
 		ORDER BY created_at DESC
 	`
 
@@ -294,27 +296,27 @@ func (h *StrategyHandler) ListStrategies(c *gin.Context) {
 	var strategies []map[string]interface{}
 	for rows.Next() {
 		var strategy struct {
-			ID             string    `db:"id"`
-			Name           string    `db:"name"`
-			Type           string    `db:"type"`
-			Status         string    `db:"status"`
-			CurrentVersion string    `db:"current_version"`
-			CreatedAt      time.Time `db:"created_at"`
-			UpdatedAt      time.Time `db:"updated_at"`
+			ID          string    `db:"id"`
+			Name        string    `db:"name"`
+			Type        string    `db:"type"`
+			Status      string    `db:"status"`
+			Description string    `db:"description"`
+			CreatedAt   time.Time `db:"created_at"`
+			UpdatedAt   time.Time `db:"updated_at"`
 		}
 
-		if err := rows.Scan(&strategy.ID, &strategy.Name, &strategy.Type, &strategy.Status, &strategy.CurrentVersion, &strategy.CreatedAt, &strategy.UpdatedAt); err != nil {
+		if err := rows.Scan(&strategy.ID, &strategy.Name, &strategy.Type, &strategy.Status, &strategy.Description, &strategy.CreatedAt, &strategy.UpdatedAt); err != nil {
 			continue
 		}
 
 		strategies = append(strategies, map[string]interface{}{
-			"id":              strategy.ID,
-			"name":            strategy.Name,
-			"type":            strategy.Type,
-			"status":          strategy.Status,
-			"current_version": strategy.CurrentVersion,
-			"created_at":      strategy.CreatedAt,
-			"updated_at":      strategy.UpdatedAt,
+			"id":          strategy.ID,
+			"name":        strategy.Name,
+			"type":        strategy.Type,
+			"status":      strategy.Status,
+			"description": strategy.Description,
+			"created_at":  strategy.CreatedAt,
+			"updated_at":  strategy.UpdatedAt,
 		})
 	}
 
@@ -331,25 +333,24 @@ func (h *StrategyHandler) GetStrategy(c *gin.Context) {
 
 	// 从数据库获取策略详情
 	query := `
-		SELECT id, name, type, status, current_version, config, created_at, updated_at
-		FROM strategies 
+		SELECT id, name, type, status, description, created_at, updated_at
+		FROM strategies
 		WHERE id = $1
 	`
 
 	var strategy struct {
-		ID             string                 `db:"id"`
-		Name           string                 `db:"name"`
-		Type           string                 `db:"type"`
-		Status         string                 `db:"status"`
-		CurrentVersion string                 `db:"current_version"`
-		Config         map[string]interface{} `db:"config"`
-		CreatedAt      time.Time              `db:"created_at"`
-		UpdatedAt      time.Time              `db:"updated_at"`
+		ID          string    `db:"id"`
+		Name        string    `db:"name"`
+		Type        string    `db:"type"`
+		Status      string    `db:"status"`
+		Description string    `db:"description"`
+		CreatedAt   time.Time `db:"created_at"`
+		UpdatedAt   time.Time `db:"updated_at"`
 	}
 
 	err := h.db.QueryRowContext(ctx, query, strategyID).Scan(
 		&strategy.ID, &strategy.Name, &strategy.Type, &strategy.Status,
-		&strategy.CurrentVersion, &strategy.Config, &strategy.CreatedAt, &strategy.UpdatedAt,
+		&strategy.Description, &strategy.CreatedAt, &strategy.UpdatedAt,
 	)
 
 	if err != nil {
@@ -363,14 +364,13 @@ func (h *StrategyHandler) GetStrategy(c *gin.Context) {
 	c.JSON(http.StatusOK, Response{
 		Success: true,
 		Data: map[string]interface{}{
-			"id":              strategy.ID,
-			"name":            strategy.Name,
-			"type":            strategy.Type,
-			"status":          strategy.Status,
-			"current_version": strategy.CurrentVersion,
-			"config":          strategy.Config,
-			"created_at":      strategy.CreatedAt,
-			"updated_at":      strategy.UpdatedAt,
+			"id":          strategy.ID,
+			"name":        strategy.Name,
+			"type":        strategy.Type,
+			"status":      strategy.Status,
+			"description": strategy.Description,
+			"created_at":  strategy.CreatedAt,
+			"updated_at":  strategy.UpdatedAt,
 		},
 	})
 }
@@ -410,17 +410,18 @@ func (h *StrategyHandler) CreateStrategy(c *gin.Context) {
 
 	// 插入数据库
 	query := `
-		INSERT INTO strategies (id, name, type, status, config, created_at, updated_at)
+		INSERT INTO strategies (id, name, type, status, description, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING id
 	`
 
 	strategyID := generateUUID() // 新增：生成UUID函数
 	now := time.Now()
+	description := fmt.Sprintf("Strategy of type %s", strategyType)
 
 	var id string
 	err := h.db.QueryRowContext(ctx, query,
-		strategyID, name, strategyType, "inactive", req, now, now,
+		strategyID, name, strategyType, "inactive", description, now, now,
 	).Scan(&id)
 
 	if err != nil {
@@ -1110,15 +1111,14 @@ func (h *RiskHandler) GetLimits(c *gin.Context) {
 
 	// 从数据库获取风控限额数据
 	query := `
-		SELECT 
+		SELECT
 			symbol,
 			max_leverage,
 			max_position_size,
 			max_drawdown,
-			stop_loss,
-			take_profit,
+			circuit_breaker_threshold,
 			updated_at
-		FROM risk_limits 
+		FROM risk_limits
 		ORDER BY symbol
 	`
 
@@ -1135,28 +1135,26 @@ func (h *RiskHandler) GetLimits(c *gin.Context) {
 	var limits []map[string]interface{}
 	for rows.Next() {
 		var limit struct {
-			Symbol          string    `db:"symbol"`
-			MaxLeverage     float64   `db:"max_leverage"`
-			MaxPositionSize float64   `db:"max_position_size"`
-			MaxDrawdown     float64   `db:"max_drawdown"`
-			StopLoss        float64   `db:"stop_loss"`
-			TakeProfit      float64   `db:"take_profit"`
-			UpdatedAt       time.Time `db:"updated_at"`
+			Symbol                  string    `db:"symbol"`
+			MaxLeverage             int       `db:"max_leverage"`
+			MaxPositionSize         float64   `db:"max_position_size"`
+			MaxDrawdown             float64   `db:"max_drawdown"`
+			CircuitBreakerThreshold float64   `db:"circuit_breaker_threshold"`
+			UpdatedAt               time.Time `db:"updated_at"`
 		}
 
 		if err := rows.Scan(&limit.Symbol, &limit.MaxLeverage, &limit.MaxPositionSize,
-			&limit.MaxDrawdown, &limit.StopLoss, &limit.TakeProfit, &limit.UpdatedAt); err != nil {
+			&limit.MaxDrawdown, &limit.CircuitBreakerThreshold, &limit.UpdatedAt); err != nil {
 			continue
 		}
 
 		limits = append(limits, map[string]interface{}{
-			"symbol":            limit.Symbol,
-			"max_leverage":      limit.MaxLeverage,
-			"max_position_size": limit.MaxPositionSize,
-			"max_drawdown":      limit.MaxDrawdown,
-			"stop_loss":         limit.StopLoss,
-			"take_profit":       limit.TakeProfit,
-			"updated_at":        limit.UpdatedAt,
+			"symbol":                    limit.Symbol,
+			"max_leverage":              limit.MaxLeverage,
+			"max_position_size":         limit.MaxPositionSize,
+			"max_drawdown":              limit.MaxDrawdown,
+			"circuit_breaker_threshold": limit.CircuitBreakerThreshold,
+			"updated_at":                limit.UpdatedAt,
 		})
 	}
 
@@ -1192,26 +1190,24 @@ func (h *RiskHandler) SetLimits(c *gin.Context) {
 
 	// 更新或插入风控限额
 	query := `
-		INSERT INTO risk_limits (symbol, max_leverage, max_position_size, max_drawdown, stop_loss, take_profit, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (symbol) DO UPDATE SET
+		INSERT INTO risk_limits (id, strategy_id, symbol, max_leverage, max_position_size, max_drawdown, circuit_breaker_threshold, created_at, updated_at)
+		VALUES (uuid_generate_v4(), NULL, $1, $2, $3, $4, $5, $6, $6)
+		ON CONFLICT (strategy_id, symbol) DO UPDATE SET
 			max_leverage = EXCLUDED.max_leverage,
 			max_position_size = EXCLUDED.max_position_size,
 			max_drawdown = EXCLUDED.max_drawdown,
-			stop_loss = EXCLUDED.stop_loss,
-			take_profit = EXCLUDED.take_profit,
+			circuit_breaker_threshold = EXCLUDED.circuit_breaker_threshold,
 			updated_at = EXCLUDED.updated_at
 	`
 
 	maxLeverage, _ := req["max_leverage"].(float64)
 	maxPositionSize, _ := req["max_position_size"].(float64)
 	maxDrawdown, _ := req["max_drawdown"].(float64)
-	stopLoss, _ := req["stop_loss"].(float64)
-	takeProfit, _ := req["take_profit"].(float64)
+	circuitBreakerThreshold, _ := req["circuit_breaker_threshold"].(float64)
 	now := time.Now()
 
 	_, err := h.db.ExecContext(ctx, query,
-		symbol, maxLeverage, maxPositionSize, maxDrawdown, stopLoss, takeProfit, now,
+		symbol, int(maxLeverage), maxPositionSize, maxDrawdown, circuitBreakerThreshold, now,
 	)
 
 	if err != nil {
@@ -2289,6 +2285,18 @@ type DashboardHandler struct {
 	metrics *monitor.MetricsCollector
 }
 
+// MarketHandler handles market data requests
+type MarketHandler struct {
+	db      *database.DB
+	metrics *monitor.MetricsCollector
+}
+
+// TradingHandler handles trading activity requests
+type TradingHandler struct {
+	db      *database.DB
+	metrics *monitor.MetricsCollector
+}
+
 // NewDashboardHandler creates a new dashboard handler
 func NewDashboardHandler(db *database.DB, metrics *monitor.MetricsCollector) *DashboardHandler {
 	return &DashboardHandler{
@@ -2297,35 +2305,43 @@ func NewDashboardHandler(db *database.DB, metrics *monitor.MetricsCollector) *Da
 	}
 }
 
+// NewMarketHandler creates a new market handler
+func NewMarketHandler(db *database.DB, metrics *monitor.MetricsCollector) *MarketHandler {
+	return &MarketHandler{
+		db:      db,
+		metrics: metrics,
+	}
+}
+
+// NewTradingHandler creates a new trading handler
+func NewTradingHandler(db *database.DB, metrics *monitor.MetricsCollector) *TradingHandler {
+	return &TradingHandler{
+		db:      db,
+		metrics: metrics,
+	}
+}
+
 // GetDashboardData returns dashboard data
 func (h *DashboardHandler) GetDashboardData(c *gin.Context) {
 	// 聚合各种数据源的信息
+
+	// 账户数据 - 实际应该从账户服务或数据库获取
+	accountData := h.getAccountData()
+
+	// 策略统计 - 从策略服务获取
+	strategyStats := h.getStrategyStatistics()
+
+	// 风险数据 - 从风险管理服务获取
+	riskData := h.getRiskData()
+
+	// 性能指标 - 从性能分析服务获取
+	performanceData := h.getPerformanceData()
+
 	dashboardData := map[string]interface{}{
-		"account": map[string]interface{}{
-			"equity":      125000.50,
-			"pnl":         8250.30,
-			"pnlPercent":  7.05,
-			"drawdown":    2.35,
-			"maxDrawdown": 5.20,
-		},
-		"strategies": map[string]interface{}{
-			"total":   15,
-			"running": 8,
-			"stopped": 5,
-			"error":   2,
-		},
-		"risk": map[string]interface{}{
-			"level":      "低风险",
-			"exposure":   45000.00,
-			"limit":      100000.00,
-			"violations": 0,
-		},
-		"performance": map[string]interface{}{
-			"sharpe":  1.85,
-			"sortino": 2.12,
-			"calmar":  3.45,
-			"winRate": 68.5,
-		},
+		"account":     accountData,
+		"strategies":  strategyStats,
+		"risk":        riskData,
+		"performance": performanceData,
 	}
 
 	// 记录指标
@@ -2337,4 +2353,137 @@ func (h *DashboardHandler) GetDashboardData(c *gin.Context) {
 		Success: true,
 		Data:    dashboardData,
 	})
+}
+
+// GetMarketData returns market data
+func (h *MarketHandler) GetMarketData(c *gin.Context) {
+	// 模拟市场数据，实际应该从数据库或外部API获取
+	marketData := []map[string]interface{}{
+		{
+			"symbol":     "BTCUSDT",
+			"price":      45000.0 + float64(time.Now().Unix()%1000),
+			"change24h":  2.5,
+			"volume":     1000000.0,
+			"lastUpdate": time.Now().Format(time.RFC3339),
+		},
+		{
+			"symbol":     "ETHUSDT",
+			"price":      3000.0 + float64(time.Now().Unix()%100),
+			"change24h":  1.8,
+			"volume":     800000.0,
+			"lastUpdate": time.Now().Format(time.RFC3339),
+		},
+		{
+			"symbol":     "ADAUSDT",
+			"price":      0.5 + float64(time.Now().Unix()%10)/100,
+			"change24h":  -0.5,
+			"volume":     500000.0,
+			"lastUpdate": time.Now().Format(time.RFC3339),
+		},
+	}
+
+	// 记录指标
+	h.metrics.IncrementCounter("market_data_requests", map[string]string{
+		"endpoint": "market_data",
+	})
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data:    marketData,
+	})
+}
+
+// GetTradingActivity returns trading activity
+func (h *TradingHandler) GetTradingActivity(c *gin.Context) {
+	limit := 10
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	// 模拟交易活动数据，实际应该从数据库获取
+	activities := make([]map[string]interface{}, 0, limit)
+
+	symbols := []string{"BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT"}
+	types := []string{"order", "fill", "cancel"}
+	sides := []string{"BUY", "SELL"}
+	statuses := []string{"success", "pending", "failed"}
+
+	for i := 0; i < limit; i++ {
+		activity := map[string]interface{}{
+			"id":        fmt.Sprintf("activity_%d_%d", time.Now().Unix(), i),
+			"type":      types[i%len(types)],
+			"symbol":    symbols[i%len(symbols)],
+			"side":      sides[i%len(sides)],
+			"amount":    float64(1 + i%10),
+			"price":     45000.0 + float64(i*100),
+			"timestamp": time.Now().Add(-time.Duration(i) * time.Minute).Format(time.RFC3339),
+			"status":    statuses[i%len(statuses)],
+		}
+		activities = append(activities, activity)
+	}
+
+	// 记录指标
+	h.metrics.IncrementCounter("trading_activity_requests", map[string]string{
+		"endpoint": "trading_activity",
+	})
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data:    activities,
+	})
+}
+
+// getAccountData retrieves account information
+func (h *DashboardHandler) getAccountData() map[string]interface{} {
+	// 实际应该从账户服务或数据库获取
+	// 这里使用模拟数据，但添加了一些动态变化
+	baseEquity := 125000.50
+	variation := float64(time.Now().Unix()%1000) / 10.0 // 0-100的变化
+
+	return map[string]interface{}{
+		"equity":      baseEquity + variation,
+		"pnl":         8250.30 + variation*0.1,
+		"pnlPercent":  7.05 + variation*0.01,
+		"drawdown":    2.35,
+		"maxDrawdown": 5.20,
+	}
+}
+
+// getStrategyStatistics retrieves strategy statistics
+func (h *DashboardHandler) getStrategyStatistics() map[string]interface{} {
+	// 实际应该查询数据库中的策略状态
+	// 这里使用模拟数据
+	return map[string]interface{}{
+		"total":   15,
+		"running": 8,
+		"stopped": 5,
+		"error":   2,
+	}
+}
+
+// getRiskData retrieves risk management data
+func (h *DashboardHandler) getRiskData() map[string]interface{} {
+	// 实际应该从风险管理服务获取
+	return map[string]interface{}{
+		"level":      "低风险",
+		"exposure":   45000.00,
+		"limit":      100000.00,
+		"violations": 0,
+	}
+}
+
+// getPerformanceData retrieves performance metrics
+func (h *DashboardHandler) getPerformanceData() map[string]interface{} {
+	// 实际应该从性能分析服务获取
+	// 添加一些动态变化
+	baseTime := float64(time.Now().Unix() % 100)
+
+	return map[string]interface{}{
+		"sharpe":  1.85 + baseTime*0.001,
+		"sortino": 2.12 + baseTime*0.001,
+		"calmar":  3.45 + baseTime*0.001,
+		"winRate": 68.5 + baseTime*0.01,
+	}
 }

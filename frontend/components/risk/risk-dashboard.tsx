@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import apiClient, { type RiskOverview, type RiskLimits } from "@/lib/api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -48,23 +49,32 @@ interface PositionRisk {
 }
 
 export function RiskDashboard() {
-  const [riskMetrics, setRiskMetrics] = useState<RiskMetric[]>([])
-  const [riskAlerts, setRiskAlerts] = useState<RiskAlert[]>([])
-  const [positionRisks, setPositionRisks] = useState<PositionRisk[]>([])
-  const [overallRiskScore, setOverallRiskScore] = useState(0)
+  const [riskOverview, setRiskOverview] = useState<RiskOverview | null>(null)
+  const [riskLimits, setRiskLimits] = useState<RiskLimits | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     loadRiskData()
-    const interval = setInterval(loadRiskData, 5000) // 每5秒更新
+    const interval = setInterval(loadRiskData, 10000) // 每10秒更新
     return () => clearInterval(interval)
   }, [])
 
-  const loadRiskData = () => {
-    // 模拟风险数据
-    setRiskMetrics(generateMockRiskMetrics())
-    setRiskAlerts(generateMockRiskAlerts())
-    setPositionRisks(generateMockPositionRisks())
-    setOverallRiskScore(calculateOverallRiskScore())
+  const loadRiskData = async () => {
+    try {
+      setError(null)
+      const [overview, limits] = await Promise.all([
+        apiClient.getRiskOverview(),
+        apiClient.getRiskLimits()
+      ])
+      setRiskOverview(overview)
+      setRiskLimits(limits)
+    } catch (error) {
+      console.error('Failed to load risk data:', error)
+      setError('无法获取风险数据')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const calculateOverallRiskScore = () => {
@@ -118,6 +128,29 @@ export function RiskDashboard() {
     return `${percent.toFixed(2)}%`
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p>加载风险数据...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !riskOverview || !riskLimits) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600 mb-4">{error || '无法加载风险数据'}</p>
+          <Button onClick={() => loadRiskData()}>重试</Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       {/* 风险概览 */}
@@ -126,47 +159,70 @@ export function RiskDashboard() {
           <CardContent className="p-6">
             <div className="text-center">
               <div className={`text-4xl font-bold mb-2 ${
-                overallRiskScore < 30 ? 'text-green-600' :
-                overallRiskScore < 60 ? 'text-yellow-600' : 'text-red-600'
+                riskOverview.overall === '低风险' ? 'text-green-600' :
+                riskOverview.overall === '中风险' ? 'text-yellow-600' : 'text-red-600'
               }`}>
-                {overallRiskScore}
+                {riskOverview.overall}
               </div>
-              <div className="text-sm text-muted-foreground mb-4">综合风险评分</div>
-              <Progress 
-                value={overallRiskScore} 
-                className="h-2"
-              />
+              <div className="text-sm text-muted-foreground mb-4">风险等级</div>
               <div className="text-xs text-muted-foreground mt-2">
-                {overallRiskScore < 30 ? '低风险' :
-                 overallRiskScore < 60 ? '中等风险' : '高风险'}
+                违规次数: {riskOverview.violations}
               </div>
             </div>
           </CardContent>
         </Card>
 
         <div className="md:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-4">
-          {riskMetrics.slice(0, 3).map((metric) => (
-            <Card key={metric.name}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium">{metric.name}</span>
-                  <Badge variant={getRiskBadgeVariant(metric.status)}>
-                    {metric.status}
-                  </Badge>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-muted-foreground">VaR (95%)</div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    ${riskOverview.metrics.var.toFixed(0)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    风险价值
+                  </div>
                 </div>
-                <div className={`text-2xl font-bold ${getRiskColor(metric.status)}`}>
-                  {metric.value.toFixed(2)}{metric.unit}
+                <BarChart3 className="h-8 w-8 text-blue-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-muted-foreground">最大回撤</div>
+                  <div className="text-2xl font-bold text-red-600">
+                    {riskOverview.metrics.maxDrawdown.toFixed(2)}%
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    历史最大
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  阈值: {metric.threshold}{metric.unit}
+                <TrendingDown className="h-8 w-8 text-red-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-muted-foreground">夏普比率</div>
+                  <div className="text-2xl font-bold text-green-600">
+                    {riskOverview.metrics.sharpeRatio.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    风险调整收益
+                  </div>
                 </div>
-                <Progress 
-                  value={(metric.value / metric.threshold) * 100} 
-                  className="h-1 mt-2"
-                />
-              </CardContent>
-            </Card>
-          ))}
+                <Target className="h-8 w-8 text-green-500" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
 

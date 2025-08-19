@@ -43,76 +43,8 @@ export default function PortfolioPage() {
       setAllocations(allocationData);
     } catch (error) {
       console.error('Failed to load portfolio data:', error);
-      
-      // 设置模拟数据
-      const mockPortfolio: Portfolio = {
-        totalValue: 125000,
-        targetVolatility: 15.0,
-        currentVolatility: 12.8,
-        strategies: [],
-        rebalanceHistory: [
-          {
-            date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-            type: 'auto',
-            changes: [
-              { strategy: '趋势跟踪策略 Alpha', from: 35, to: 40 },
-              { strategy: '网格交易策略 Beta', from: 25, to: 20 }
-            ],
-            reason: '性能优化'
-          }
-        ]
-      };
-      
-      const mockAllocations: StrategyAllocation[] = [
-        {
-          id: '1',
-          name: '趋势跟踪策略 Alpha',
-          currentWeight: 40.5,
-          targetWeight: 40.0,
-          value: 50625,
-          pnl: 8250,
-          pnlPercent: 19.5
-        },
-        {
-          id: '2',
-          name: '网格交易策略 Beta',
-          currentWeight: 22.3,
-          targetWeight: 25.0,
-          value: 27875,
-          pnl: 2180,
-          pnlPercent: 8.5
-        },
-        {
-          id: '3',
-          name: '套利策略 Gamma',
-          currentWeight: 18.7,
-          targetWeight: 20.0,
-          value: 23375,
-          pnl: -850,
-          pnlPercent: -3.5
-        },
-        {
-          id: '4',
-          name: '均值回归策略 Delta',
-          currentWeight: 12.1,
-          targetWeight: 10.0,
-          value: 15125,
-          pnl: 750,
-          pnlPercent: 5.2
-        },
-        {
-          id: '5',
-          name: '动量突破策略 Epsilon',
-          currentWeight: 6.4,
-          targetWeight: 5.0,
-          value: 8000,
-          pnl: 420,
-          pnlPercent: 5.5
-        }
-      ];
-      
-      setPortfolio(mockPortfolio);
-      setAllocations(mockAllocations);
+      setPortfolio(null);
+      setAllocations([]);
     } finally {
       setLoading(false);
     }

@@ -15,16 +15,18 @@ import { ParameterSettings } from "@/components/strategies/parameter-settings"
 export default function StrategiesPage() {
   const [strategies, setStrategies] = useState<Strategy[]>([])
   const [loading, setLoading] = useState(true)
-  // const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null) // 暂时注释掉未使用的状态
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchStrategies = async () => {
       try {
+        setLoading(true)
+        setError(null)
         const strategies = await apiClient.getStrategies()
         setStrategies(strategies)
-
       } catch (error) {
         console.error("Failed to fetch strategies:", error)
+        setError('无法获取策略数据，请检查后端服务是否正常运行')
       } finally {
         setLoading(false)
       }
@@ -51,13 +53,51 @@ export default function StrategiesPage() {
     }
   }
 
-  const handleStrategyAction = (strategyId: string, action: string) => {
-    console.log(`Action ${action} for strategy ${strategyId}`)
-    // 实际项目中这里会调用API
+  const handleStrategyAction = async (strategyId: string, action: string) => {
+    try {
+      switch (action) {
+        case 'start':
+          await apiClient.startStrategy(strategyId)
+          break
+        case 'stop':
+          await apiClient.stopStrategy(strategyId)
+          break
+        case 'backtest':
+        case 'optimize':
+        case 'export':
+          console.log(`Action ${action} for strategy ${strategyId} - 功能开发中`)
+          break
+        default:
+          console.log(`Unknown action ${action} for strategy ${strategyId}`)
+      }
+      // 重新获取策略数据以更新状态
+      const updatedStrategies = await apiClient.getStrategies()
+      setStrategies(updatedStrategies)
+    } catch (error) {
+      console.error(`Failed to execute action ${action} for strategy ${strategyId}:`, error)
+    }
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64">Loading...</div>
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p>加载策略数据...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>重试</Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -83,8 +123,8 @@ export default function StrategiesPage() {
               </div>
               <CardDescription>{strategy.description}</CardDescription>
               <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>版本: {strategy.version}</span>
-                <span>更新: {strategy.lastUpdate}</span>
+                <span>版本: {strategy.version || '1.0.0'}</span>
+                <span>更新: {strategy.lastUpdate || new Date().toLocaleDateString()}</span>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -92,14 +132,14 @@ export default function StrategiesPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-2xl font-bold text-green-600">
-                    +${strategy.performance.pnl.toFixed(2)}
+                    +${strategy.performance?.pnl?.toFixed(2) || '0.00'}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {strategy.performance.pnlPercent >= 0 ? "+" : ""}{strategy.performance.pnlPercent.toFixed(2)}%
+                    {(strategy.performance?.pnlPercent || 0) >= 0 ? "+" : ""}{(strategy.performance?.pnlPercent || 0).toFixed(2)}%
                   </div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold">{strategy.performance.sharpe.toFixed(2)}</div>
+                  <div className="text-2xl font-bold">{strategy.performance?.sharpe?.toFixed(2) || '0.00'}</div>
                   <div className="text-sm text-muted-foreground">夏普比率</div>
                 </div>
               </div>
@@ -108,23 +148,23 @@ export default function StrategiesPage() {
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span>风险敞口</span>
-                  <span>${strategy.risk.exposure.toLocaleString()} / ${strategy.risk.limit.toLocaleString()}</span>
+                  <span>${(strategy.risk?.exposure || 0).toLocaleString()} / ${(strategy.risk?.limit || 100000).toLocaleString()}</span>
                 </div>
-                <Progress value={(strategy.risk.exposure / strategy.risk.limit) * 100} className="h-2" />
+                <Progress value={((strategy.risk?.exposure || 0) / (strategy.risk?.limit || 100000)) * 100} className="h-2" />
               </div>
 
               {/* 交易统计 */}
               <div className="grid grid-cols-3 gap-2 text-center text-sm">
                 <div>
-                  <div className="font-bold">{strategy.performance.totalTrades}</div>
+                  <div className="font-bold">{strategy.performance?.totalTrades || 0}</div>
                   <div className="text-muted-foreground">总交易</div>
                 </div>
                 <div>
-                  <div className="font-bold">{(strategy.performance.winRate * 100).toFixed(1)}%</div>
+                  <div className="font-bold">{((strategy.performance?.winRate || 0) * 100).toFixed(1)}%</div>
                   <div className="text-muted-foreground">胜率</div>
                 </div>
                 <div>
-                  <div className="font-bold text-red-600">${Math.abs(strategy.performance.maxDrawdown).toFixed(0)}</div>
+                  <div className="font-bold text-red-600">${Math.abs(strategy.performance?.maxDrawdown || 0).toFixed(0)}</div>
                   <div className="text-muted-foreground">最大回撤</div>
                 </div>
               </div>
@@ -133,7 +173,7 @@ export default function StrategiesPage() {
               <div>
                 <div className="text-sm text-muted-foreground mb-1">交易对:</div>
                 <div className="flex flex-wrap gap-1">
-                  {strategy.symbols.map((symbol) => (
+                  {(strategy.symbols || ['BTC/USDT', 'ETH/USDT']).map((symbol) => (
                     <Badge key={symbol} variant="secondary" className="text-xs">
                       {symbol}
                     </Badge>
@@ -166,25 +206,25 @@ export default function StrategiesPage() {
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <Card>
                             <CardContent className="p-4">
-                              <div className="text-2xl font-bold text-green-600">+${strategy.performance.pnl.toFixed(2)}</div>
+                              <div className="text-2xl font-bold text-green-600">+${strategy.performance?.pnl?.toFixed(2) || '0.00'}</div>
                               <div className="text-sm text-muted-foreground">总收益</div>
                             </CardContent>
                           </Card>
                           <Card>
                             <CardContent className="p-4">
-                              <div className="text-2xl font-bold">{strategy.performance.sharpe.toFixed(2)}</div>
+                              <div className="text-2xl font-bold">{strategy.performance?.sharpe?.toFixed(2) || '0.00'}</div>
                               <div className="text-sm text-muted-foreground">夏普比率</div>
                             </CardContent>
                           </Card>
                           <Card>
                             <CardContent className="p-4">
-                              <div className="text-2xl font-bold">{(strategy.performance.winRate * 100).toFixed(1)}%</div>
+                              <div className="text-2xl font-bold">{((strategy.performance?.winRate || 0) * 100).toFixed(1)}%</div>
                               <div className="text-sm text-muted-foreground">胜率</div>
                             </CardContent>
                           </Card>
                           <Card>
                             <CardContent className="p-4">
-                              <div className="text-2xl font-bold text-red-600">${Math.abs(strategy.performance.maxDrawdown).toFixed(0)}</div>
+                              <div className="text-2xl font-bold text-red-600">${Math.abs(strategy.performance?.maxDrawdown || 0).toFixed(0)}</div>
                               <div className="text-sm text-muted-foreground">最大回撤</div>
                             </CardContent>
                           </Card>
@@ -198,16 +238,16 @@ export default function StrategiesPage() {
                           <CardContent className="space-y-4">
                             <div className="flex justify-between">
                               <span>风险敞口</span>
-                              <span className="font-bold">${strategy.risk.exposure.toLocaleString()}</span>
+                              <span className="font-bold">${(strategy.risk?.exposure || 0).toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>风险限额</span>
-                              <span className="font-bold">${strategy.risk.limit.toLocaleString()}</span>
+                              <span className="font-bold">${(strategy.risk?.limit || 100000).toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between">
                               <span>违规次数</span>
-                              <span className={`font-bold ${strategy.risk.violations > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                {strategy.risk.violations}
+                              <span className={`font-bold ${(strategy.risk?.violations || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                {strategy.risk?.violations || 0}
                               </span>
                             </div>
                           </CardContent>
