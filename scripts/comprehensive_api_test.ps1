@@ -31,8 +31,8 @@ $testEndpoints = @(
     @{ name = "用户注册"; method = "POST"; path = "/api/v1/auth/register"; auth = $false; category = "认证"; 
        body = @{username="testuser$(Get-Random)"; password="testpass123"; email="test@example.com"} },
     
-    # 仪表板
-    @{ name = "仪表板数据"; method = "GET"; path = "/api/v1/dashboard"; auth = $true; category = "仪表板" },
+    # 仪表盘
+    @{ name = "仪表盘数据"; method = "GET"; path = "/api/v1/dashboard"; auth = $true; category = "仪表盘" },
     
     # 市场数据
     @{ name = "市场数据"; method = "GET"; path = "/api/v1/market/data"; auth = $true; category = "市场数据" },

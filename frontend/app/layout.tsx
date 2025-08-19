@@ -36,7 +36,7 @@ const inter = Inter({ subsets: ["latin"] });
 
 const navigation = [
   {
-    name: "仪表板",
+    name: "仪表盘",
     href: "/",
     icon: Home,
     description: "系统概览和实时监控"
@@ -235,7 +235,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                       {navigation.find(item =>
                         pathname === item.href ||
                         (item.href !== "/" && pathname.startsWith(item.href))
-                      )?.name || "仪表板"}
+                      )?.name || "仪表盘"}
                     </span>
                   </nav>
                 </div>

@@ -31,8 +31,8 @@ func main() {
 		{Method: "POST", Path: "/api/v1/auth/register", Handler: "Auth.Register", Category: "认证", RequiresAuth: false},
 		{Method: "POST", Path: "/api/v1/auth/refresh", Handler: "Auth.RefreshToken", Category: "认证", RequiresAuth: false},
 
-		// 仪表板
-		{Method: "GET", Path: "/api/v1/dashboard", Handler: "Dashboard.GetDashboardData", Category: "仪表板", RequiresAuth: true},
+		// 仪表盘
+		{Method: "GET", Path: "/api/v1/dashboard", Handler: "Dashboard.GetDashboardData", Category: "仪表盘", RequiresAuth: true},
 
 		// 市场数据
 		{Method: "GET", Path: "/api/v1/market/data", Handler: "Market.GetMarketData", Category: "市场数据", RequiresAuth: true},

@@ -74,15 +74,15 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     testData: { refresh_token: 'test-refresh-token' }
   },
 
-  // 仪表板
+  // 仪表盘
   {
     id: 'dashboard-data',
-    name: '仪表板数据',
+    name: '仪表盘数据',
     method: 'GET',
     path: '/api/v1/dashboard',
-    description: '获取仪表板概览数据',
+    description: '获取仪表盘概览数据',
     requiresAuth: true,
-    category: '仪表板'
+    category: '仪表盘'
   },
 
   // 策略管理

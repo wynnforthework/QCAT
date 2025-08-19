@@ -121,7 +121,7 @@ services:
     networks:
       - qcat-network
 
-  # Grafana仪表板
+  # Grafana仪表盘
   grafana:
     image: grafana/grafana:latest
     container_name: qcat-grafana

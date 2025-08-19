@@ -28,7 +28,7 @@ export default function HomePage() {
         setError(null)
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error)
-        setError('无法获取仪表板数据，请检查后端服务是否正常运行')
+        setError('无法获取仪表盘数据，请检查后端服务是否正常运行')
         setDashboardData(null)
       } finally {
         setLoading(false)
@@ -47,7 +47,7 @@ export default function HomePage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p>加载仪表板数据...</p>
+          <p>加载仪表盘数据...</p>
         </div>
       </div>
     )

@@ -7,8 +7,8 @@
 - `POST /api/v1/auth/register` - 用户注册
 - `POST /api/v1/auth/refresh` - 刷新访问令牌
 
-#### 仪表板
-- `GET /api/v1/dashboard` - 获取仪表板概览数据
+#### 仪表盘
+- `GET /api/v1/dashboard` - 获取仪表盘概览数据
 
 #### 市场数据
 - `GET /api/v1/market/data` - 获取市场数据
