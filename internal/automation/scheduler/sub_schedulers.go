@@ -1634,3 +1634,353 @@ func (rs *RiskScheduler) executeExchangeRebalance(ctx context.Context, transfer 
 
 	return nil
 }
+
+// 剩余的辅助方法
+
+// executeDeposit 执行存款操作
+func (rs *RiskScheduler) executeDeposit(ctx context.Context, transfer *FundTransfer) error {
+	log.Printf("Executing deposit: %.2f %s to %s", transfer.Amount, transfer.Currency, transfer.ToAddress)
+
+	// 模拟存款操作
+	time.Sleep(time.Millisecond * 200)
+
+	transfer.TransactionHash = fmt.Sprintf("deposit_%d", time.Now().UnixNano())
+	transfer.Status = "COMPLETED"
+	now := time.Now()
+	transfer.CompletedAt = &now
+
+	return nil
+}
+
+// executeWithdraw 执行提款操作
+func (rs *RiskScheduler) executeWithdraw(ctx context.Context, transfer *FundTransfer) error {
+	log.Printf("Executing withdraw: %.2f %s from %s", transfer.Amount, transfer.Currency, transfer.FromAddress)
+
+	// 模拟提款操作
+	time.Sleep(time.Millisecond * 300)
+
+	transfer.TransactionHash = fmt.Sprintf("withdraw_%d", time.Now().UnixNano())
+	transfer.Status = "CONFIRMING"
+	transfer.Confirmations = 0
+
+	// 模拟确认过程
+	go rs.simulateConfirmationProcess(transfer)
+
+	return nil
+}
+
+// simulateConfirmationProcess 模拟确认过程
+func (rs *RiskScheduler) simulateConfirmationProcess(transfer *FundTransfer) {
+	for transfer.Confirmations < transfer.RequiredConfirms {
+		time.Sleep(time.Second * 10) // 每10秒增加一个确认
+		transfer.Confirmations++
+		log.Printf("Transfer %s: %d/%d confirmations", transfer.ID, transfer.Confirmations, transfer.RequiredConfirms)
+	}
+
+	transfer.Status = "COMPLETED"
+	now := time.Now()
+	transfer.CompletedAt = &now
+	log.Printf("Transfer %s completed", transfer.ID)
+}
+
+// recordTransferResult 记录转移结果
+func (rs *RiskScheduler) recordTransferResult(ctx context.Context, result *TransferResult) error {
+	query := `
+		INSERT INTO fund_transfer_results (
+			transfer_id, success, error_message, actual_amount,
+			execution_time, created_at
+		) VALUES ($1, $2, $3, $4, $5, NOW())
+	`
+
+	_, err := rs.db.ExecContext(ctx, query,
+		result.Transfer.ID, result.Success, result.Error,
+		result.ActualAmount, result.ExecutionTime.Milliseconds(),
+	)
+
+	return err
+}
+
+// integrateColdWalletOperations 集成冷钱包操作
+func (rs *RiskScheduler) integrateColdWalletOperations(ctx context.Context, transferResults []*TransferResult) error {
+	var coldWalletOps []*ColdWalletOperation
+
+	// 为涉及冷钱包的转移创建冷钱包操作
+	for _, result := range transferResults {
+		if !result.Success {
+			continue
+		}
+
+		transfer := result.Transfer
+		if transfer.FromAddress == "cold_wallet" || transfer.ToAddress == "cold_wallet" {
+			op := &ColdWalletOperation{
+				ID:            fmt.Sprintf("cold_op_%d", time.Now().UnixNano()),
+				Amount:        transfer.Amount,
+				Currency:      transfer.Currency,
+				Status:        "PENDING",
+				SecurityLevel: "HIGH",
+				RequiredSigs:  3, // 需要3个签名
+				ProvidedSigs:  0,
+				CreatedAt:     time.Now(),
+				Metadata:      make(map[string]interface{}),
+			}
+
+			if transfer.ToAddress == "cold_wallet" {
+				op.Type = "DEPOSIT"
+				op.WalletAddress = transfer.ToAddress
+			} else {
+				op.Type = "WITHDRAW"
+				op.WalletAddress = transfer.FromAddress
+			}
+
+			op.Metadata["transfer_id"] = transfer.ID
+			op.Metadata["transfer_type"] = transfer.Type
+
+			coldWalletOps = append(coldWalletOps, op)
+		}
+	}
+
+	// 执行冷钱包操作
+	for _, op := range coldWalletOps {
+		err := rs.executeColdWalletOperation(ctx, op)
+		if err != nil {
+			log.Printf("Failed to execute cold wallet operation %s: %v", op.ID, err)
+			continue
+		}
+	}
+
+	log.Printf("Integrated %d cold wallet operations", len(coldWalletOps))
+	return nil
+}
+
+// executeColdWalletOperation 执行冷钱包操作
+func (rs *RiskScheduler) executeColdWalletOperation(ctx context.Context, op *ColdWalletOperation) error {
+	log.Printf("Executing cold wallet operation: %s %s %.2f %s", op.Type, op.WalletAddress, op.Amount, op.Currency)
+
+	// 模拟多重签名过程
+	for op.ProvidedSigs < op.RequiredSigs {
+		time.Sleep(time.Second * 5) // 模拟签名延迟
+		op.ProvidedSigs++
+		log.Printf("Cold wallet operation %s: %d/%d signatures", op.ID, op.ProvidedSigs, op.RequiredSigs)
+	}
+
+	op.Status = "COMPLETED"
+	now := time.Now()
+	op.ExecutedAt = &now
+
+	// 记录到数据库
+	err := rs.recordColdWalletOperation(ctx, op)
+	if err != nil {
+		return fmt.Errorf("failed to record cold wallet operation: %w", err)
+	}
+
+	return nil
+}
+
+// recordColdWalletOperation 记录冷钱包操作
+func (rs *RiskScheduler) recordColdWalletOperation(ctx context.Context, op *ColdWalletOperation) error {
+	query := `
+		INSERT INTO cold_wallet_operations (
+			id, type, wallet_address, amount, currency, status,
+			security_level, required_sigs, provided_sigs, created_at, executed_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	`
+
+	_, err := rs.db.ExecContext(ctx, query,
+		op.ID, op.Type, op.WalletAddress, op.Amount, op.Currency,
+		op.Status, op.SecurityLevel, op.RequiredSigs, op.ProvidedSigs,
+		op.CreatedAt, op.ExecutedAt,
+	)
+
+	return err
+}
+
+// updateFundProtectionProtocol 更新资金保护协议
+func (rs *RiskScheduler) updateFundProtectionProtocol(ctx context.Context, distribution *OptimalFundDistribution, transferResults []*TransferResult) error {
+	log.Printf("Updating fund protection protocol")
+
+	// 1. 计算新的风险参数
+	newRiskParams := rs.calculateNewRiskParameters(distribution, transferResults)
+
+	// 2. 更新保护阈值
+	err := rs.updateProtectionThresholds(ctx, newRiskParams)
+	if err != nil {
+		return fmt.Errorf("failed to update protection thresholds: %w", err)
+	}
+
+	// 3. 更新监控规则
+	err = rs.updateMonitoringRules(ctx, distribution)
+	if err != nil {
+		return fmt.Errorf("failed to update monitoring rules: %w", err)
+	}
+
+	// 4. 记录协议更新历史
+	err = rs.recordProtocolUpdate(ctx, distribution, transferResults, newRiskParams)
+	if err != nil {
+		log.Printf("Failed to record protocol update: %v", err)
+		// 不返回错误，因为记录失败不应该影响主流程
+	}
+
+	log.Printf("Fund protection protocol updated successfully")
+	return nil
+}
+
+// calculateNewRiskParameters 计算新的风险参数
+func (rs *RiskScheduler) calculateNewRiskParameters(distribution *OptimalFundDistribution, transferResults []*TransferResult) map[string]float64 {
+	params := make(map[string]float64)
+
+	// 基于目标分配计算新的风险阈值
+	maxSingleAllocation := 0.0
+	for _, ratio := range distribution.TargetDistribution {
+		if ratio > maxSingleAllocation {
+			maxSingleAllocation = ratio
+		}
+	}
+
+	params["max_single_allocation"] = maxSingleAllocation
+	params["concentration_threshold"] = maxSingleAllocation * 1.2 // 120%作为告警阈值
+	params["hot_wallet_limit"] = 0.15                             // 热钱包限制15%
+	params["emergency_threshold"] = 0.8                           // 紧急阈值80%
+
+	// 基于转移成功率调整参数
+	successRate := rs.calculateTransferSuccessRate(transferResults)
+	params["transfer_success_rate"] = successRate
+
+	if successRate < 0.9 {
+		// 如果成功率低于90%，提高保护级别
+		params["protection_level"] = 0.9
+	} else {
+		params["protection_level"] = 0.7
+	}
+
+	return params
+}
+
+// calculateTransferSuccessRate 计算转移成功率
+func (rs *RiskScheduler) calculateTransferSuccessRate(transferResults []*TransferResult) float64 {
+	if len(transferResults) == 0 {
+		return 1.0
+	}
+
+	successCount := 0
+	for _, result := range transferResults {
+		if result.Success {
+			successCount++
+		}
+	}
+
+	return float64(successCount) / float64(len(transferResults))
+}
+
+// updateProtectionThresholds 更新保护阈值
+func (rs *RiskScheduler) updateProtectionThresholds(ctx context.Context, riskParams map[string]float64) error {
+	query := `
+		INSERT INTO fund_protection_thresholds (
+			max_single_allocation, concentration_threshold, hot_wallet_limit,
+			emergency_threshold, protection_level, updated_at
+		) VALUES ($1, $2, $3, $4, $5, NOW())
+		ON CONFLICT (id) DO UPDATE SET
+			max_single_allocation = EXCLUDED.max_single_allocation,
+			concentration_threshold = EXCLUDED.concentration_threshold,
+			hot_wallet_limit = EXCLUDED.hot_wallet_limit,
+			emergency_threshold = EXCLUDED.emergency_threshold,
+			protection_level = EXCLUDED.protection_level,
+			updated_at = NOW()
+	`
+
+	_, err := rs.db.ExecContext(ctx, query,
+		riskParams["max_single_allocation"],
+		riskParams["concentration_threshold"],
+		riskParams["hot_wallet_limit"],
+		riskParams["emergency_threshold"],
+		riskParams["protection_level"],
+	)
+
+	return err
+}
+
+// updateMonitoringRules 更新监控规则
+func (rs *RiskScheduler) updateMonitoringRules(ctx context.Context, distribution *OptimalFundDistribution) error {
+	// 为每个分配位置创建监控规则
+	for location, targetRatio := range distribution.TargetDistribution {
+		rule := map[string]interface{}{
+			"location":           location,
+			"target_ratio":       targetRatio,
+			"warning_threshold":  targetRatio * 1.1, // 超出目标10%时告警
+			"critical_threshold": targetRatio * 1.3, // 超出目标30%时紧急告警
+			"check_interval":     300,               // 5分钟检查一次
+		}
+
+		err := rs.createOrUpdateMonitoringRule(ctx, rule)
+		if err != nil {
+			log.Printf("Failed to update monitoring rule for %s: %v", location, err)
+			continue
+		}
+	}
+
+	return nil
+}
+
+// createOrUpdateMonitoringRule 创建或更新监控规则
+func (rs *RiskScheduler) createOrUpdateMonitoringRule(ctx context.Context, rule map[string]interface{}) error {
+	query := `
+		INSERT INTO fund_monitoring_rules (
+			location, target_ratio, warning_threshold, critical_threshold,
+			check_interval, created_at, updated_at
+		) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+		ON CONFLICT (location) DO UPDATE SET
+			target_ratio = EXCLUDED.target_ratio,
+			warning_threshold = EXCLUDED.warning_threshold,
+			critical_threshold = EXCLUDED.critical_threshold,
+			check_interval = EXCLUDED.check_interval,
+			updated_at = NOW()
+	`
+
+	_, err := rs.db.ExecContext(ctx, query,
+		rule["location"],
+		rule["target_ratio"],
+		rule["warning_threshold"],
+		rule["critical_threshold"],
+		rule["check_interval"],
+	)
+
+	return err
+}
+
+// recordProtocolUpdate 记录协议更新历史
+func (rs *RiskScheduler) recordProtocolUpdate(ctx context.Context, distribution *OptimalFundDistribution, transferResults []*TransferResult, riskParams map[string]float64) error {
+	// 序列化分配信息
+	distributionJSON := ""
+	for location, ratio := range distribution.TargetDistribution {
+		if distributionJSON != "" {
+			distributionJSON += ","
+		}
+		distributionJSON += fmt.Sprintf(`"%s":%.4f`, location, ratio)
+	}
+	distributionJSON = "{" + distributionJSON + "}"
+
+	// 序列化风险参数
+	paramsJSON := ""
+	for param, value := range riskParams {
+		if paramsJSON != "" {
+			paramsJSON += ","
+		}
+		paramsJSON += fmt.Sprintf(`"%s":%.4f`, param, value)
+	}
+	paramsJSON = "{" + paramsJSON + "}"
+
+	query := `
+		INSERT INTO fund_protection_history (
+			target_distribution, risk_parameters, transfer_count,
+			success_rate, expected_risk_reduction, created_at
+		) VALUES ($1, $2, $3, $4, $5, NOW())
+	`
+
+	successRate := rs.calculateTransferSuccessRate(transferResults)
+
+	_, err := rs.db.ExecContext(ctx, query,
+		distributionJSON, paramsJSON, len(transferResults),
+		successRate, distribution.ExpectedRiskReduction,
+	)
+
+	return err
+}
