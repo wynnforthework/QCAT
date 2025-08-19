@@ -68,7 +68,7 @@ func TestLoadConfigWithEnvironmentOverride(t *testing.T) {
 	defer suite.TearDown()
 
 	// 设置环境变量
-	testutils.SetEnv(t, "QCAT_SERVER_PORT", "9090")
+	testutils.SetEnv(t, "QCAT_SERVER_PORT", "8082")
 	testutils.SetEnv(t, "QCAT_DATABASE_HOST", "db.example.com")
 
 	configContent := `
@@ -89,8 +89,8 @@ database:
 	}
 
 	// 验证环境变量覆盖
-	if config.Server.Port != 9090 {
-		t.Errorf("Expected port 9090 (from env), got %d", config.Server.Port)
+	if config.Server.Port != 8082 {
+		t.Errorf("Expected port 8082 (from env), got %d", config.Server.Port)
 	}
 
 	if config.Database.Host != "db.example.com" {
@@ -187,7 +187,7 @@ server:
 	// 修改配置文件
 	newContent := `
 server:
-  port: 9090
+  port: 8082
 `
 	err = os.WriteFile(configPath, []byte(newContent), 0644)
 	if err != nil {

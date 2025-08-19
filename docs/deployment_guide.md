@@ -132,7 +132,7 @@ curl http://localhost:8080/health
 curl http://localhost:80
 
 # 检查监控
-curl http://localhost:9090/-/healthy  # Prometheus
+curl http://localhost:8082/-/healthy  # Prometheus
 curl http://localhost:3000/api/health # Grafana
 ```
 
@@ -141,7 +141,7 @@ curl http://localhost:3000/api/health # Grafana
 - **前端界面**: http://localhost
 - **API文档**: http://localhost:8080/docs
 - **Grafana监控**: http://localhost:3000 (admin/admin_password)
-- **Prometheus**: http://localhost:9090
+- **Prometheus**: http://localhost:8082
 
 ## Kubernetes部署
 
@@ -438,10 +438,10 @@ SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK
 
 ```bash
 # 访问Prometheus
-http://localhost:9090
+http://localhost:8082
 
 # 查看指标
-http://localhost:9090/metrics
+http://localhost:8082/metrics
 ```
 
 ### 2. Grafana仪表板

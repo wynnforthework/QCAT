@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { SafeTimeDisplay } from "@/components/ui/client-only";
 import {
   Activity,
   BarChart3,
@@ -195,7 +196,7 @@ export default function RootLayout({
                 <div className="text-xs text-gray-500">
                   <div className="flex justify-between items-center mb-1">
                     <span>最后更新</span>
-                    <span>{new Date().toLocaleTimeString()}</span>
+                    <SafeTimeDisplay />
                   </div>
                   <div className="flex justify-between items-center">
                     <span>连接状态</span>

@@ -144,7 +144,7 @@ QCAT v2.0 是一个革命性的加密货币智能化自动交易平台，集成�
    createdb qcat
    
    # 运行数据库迁移
-   go run cmd/qcat/main.go -migrate
+   go run cmd/migrate/main.go -up
    ```
 
 6. 启动智能化交易系统:
@@ -194,7 +194,7 @@ curl http://localhost:8082/health
 # 智能化控制器状态
 curl http://localhost:8082/api/v1/intelligence/status
 
-# AutoML引擎状态  
+# AutoML引擎状态
 curl http://localhost:8082/api/v1/automl/status
 
 # 自愈系统状态

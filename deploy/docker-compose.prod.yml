@@ -14,7 +14,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
     ports:
-      - "5432:5432"
+      - "${QCAT_PORTS_POSTGRES:-5432}:5432"
     networks:
       - qcat-network
     healthcheck:
@@ -32,7 +32,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - "${QCAT_PORTS_REDIS:-6379}:6379"
     networks:
       - qcat-network
     healthcheck:
@@ -59,8 +59,9 @@ services:
       - JWT_SECRET=${JWT_SECRET:-your_jwt_secret}
       - API_KEY=${API_KEY:-your_api_key}
       - API_SECRET=${API_SECRET:-your_api_secret}
+      - QCAT_SERVER_PORT=${QCAT_PORTS_QCAT_API:-8082}
     ports:
-      - "8080:8080"
+      - "${QCAT_PORTS_QCAT_API:-8082}:${QCAT_PORTS_QCAT_API:-8082}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,7 +70,7 @@ services:
     networks:
       - qcat-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${QCAT_PORTS_QCAT_API:-8082}/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -82,9 +83,11 @@ services:
     image: ${REGISTRY:-ghcr.io}/${GITHUB_REPOSITORY:-your-org/qcat}/qcat-frontend:latest
     container_name: qcat-frontend
     restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:${QCAT_PORTS_QCAT_API:-8082}
     ports:
-      - "80:80"
-      - "443:443"
+      - "${QCAT_PORTS_NGINX_HTTP:-80}:80"
+      - "${QCAT_PORTS_NGINX_HTTPS:-443}:443"
     depends_on:
       - backend
     networks:

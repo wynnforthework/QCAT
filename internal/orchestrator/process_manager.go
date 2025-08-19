@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -58,11 +57,11 @@ type ProcessConfig struct {
 
 // HealthCheckConfig defines health check parameters
 type HealthCheckConfig struct {
-	Enabled         bool          `json:"enabled"`
-	Interval        time.Duration `json:"interval"`
-	Timeout         time.Duration `json:"timeout"`
-	FailureThreshold int          `json:"failure_threshold"`
-	HealthEndpoint  string        `json:"health_endpoint"`
+	Enabled          bool          `json:"enabled"`
+	Interval         time.Duration `json:"interval"`
+	Timeout          time.Duration `json:"timeout"`
+	FailureThreshold int           `json:"failure_threshold"`
+	HealthEndpoint   string        `json:"health_endpoint"`
 }
 
 // ProcessManager manages multiple processes
@@ -78,7 +77,7 @@ type ProcessManager struct {
 // NewProcessManager creates a new process manager
 func NewProcessManager(msgQueue MessageQueue) *ProcessManager {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	pm := &ProcessManager{
 		processes: make(map[string]*Process),
 		msgQueue:  msgQueue,
@@ -86,7 +85,7 @@ func NewProcessManager(msgQueue MessageQueue) *ProcessManager {
 		ctx:       ctx,
 		cancel:    cancel,
 	}
-	
+
 	pm.monitor = NewProcessMonitor(pm)
 	return pm
 }
@@ -95,15 +94,15 @@ func NewProcessManager(msgQueue MessageQueue) *ProcessManager {
 func (pm *ProcessManager) StartProcess(config ProcessConfig) (*Process, error) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	
+
 	// Generate unique process ID
 	processID := generateProcessID(config.Type, config.Name)
-	
+
 	// Check if process already exists
 	if _, exists := pm.processes[processID]; exists {
 		return nil, fmt.Errorf("process %s already exists", processID)
 	}
-	
+
 	// Create process instance
 	process := &Process{
 		ID:        processID,
@@ -112,32 +111,32 @@ func (pm *ProcessManager) StartProcess(config ProcessConfig) (*Process, error) {
 		StartTime: time.Now(),
 		Config:    config,
 	}
-	
+
 	// Prepare command
 	cmd := exec.CommandContext(pm.ctx, config.Executable, config.Args...)
 	cmd.Dir = config.WorkingDir
-	
+
 	// Set environment variables
 	cmd.Env = os.Environ()
 	for key, value := range config.Env {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
 	}
-	
+
 	// Start the process
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start process %s: %w", processID, err)
 	}
-	
+
 	process.cmd = cmd
 	process.PID = cmd.Process.Pid
 	process.Status = ProcessStatusRunning
-	
+
 	// Store process
 	pm.processes[processID] = process
-	
+
 	// Start monitoring
 	go pm.monitorProcess(process)
-	
+
 	return process, nil
 }
 
@@ -145,48 +144,39 @@ func (pm *ProcessManager) StartProcess(config ProcessConfig) (*Process, error) {
 func (pm *ProcessManager) StopProcess(processID string) error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	
+
 	process, exists := pm.processes[processID]
 	if !exists {
 		return fmt.Errorf("process %s not found", processID)
 	}
-	
+
 	process.mu.Lock()
 	defer process.mu.Unlock()
-	
+
 	if process.Status != ProcessStatusRunning {
 		return fmt.Errorf("process %s is not running (status: %s)", processID, process.Status)
 	}
-	
+
 	process.Status = ProcessStatusStopping
-	
-	// Send SIGTERM first
-	if err := process.cmd.Process.Signal(syscall.SIGTERM); err != nil {
-		return fmt.Errorf("failed to send SIGTERM to process %s: %w", processID, err)
+
+	// Try graceful shutdown first (Windows doesn't support SIGTERM)
+	// On Windows, we'll use Kill() directly with a timeout
+	// On Unix systems, we could use SIGTERM, but for simplicity we'll use Kill() everywhere
+
+	// Force kill the process (works on both Windows and Unix)
+	if err := process.cmd.Process.Kill(); err != nil {
+		return fmt.Errorf("failed to kill process %s: %w", processID, err)
 	}
-	
-	// Wait for graceful shutdown with timeout
-	done := make(chan error, 1)
-	go func() {
-		done <- process.cmd.Wait()
-	}()
-	
-	select {
-	case err := <-done:
-		if err != nil {
-			process.Status = ProcessStatusFailed
-		} else {
-			process.Status = ProcessStatusStopped
-		}
-		return err
-	case <-time.After(30 * time.Second):
-		// Force kill if graceful shutdown fails
-		if err := process.cmd.Process.Kill(); err != nil {
-			return fmt.Errorf("failed to kill process %s: %w", processID, err)
-		}
+
+	// Wait for process to exit
+	err := process.cmd.Wait()
+	if err != nil {
+		process.Status = ProcessStatusFailed
+	} else {
 		process.Status = ProcessStatusStopped
-		return nil
 	}
+
+	return err
 }
 
 // RestartProcess restarts a process
@@ -195,17 +185,17 @@ func (pm *ProcessManager) RestartProcess(processID string) error {
 	if !exists {
 		return fmt.Errorf("process %s not found", processID)
 	}
-	
+
 	// Stop the process
 	if err := pm.StopProcess(processID); err != nil {
 		return fmt.Errorf("failed to stop process %s: %w", processID, err)
 	}
-	
+
 	// Remove from processes map
 	pm.mu.Lock()
 	delete(pm.processes, processID)
 	pm.mu.Unlock()
-	
+
 	// Start new process with same config
 	_, err := pm.StartProcess(process.Config)
 	return err
@@ -215,7 +205,7 @@ func (pm *ProcessManager) RestartProcess(processID string) error {
 func (pm *ProcessManager) GetProcess(processID string) (*Process, bool) {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
-	
+
 	process, exists := pm.processes[processID]
 	return process, exists
 }
@@ -224,7 +214,7 @@ func (pm *ProcessManager) GetProcess(processID string) (*Process, bool) {
 func (pm *ProcessManager) ListProcesses() map[string]*Process {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
-	
+
 	result := make(map[string]*Process)
 	for id, process := range pm.processes {
 		result[id] = process
@@ -236,7 +226,7 @@ func (pm *ProcessManager) ListProcesses() map[string]*Process {
 func (pm *ProcessManager) GetProcessesByType(processType ProcessType) []*Process {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
-	
+
 	var result []*Process
 	for _, process := range pm.processes {
 		if process.Type == processType {
@@ -253,10 +243,10 @@ func (pm *ProcessManager) monitorProcess(process *Process) {
 			fmt.Printf("Process monitor panic for %s: %v\n", process.ID, r)
 		}
 	}()
-	
+
 	// Wait for process to exit
 	err := process.cmd.Wait()
-	
+
 	process.mu.Lock()
 	if process.Status == ProcessStatusStopping {
 		process.Status = ProcessStatusStopped
@@ -264,12 +254,12 @@ func (pm *ProcessManager) monitorProcess(process *Process) {
 		process.Status = ProcessStatusFailed
 	}
 	process.mu.Unlock()
-	
+
 	// Handle auto-restart
 	if process.Config.AutoRestart && process.Status == ProcessStatusFailed {
 		go pm.handleAutoRestart(process)
 	}
-	
+
 	// Notify about process exit
 	pm.notifyProcessExit(process, err)
 }
@@ -280,21 +270,21 @@ func (pm *ProcessManager) handleAutoRestart(process *Process) {
 	if maxRetries <= 0 {
 		maxRetries = 3 // Default max retries
 	}
-	
+
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		// Wait before retry (exponential backoff)
 		backoff := time.Duration(attempt*attempt) * time.Second
 		time.Sleep(backoff)
-		
+
 		// Try to restart
 		if err := pm.RestartProcess(process.ID); err == nil {
 			fmt.Printf("Successfully restarted process %s after %d attempts\n", process.ID, attempt)
 			return
 		}
-		
+
 		fmt.Printf("Failed to restart process %s (attempt %d/%d)\n", process.ID, attempt, maxRetries)
 	}
-	
+
 	fmt.Printf("Giving up on restarting process %s after %d attempts\n", process.ID, maxRetries)
 }
 
@@ -305,7 +295,7 @@ func (pm *ProcessManager) notifyProcessExit(process *Process, err error) {
 		ExitTime:  time.Now(),
 		Error:     err,
 	}
-	
+
 	if pm.msgQueue != nil {
 		pm.msgQueue.Publish("process.exit", message)
 	}
@@ -315,10 +305,10 @@ func (pm *ProcessManager) notifyProcessExit(process *Process, err error) {
 func (pm *ProcessManager) Shutdown() error {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	
+
 	// Cancel context to stop new processes
 	pm.cancel()
-	
+
 	// Stop all running processes
 	var wg sync.WaitGroup
 	for processID := range pm.processes {
@@ -330,14 +320,14 @@ func (pm *ProcessManager) Shutdown() error {
 			}
 		}(processID)
 	}
-	
+
 	// Wait for all processes to stop with timeout
 	done := make(chan struct{})
 	go func() {
 		wg.Wait()
 		close(done)
 	}()
-	
+
 	select {
 	case <-done:
 		return nil

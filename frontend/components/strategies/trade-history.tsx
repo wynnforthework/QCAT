@@ -79,11 +79,7 @@ export function TradeHistory({ strategyId, strategyName }: TradeHistoryProps) {
   }, [filteredTrades])
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2
-    }).format(amount)
+    return `$${amount.toFixed(2)}`
   }
 
   const formatPercent = (percent: number) => {

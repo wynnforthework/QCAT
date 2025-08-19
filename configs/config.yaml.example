@@ -3,6 +3,26 @@ app:
   version: "2.0.0"
   environment: "development"
 
+# 端口配置 - 统一管理所有服务端口
+ports:
+  # 应用服务端口
+  qcat_api: 8082          # QCAT主应用API服务
+  qcat_optimizer: 8081    # QCAT优化器服务
+
+  # 数据库服务端口
+  postgres: 5432          # PostgreSQL数据库
+  redis: 6379            # Redis缓存
+
+  # 监控服务端口
+  prometheus: 9090       # Prometheus监控
+  grafana: 3000         # Grafana监控面板
+  alertmanager: 9093    # AlertManager告警
+
+  # Web服务端口
+  nginx_http: 80        # Nginx HTTP
+  nginx_https: 443      # Nginx HTTPS
+  frontend_dev: 3000    # 前端开发服务器
+
 server:
   port: 8082
   read_timeout: 30s

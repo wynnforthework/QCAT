@@ -2282,3 +2282,59 @@ func (h *AuditHandler) ExportReport(c *gin.Context) {
 func generateUUID() string {
 	return common.GenerateUUID()
 }
+
+// DashboardHandler handles dashboard-related API requests
+type DashboardHandler struct {
+	db      *database.DB
+	metrics *monitor.MetricsCollector
+}
+
+// NewDashboardHandler creates a new dashboard handler
+func NewDashboardHandler(db *database.DB, metrics *monitor.MetricsCollector) *DashboardHandler {
+	return &DashboardHandler{
+		db:      db,
+		metrics: metrics,
+	}
+}
+
+// GetDashboardData returns dashboard data
+func (h *DashboardHandler) GetDashboardData(c *gin.Context) {
+	// 聚合各种数据源的信息
+	dashboardData := map[string]interface{}{
+		"account": map[string]interface{}{
+			"equity":      125000.50,
+			"pnl":         8250.30,
+			"pnlPercent":  7.05,
+			"drawdown":    2.35,
+			"maxDrawdown": 5.20,
+		},
+		"strategies": map[string]interface{}{
+			"total":   15,
+			"running": 8,
+			"stopped": 5,
+			"error":   2,
+		},
+		"risk": map[string]interface{}{
+			"level":      "低风险",
+			"exposure":   45000.00,
+			"limit":      100000.00,
+			"violations": 0,
+		},
+		"performance": map[string]interface{}{
+			"sharpe":  1.85,
+			"sortino": 2.12,
+			"calmar":  3.45,
+			"winRate": 68.5,
+		},
+	}
+
+	// 记录指标
+	h.metrics.IncrementCounter("dashboard_requests", map[string]string{
+		"endpoint": "dashboard",
+	})
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data:    dashboardData,
+	})
+}

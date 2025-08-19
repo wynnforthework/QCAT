@@ -15,13 +15,46 @@
 - **环境变量管理**: 建立了安全的环境变量配置体系
 
 #### 服务组件
-- **QCAT应用**: 主应用服务，端口8082
-- **PostgreSQL**: 数据库服务，端口5432
-- **Redis**: 缓存服务，端口6379
-- **Prometheus**: 监控服务，端口9090
-- **Grafana**: 监控面板，端口3000
-- **AlertManager**: 告警服务，端口9093
-- **Nginx**: 反向代理，端口80/443
+- **QCAT应用**: 主应用服务，端口8082（可通过配置修改）
+- **QCAT优化器**: 优化器服务，端口8081（可通过配置修改）
+- **PostgreSQL**: 数据库服务，端口5432（可通过配置修改）
+- **Redis**: 缓存服务，端口6379（可通过配置修改）
+- **Prometheus**: 监控服务，端口9090（可通过配置修改）
+- **Grafana**: 监控面板，端口3000（可通过配置修改）
+- **AlertManager**: 告警服务，端口9093（可通过配置修改）
+- **Nginx**: 反向代理，端口80/443（可通过配置修改）
+
+#### 端口配置管理
+所有服务端口现已统一通过配置文件管理，支持以下配置方式：
+
+1. **主配置文件** (`configs/config.yaml`)：
+   ```yaml
+   ports:
+     qcat_api: 8082          # QCAT主应用API服务
+     qcat_optimizer: 8081    # QCAT优化器服务
+     postgres: 5432          # PostgreSQL数据库
+     redis: 6379            # Redis缓存
+     prometheus: 9090       # Prometheus监控
+     grafana: 3000         # Grafana监控面板
+     alertmanager: 9093    # AlertManager告警
+     nginx_http: 80        # Nginx HTTP
+     nginx_https: 443      # Nginx HTTPS
+     frontend_dev: 3000    # 前端开发服务器
+   ```
+
+2. **环境变量覆盖**：
+   ```bash
+   QCAT_PORTS_QCAT_API=8082
+   QCAT_PORTS_QCAT_OPTIMIZER=8081
+   QCAT_PORTS_POSTGRES=5432
+   QCAT_PORTS_REDIS=6379
+   # ... 其他端口配置
+   ```
+
+3. **前端环境变量**：
+   ```bash
+   NEXT_PUBLIC_API_URL=http://localhost:8082
+   ```
 
 #### 安全配置
 - **SSL/TLS**: 配置了HTTPS加密传输
@@ -230,6 +263,44 @@ PostgreSQL → 备份脚本 → 压缩存储
 - **本地存储**: 备份文件本地存储
 - **远程存储**: 重要备份远程存储
 - **压缩存储**: 备份文件压缩存储
+
+## 端口配置详细说明
+
+### 配置优先级
+端口配置按以下优先级生效：
+1. **环境变量** (最高优先级)
+2. **配置文件** (`configs/config.yaml`)
+3. **默认值** (最低优先级)
+
+### 本地开发环境
+启动脚本 `scripts/start_local.sh` 会自动：
+1. 从配置文件读取端口设置
+2. 为前端设置正确的API URL环境变量
+3. 使用配置的端口启动各个服务
+4. 显示实际使用的端口信息
+
+### Docker部署环境
+Docker Compose配置支持通过环境变量动态配置端口：
+```bash
+# 设置环境变量
+export QCAT_PORTS_QCAT_API=8082
+export QCAT_PORTS_POSTGRES=5432
+export QCAT_PORTS_REDIS=6379
+
+# 启动服务
+docker-compose -f deploy/docker-compose.prod.yml up -d
+```
+
+### 前端配置
+前端通过以下环境变量配置API端点：
+- **开发环境**: 在 `frontend/.env.local` 中设置 `NEXT_PUBLIC_API_URL`
+- **生产环境**: 通过Docker环境变量或构建时配置
+
+### 配置验证
+使用配置验证工具检查端口配置：
+```bash
+go run cmd/config/main.go -validate
+```
 
 ## 安全措施
 

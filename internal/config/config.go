@@ -11,6 +11,7 @@ import (
 // Config 应用配置
 type Config struct {
 	App        AppConfig        `yaml:"app"`
+	Ports      PortsConfig      `yaml:"ports"`
 	Server     ServerConfig     `yaml:"server"`
 	Database   DatabaseConfig   `yaml:"database"`
 	Redis      RedisConfig      `yaml:"redis"`
@@ -38,6 +39,20 @@ type AppConfig struct {
 	Name        string `yaml:"name"`
 	Version     string `yaml:"version"`
 	Environment string `yaml:"environment"`
+}
+
+// PortsConfig 端口配置
+type PortsConfig struct {
+	QcatAPI       int `yaml:"qcat_api"`       // QCAT主应用API服务
+	QcatOptimizer int `yaml:"qcat_optimizer"` // QCAT优化器服务
+	Postgres      int `yaml:"postgres"`       // PostgreSQL数据库
+	Redis         int `yaml:"redis"`          // Redis缓存
+	Prometheus    int `yaml:"prometheus"`     // Prometheus监控
+	Grafana       int `yaml:"grafana"`        // Grafana监控面板
+	AlertManager  int `yaml:"alertmanager"`   // AlertManager告警
+	NginxHTTP     int `yaml:"nginx_http"`     // Nginx HTTP
+	NginxHTTPS    int `yaml:"nginx_https"`    // Nginx HTTPS
+	FrontendDev   int `yaml:"frontend_dev"`   // 前端开发服务器
 }
 
 // ServerConfig 服务器配置
@@ -79,18 +94,18 @@ type RedisConfig struct {
 
 // ExchangeConfig 交易所配置
 type ExchangeConfig struct {
-	Name      string              `yaml:"name"`
-	APIKey    string              `yaml:"api_key"`
-	APISecret string              `yaml:"api_secret"`
-	TestNet   bool                `yaml:"test_net"`
-	BaseURL   string              `yaml:"base_url"`
-	WebsocketURL string           `yaml:"websocket_url"`
-	FuturesBaseURL string         `yaml:"futures_base_url"`
-	FuturesWebsocketURL string    `yaml:"futures_websocket_url"`
-	RateLimit ExchangeRateLimit   `yaml:"rate_limit"`
-	Timeout   time.Duration       `yaml:"timeout"`
-	RetryAttempts int             `yaml:"retry_attempts"`
-	RetryDelay time.Duration      `yaml:"retry_delay"`
+	Name                string            `yaml:"name"`
+	APIKey              string            `yaml:"api_key"`
+	APISecret           string            `yaml:"api_secret"`
+	TestNet             bool              `yaml:"test_net"`
+	BaseURL             string            `yaml:"base_url"`
+	WebsocketURL        string            `yaml:"websocket_url"`
+	FuturesBaseURL      string            `yaml:"futures_base_url"`
+	FuturesWebsocketURL string            `yaml:"futures_websocket_url"`
+	RateLimit           ExchangeRateLimit `yaml:"rate_limit"`
+	Timeout             time.Duration     `yaml:"timeout"`
+	RetryAttempts       int               `yaml:"retry_attempts"`
+	RetryDelay          time.Duration     `yaml:"retry_delay"`
 }
 
 // ExchangeRateLimit 交易所限流配置
@@ -108,8 +123,8 @@ type JWTConfig struct {
 
 // MonitoringConfig 监控配置
 type MonitoringConfig struct {
-	PrometheusEnabled bool   `yaml:"prometheus_enabled"`
-	PrometheusPath    string `yaml:"prometheus_path"`
+	PrometheusEnabled bool              `yaml:"prometheus_enabled"`
+	PrometheusPath    string            `yaml:"prometheus_path"`
 	Alerts            AlertsConfig      `yaml:"alerts"`
 	HealthCheck       HealthCheckConfig `yaml:"health_check"`
 	Metrics           MetricsMonConfig  `yaml:"metrics"`
@@ -225,25 +240,25 @@ type ApprovalConfig struct {
 
 // LoggingConfig 日志配置
 type LoggingConfig struct {
-	Level  string       `yaml:"level"`
-	Format string       `yaml:"format"`
-	Output string       `yaml:"output"`
-	Levels map[string]string `yaml:"levels"`
-	OutputConfig OutputConfig `yaml:"output_config"`
-	MaxSize int    `yaml:"max_size"`
-	MaxBackups int `yaml:"max_backups"`
-	MaxAge int     `yaml:"max_age"`
-	Compress bool  `yaml:"compress"`
-	LogDir  string `yaml:"log_dir"`
+	Level        string            `yaml:"level"`
+	Format       string            `yaml:"format"`
+	Output       string            `yaml:"output"`
+	Levels       map[string]string `yaml:"levels"`
+	OutputConfig OutputConfig      `yaml:"output_config"`
+	MaxSize      int               `yaml:"max_size"`
+	MaxBackups   int               `yaml:"max_backups"`
+	MaxAge       int               `yaml:"max_age"`
+	Compress     bool              `yaml:"compress"`
+	LogDir       string            `yaml:"log_dir"`
 }
 
 // OutputConfig represents log output configuration
 type OutputConfig struct {
-	ConsoleEnabled   bool   `yaml:"console_enabled"`
-	FileEnabled      bool   `yaml:"file_enabled"`
-	FilePath         string `yaml:"file_path"`
-	MaxFileSizeMB    int    `yaml:"max_file_size_mb"`
-	MaxBackupFiles   int    `yaml:"max_backup_files"`
+	ConsoleEnabled bool   `yaml:"console_enabled"`
+	FileEnabled    bool   `yaml:"file_enabled"`
+	FilePath       string `yaml:"file_path"`
+	MaxFileSizeMB  int    `yaml:"max_file_size_mb"`
+	MaxBackupFiles int    `yaml:"max_backup_files"`
 }
 
 // MemoryConfig 内存管理配置
@@ -299,12 +314,12 @@ type ShutdownConfig struct {
 
 // StrategyConfig 策略配置
 type StrategyConfig struct {
-	DefaultMode            string              `yaml:"default_mode"`
-	MaxConcurrentStrategies int                `yaml:"max_concurrent_strategies"`
-	StrategyTimeout        time.Duration       `yaml:"strategy_timeout"`
-	MemoryLimitMB          int                 `yaml:"memory_limit_mb"`
-	SandboxEnabled         bool                `yaml:"sandbox_enabled"`
-	Backtest               BacktestConfig      `yaml:"backtest"`
+	DefaultMode             string         `yaml:"default_mode"`
+	MaxConcurrentStrategies int            `yaml:"max_concurrent_strategies"`
+	StrategyTimeout         time.Duration  `yaml:"strategy_timeout"`
+	MemoryLimitMB           int            `yaml:"memory_limit_mb"`
+	SandboxEnabled          bool           `yaml:"sandbox_enabled"`
+	Backtest                BacktestConfig `yaml:"backtest"`
 }
 
 // BacktestConfig 回测配置
@@ -315,28 +330,26 @@ type BacktestConfig struct {
 	DataRetentionDays int           `yaml:"data_retention_days"`
 }
 
-
-
 // OrderConfig 订单管理配置
 type OrderConfig struct {
-	Timeout            time.Duration `yaml:"timeout"`
-	MaxPendingOrders   int           `yaml:"max_pending_orders"`
-	RetryAttempts      int           `yaml:"retry_attempts"`
-	RetryDelay         time.Duration `yaml:"retry_delay"`
-	AutoCancelTimeout  time.Duration `yaml:"auto_cancel_timeout"`
+	Timeout           time.Duration `yaml:"timeout"`
+	MaxPendingOrders  int           `yaml:"max_pending_orders"`
+	RetryAttempts     int           `yaml:"retry_attempts"`
+	RetryDelay        time.Duration `yaml:"retry_delay"`
+	AutoCancelTimeout time.Duration `yaml:"auto_cancel_timeout"`
 }
 
 // RiskConfig 风险管理配置
 type RiskConfig struct {
-	Enabled                bool          `yaml:"enabled"`
-	CheckInterval          time.Duration `yaml:"check_interval"`
-	MarginCallThreshold    float64       `yaml:"margin_call_threshold"`
-	LiquidationThreshold   float64       `yaml:"liquidation_threshold"`
-	MaxPositionSize        float64       `yaml:"max_position_size"`
-	MaxLeverage            int           `yaml:"max_leverage"`
-	MaxDrawdown            float64       `yaml:"max_drawdown"`
-	CircuitBreakerThreshold float64      `yaml:"circuit_breaker_threshold"`
-	PositionMonitoring     PositionMonitoringConfig `yaml:"position_monitoring"`
+	Enabled                 bool                     `yaml:"enabled"`
+	CheckInterval           time.Duration            `yaml:"check_interval"`
+	MarginCallThreshold     float64                  `yaml:"margin_call_threshold"`
+	LiquidationThreshold    float64                  `yaml:"liquidation_threshold"`
+	MaxPositionSize         float64                  `yaml:"max_position_size"`
+	MaxLeverage             int                      `yaml:"max_leverage"`
+	MaxDrawdown             float64                  `yaml:"max_drawdown"`
+	CircuitBreakerThreshold float64                  `yaml:"circuit_breaker_threshold"`
+	PositionMonitoring      PositionMonitoringConfig `yaml:"position_monitoring"`
 }
 
 // PositionMonitoringConfig 仓位监控配置
@@ -397,9 +410,45 @@ func (c *Config) overrideWithEnv(env *EnvManager) {
 		c.App.Environment = env.GetString("APP_ENVIRONMENT", c.App.Environment)
 	}
 
+	// Ports configuration
+	if env.GetInt("PORTS_QCAT_API", 0) != 0 {
+		c.Ports.QcatAPI = env.GetInt("PORTS_QCAT_API", c.Ports.QcatAPI)
+	}
+	if env.GetInt("PORTS_QCAT_OPTIMIZER", 0) != 0 {
+		c.Ports.QcatOptimizer = env.GetInt("PORTS_QCAT_OPTIMIZER", c.Ports.QcatOptimizer)
+	}
+	if env.GetInt("PORTS_POSTGRES", 0) != 0 {
+		c.Ports.Postgres = env.GetInt("PORTS_POSTGRES", c.Ports.Postgres)
+	}
+	if env.GetInt("PORTS_REDIS", 0) != 0 {
+		c.Ports.Redis = env.GetInt("PORTS_REDIS", c.Ports.Redis)
+	}
+	if env.GetInt("PORTS_PROMETHEUS", 0) != 0 {
+		c.Ports.Prometheus = env.GetInt("PORTS_PROMETHEUS", c.Ports.Prometheus)
+	}
+	if env.GetInt("PORTS_GRAFANA", 0) != 0 {
+		c.Ports.Grafana = env.GetInt("PORTS_GRAFANA", c.Ports.Grafana)
+	}
+	if env.GetInt("PORTS_ALERTMANAGER", 0) != 0 {
+		c.Ports.AlertManager = env.GetInt("PORTS_ALERTMANAGER", c.Ports.AlertManager)
+	}
+	if env.GetInt("PORTS_NGINX_HTTP", 0) != 0 {
+		c.Ports.NginxHTTP = env.GetInt("PORTS_NGINX_HTTP", c.Ports.NginxHTTP)
+	}
+	if env.GetInt("PORTS_NGINX_HTTPS", 0) != 0 {
+		c.Ports.NginxHTTPS = env.GetInt("PORTS_NGINX_HTTPS", c.Ports.NginxHTTPS)
+	}
+	if env.GetInt("PORTS_FRONTEND_DEV", 0) != 0 {
+		c.Ports.FrontendDev = env.GetInt("PORTS_FRONTEND_DEV", c.Ports.FrontendDev)
+	}
+
 	// Server configuration
 	if env.GetInt("SERVER_PORT", 0) != 0 {
 		c.Server.Port = env.GetInt("SERVER_PORT", c.Server.Port)
+	}
+	// 如果没有设置SERVER_PORT但设置了PORTS_QCAT_API，则使用PORTS_QCAT_API
+	if c.Server.Port == 0 && c.Ports.QcatAPI != 0 {
+		c.Server.Port = c.Ports.QcatAPI
 	}
 	if env.GetDuration("SERVER_READ_TIMEOUT", 0) != 0 {
 		c.Server.ReadTimeout = env.GetDuration("SERVER_READ_TIMEOUT", c.Server.ReadTimeout)

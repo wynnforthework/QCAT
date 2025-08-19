@@ -1,6 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useClientOnly } from "@/lib/use-client-only"
+import { SafeTimeDisplay } from "@/components/ui/client-only"
+import {
+  generateMockSystemStatus,
+  generateMockMarketData,
+  generateMockTradingActivity
+} from "@/lib/mock-data-generator"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -55,9 +62,19 @@ export function RealTimeMonitor() {
   const [marketData, setMarketData] = useState<MarketData[]>([])
   const [tradingActivity, setTradingActivity] = useState<TradingActivity[]>([])
   const [isConnected, setIsConnected] = useState(true)
-  const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null)
+  const isClient = useClientOnly()
 
   useEffect(() => {
+    if (!isClient) return
+
+    setLastUpdate(new Date())
+
+    // 初始化数据
+    updateSystemStatus()
+    updateMarketData()
+    updateTradingActivity()
+
     // 模拟实时数据更新
     const interval = setInterval(() => {
       updateSystemStatus()
@@ -66,103 +83,33 @@ export function RealTimeMonitor() {
       setLastUpdate(new Date())
     }, 2000)
 
-    // 初始化数据
-    updateSystemStatus()
-    updateMarketData()
-    updateTradingActivity()
-
     return () => clearInterval(interval)
-  }, [])
+  }, [isClient])
 
   const updateSystemStatus = () => {
-    const components = [
-      "交易引擎",
-      "市场数据", 
-      "风控系统",
-      "订单管理",
-      "数据库",
-      "缓存系统"
-    ]
+    if (!isClient) return
 
-    const newStatus: SystemStatus[] = components.map(component => {
-      const isHealthy = Math.random() > 0.1 // 90% 健康率
-      const hasWarning = Math.random() > 0.7 // 30% 警告率
-      
-      let status: "healthy" | "warning" | "error"
-      let message: string
-      
-      if (!isHealthy) {
-        status = "error"
-        message = "服务异常"
-      } else if (hasWarning) {
-        status = "warning"
-        message = "性能警告"
-      } else {
-        status = "healthy"
-        message = "运行正常"
-      }
-
-      return {
-        component,
-        status,
-        message,
-        lastUpdate: new Date().toISOString(),
-        metrics: {
-          cpu: Math.random() * 100,
-          memory: Math.random() * 100,
-          latency: Math.random() * 50
-        }
-      }
-    })
-
+    const newStatus = generateMockSystemStatus()
     setSystemStatus(newStatus)
     setIsConnected(Math.random() > 0.05) // 95% 连接率
   }
 
   const updateMarketData = () => {
-    const symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT"]
-    
-    const newMarketData: MarketData[] = symbols.map(symbol => {
-      const basePrice = symbol === "BTCUSDT" ? 45000 : 
-                       symbol === "ETHUSDT" ? 3000 :
-                       symbol === "ADAUSDT" ? 0.5 : 8
-      
-      const price = basePrice * (1 + (Math.random() - 0.5) * 0.02)
-      const change24h = (Math.random() - 0.5) * 10
-      const volume = Math.random() * 1000000
+    if (!isClient) return
 
-      return {
-        symbol,
-        price,
-        change24h,
-        volume,
-        lastUpdate: new Date().toISOString()
-      }
-    })
-
+    const newMarketData = generateMockMarketData()
     setMarketData(newMarketData)
   }
 
   const updateTradingActivity = () => {
-    // 随机生成新的交易活动
+    if (!isClient) return
+
+    // 30% 概率生成新活动
     if (Math.random() > 0.7) {
-      const types: ("order" | "fill" | "cancel")[] = ["order", "fill", "cancel"]
-      const symbols = ["BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT"]
-      const sides: ("BUY" | "SELL")[] = ["BUY", "SELL"]
-      const statuses: ("success" | "pending" | "failed")[] = ["success", "pending", "failed"]
-
-      const newActivity: TradingActivity = {
-        id: `activity_${Date.now()}`,
-        type: types[Math.floor(Math.random() * types.length)],
-        symbol: symbols[Math.floor(Math.random() * symbols.length)],
-        side: sides[Math.floor(Math.random() * sides.length)],
-        amount: Math.random() * 10,
-        price: Math.random() * 50000,
-        timestamp: new Date().toISOString(),
-        status: statuses[Math.floor(Math.random() * statuses.length)]
+      const newActivities = generateMockTradingActivity(1)
+      if (newActivities.length > 0) {
+        setTradingActivity(prev => [newActivities[0], ...prev.slice(0, 9)]) // 保持最新10条
       }
-
-      setTradingActivity(prev => [newActivity, ...prev.slice(0, 9)]) // 保持最新10条
     }
   }
 
@@ -206,12 +153,7 @@ export function RealTimeMonitor() {
   }
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 4
-    }).format(price)
+    return `$${price.toFixed(price > 100 ? 2 : 4)}`
   }
 
   const formatVolume = (volume: number) => {
@@ -242,7 +184,7 @@ export function RealTimeMonitor() {
           )}
           <div className="flex items-center text-xs text-muted-foreground">
             <Clock className="h-3 w-3 mr-1" />
-            {lastUpdate.toLocaleTimeString()}
+            {lastUpdate ? <SafeTimeDisplay date={lastUpdate} /> : <SafeTimeDisplay />}
           </div>
         </div>
       </div>
@@ -374,7 +316,7 @@ export function RealTimeMonitor() {
                       {activity.status}
                     </Badge>
                     <div className="text-xs text-muted-foreground mt-1">
-                      {new Date(activity.timestamp).toLocaleTimeString()}
+                      <SafeTimeDisplay date={new Date(activity.timestamp)} />
                     </div>
                   </div>
                 </div>

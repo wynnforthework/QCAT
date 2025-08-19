@@ -141,12 +141,17 @@ dev-down:
 # Run database migrations
 migrate-up:
 	@echo "Running database migrations..."
-	migrate -path ./internal/database/migrations -database "$(DATABASE_URL)" up
+	$(GORUN) cmd/migrate/main.go -up
 
 # Rollback database migrations
 migrate-down:
 	@echo "Rolling back database migrations..."
-	migrate -path ./internal/database/migrations -database "$(DATABASE_URL)" down
+	$(GORUN) cmd/migrate/main.go -down
+
+# Show migration version
+migrate-version:
+	@echo "Showing migration version..."
+	$(GORUN) cmd/migrate/main.go -version
 
 # Generate mocks
 generate-mocks:
@@ -207,6 +212,7 @@ help:
 	@echo "  dev-down        - Stop development environment"
 	@echo "  migrate-up      - Run database migrations"
 	@echo "  migrate-down    - Rollback database migrations"
+	@echo "  migrate-version - Show migration version"
 	@echo "  generate-mocks  - Generate mocks"
 	@echo "  config-validate - Validate configuration"
 	@echo "  config-generate - Generate environment template"

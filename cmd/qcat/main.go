@@ -24,7 +24,7 @@ func main() {
 
 	// Initialize orchestrator
 	orch := orchestrator.NewOrchestrator()
-	
+
 	// Start orchestrator
 	if err := orch.Start(); err != nil {
 		log.Fatalf("Failed to start orchestrator: %v", err)
@@ -35,7 +35,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create server: %v", err)
 	}
-	
+
 	// Add orchestrator handler to server
 	orchHandler := api.NewOrchestratorHandler(orch)
 	server.RegisterOrchestratorHandler(orchHandler)

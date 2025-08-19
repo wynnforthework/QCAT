@@ -10,11 +10,14 @@ import { RealTimeMonitor } from "@/components/dashboard/real-time-monitor"
 import { TrendingUp, TrendingDown, Activity, Shield, AlertTriangle, DollarSign } from "lucide-react"
 import Link from "next/link"
 import apiClient, { DashboardData } from "@/lib/api"
+import { useClientOnly } from "@/lib/use-client-only"
+import { SafeNumberDisplay } from "@/components/ui/client-only"
 
 export default function HomePage() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const isClient = useClientOnly()
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -66,7 +69,7 @@ export default function HomePage() {
     return () => clearInterval(interval)
   }, [])
 
-  if (loading) {
+  if (loading || !isClient) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -109,7 +112,9 @@ export default function HomePage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">${account.equity.toLocaleString()}</div>
+              <div className="text-2xl font-bold">
+                <SafeNumberDisplay value={account.equity} format="currency" />
+              </div>
               <div className="flex items-center space-x-2 text-sm">
                 {account.pnl >= 0 ? (
                   <TrendingUp className="h-4 w-4 text-green-500" />
@@ -117,7 +122,7 @@ export default function HomePage() {
                   <TrendingDown className="h-4 w-4 text-red-500" />
                 )}
                 <span className={account.pnl >= 0 ? "text-green-600" : "text-red-600"}>
-                  ${account.pnl.toLocaleString()} ({account.pnlPercent.toFixed(2)}%)
+                  <SafeNumberDisplay value={account.pnl} format="currency" /> (<SafeNumberDisplay value={account.pnlPercent} format="percentage" />)
                 </span>
               </div>
             </CardContent>
@@ -159,9 +164,9 @@ export default function HomePage() {
               <div className="mt-2">
                 <div className="flex justify-between text-sm text-gray-600">
                   <span>风险敞口</span>
-                  <span>{((risk.exposure / risk.limit) * 100).toFixed(1)}%</span>
+                  <span>{risk?.exposure && risk?.limit ? ((risk.exposure / risk.limit) * 100).toFixed(1) : '0.0'}%</span>
                 </div>
-                <Progress value={(risk.exposure / risk.limit) * 100} className="mt-1" />
+                <Progress value={risk?.exposure && risk?.limit ? (risk.exposure / risk.limit) * 100 : 0} className="mt-1" />
               </div>
             </CardContent>
           </Card>
@@ -173,9 +178,9 @@ export default function HomePage() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{performance.sharpe.toFixed(2)}</div>
+              <div className="text-2xl font-bold">{performance?.sharpe?.toFixed(2) || '0.00'}</div>
               <div className="text-sm text-gray-600">
-                胜率: {performance.winRate.toFixed(1)}%
+                胜率: {performance?.winRate?.toFixed(1) || '0.0'}%
               </div>
             </CardContent>
           </Card>
@@ -228,11 +233,13 @@ export default function HomePage() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <span>总权益:</span>
-                    <span className="font-semibold">${account.equity.toLocaleString()}</span>
+                    <span className="font-semibold">
+                      <SafeNumberDisplay value={account.equity} format="currency" />
+                    </span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span>最大回撤:</span>
-                    <span className="text-red-600">{account.maxDrawdown.toFixed(2)}%</span>
+                    <span className="text-red-600">{account?.maxDrawdown?.toFixed(2) || '0.00'}%</span>
                   </div>
                   <div className="mt-4">
                     <Link href="/portfolio">

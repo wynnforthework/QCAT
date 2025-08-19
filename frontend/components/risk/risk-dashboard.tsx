@@ -111,12 +111,7 @@ export function RiskDashboard() {
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount)
+    return `$${Math.round(amount).toFixed(0)}`
   }
 
   const formatPercent = (percent: number) => {

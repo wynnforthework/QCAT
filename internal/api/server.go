@@ -63,6 +63,7 @@ type Handlers struct {
 	Auth      *AuthHandler
 	Cache     *CacheHandler
 	Security  *SecurityHandler
+	Dashboard *DashboardHandler
 }
 
 // RateLimiter 速率限制器结构
@@ -365,6 +366,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		Auth:      NewAuthHandler(jwtManager, db),
 		Cache:     NewCacheHandler(cacheManagerRef),
 		Security:  NewSecurityHandler(keyManager, auditLogger),
+		Dashboard: NewDashboardHandler(db, metricsCollector),
 	}
 
 	// Store security components for middleware
@@ -427,10 +429,14 @@ func (s *Server) setupRoutes() {
 			auth.POST("/refresh", s.handlers.Auth.RefreshToken)
 		}
 
+		// Dashboard routes (public for now, can be moved to protected later)
+		v1.GET("/dashboard", s.handlers.Dashboard.GetDashboardData)
+
 		// Protected routes (authentication required)
 		protected := v1.Group("")
 		protected.Use(s.jwtManager.AuthMiddleware())
 		{
+
 			// Optimizer routes
 			optimizer := protected.Group("/optimizer")
 			{

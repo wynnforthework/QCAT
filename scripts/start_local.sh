@@ -1,281 +1,242 @@
-#!/bin/bash
-
-# QCAT 本地开发环境一键启动脚本
-
+#!/usr/bin/env bash
 set -e
 
-# 颜色定义
+# 颜色定义（Windows PowerShell 默认忽略颜色）
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
+log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
+
+# 检测操作系统
+detect_os() {
+    case "$(uname -s)" in
+        Linux*)     OS_TYPE="linux";;
+        Darwin*)    OS_TYPE="mac";;
+        CYGWIN*|MINGW*|MSYS*|Windows_NT) OS_TYPE="windows";;
+        *)          OS_TYPE="unknown";;
+    esac
+    log_info "检测到操作系统: $OS_TYPE"
 }
 
-log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
+# 读取配置文件中的端口信息
+read_port_config() {
+    # 默认端口
+    QCAT_API_PORT=8082
+    QCAT_OPTIMIZER_PORT=8081
+    FRONTEND_DEV_PORT=3000
 
-log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
+    # 尝试从config.yaml读取端口配置
+    if [ -f "configs/config.yaml" ]; then
+        # 使用yq或grep来解析YAML文件
+        if command -v yq &> /dev/null; then
+            QCAT_API_PORT=$(yq eval '.ports.qcat_api // 8082' configs/config.yaml 2>/dev/null || echo 8082)
+            QCAT_OPTIMIZER_PORT=$(yq eval '.ports.qcat_optimizer // 8081' configs/config.yaml 2>/dev/null || echo 8081)
+            FRONTEND_DEV_PORT=$(yq eval '.ports.frontend_dev // 3000' configs/config.yaml 2>/dev/null || echo 3000)
+        else
+            # 如果没有yq，使用grep和sed来解析
+            QCAT_API_PORT=$(grep -A 20 "^ports:" configs/config.yaml | grep "qcat_api:" | sed 's/.*qcat_api: *\([0-9]*\).*/\1/' | head -1)
+            QCAT_OPTIMIZER_PORT=$(grep -A 20 "^ports:" configs/config.yaml | grep "qcat_optimizer:" | sed 's/.*qcat_optimizer: *\([0-9]*\).*/\1/' | head -1)
+            FRONTEND_DEV_PORT=$(grep -A 20 "^ports:" configs/config.yaml | grep "frontend_dev:" | sed 's/.*frontend_dev: *\([0-9]*\).*/\1/' | head -1)
 
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+            # 如果解析失败，使用默认值
+            [ -z "$QCAT_API_PORT" ] && QCAT_API_PORT=8082
+            [ -z "$QCAT_OPTIMIZER_PORT" ] && QCAT_OPTIMIZER_PORT=8081
+            [ -z "$FRONTEND_DEV_PORT" ] && FRONTEND_DEV_PORT=3000
+        fi
+    fi
+
+    # 从环境变量覆盖（如果设置了）
+    [ ! -z "$QCAT_PORTS_QCAT_API" ] && QCAT_API_PORT=$QCAT_PORTS_QCAT_API
+    [ ! -z "$QCAT_PORTS_QCAT_OPTIMIZER" ] && QCAT_OPTIMIZER_PORT=$QCAT_PORTS_QCAT_OPTIMIZER
+    [ ! -z "$QCAT_PORTS_FRONTEND_DEV" ] && FRONTEND_DEV_PORT=$QCAT_PORTS_FRONTEND_DEV
+
+    log_info "端口配置: API=$QCAT_API_PORT, 优化器=$QCAT_OPTIMIZER_PORT, 前端=$FRONTEND_DEV_PORT"
 }
 
 # 检查依赖
 check_dependencies() {
     log_info "检查系统依赖..."
-    
     if ! command -v go &> /dev/null; then
         log_error "Go 未安装，请先安装 Go 1.23+"
         exit 1
     fi
-    
     if ! command -v node &> /dev/null; then
         log_error "Node.js 未安装，请先安装 Node.js 20+"
         exit 1
     fi
-    
     if ! command -v npm &> /dev/null; then
         log_error "npm 未安装"
         exit 1
     fi
-    
     log_success "依赖检查完成"
 }
 
 # 安装依赖
 install_dependencies() {
     log_info "安装项目依赖..."
-    
-    # 安装Go依赖
     go mod download
     go mod tidy
-    
-    # 安装前端依赖
-    cd frontend
-    npm install
-    cd ..
-    
+    cd frontend && npm install && cd ..
     log_success "依赖安装完成"
 }
 
 # 配置环境
 setup_config() {
     log_info "配置环境..."
-    
-    # 复制配置文件
     if [ ! -f "configs/config.yaml" ] && [ -f "configs/config.yaml.example" ]; then
         cp configs/config.yaml.example configs/config.yaml
         log_info "已复制配置文件"
     fi
-    
-    # 创建日志目录
     mkdir -p logs
-    
-    # 检查是否存在.env文件
     if [ ! -f ".env" ]; then
         if [ -f "deploy/env.example" ]; then
-            log_warning "未找到.env文件，请复制deploy/env.example为.env并配置环境变量"
-            log_info "或者使用以下默认环境变量："
-            echo "export QCAT_DATABASE_PASSWORD=123"
-            echo "export QCAT_REDIS_PASSWORD="
-            echo "export QCAT_JWT_SECRET_KEY=f31e8818003142e8ad518726cda4af31"
-            echo "export QCAT_EXCHANGE_API_KEY=your_api_key"
-            echo "export QCAT_EXCHANGE_API_SECRET=your_api_secret"
-            echo "export QCAT_ENCRYPTION_KEY=your_encryption_key"
+            log_warning "未找到.env文件，请复制 deploy/env.example 为 .env 并配置环境变量"
         fi
     else
-        log_info "找到.env文件，正在加载环境变量..."
+        log_info "加载 .env 环境变量..."
         export $(grep -v '^#' .env | xargs)
     fi
-    
     log_success "环境配置完成"
 }
 
 # 启动数据库服务
 start_database() {
     log_info "启动数据库服务..."
-    
+
     if command -v docker-compose &> /dev/null && [ -f "deploy/docker-compose.prod.yml" ]; then
-        # 检查Redis是否启用
         if [ "$QCAT_REDIS_ENABLED" = "true" ]; then
-            log_info "启动PostgreSQL和Redis..."
+            log_info "使用 Docker 启动 PostgreSQL 和 Redis..."
             docker-compose -f deploy/docker-compose.prod.yml up -d postgres redis
         else
-            log_info "Redis已禁用，仅启动PostgreSQL..."
+            log_info "使用 Docker 启动 PostgreSQL..."
             docker-compose -f deploy/docker-compose.prod.yml up -d postgres
         fi
         sleep 10
-        log_success "数据库服务启动完成"
+        log_success "数据库服务启动完成 (Docker)"
     else
-        log_warning "Docker Compose不可用，请手动启动PostgreSQL"
+        log_warning "未检测到 Docker Compose，将尝试手动启动数据库服务"
+        log_info "⚠️ 请确保 PostgreSQL 已经在本地运行 (端口: $QCAT_DATABASE_PORT)"
         if [ "$QCAT_REDIS_ENABLED" = "true" ]; then
-            log_warning "Redis已启用，请确保Redis服务正在运行"
+            log_info "⚠️ 请确保 Redis 已经在本地运行 (端口: $QCAT_REDIS_PORT)"
         else
-            log_info "Redis已禁用，无需启动Redis服务"
+            log_info "Redis 已禁用，无需启动"
         fi
-        # read -p "数据库服务已启动? (y/N): " -n 1 -r
-        # echo
-        # if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        #     log_error "请先启动数据库服务"
-        #     exit 1
-        # fi
-        log_info "数据库服务已启动"
     fi
 }
+
 
 # 初始化数据库
 init_database() {
     log_info "初始化数据库..."
-    go run cmd/qcat/main.go -migrate
+    go run cmd/migrate/main.go -up
     log_success "数据库初始化完成"
+}
+
+# 编译 Go 项目
+build_binaries() {
+    log_info "编译 Go 项目..."
+    if [ "$OS_TYPE" = "windows" ]; then
+        go build -o qcat.exe ./cmd/qcat/main.go
+        go build -o optimizer.exe ./cmd/optimizer/main.go
+    else
+        go build -o qcat ./cmd/qcat/main.go
+        go build -o optimizer ./cmd/optimizer/main.go
+    fi
+    log_success "Go 项目编译完成"
 }
 
 # 启动服务
 start_services() {
     log_info "启动服务..."
-    
-    # 启动后端
-    log_info "启动后端服务 (端口: 8082)..."
-    go run cmd/qcat/main.go &
-    BACKEND_PID=$!
-    
-    # 启动优化器
-    log_info "启动优化器服务 (端口: 8081)..."
-    go run cmd/optimizer/main.go &
-    OPTIMIZER_PID=$!
-    
-    # 启动前端
-    log_info "启动前端服务 (端口: 3000)..."
+
+    # 启动后端服务
+    if [ "$OS_TYPE" = "windows" ]; then
+        ./qcat.exe &
+        BACKEND_PID=$!
+        ./optimizer.exe --port=$QCAT_OPTIMIZER_PORT &
+        OPTIMIZER_PID=$!
+    else
+        ./qcat &
+        BACKEND_PID=$!
+        ./optimizer --port=$QCAT_OPTIMIZER_PORT &
+        OPTIMIZER_PID=$!
+    fi
+
+    # 为前端设置环境变量并启动
+    log_info "设置前端环境变量: NEXT_PUBLIC_API_URL=http://localhost:$QCAT_API_PORT"
     cd frontend
-    npm run dev &
-    FRONTEND_PID=$!
+
+    # 创建或更新 .env.local 文件
+    echo "NEXT_PUBLIC_API_URL=http://localhost:$QCAT_API_PORT" > .env.local
+    echo "NEXT_PUBLIC_APP_NAME=QCAT" >> .env.local
+    echo "NEXT_PUBLIC_APP_VERSION=2.0.0" >> .env.local
+
+    # 启动前端开发服务器
+    npm run dev & FRONTEND_PID=$!
     cd ..
-    
-    sleep 10
+
+    sleep 8
     log_success "所有服务启动完成"
 }
 
 # 显示状态
 show_status() {
-    echo
     echo "=========================================="
     echo "           QCAT 服务状态"
     echo "=========================================="
-    
-    if curl -f http://localhost:8082/health >/dev/null 2>&1; then
-        echo -e "✅ 后端API服务 (端口: 8082) - ${GREEN}运行中${NC}"
+    if curl -f http://localhost:$QCAT_API_PORT/health >/dev/null 2>&1; then
+        echo -e "✅ 后端API服务 ($QCAT_API_PORT) - 运行中"
     else
-        echo -e "❌ 后端API服务 (端口: 8082) - ${RED}未运行${NC}"
+        echo -e "❌ 后端API服务 ($QCAT_API_PORT) - 未运行"
     fi
-    
-    if curl -f http://localhost:8081/health >/dev/null 2>&1; then
-        echo -e "✅ 优化器服务 (端口: 8081) - ${GREEN}运行中${NC}"
+    if curl -f http://localhost:$QCAT_OPTIMIZER_PORT/health >/dev/null 2>&1; then
+        echo -e "✅ 优化器服务 ($QCAT_OPTIMIZER_PORT) - 运行中"
     else
-        echo -e "⚠️  优化器服务 (端口: 8081) - ${YELLOW}状态未知${NC}"
+        echo -e "⚠️  优化器服务 ($QCAT_OPTIMIZER_PORT) - 状态未知"
     fi
-    
-    if curl -f http://localhost:3000 >/dev/null 2>&1; then
-        echo -e "✅ 前端服务 (端口: 3000) - ${GREEN}运行中${NC}"
+    if curl -f http://localhost:$FRONTEND_DEV_PORT >/dev/null 2>&1; then
+        echo -e "✅ 前端服务 ($FRONTEND_DEV_PORT) - 运行中"
     else
-        echo -e "⚠️  前端服务 (端口: 3000) - ${YELLOW}状态未知${NC}"
+        echo -e "⚠️  前端服务 ($FRONTEND_DEV_PORT) - 状态未知"
     fi
-    
     echo "=========================================="
-    echo
-    echo "🌐 访问地址:"
-    echo "   前端界面: http://localhost:3000"
-    echo "   后端API:  http://localhost:8082"
-    echo "   优化器:   http://localhost:8081"
-    echo
-    echo "📊 配置信息:"
-    echo "   环境: $QCAT_APP_ENVIRONMENT"
-    echo "   数据库: $QCAT_DATABASE_HOST:$QCAT_DATABASE_PORT/$QCAT_DATABASE_NAME"
-    echo "   Redis: $([ "$QCAT_REDIS_ENABLED" = "true" ] && echo "启用" || echo "禁用")"
-    echo "   交易所: $QCAT_EXCHANGE_NAME ($([ "$QCAT_EXCHANGE_TEST_NET" = "true" ] && echo "测试网" || echo "主网"))"
-    echo
-    echo "🛑 停止服务: 按 Ctrl+C"
-    echo
+    echo "🌐 前端:   http://localhost:$FRONTEND_DEV_PORT"
+    echo "   后端API: http://localhost:$QCAT_API_PORT"
+    echo "   优化器:  http://localhost:$QCAT_OPTIMIZER_PORT"
+    echo "🛑 停止服务: Ctrl+C"
 }
 
 # 清理函数
 cleanup() {
     log_info "正在停止服务..."
-    
-    if [ ! -z "$FRONTEND_PID" ]; then
-        kill $FRONTEND_PID 2>/dev/null || true
-    fi
-    
-    if [ ! -z "$OPTIMIZER_PID" ]; then
-        kill $OPTIMIZER_PID 2>/dev/null || true
-    fi
-    
-    if [ ! -z "$BACKEND_PID" ]; then
-        kill $BACKEND_PID 2>/dev/null || true
-    fi
-    
+    kill $FRONTEND_PID 2>/dev/null || true
+    kill $OPTIMIZER_PID 2>/dev/null || true
+    kill $BACKEND_PID 2>/dev/null || true
     log_success "服务已停止"
     exit 0
 }
 
-# 主函数
 main() {
-    echo "=========================================="
-    echo "    QCAT 本地开发环境一键启动脚本"
-    echo "=========================================="
-    
-    # 设置信号处理
     trap cleanup SIGINT SIGTERM
-    
-    # 检查依赖
+    detect_os
+    read_port_config
     check_dependencies
-    
-    # 安装依赖
     install_dependencies
-    
-    # 配置环境
     setup_config
-    
-    # 启动数据库
     start_database
-    
-    # 初始化数据库
     init_database
-    
-    # 启动服务
+    build_binaries
     start_services
-    
-    # 显示状态
     show_status
-    
-    # 等待用户中断
     log_info "所有服务已启动，按 Ctrl+C 停止服务"
     wait
 }
 
-# 显示帮助
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    echo "用法: $0"
-    echo "启动QCAT本地开发环境"
-    echo ""
-    echo "环境变量配置:"
-    echo "  复制 deploy/env.example 为 .env 并修改配置"
-    echo "  或设置以下环境变量:"
-    echo "    QCAT_DATABASE_PASSWORD - 数据库密码"
-    echo "    QCAT_REDIS_ENABLED - 是否启用Redis (true/false)"
-    echo "    QCAT_REDIS_PASSWORD - Redis密码"
-    echo "    QCAT_JWT_SECRET_KEY - JWT密钥"
-    echo "    QCAT_EXCHANGE_API_KEY - 交易所API密钥"
-    echo "    QCAT_EXCHANGE_API_SECRET - 交易所API密钥"
-    echo "    QCAT_ENCRYPTION_KEY - 加密密钥"
-    exit 0
-fi
-
-# 执行主函数
 main
+

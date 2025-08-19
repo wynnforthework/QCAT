@@ -60,12 +60,13 @@ CREATE TABLE IF NOT EXISTS funding_rates (
     rate DECIMAL(10,8) NOT NULL,
     next_rate DECIMAL(10,8) DEFAULT 0,
     next_time TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    
-    INDEX idx_funding_rates_symbol (symbol),
-    INDEX idx_funding_rates_created_at (created_at),
-    INDEX idx_funding_rates_symbol_created_at (symbol, created_at)
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
+
+-- Create indexes for funding_rates
+CREATE INDEX IF NOT EXISTS idx_funding_rates_symbol ON funding_rates(symbol);
+CREATE INDEX IF NOT EXISTS idx_funding_rates_created_at ON funding_rates(created_at);
+CREATE INDEX IF NOT EXISTS idx_funding_rates_symbol_created_at ON funding_rates(symbol, created_at);
 
 -- Open interest table (for futures)
 CREATE TABLE IF NOT EXISTS open_interest (

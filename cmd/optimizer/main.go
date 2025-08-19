@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"qcat/internal/config"
 	"qcat/internal/learning/automl"
 	"qcat/internal/orchestrator"
 	"qcat/internal/strategy/optimizer"
@@ -781,13 +782,23 @@ func (s *OptimizerService) shareResultHandler(w http.ResponseWriter, r *http.Req
 
 // loadConfig loads configuration from file or uses defaults
 func loadConfig(configFile string, port int, logLevel string) (*Config, error) {
-	config := &Config{
+	cfg := &Config{
 		Port:         port,
 		MessageQueue: "memory",
 		LogLevel:     logLevel,
 	}
 
-	// Try to load from file
+	// Try to load main config file first to get port configuration
+	mainConfigPath := "configs/config.yaml"
+	if _, err := os.Stat(mainConfigPath); err == nil {
+		mainConfig, err := config.Load(mainConfigPath)
+		if err == nil && mainConfig.Ports.QcatOptimizer != 0 {
+			cfg.Port = mainConfig.Ports.QcatOptimizer
+			log.Printf("Using optimizer port from main config: %d", cfg.Port)
+		}
+	}
+
+	// Try to load optimizer-specific config file
 	if _, err := os.Stat(configFile); err == nil {
 		file, err := os.Open(configFile)
 		if err != nil {
@@ -795,18 +806,23 @@ func loadConfig(configFile string, port int, logLevel string) (*Config, error) {
 		}
 		defer file.Close()
 
-		if err := json.NewDecoder(file).Decode(config); err != nil {
+		if err := json.NewDecoder(file).Decode(cfg); err != nil {
 			return nil, fmt.Errorf("failed to decode config file: %w", err)
 		}
 	}
 
+	// Override with command line port if specified
+	if port != 8081 { // 8081 is the default
+		cfg.Port = port
+	}
+
 	// Load result sharing config if not present
-	if config.ResultSharing == nil {
-		config.ResultSharing = &automl.ResultSharingConfig{
+	if cfg.ResultSharing == nil {
+		cfg.ResultSharing = &automl.ResultSharingConfig{
 			Enabled: true,
 			Mode:    "hybrid",
 		}
 	}
 
-	return config, nil
+	return cfg, nil
 }
