@@ -41,8 +41,11 @@ func (db *DB) CreateUser(ctx context.Context, username, email, password, role st
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
+	// Generate a new UUID for the user
+	userID := uuid.New()
+
 	user := &User{
-		ID:           uuid.UUID{},
+		ID:           userID,
 		Username:     username,
 		Email:        email,
 		PasswordHash: string(hashedPassword),
