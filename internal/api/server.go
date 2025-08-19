@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -181,6 +183,46 @@ func getClientID(c *gin.Context) string {
 
 	// 否则使用IP地址
 	return fmt.Sprintf("ip:%s", c.ClientIP())
+}
+
+// isIPInWhitelist 检查IP是否在白名单中
+func isIPInWhitelist(clientIP string, whitelist []string) bool {
+	if len(whitelist) == 0 {
+		return false
+	}
+
+	for _, whitelistIP := range whitelist {
+		if clientIP == whitelistIP {
+			return true
+		}
+		// 支持CIDR格式的IP段匹配（如 192.168.1.0/24）
+		if strings.Contains(whitelistIP, "/") {
+			if isIPInCIDR(clientIP, whitelistIP) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// isIPInCIDR 检查IP是否在CIDR网段中
+func isIPInCIDR(clientIP, cidr string) bool {
+	// 解析CIDR网段
+	_, ipNet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		log.Printf("Warning: Invalid CIDR format %s: %v", cidr, err)
+		return false
+	}
+
+	// 解析客户端IP
+	ip := net.ParseIP(clientIP)
+	if ip == nil {
+		log.Printf("Warning: Invalid IP format %s", clientIP)
+		return false
+	}
+
+	// 检查IP是否在网段中
+	return ipNet.Contains(ip)
 }
 
 // NewServer creates a new API server
@@ -716,6 +758,13 @@ func rateLimitMiddleware(rateLimitConfig config.RateLimitConfig) gin.HandlerFunc
 	rateLimiter := NewRateLimiter(rateLimitConfig.RequestsPerMinute, rateLimitConfig.Burst)
 
 	return func(c *gin.Context) {
+		// 检查IP白名单
+		if rateLimitConfig.WhitelistEnabled && isIPInWhitelist(c.ClientIP(), rateLimitConfig.WhitelistIPs) {
+			// 白名单IP跳过限流检查
+			c.Next()
+			return
+		}
+
 		// 获取客户端标识符
 		clientID := getClientID(c)
 

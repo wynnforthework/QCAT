@@ -162,9 +162,11 @@ type CORSConfig struct {
 
 // RateLimitConfig 限流配置
 type RateLimitConfig struct {
-	Enabled           bool `yaml:"enabled"`
-	RequestsPerMinute int  `yaml:"requests_per_minute"`
-	Burst             int  `yaml:"burst"`
+	Enabled           bool     `yaml:"enabled"`
+	RequestsPerMinute int      `yaml:"requests_per_minute"`
+	Burst             int      `yaml:"burst"`
+	WhitelistIPs      []string `yaml:"whitelist_ips"`     // IP白名单，这些IP不受限流限制
+	WhitelistEnabled  bool     `yaml:"whitelist_enabled"` // 是否启用白名单功能
 }
 
 // SecurityConfig 安全配置
