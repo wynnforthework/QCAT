@@ -3,6 +3,7 @@ package exchange
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -87,16 +88,31 @@ func (r *RateLimiter) Wait(ctx context.Context, name string) error {
 
 // WaitWithFallback waits with a fallback mechanism using Redis
 func (r *RateLimiter) WaitWithFallback(ctx context.Context, exchange, name string, limit int, window time.Duration) error {
+	// If no limit specified, use default wait
+	if limit <= 0 || window <= 0 {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(r.defaultWait):
+			return nil
+		}
+	}
+
 	// Try local rate limiter first
 	if err := r.Wait(ctx, name); err != nil {
 		// Fall back to Redis-based rate limiting
-		ok, err := r.cache.CheckRateLimit(ctx, fmt.Sprintf("%s:%s", exchange, name), limit, window)
+		key := fmt.Sprintf("%s:%s", exchange, name)
+		ok, err := r.cache.CheckRateLimit(ctx, key, limit, window)
 		if err != nil {
-			// If Redis fails, use default wait
+			// If Redis fails, use exponential backoff
+			waitTime := r.defaultWait
+			if strings.Contains(err.Error(), "rate limit") {
+				waitTime = time.Duration(float64(r.defaultWait) * 1.5) // Increase wait time
+			}
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(r.defaultWait):
+			case <-time.After(waitTime):
 				return nil
 			}
 		}

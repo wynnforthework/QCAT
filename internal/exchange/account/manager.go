@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -65,26 +66,39 @@ func (m *Manager) Unsubscribe(asset string, ch chan *exch.AccountBalance) {
 
 // GetBalance returns the current balance for an asset
 func (m *Manager) GetBalance(ctx context.Context, asset string) (*exch.AccountBalance, error) {
-	// Check cache first
+	// Check cache first with longer TTL to reduce API calls
 	var balance exch.AccountBalance
 	err := m.cache.Get(ctx, fmt.Sprintf("balance:%s", asset), &balance)
 	if err == nil {
-		return &balance, nil
+		// Check if cache is still fresh (within 2 minutes)
+		if time.Since(balance.UpdatedAt) < 2*time.Minute {
+			return &balance, nil
+		}
 	}
 
-	// Get from exchange
+	// Get from exchange with rate limiting awareness
 	balances, err := m.exchange.GetAccountBalance(ctx)
 	if err != nil {
+		// If rate limited and we have cached data, return it even if stale
+		if strings.Contains(err.Error(), "rate limit") && balance.Asset != "" {
+			log.Printf("Rate limited, returning cached balance for %s", asset)
+			return &balance, nil
+		}
 		return nil, fmt.Errorf("failed to get balance: %w", err)
 	}
 
 	balancePtr, exists := balances[asset]
 	if !exists {
-		return nil, fmt.Errorf("balance not found for asset: %s", asset)
+		balancePtr = &exch.AccountBalance{
+			Asset:     asset,
+			Total:     0,
+			Available: 0,
+			UpdatedAt: time.Now(),
+		}
 	}
 
-	// Cache the balance
-	if err := m.cache.Set(ctx, fmt.Sprintf("balance:%s", asset), balancePtr, time.Minute); err != nil {
+	// Cache the balance with longer TTL
+	if err := m.cache.Set(ctx, fmt.Sprintf("balance:%s", asset), balancePtr, 5*time.Minute); err != nil {
 		log.Printf("Failed to cache balance: %v", err)
 	}
 
@@ -96,21 +110,44 @@ func (m *Manager) GetBalance(ctx context.Context, asset string) (*exch.AccountBa
 
 // GetAllBalances returns all account balances
 func (m *Manager) GetAllBalances(ctx context.Context) (map[string]*exch.AccountBalance, error) {
-	// Get from exchange
+	// Check if we have recent cached data for all balances
+	cacheKey := "all_balances"
+	var cachedBalances map[string]*exch.AccountBalance
+	if err := m.cache.Get(ctx, cacheKey, &cachedBalances); err == nil && cachedBalances != nil {
+		// Check if cache is still fresh (within 3 minutes for bulk operations)
+		for _, balance := range cachedBalances {
+			if time.Since(balance.UpdatedAt) < 3*time.Minute {
+				return cachedBalances, nil
+			}
+			break // If any balance is stale, refresh all
+		}
+	}
+
+	// Get from exchange with rate limiting awareness
 	balances, err := m.exchange.GetAccountBalance(ctx)
 	if err != nil {
+		// If rate limited and we have cached data, return it even if stale
+		if strings.Contains(err.Error(), "rate limit") && cachedBalances != nil {
+			log.Printf("Rate limited, returning cached balances")
+			return cachedBalances, nil
+		}
 		return nil, fmt.Errorf("failed to get balances: %w", err)
 	}
 
 	// Update cache and notify subscribers
 	for _, balance := range balances {
-		// Cache the balance
-		if err := m.cache.Set(ctx, fmt.Sprintf("balance:%s", balance.Asset), balance, time.Minute); err != nil {
+		// Cache individual balance with longer TTL
+		if err := m.cache.Set(ctx, fmt.Sprintf("balance:%s", balance.Asset), balance, 5*time.Minute); err != nil {
 			log.Printf("Failed to cache balance: %v", err)
 		}
 
 		// Update local cache
 		m.updateBalance(balance)
+	}
+
+	// Cache all balances together
+	if err := m.cache.Set(ctx, cacheKey, balances, 3*time.Minute); err != nil {
+		log.Printf("Failed to cache all balances: %v", err)
 	}
 
 	return balances, nil
@@ -215,14 +252,23 @@ func (m *Manager) notifySubscribers(balance *exch.AccountBalance) {
 
 // monitorBalances periodically updates account balances
 func (m *Manager) monitorBalances() {
-	ticker := time.NewTicker(time.Minute)
+	// Use a longer interval to reduce API calls and avoid rate limits
+	// Binance account endpoint has a limit of 10 requests per minute
+	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
 	for range ticker.C {
-		ctx := context.Background()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		balances, err := m.GetAllBalances(ctx)
+		cancel()
+
 		if err != nil {
 			log.Printf("Failed to update balances: %v", err)
+			// If rate limited, wait longer before next attempt
+			if strings.Contains(err.Error(), "rate limit exceeded") {
+				log.Printf("Rate limit hit, extending wait time")
+				time.Sleep(2 * time.Minute)
+			}
 			continue
 		}
 

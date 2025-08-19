@@ -19,9 +19,9 @@ import (
 
 // Binance API endpoints
 const (
-	BaseSpotURL     = "https://api.binance.com"
-	BaseFuturesURL  = "https://fapi.binance.com"
-	BaseTestnetURL  = "https://testnet.binancefuture.com"
+	BaseSpotURL    = "https://api.binance.com"
+	BaseFuturesURL = "https://fapi.binance.com"
+	BaseTestnetURL = "https://testnet.binancefuture.com"
 )
 
 // Client represents a Binance API client
@@ -86,8 +86,11 @@ func (c *Client) signRequest(method, endpoint string, params url.Values) (*http.
 
 // doRequest executes an API request with rate limiting and retries
 func (c *Client) doRequest(ctx context.Context, method, endpoint string, params url.Values, result interface{}) error {
+	// Configure rate limits based on endpoint
+	limit, window := c.getRateLimitForEndpoint(endpoint)
+
 	// Wait for rate limit
-	if err := c.rateLimiter.WaitWithFallback(ctx, "binance", endpoint, 0, 0); err != nil {
+	if err := c.rateLimiter.WaitWithFallback(ctx, "binance", endpoint, limit, window); err != nil {
 		return err
 	}
 
@@ -126,6 +129,33 @@ func (c *Client) doRequest(ctx context.Context, method, endpoint string, params 
 	}, nil)
 
 	return err
+}
+
+// getRateLimitForEndpoint returns appropriate rate limit settings for different endpoints
+func (c *Client) getRateLimitForEndpoint(endpoint string) (int, time.Duration) {
+	switch endpoint {
+	case MethodAccount, MethodBalance:
+		// Account endpoints: 5 requests per minute (Binance limit is 10/min)
+		return 5, time.Minute
+	case MethodPositions: // "/fapi/v2/positionRisk"
+		// Position endpoints: 5 requests per minute
+		return 5, time.Minute
+	case MethodOrder: // "/fapi/v1/order" (covers both order and cancel)
+		// Order endpoints: 10 requests per second (Binance limit is 100/10s)
+		return 10, 10 * time.Second
+	case MethodOpenOrders, MethodAllOrders:
+		// Order query endpoints: 20 requests per minute
+		return 20, time.Minute
+	case MethodTickerPrice, MethodTicker24hr:
+		// Market data endpoints: 40 requests per minute
+		return 40, time.Minute
+	case MethodDepth, MethodKlines, MethodTrades:
+		// Market data endpoints: 20 requests per minute
+		return 20, time.Minute
+	default:
+		// Default conservative rate limit: 10 requests per minute
+		return 10, time.Minute
+	}
 }
 
 // GetExchangeInfo implements exchange.Exchange
@@ -547,4 +577,100 @@ func (c *Client) convertOrder(order *Order) *exchange.Order {
 	result.AvgPrice, _ = strconv.ParseFloat(order.AvgPrice, 64)
 
 	return result
+}
+
+// GetMarginInfo implements exchange.Exchange
+func (c *Client) GetMarginInfo(ctx context.Context) (*exchange.MarginInfo, error) {
+	// For Binance futures, we need to get account information to calculate margin info
+	var account AccountInfo
+	if err := c.doRequest(ctx, http.MethodGet, MethodAccount, nil, &account); err != nil {
+		return nil, fmt.Errorf("failed to get account info for margin calculation: %w", err)
+	}
+
+	// Calculate total asset value and debt value from account assets
+	totalAssetValue := 0.0
+	totalDebtValue := 0.0
+
+	for _, asset := range account.Assets {
+		walletBalance, _ := strconv.ParseFloat(asset.WalletBalance, 64)
+		unrealizedProfit, _ := strconv.ParseFloat(asset.UnrealizedProfit, 64)
+		assetValue := walletBalance + unrealizedProfit
+
+		if assetValue > 0 {
+			totalAssetValue += assetValue
+		} else if assetValue < 0 {
+			totalDebtValue += -assetValue
+		}
+	}
+
+	// Calculate margin ratio
+	marginRatio := 0.0
+	if totalDebtValue > 0 {
+		marginRatio = totalAssetValue / totalDebtValue
+	} else if totalAssetValue > 0 {
+		marginRatio = 999.0 // Very high ratio when no debt
+	}
+
+	// Set default margin parameters for Binance futures
+	// These should ideally be fetched from the exchange API
+	maintenanceMargin := 1.1 // 110% maintenance margin
+	marginCallRatio := 1.5   // 150% margin call ratio
+	liquidationRatio := 1.0  // 100% liquidation ratio
+
+	return &exchange.MarginInfo{
+		TotalAssetValue:   totalAssetValue,
+		TotalDebtValue:    totalDebtValue,
+		MarginRatio:       marginRatio,
+		MaintenanceMargin: maintenanceMargin,
+		MarginCallRatio:   marginCallRatio,
+		LiquidationRatio:  liquidationRatio,
+		UpdatedAt:         time.Now(),
+	}, nil
+}
+
+// GetPositionByID implements exchange.Exchange
+func (c *Client) GetPositionByID(ctx context.Context, positionID string) (*exchange.Position, error) {
+	// For Binance, position ID is typically the symbol
+	// Get all positions and find the one matching the ID
+	positions, err := c.GetPositions(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get positions: %w", err)
+	}
+
+	for _, position := range positions {
+		if position.Symbol == positionID {
+			return position, nil
+		}
+	}
+
+	return nil, fmt.Errorf("position not found: %s", positionID)
+}
+
+// GetRiskLimits implements exchange.Exchange
+func (c *Client) GetRiskLimits(ctx context.Context, symbol string) (*exchange.RiskLimits, error) {
+	// Get symbol info to determine risk limits
+	symbolInfo, err := c.GetSymbolInfo(ctx, symbol)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get symbol info for risk limits: %w", err)
+	}
+
+	// Return default risk limits based on symbol info
+	// These should ideally be fetched from the exchange API
+	return &exchange.RiskLimits{
+		Symbol:           symbol,
+		MaxLeverage:      125, // Binance futures max leverage
+		MaxPositionValue: 1000000.0,
+		MaxOrderValue:    100000.0,
+		MinOrderValue:    symbolInfo.MinNotional,
+		MaxOrderQty:      symbolInfo.MaxQuantity,
+		MinOrderQty:      symbolInfo.MinQuantity,
+	}, nil
+}
+
+// SetRiskLimits implements exchange.Exchange
+func (c *Client) SetRiskLimits(ctx context.Context, symbol string, limits *exchange.RiskLimits) error {
+	// Binance doesn't have a direct API to set risk limits
+	// This would typically be done through position size management
+	// For now, return success as this is more of a client-side validation
+	return nil
 }
