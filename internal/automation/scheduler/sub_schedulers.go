@@ -155,37 +155,22 @@ func (ps *PositionScheduler) HandleMultiStrategyHedging(ctx context.Context, tas
 
 // DataScheduler 数据调度器
 type DataScheduler struct {
-	config               *config.Config
-	db                   *database.DB
-	isRunning            bool
-	mu                   sync.RWMutex
-	recommendationEngine *hotlist.RecommendationEngine
+	config            *config.Config
+	db                *database.DB
+	isRunning         bool
+	mu                sync.RWMutex
+	integratedService *hotlist.IntegratedService
 }
 
 // NewDataScheduler 创建数据调度器
 func NewDataScheduler(cfg *config.Config, db *database.DB) *DataScheduler {
-	// 创建推荐引擎的依赖组件
-	scorer := hotlist.NewScorer(nil, nil, nil, &hotlist.ScorerConfig{
-		VolJumpWindow:    24,
-		VolJumpThreshold: 0.02,
-		TurnoverWindow:   24,
-		OIChangeWindow:   24,
-		FundingZWindow:   168,
-		RegimeWindow:     48,
-	})
-
-	detector := hotlist.NewDetector(scorer, &hotlist.DetectorConfig{
-		MinScore:        50.0,
-		TopN:            20,
-		ApprovalTimeout: time.Hour * 4,
-	})
-
-	recommendationEngine := hotlist.NewRecommendationEngine(cfg, db, scorer, detector)
+	// 创建集成服务
+	integratedService := hotlist.NewIntegratedService(cfg, db)
 
 	return &DataScheduler{
-		config:               cfg,
-		db:                   db,
-		recommendationEngine: recommendationEngine,
+		config:            cfg,
+		db:                db,
+		integratedService: integratedService,
 	}
 }
 
@@ -221,42 +206,26 @@ func (ds *DataScheduler) HandleCleaning(ctx context.Context, task *ScheduledTask
 func (ds *DataScheduler) HandleHotCoinRecommendation(ctx context.Context, task *ScheduledTask) error {
 	log.Printf("Executing hot coin recommendation task: %s", task.Name)
 
-	// 1. 获取所有可用的交易对
-	symbols, err := ds.getAvailableSymbols(ctx)
-	if err != nil {
-		log.Printf("Failed to get available symbols: %v", err)
-		return fmt.Errorf("failed to get available symbols: %w", err)
+	// 启动集成服务（如果尚未启动）
+	if !ds.isServiceRunning() {
+		err := ds.integratedService.Start(ctx)
+		if err != nil {
+			log.Printf("Failed to start integrated service: %v", err)
+			return fmt.Errorf("failed to start integrated service: %w", err)
+		}
 	}
 
-	// 2. 收集市场数据
-	marketData, err := ds.collectMarketData(ctx, symbols)
+	// 强制更新推荐
+	err := ds.integratedService.ForceUpdate(ctx)
 	if err != nil {
-		log.Printf("Failed to collect market data: %v", err)
-		return fmt.Errorf("failed to collect market data: %w", err)
+		log.Printf("Failed to force update recommendations: %v", err)
+		return fmt.Errorf("failed to force update recommendations: %w", err)
 	}
 
-	// 3. 分析热度指标
-	hotScores, err := ds.analyzeHotness(ctx, marketData)
-	if err != nil {
-		log.Printf("Failed to analyze hotness: %v", err)
-		return fmt.Errorf("failed to analyze hotness: %w", err)
-	}
+	// 获取推荐结果
+	recommendations := ds.integratedService.GetRecommendations()
 
-	// 4. 生成推荐列表
-	recommendations, err := ds.generateRecommendations(ctx, hotScores)
-	if err != nil {
-		log.Printf("Failed to generate recommendations: %v", err)
-		return fmt.Errorf("failed to generate recommendations: %w", err)
-	}
-
-	// 5. 更新热门币种数据库
-	err = ds.updateHotlistDatabase(ctx, recommendations)
-	if err != nil {
-		log.Printf("Failed to update hotlist database: %v", err)
-		return fmt.Errorf("failed to update hotlist database: %w", err)
-	}
-
-	// 6. 发送推荐通知
+	// 发送推荐通知
 	err = ds.sendRecommendationNotifications(ctx, recommendations)
 	if err != nil {
 		log.Printf("Failed to send recommendation notifications: %v", err)
@@ -265,6 +234,15 @@ func (ds *DataScheduler) HandleHotCoinRecommendation(ctx context.Context, task *
 
 	log.Printf("Hot coin recommendation completed successfully. Generated %d recommendations", len(recommendations))
 	return nil
+}
+
+// isServiceRunning 检查集成服务是否运行
+func (ds *DataScheduler) isServiceRunning() bool {
+	status := ds.integratedService.GetStatus()
+	if running, ok := status["is_running"].(bool); ok {
+		return running
+	}
+	return false
 }
 
 // HandleFactorLibraryUpdate 处理因子库动态更新任务
@@ -682,10 +660,15 @@ func (ds *DataScheduler) generateRecommendations(ctx context.Context, hotScores 
 		symbols[i] = score.Symbol
 	}
 
-	// 使用推荐引擎生成增强推荐
-	enhancedRecs, err := ds.recommendationEngine.GenerateRecommendations(ctx, symbols)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate enhanced recommendations: %w", err)
+	// 使用集成服务生成推荐
+	enhancedRecs := ds.integratedService.GetRecommendations()
+	if len(enhancedRecs) == 0 {
+		// 如果没有缓存的推荐，强制更新
+		err := ds.integratedService.ForceUpdate(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to force update recommendations: %w", err)
+		}
+		enhancedRecs = ds.integratedService.GetRecommendations()
 	}
 
 	// 转换为旧格式以保持兼容性
@@ -825,10 +808,10 @@ func (ds *DataScheduler) updateHotlistDatabase(ctx context.Context, recommendati
 	return nil
 }
 
-// sendRecommendationNotifications 发送推荐通知
-func (ds *DataScheduler) sendRecommendationNotifications(ctx context.Context, recommendations []*Recommendation) error {
+// sendRecommendationNotifications 发送推荐通知 (支持增强推荐)
+func (ds *DataScheduler) sendRecommendationNotifications(ctx context.Context, recommendations []*hotlist.EnhancedRecommendation) error {
 	// 只通知高分推荐 (分数 >= 75)
-	highScoreRecs := []*Recommendation{}
+	highScoreRecs := []*hotlist.EnhancedRecommendation{}
 	for _, rec := range recommendations {
 		if rec.Score >= 75 {
 			highScoreRecs = append(highScoreRecs, rec)
@@ -846,8 +829,8 @@ func (ds *DataScheduler) sendRecommendationNotifications(ctx context.Context, re
 		if i >= 5 { // 最多显示5个
 			break
 		}
-		message += fmt.Sprintf("• %s (评分: %.1f, 风险: %s)\n",
-			rec.Symbol, rec.Score, rec.RiskLevel)
+		message += fmt.Sprintf("• %s (评分: %.1f, 风险: %s, 置信度: %.1f%%)\n",
+			rec.Symbol, rec.Score, rec.RiskLevel, rec.Confidence*100)
 	}
 
 	// 这里可以集成实际的通知系统 (如Webhook、邮件、Slack等)
