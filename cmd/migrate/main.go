@@ -15,6 +15,8 @@ func main() {
 		up         = flag.Bool("up", false, "运行数据库迁移")
 		down       = flag.Bool("down", false, "回滚数据库迁移")
 		version    = flag.Bool("version", false, "显示当前迁移版本")
+		force      = flag.Int("force", -1, "强制设置迁移版本（用于修复脏状态）")
+		drop       = flag.Bool("drop", false, "删除所有数据库表")
 		help       = flag.Bool("help", false, "显示帮助信息")
 	)
 	flag.Parse()
@@ -66,6 +68,10 @@ func main() {
 		rollbackMigrations(migrator)
 	case *version:
 		showVersion(migrator)
+	case *force >= 0:
+		forceMigrationVersion(migrator, *force)
+	case *drop:
+		dropDatabase(migrator)
 	default:
 		// 默认运行迁移
 		runMigrations(migrator)
@@ -87,6 +93,10 @@ func showHelp() {
 	fmt.Println("        回滚数据库迁移")
 	fmt.Println("  -version")
 	fmt.Println("        显示当前迁移版本")
+	fmt.Println("  -force int")
+	fmt.Println("        强制设置迁移版本（用于修复脏状态）")
+	fmt.Println("  -drop")
+	fmt.Println("        删除所有数据库表（危险操作）")
 	fmt.Println("  -help")
 	fmt.Println("        显示帮助信息")
 	fmt.Println()
@@ -94,6 +104,8 @@ func showHelp() {
 	fmt.Println("  migrate -up")
 	fmt.Println("  migrate -down")
 	fmt.Println("  migrate -version")
+	fmt.Println("  migrate -force 7    # 修复脏状态，强制设置为版本7")
+	fmt.Println("  migrate -drop       # 删除所有表")
 	fmt.Println("  migrate -config configs/production.yaml -up")
 }
 
@@ -124,4 +136,25 @@ func showVersion(migrator *database.Migrator) {
 	}
 
 	fmt.Printf("当前迁移版本: %d\n", version)
+}
+
+func forceMigrationVersion(migrator *database.Migrator, version int) {
+	log.Printf("强制设置迁移版本为: %d", version)
+
+	if err := migrator.Force(version); err != nil {
+		log.Fatalf("强制设置迁移版本失败: %v", err)
+	}
+
+	log.Println("✅ 迁移版本强制设置完成")
+}
+
+func dropDatabase(migrator *database.Migrator) {
+	log.Println("警告: 即将删除所有数据库表!")
+	log.Println("开始删除数据库表...")
+
+	if err := migrator.Drop(); err != nil {
+		log.Fatalf("删除数据库表失败: %v", err)
+	}
+
+	log.Println("✅ 数据库表删除完成")
 }

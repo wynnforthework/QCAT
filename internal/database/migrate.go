@@ -61,6 +61,24 @@ func (m *Migrator) Version() (uint, error) {
 	return version, nil
 }
 
+// Force sets the migration version without running migrations
+func (m *Migrator) Force(version int) error {
+	if err := m.migrate.Force(version); err != nil {
+		return fmt.Errorf("failed to force migration version: %w", err)
+	}
+	log.Printf("Forced migration version to %d", version)
+	return nil
+}
+
+// Drop drops the entire database schema
+func (m *Migrator) Drop() error {
+	if err := m.migrate.Drop(); err != nil {
+		return fmt.Errorf("failed to drop database: %w", err)
+	}
+	log.Println("Database schema dropped successfully")
+	return nil
+}
+
 // Close closes the migrator
 func (m *Migrator) Close() error {
 	_, err := m.migrate.Close()
