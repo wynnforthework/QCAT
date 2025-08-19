@@ -2651,14 +2651,97 @@ func (h *DashboardHandler) getRiskData() map[string]interface{} {
 
 // getPerformanceData retrieves performance metrics
 func (h *DashboardHandler) getPerformanceData() map[string]interface{} {
-	// 实际应该从性能分析服务获取
-	// 添加一些动态变化
-	baseTime := float64(time.Now().Unix() % 100)
+	ctx := context.Background()
+
+	// 查询策略性能指标
+	performanceQuery := `
+		SELECT
+			COALESCE(AVG(sharpe_ratio), 0) as avg_sharpe,
+			COALESCE(AVG(sortino_ratio), 0) as avg_sortino,
+			COALESCE(AVG(calmar_ratio), 0) as avg_calmar,
+			COALESCE(AVG(win_rate), 0) as avg_win_rate,
+			COALESCE(AVG(total_return), 0) as avg_return,
+			COALESCE(AVG(max_drawdown), 0) as avg_drawdown,
+			COALESCE(AVG(volatility), 0) as avg_volatility,
+			COUNT(*) as strategy_count
+		FROM strategy_performance
+		WHERE updated_at >= NOW() - INTERVAL '24 hours'
+		AND status = 'active'
+	`
+
+	var avgSharpe, avgSortino, avgCalmar, avgWinRate float64
+	var avgReturn, avgDrawdown, avgVolatility float64
+	var strategyCount int
+
+	err := h.db.QueryRowContext(ctx, performanceQuery).Scan(
+		&avgSharpe, &avgSortino, &avgCalmar, &avgWinRate,
+		&avgReturn, &avgDrawdown, &avgVolatility, &strategyCount,
+	)
+
+	if err != nil || strategyCount == 0 {
+		// 如果查询失败或没有数据，尝试从交易记录计算
+		tradeQuery := `
+			SELECT
+				COALESCE(SUM(pnl), 0) as total_pnl,
+				COALESCE(COUNT(*), 0) as total_trades,
+				COALESCE(COUNT(CASE WHEN pnl > 0 THEN 1 END), 0) as winning_trades
+			FROM trades
+			WHERE created_at >= NOW() - INTERVAL '30 days'
+			AND status = 'filled'
+		`
+
+		var totalPnL float64
+		var totalTrades, winningTrades int
+
+		if err2 := h.db.QueryRowContext(ctx, tradeQuery).Scan(&totalPnL, &totalTrades, &winningTrades); err2 != nil {
+			// 如果都失败，返回默认值
+			return map[string]interface{}{
+				"sharpe":      0.0,
+				"sortino":     0.0,
+				"calmar":      0.0,
+				"winRate":     0.0,
+				"totalReturn": 0.0,
+				"maxDrawdown": 0.0,
+				"volatility":  0.0,
+				"db_error":    err.Error(),
+			}
+		}
+
+		// 从交易数据计算基础指标
+		winRate := 0.0
+		if totalTrades > 0 {
+			winRate = float64(winningTrades) / float64(totalTrades) * 100
+		}
+
+		// 简化的夏普比率计算（需要更多历史数据来准确计算）
+		estimatedSharpe := 0.0
+		if totalTrades > 10 {
+			// 假设年化收益率和波动率的简化计算
+			estimatedSharpe = totalPnL / 10000.0 // 简化计算
+		}
+
+		return map[string]interface{}{
+			"sharpe":      estimatedSharpe,
+			"sortino":     estimatedSharpe * 1.2, // 估算
+			"calmar":      estimatedSharpe * 1.8, // 估算
+			"winRate":     winRate,
+			"totalReturn": totalPnL,
+			"maxDrawdown": 0.0, // 需要更复杂的计算
+			"volatility":  0.0, // 需要更复杂的计算
+			"trades":      totalTrades,
+			"source":      "trades",
+		}
+	}
 
 	return map[string]interface{}{
-		"sharpe":  1.85 + baseTime*0.001,
-		"sortino": 2.12 + baseTime*0.001,
-		"calmar":  3.45 + baseTime*0.001,
-		"winRate": 68.5 + baseTime*0.01,
+		"sharpe":      avgSharpe,
+		"sortino":     avgSortino,
+		"calmar":      avgCalmar,
+		"winRate":     avgWinRate,
+		"totalReturn": avgReturn,
+		"maxDrawdown": avgDrawdown,
+		"volatility":  avgVolatility,
+		"strategies":  strategyCount,
+		"source":      "performance_table",
 	}
 }
