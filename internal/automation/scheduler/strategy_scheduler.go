@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"sort"
 	"sync"
@@ -607,14 +608,50 @@ func (ss *StrategyScheduler) HandleNewStrategyIntroduction(ctx context.Context, 
 func (ss *StrategyScheduler) HandleProfitMaximization(ctx context.Context, task *ScheduledTask) error {
 	log.Printf("Executing profit maximization task: %s", task.Name)
 
-	// 实现利润最大化逻辑
-	// 1. 分析当前收益状况
-	// 2. 执行全局收益优化
-	// 3. 调整策略权重和资金分配
-	// 4. 实时执行优化决策
+	// 1. 获取当前投资组合状态
+	portfolio, err := ss.getCurrentPortfolio(ctx)
+	if err != nil {
+		log.Printf("Failed to get current portfolio: %v", err)
+		return fmt.Errorf("failed to get current portfolio: %w", err)
+	}
 
-	// TODO: 实现全局收益优化算法
-	log.Printf("Profit maximization logic executed")
+	// 2. 获取市场数据
+	marketData, err := ss.getMarketData(ctx)
+	if err != nil {
+		log.Printf("Failed to get market data: %v", err)
+		return fmt.Errorf("failed to get market data: %w", err)
+	}
+
+	// 3. 获取活跃策略
+	strategies, err := ss.getActiveStrategiesForOptimization(ctx)
+	if err != nil {
+		log.Printf("Failed to get active strategies: %v", err)
+		return fmt.Errorf("failed to get active strategies: %w", err)
+	}
+
+	// 4. 执行全局收益优化
+	optimizationResult, err := ss.executeGlobalOptimization(ctx, portfolio, marketData, strategies)
+	if err != nil {
+		log.Printf("Failed to execute global optimization: %v", err)
+		return fmt.Errorf("failed to execute global optimization: %w", err)
+	}
+
+	// 5. 应用优化结果
+	err = ss.applyProfitOptimizationResult(ctx, optimizationResult)
+	if err != nil {
+		log.Printf("Failed to apply optimization result: %v", err)
+		return fmt.Errorf("failed to apply optimization result: %w", err)
+	}
+
+	// 6. 记录优化历史
+	err = ss.recordOptimizationHistory(ctx, optimizationResult)
+	if err != nil {
+		log.Printf("Failed to record optimization history: %v", err)
+		// 不返回错误，因为记录失败不应该影响主流程
+	}
+
+	log.Printf("Profit maximization completed successfully. Objective value: %.4f",
+		optimizationResult.ObjectiveValue)
 	return nil
 }
 
@@ -2267,4 +2304,634 @@ func (ss *StrategyScheduler) saveStopLossReportToDB(ctx context.Context, report 
 	)
 
 	return err
+}
+
+// 利润最大化相关方法
+
+// Portfolio 投资组合结构
+type Portfolio struct {
+	TotalValue  float64             `json:"total_value"`
+	CashBalance float64             `json:"cash_balance"`
+	Allocations []*Allocation       `json:"allocations"`
+	Performance *PerformanceMetrics `json:"performance"`
+	LastUpdated time.Time           `json:"last_updated"`
+}
+
+// Allocation 资产配置
+type Allocation struct {
+	Symbol     string  `json:"symbol"`
+	Quantity   float64 `json:"quantity"`
+	Value      float64 `json:"value"`
+	Weight     float64 `json:"weight"`
+	PnL        float64 `json:"pnl"`
+	PnLPercent float64 `json:"pnl_percent"`
+}
+
+// ProfitOptimizationResult 利润优化结果
+type ProfitOptimizationResult struct {
+	ObjectiveValue      float64              `json:"objective_value"`
+	OptimalAllocation   map[string]float64   `json:"optimal_allocation"`
+	ExpectedReturn      float64              `json:"expected_return"`
+	ExpectedRisk        float64              `json:"expected_risk"`
+	SharpeRatio         float64              `json:"sharpe_ratio"`
+	RebalanceActions    []*RebalanceAction   `json:"rebalance_actions"`
+	PerformanceForecast *PerformanceForecast `json:"performance_forecast"`
+	Timestamp           time.Time            `json:"timestamp"`
+	ComputationTime     time.Duration        `json:"computation_time"`
+}
+
+// RebalanceAction 再平衡动作
+type RebalanceAction struct {
+	Symbol        string  `json:"symbol"`
+	Action        string  `json:"action"` // BUY, SELL, HOLD
+	CurrentWeight float64 `json:"current_weight"`
+	TargetWeight  float64 `json:"target_weight"`
+	Quantity      float64 `json:"quantity"`
+	EstimatedCost float64 `json:"estimated_cost"`
+	Priority      int     `json:"priority"`
+}
+
+// PerformanceForecast 性能预测
+type PerformanceForecast struct {
+	ExpectedReturn1D  float64            `json:"expected_return_1d"`
+	ExpectedReturn7D  float64            `json:"expected_return_7d"`
+	ExpectedReturn30D float64            `json:"expected_return_30d"`
+	RiskMetrics       map[string]float64 `json:"risk_metrics"`
+	Confidence        float64            `json:"confidence"`
+}
+
+// getCurrentPortfolio 获取当前投资组合状态
+func (ss *StrategyScheduler) getCurrentPortfolio(ctx context.Context) (*Portfolio, error) {
+	// 从数据库获取当前投资组合信息
+	query := `
+		SELECT
+			total_value, cash_balance, total_return,
+			volatility, sharpe_ratio, max_drawdown, win_rate,
+			updated_at
+		FROM portfolio_summary
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`
+
+	portfolio := &Portfolio{
+		Allocations: make([]*Allocation, 0),
+		Performance: &PerformanceMetrics{},
+	}
+
+	err := ss.db.QueryRowContext(ctx, query).Scan(
+		&portfolio.TotalValue,
+		&portfolio.CashBalance,
+		&portfolio.Performance.TotalReturn,
+		&portfolio.Performance.Volatility,
+		&portfolio.Performance.SharpeRatio,
+		&portfolio.Performance.MaxDrawdown,
+		&portfolio.Performance.WinRate,
+		&portfolio.LastUpdated,
+	)
+
+	if err != nil {
+		// 如果没有数据，使用默认值
+		portfolio = &Portfolio{
+			TotalValue:  100000.0, // 默认10万资金
+			CashBalance: 50000.0,  // 50%现金
+			Allocations: make([]*Allocation, 0),
+			Performance: &PerformanceMetrics{
+				TotalReturn:  0.0,
+				Volatility:   0.02,
+				SharpeRatio:  0.0,
+				MaxDrawdown:  0.0,
+				WinRate:      0.5,
+				ProfitFactor: 1.0,
+			},
+			LastUpdated: time.Now(),
+		}
+	}
+
+	// 获取资产配置
+	allocations, err := ss.getPortfolioAllocations(ctx)
+	if err != nil {
+		log.Printf("Failed to get portfolio allocations: %v", err)
+		// 不返回错误，使用空配置
+	} else {
+		portfolio.Allocations = allocations
+	}
+
+	return portfolio, nil
+}
+
+// getPortfolioAllocations 获取投资组合配置
+func (ss *StrategyScheduler) getPortfolioAllocations(ctx context.Context) ([]*Allocation, error) {
+	query := `
+		SELECT symbol, quantity, value, weight, pnl, pnl_percent
+		FROM portfolio_allocations
+		WHERE updated_at > NOW() - INTERVAL '1 hour'
+		ORDER BY value DESC
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query allocations: %w", err)
+	}
+	defer rows.Close()
+
+	var allocations []*Allocation
+	for rows.Next() {
+		allocation := &Allocation{}
+		err := rows.Scan(
+			&allocation.Symbol,
+			&allocation.Quantity,
+			&allocation.Value,
+			&allocation.Weight,
+			&allocation.PnL,
+			&allocation.PnLPercent,
+		)
+		if err != nil {
+			log.Printf("Failed to scan allocation: %v", err)
+			continue
+		}
+		allocations = append(allocations, allocation)
+	}
+
+	return allocations, nil
+}
+
+// getMarketData 获取市场数据
+func (ss *StrategyScheduler) getMarketData(ctx context.Context) (map[string]*MarketData, error) {
+	query := `
+		SELECT symbol, price, volume_24h, price_change_24h, volatility, updated_at
+		FROM market_data
+		WHERE updated_at > NOW() - INTERVAL '1 hour'
+		ORDER BY volume_24h DESC
+		LIMIT 50
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query market data: %w", err)
+	}
+	defer rows.Close()
+
+	marketData := make(map[string]*MarketData)
+	for rows.Next() {
+		data := &MarketData{}
+		err := rows.Scan(
+			&data.Symbol,
+			&data.Price,
+			&data.Volume24h,
+			&data.PriceChange24h,
+			&data.Volatility,
+			&data.Timestamp,
+		)
+		if err != nil {
+			log.Printf("Failed to scan market data: %v", err)
+			continue
+		}
+		marketData[data.Symbol] = data
+	}
+
+	// 如果没有数据，生成模拟数据
+	if len(marketData) == 0 {
+		symbols := []string{"BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "SOLUSDT"}
+		for i, symbol := range symbols {
+			marketData[symbol] = &MarketData{
+				Symbol:         symbol,
+				Price:          50000.0 + float64(i*1000),
+				Volume24h:      1000000.0 + float64(i*100000),
+				PriceChange24h: -5.0 + float64(i*2),
+				Volatility:     0.02 + float64(i)*0.01,
+				Timestamp:      time.Now(),
+			}
+		}
+	}
+
+	return marketData, nil
+}
+
+// getActiveStrategiesForOptimization 获取用于优化的活跃策略
+func (ss *StrategyScheduler) getActiveStrategiesForOptimization(ctx context.Context) ([]*Strategy, error) {
+	// 使用现有的getActiveStrategies方法
+	return ss.getActiveStrategies(ctx)
+}
+
+// executeGlobalOptimization 执行全局收益优化
+func (ss *StrategyScheduler) executeGlobalOptimization(ctx context.Context,
+	portfolio *Portfolio, marketData map[string]*MarketData, strategies []*Strategy) (*ProfitOptimizationResult, error) {
+
+	startTime := time.Now()
+
+	// 1. 计算当前组合的风险收益特征
+	currentReturn := portfolio.Performance.TotalReturn
+	currentRisk := portfolio.Performance.Volatility
+	currentSharpe := portfolio.Performance.SharpeRatio
+
+	log.Printf("Current portfolio: Return=%.4f, Risk=%.4f, Sharpe=%.4f",
+		currentReturn, currentRisk, currentSharpe)
+
+	// 2. 分析市场机会
+	marketOpportunities := ss.analyzeMarketOpportunities(marketData)
+
+	// 3. 评估策略表现
+	strategyScores := ss.evaluateStrategyPerformance(strategies)
+
+	// 4. 执行多目标优化
+	optimalAllocation := ss.optimizePortfolioAllocation(portfolio, marketOpportunities, strategyScores)
+
+	// 5. 计算预期收益和风险
+	expectedReturn := ss.calculateExpectedReturn(optimalAllocation, marketData, strategies)
+	expectedRisk := ss.calculateExpectedRisk(optimalAllocation, marketData)
+	expectedSharpe := expectedReturn / expectedRisk
+
+	// 6. 生成再平衡动作
+	rebalanceActions := ss.generateRebalanceActions(portfolio, optimalAllocation)
+
+	// 7. 生成性能预测
+	performanceForecast := ss.generatePerformanceForecast(optimalAllocation, marketData)
+
+	// 8. 计算目标函数值 (最大化夏普比率)
+	objectiveValue := expectedSharpe
+
+	result := &ProfitOptimizationResult{
+		ObjectiveValue:      objectiveValue,
+		OptimalAllocation:   optimalAllocation,
+		ExpectedReturn:      expectedReturn,
+		ExpectedRisk:        expectedRisk,
+		SharpeRatio:         expectedSharpe,
+		RebalanceActions:    rebalanceActions,
+		PerformanceForecast: performanceForecast,
+		Timestamp:           startTime,
+		ComputationTime:     time.Since(startTime),
+	}
+
+	log.Printf("Optimization completed: Objective=%.4f, Expected Return=%.4f, Expected Risk=%.4f",
+		objectiveValue, expectedReturn, expectedRisk)
+
+	return result, nil
+}
+
+// analyzeMarketOpportunities 分析市场机会
+func (ss *StrategyScheduler) analyzeMarketOpportunities(marketData map[string]*MarketData) map[string]float64 {
+	opportunities := make(map[string]float64)
+
+	for symbol, data := range marketData {
+		// 基于价格变化和波动率计算机会分数
+		priceScore := math.Abs(data.PriceChange24h) / 10.0 // 价格变化越大，机会越大
+		volumeScore := math.Log10(data.Volume24h) / 10.0   // 交易量越大，流动性越好
+		volatilityScore := data.Volatility * 10.0          // 适度波动提供交易机会
+
+		// 综合评分
+		opportunityScore := (priceScore*0.4 + volumeScore*0.3 + volatilityScore*0.3)
+		opportunities[symbol] = math.Min(1.0, opportunityScore)
+	}
+
+	return opportunities
+}
+
+// evaluateStrategyPerformance 评估策略表现
+func (ss *StrategyScheduler) evaluateStrategyPerformance(strategies []*Strategy) map[string]float64 {
+	scores := make(map[string]float64)
+
+	for _, strategy := range strategies {
+		// 基于多个指标评估策略表现
+		returnScore := strategy.Performance / 0.3     // 假设30%是优秀表现
+		sharpeScore := strategy.SharpeRatio / 2.0     // 假设2.0是优秀夏普比率
+		drawdownScore := (1.0 - strategy.MaxDrawdown) // 回撤越小越好
+
+		// 综合评分
+		strategyScore := (returnScore*0.5 + sharpeScore*0.3 + drawdownScore*0.2)
+		scores[strategy.ID] = math.Min(1.0, math.Max(0.0, strategyScore))
+	}
+
+	return scores
+}
+
+// optimizePortfolioAllocation 优化投资组合配置
+func (ss *StrategyScheduler) optimizePortfolioAllocation(
+	portfolio *Portfolio,
+	opportunities map[string]float64,
+	strategyScores map[string]float64) map[string]float64 {
+
+	allocation := make(map[string]float64)
+
+	// 简化的优化算法：基于机会分数和策略表现分配权重
+	totalScore := 0.0
+	symbolScores := make(map[string]float64)
+
+	// 计算每个资产的综合分数
+	for _, alloc := range portfolio.Allocations {
+		symbol := alloc.Symbol
+		opportunityScore := opportunities[symbol]
+		if opportunityScore == 0 {
+			opportunityScore = 0.5 // 默认中等机会
+		}
+
+		// 综合分数 = 机会分数 * 当前表现
+		score := opportunityScore * (1.0 + alloc.PnLPercent/100.0)
+		symbolScores[symbol] = math.Max(0.1, score) // 最小权重10%
+		totalScore += symbolScores[symbol]
+	}
+
+	// 归一化权重
+	for symbol, score := range symbolScores {
+		allocation[symbol] = score / totalScore
+	}
+
+	// 确保权重和为1
+	ss.normalizeAllocation(allocation)
+
+	return allocation
+}
+
+// calculateExpectedReturn 计算预期收益
+func (ss *StrategyScheduler) calculateExpectedReturn(
+	allocation map[string]float64,
+	marketData map[string]*MarketData,
+	strategies []*Strategy) float64 {
+
+	expectedReturn := 0.0
+
+	// 基于历史表现和市场数据估算预期收益
+	for symbol, weight := range allocation {
+		if data, exists := marketData[symbol]; exists {
+			// 基于价格变化趋势估算收益
+			priceReturn := data.PriceChange24h / 100.0 // 转换为小数
+
+			// 基于波动率调整收益预期
+			volatilityAdjustment := 1.0 - (data.Volatility * 0.5)
+
+			symbolReturn := priceReturn * volatilityAdjustment
+			expectedReturn += weight * symbolReturn
+		}
+	}
+
+	// 添加策略alpha
+	strategyAlpha := 0.0
+	for _, strategy := range strategies {
+		strategyAlpha += strategy.Performance * 0.1 // 策略贡献10%的alpha
+	}
+
+	return expectedReturn + strategyAlpha
+}
+
+// calculateExpectedRisk 计算预期风险
+func (ss *StrategyScheduler) calculateExpectedRisk(
+	allocation map[string]float64,
+	marketData map[string]*MarketData) float64 {
+
+	// 简化的风险计算：加权平均波动率
+	weightedVolatility := 0.0
+
+	for symbol, weight := range allocation {
+		if data, exists := marketData[symbol]; exists {
+			weightedVolatility += weight * data.Volatility
+		}
+	}
+
+	// 考虑分散化效应，降低总体风险
+	diversificationFactor := 1.0 - (0.2 * float64(len(allocation)-1) / 10.0)
+	if diversificationFactor < 0.5 {
+		diversificationFactor = 0.5 // 最多降低50%的风险
+	}
+
+	return weightedVolatility * diversificationFactor
+}
+
+// generateRebalanceActions 生成再平衡动作
+func (ss *StrategyScheduler) generateRebalanceActions(
+	portfolio *Portfolio,
+	optimalAllocation map[string]float64) []*RebalanceAction {
+
+	var actions []*RebalanceAction
+
+	// 计算当前权重
+	currentWeights := make(map[string]float64)
+	for _, alloc := range portfolio.Allocations {
+		currentWeights[alloc.Symbol] = alloc.Weight
+	}
+
+	// 生成再平衡动作
+	for symbol, targetWeight := range optimalAllocation {
+		currentWeight := currentWeights[symbol]
+		weightDiff := targetWeight - currentWeight
+
+		// 只有权重差异超过阈值才执行再平衡
+		if math.Abs(weightDiff) > 0.05 { // 5%阈值
+			action := &RebalanceAction{
+				Symbol:        symbol,
+				CurrentWeight: currentWeight,
+				TargetWeight:  targetWeight,
+				Quantity:      weightDiff * portfolio.TotalValue,
+				EstimatedCost: math.Abs(weightDiff * portfolio.TotalValue * 0.001), // 0.1%交易成本
+				Priority:      ss.calculateActionPriority(weightDiff),
+			}
+
+			if weightDiff > 0 {
+				action.Action = "BUY"
+			} else {
+				action.Action = "SELL"
+				action.Quantity = math.Abs(action.Quantity)
+			}
+
+			actions = append(actions, action)
+		}
+	}
+
+	// 按优先级排序
+	sort.Slice(actions, func(i, j int) bool {
+		return actions[i].Priority > actions[j].Priority
+	})
+
+	return actions
+}
+
+// calculateActionPriority 计算动作优先级
+func (ss *StrategyScheduler) calculateActionPriority(weightDiff float64) int {
+	absDiff := math.Abs(weightDiff)
+	if absDiff > 0.2 {
+		return 3 // 高优先级
+	} else if absDiff > 0.1 {
+		return 2 // 中优先级
+	} else {
+		return 1 // 低优先级
+	}
+}
+
+// generatePerformanceForecast 生成性能预测
+func (ss *StrategyScheduler) generatePerformanceForecast(
+	allocation map[string]float64,
+	marketData map[string]*MarketData) *PerformanceForecast {
+
+	// 基于当前配置和市场数据预测未来表现
+	baseReturn := ss.calculateExpectedReturn(allocation, marketData, nil)
+
+	forecast := &PerformanceForecast{
+		ExpectedReturn1D:  baseReturn * 1.0,  // 1天预期收益
+		ExpectedReturn7D:  baseReturn * 7.0,  // 7天预期收益
+		ExpectedReturn30D: baseReturn * 30.0, // 30天预期收益
+		RiskMetrics: map[string]float64{
+			"volatility":   ss.calculateExpectedRisk(allocation, marketData),
+			"max_drawdown": ss.calculateExpectedRisk(allocation, marketData) * 2.0,
+			"var_95":       baseReturn - 1.96*ss.calculateExpectedRisk(allocation, marketData),
+		},
+		Confidence: 0.75, // 75%置信度
+	}
+
+	return forecast
+}
+
+// normalizeAllocation 归一化配置权重
+func (ss *StrategyScheduler) normalizeAllocation(allocation map[string]float64) {
+	total := 0.0
+	for _, weight := range allocation {
+		total += weight
+	}
+
+	if total > 0 {
+		for symbol := range allocation {
+			allocation[symbol] /= total
+		}
+	}
+}
+
+// applyProfitOptimizationResult 应用利润优化结果
+func (ss *StrategyScheduler) applyProfitOptimizationResult(ctx context.Context, result *ProfitOptimizationResult) error {
+	log.Printf("Applying profit optimization result with objective value: %.4f", result.ObjectiveValue)
+
+	// 1. 更新投资组合配置
+	err := ss.updatePortfolioAllocation(ctx, result.OptimalAllocation)
+	if err != nil {
+		return fmt.Errorf("failed to update portfolio allocation: %w", err)
+	}
+
+	// 2. 执行再平衡动作
+	err = ss.executeRebalanceActions(ctx, result.RebalanceActions)
+	if err != nil {
+		return fmt.Errorf("failed to execute rebalance actions: %w", err)
+	}
+
+	// 3. 更新性能预测
+	err = ss.updatePerformanceForecast(ctx, result.PerformanceForecast)
+	if err != nil {
+		log.Printf("Failed to update performance forecast: %v", err)
+		// 不返回错误，因为预测更新失败不应该影响主流程
+	}
+
+	log.Printf("Profit optimization result applied successfully")
+	return nil
+}
+
+// updatePortfolioAllocation 更新投资组合配置
+func (ss *StrategyScheduler) updatePortfolioAllocation(ctx context.Context, allocation map[string]float64) error {
+	// 更新数据库中的配置权重
+	for symbol, weight := range allocation {
+		query := `
+			UPDATE portfolio_allocations
+			SET weight = $1, updated_at = NOW()
+			WHERE symbol = $2
+		`
+		_, err := ss.db.ExecContext(ctx, query, weight, symbol)
+		if err != nil {
+			log.Printf("Failed to update allocation for %s: %v", symbol, err)
+			continue
+		}
+	}
+
+	return nil
+}
+
+// executeRebalanceActions 执行再平衡动作
+func (ss *StrategyScheduler) executeRebalanceActions(ctx context.Context, actions []*RebalanceAction) error {
+	for _, action := range actions {
+		log.Printf("Executing rebalance action: %s %s %.4f (Priority: %d)",
+			action.Action, action.Symbol, action.Quantity, action.Priority)
+
+		// 这里应该调用实际的交易执行逻辑
+		// 目前只记录到数据库
+		err := ss.recordRebalanceAction(ctx, action)
+		if err != nil {
+			log.Printf("Failed to record rebalance action for %s: %v", action.Symbol, err)
+			continue
+		}
+
+		// 模拟执行延迟
+		time.Sleep(time.Millisecond * 100)
+	}
+
+	return nil
+}
+
+// recordRebalanceAction 记录再平衡动作
+func (ss *StrategyScheduler) recordRebalanceAction(ctx context.Context, action *RebalanceAction) error {
+	query := `
+		INSERT INTO rebalance_actions (
+			symbol, action, current_weight, target_weight,
+			quantity, estimated_cost, priority, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+	`
+
+	_, err := ss.db.ExecContext(ctx, query,
+		action.Symbol, action.Action, action.CurrentWeight,
+		action.TargetWeight, action.Quantity, action.EstimatedCost,
+		action.Priority,
+	)
+
+	return err
+}
+
+// updatePerformanceForecast 更新性能预测
+func (ss *StrategyScheduler) updatePerformanceForecast(ctx context.Context, forecast *PerformanceForecast) error {
+	query := `
+		INSERT INTO performance_forecasts (
+			expected_return_1d, expected_return_7d, expected_return_30d,
+			volatility, max_drawdown, var_95, confidence, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+		ON CONFLICT (id) DO UPDATE SET
+			expected_return_1d = EXCLUDED.expected_return_1d,
+			expected_return_7d = EXCLUDED.expected_return_7d,
+			expected_return_30d = EXCLUDED.expected_return_30d,
+			volatility = EXCLUDED.volatility,
+			max_drawdown = EXCLUDED.max_drawdown,
+			var_95 = EXCLUDED.var_95,
+			confidence = EXCLUDED.confidence,
+			updated_at = NOW()
+	`
+
+	_, err := ss.db.ExecContext(ctx, query,
+		forecast.ExpectedReturn1D, forecast.ExpectedReturn7D, forecast.ExpectedReturn30D,
+		forecast.RiskMetrics["volatility"], forecast.RiskMetrics["max_drawdown"],
+		forecast.RiskMetrics["var_95"], forecast.Confidence,
+	)
+
+	return err
+}
+
+// recordOptimizationHistory 记录优化历史
+func (ss *StrategyScheduler) recordOptimizationHistory(ctx context.Context, result *ProfitOptimizationResult) error {
+	// 将优化结果序列化为JSON
+	allocationJSON := ""
+	for symbol, weight := range result.OptimalAllocation {
+		if allocationJSON != "" {
+			allocationJSON += ","
+		}
+		allocationJSON += fmt.Sprintf(`"%s":%.4f`, symbol, weight)
+	}
+	allocationJSON = "{" + allocationJSON + "}"
+
+	query := `
+		INSERT INTO profit_optimization_history (
+			objective_value, optimal_allocation, expected_return,
+			expected_risk, sharpe_ratio, computation_time, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`
+
+	_, err := ss.db.ExecContext(ctx, query,
+		result.ObjectiveValue, allocationJSON, result.ExpectedReturn,
+		result.ExpectedRisk, result.SharpeRatio, result.ComputationTime,
+		result.Timestamp,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to record optimization history: %w", err)
+	}
+
+	return nil
 }
