@@ -43,19 +43,19 @@ type AutomationSystem struct {
 
 // SystemStatus 系统状态
 type SystemStatus struct {
-	StartTime         time.Time
-	IsRunning         bool
-	SchedulerStatus   string
-	ExecutorStatus    string
-	ActiveTasks       int
-	CompletedTasks    int
-	FailedTasks       int
-	ActiveActions     int
-	CompletedActions  int
-	FailedActions     int
-	LastHealthCheck   time.Time
-	HealthScore       float64
-	mu                sync.RWMutex
+	StartTime        time.Time
+	IsRunning        bool
+	SchedulerStatus  string
+	ExecutorStatus   string
+	ActiveTasks      int
+	CompletedTasks   int
+	FailedTasks      int
+	ActiveActions    int
+	CompletedActions int
+	FailedActions    int
+	LastHealthCheck  time.Time
+	HealthScore      float64
+	mu               sync.RWMutex
 }
 
 // NewAutomationSystem 创建自动化系统
@@ -288,34 +288,34 @@ func (as *AutomationSystem) GetStatus() *SystemStatus {
 
 	// 返回副本
 	return &SystemStatus{
-		StartTime:         as.status.StartTime,
-		IsRunning:         as.status.IsRunning,
-		SchedulerStatus:   as.status.SchedulerStatus,
-		ExecutorStatus:    as.status.ExecutorStatus,
-		ActiveTasks:       as.status.ActiveTasks,
-		CompletedTasks:    as.status.CompletedTasks,
-		FailedTasks:       as.status.FailedTasks,
-		ActiveActions:     as.status.ActiveActions,
-		CompletedActions:  as.status.CompletedActions,
-		FailedActions:     as.status.FailedActions,
-		LastHealthCheck:   as.status.LastHealthCheck,
-		HealthScore:       as.status.HealthScore,
+		StartTime:        as.status.StartTime,
+		IsRunning:        as.status.IsRunning,
+		SchedulerStatus:  as.status.SchedulerStatus,
+		ExecutorStatus:   as.status.ExecutorStatus,
+		ActiveTasks:      as.status.ActiveTasks,
+		CompletedTasks:   as.status.CompletedTasks,
+		FailedTasks:      as.status.FailedTasks,
+		ActiveActions:    as.status.ActiveActions,
+		CompletedActions: as.status.CompletedActions,
+		FailedActions:    as.status.FailedActions,
+		LastHealthCheck:  as.status.LastHealthCheck,
+		HealthScore:      as.status.HealthScore,
 	}
 }
 
 // logSystemStatus 记录系统状态
 func (as *AutomationSystem) logSystemStatus() {
 	status := as.GetStatus()
-	
+
 	log.Println("📊 QCAT Automation System Status:")
 	log.Printf("   🕐 Start Time: %s", status.StartTime.Format("2006-01-02 15:04:05"))
 	log.Printf("   ⚡ Running: %v", status.IsRunning)
 	log.Printf("   📋 Scheduler: %s", status.SchedulerStatus)
 	log.Printf("   🎯 Executor: %s", status.ExecutorStatus)
 	log.Printf("   📈 Health Score: %.2f", status.HealthScore)
-	log.Printf("   📊 Tasks: %d active, %d completed, %d failed", 
+	log.Printf("   📊 Tasks: %d active, %d completed, %d failed",
 		status.ActiveTasks, status.CompletedTasks, status.FailedTasks)
-	log.Printf("   🎯 Actions: %d active, %d completed, %d failed", 
+	log.Printf("   🎯 Actions: %d active, %d completed, %d failed",
 		status.ActiveActions, status.CompletedActions, status.FailedActions)
 }
 
@@ -344,4 +344,14 @@ func (as *AutomationSystem) IsRunning() bool {
 	as.mu.RLock()
 	defer as.mu.RUnlock()
 	return as.isRunning
+}
+
+// GetExecutor 获取实时执行引擎
+func (as *AutomationSystem) GetExecutor() *executor.RealtimeExecutor {
+	return as.executor
+}
+
+// GetScheduler 获取自动化调度器
+func (as *AutomationSystem) GetScheduler() *scheduler.AutomationScheduler {
+	return as.scheduler
 }

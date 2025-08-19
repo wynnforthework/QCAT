@@ -78,6 +78,8 @@ type ExecutorStats struct {
 	TotalActions      int
 	ExecutedActions   int
 	FailedActions     int
+	SuccessfulActions int
+	QueueLength       int
 	AverageLatency    time.Duration
 	LastExecutionTime time.Time
 	mu                sync.RWMutex
@@ -232,8 +234,40 @@ func (re *RealtimeExecutor) updateStats() {
 	re.stats.mu.Lock()
 	defer re.stats.mu.Unlock()
 
-	// TODO: 实现统计信息更新逻辑
+	// 更新统计信息
 	re.stats.LastExecutionTime = time.Now()
+
+	// 计算队列长度
+	queueLength := len(re.actionQueue)
+	re.stats.QueueLength = queueLength
+
+	// 记录性能指标
+	if re.metrics != nil {
+		// 使用现有的系统指标更新方法
+		re.metrics.UpdateSystemMetrics(0, 0, 0, queueLength) // 使用goroutines字段记录队列长度
+
+		// 记录执行器相关的指标
+		labels := map[string]string{
+			"component": "executor",
+		}
+
+		// 使用IncrementCounter记录计数指标
+		if re.stats.TotalActions > 0 {
+			re.metrics.IncrementCounter("executor_actions", labels)
+		}
+
+		// 计算成功率并记录
+		if re.stats.TotalActions > 0 {
+			successRate := float64(re.stats.SuccessfulActions) / float64(re.stats.TotalActions)
+			log.Printf("Executor success rate: %.2f%% (%d/%d)",
+				successRate*100, re.stats.SuccessfulActions, re.stats.TotalActions)
+		}
+	}
+
+	// 如果队列过长，记录警告
+	if queueLength > 5000 {
+		log.Printf("Warning: Execution queue is getting long: %d actions", queueLength)
+	}
 }
 
 // initializeExecutors 初始化执行器
@@ -254,6 +288,9 @@ func (re *RealtimeExecutor) initializeWorkers() {
 
 // handleActionCompletion 处理动作完成
 func (re *RealtimeExecutor) handleActionCompletion(action *ExecutionAction, err error) {
+	re.stats.mu.Lock()
+	re.stats.TotalActions++
+
 	if err != nil {
 		log.Printf("Action failed: %s, error: %v, retry: %d/%d",
 			action.Action, err, action.RetryCount, action.MaxRetries)
@@ -262,6 +299,7 @@ func (re *RealtimeExecutor) handleActionCompletion(action *ExecutionAction, err 
 		if action.RetryCount < action.MaxRetries {
 			action.RetryCount++
 			action.ScheduledAt = time.Now().Add(time.Second * time.Duration(action.RetryCount))
+			re.stats.mu.Unlock()
 
 			// 重新加入队列
 			select {
@@ -269,17 +307,27 @@ func (re *RealtimeExecutor) handleActionCompletion(action *ExecutionAction, err 
 				log.Printf("Action retried: %s", action.Action)
 			default:
 				log.Printf("Failed to retry action: queue is full")
+				// 如果重试失败，标记为失败
+				re.stats.mu.Lock()
+				re.stats.FailedActions++
+				re.stats.mu.Unlock()
 			}
 		} else {
-			re.stats.mu.Lock()
 			re.stats.FailedActions++
 			re.stats.mu.Unlock()
+			log.Printf("Action permanently failed after %d retries: %s", action.MaxRetries, action.Action)
 		}
 	} else {
-		log.Printf("Action completed: %s", action.Action)
-		re.stats.mu.Lock()
+		log.Printf("Action completed successfully: %s", action.Action)
 		re.stats.ExecutedActions++
+		re.stats.SuccessfulActions++
 		re.stats.mu.Unlock()
+
+		// 记录执行延迟
+		if re.metrics != nil {
+			executionTime := time.Since(action.CreatedAt)
+			re.metrics.RecordTrade(action.Symbol, action.Action, 1.0, executionTime)
+		}
 	}
 }
 
@@ -292,6 +340,8 @@ func (re *RealtimeExecutor) GetStats() *ExecutorStats {
 		TotalActions:      re.stats.TotalActions,
 		ExecutedActions:   re.stats.ExecutedActions,
 		FailedActions:     re.stats.FailedActions,
+		SuccessfulActions: re.stats.SuccessfulActions,
+		QueueLength:       re.stats.QueueLength,
 		AverageLatency:    re.stats.AverageLatency,
 		LastExecutionTime: re.stats.LastExecutionTime,
 	}

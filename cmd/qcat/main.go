@@ -50,7 +50,7 @@ func main() {
 		log.Fatalf("Failed to initialize automation system: %v", err)
 	}
 
-	// Start automation system
+	// Start automation system (includes executor and scheduler)
 	if err := automationSystem.Start(); err != nil {
 		log.Fatalf("Failed to start automation system: %v", err)
 	}
