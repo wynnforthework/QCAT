@@ -2565,12 +2565,87 @@ func (h *DashboardHandler) getStrategyStatistics() map[string]interface{} {
 
 // getRiskData retrieves risk management data
 func (h *DashboardHandler) getRiskData() map[string]interface{} {
-	// 实际应该从风险管理服务获取
+	ctx := context.Background()
+
+	// 查询风险指标数据
+	riskQuery := `
+		SELECT
+			COALESCE(AVG(risk_score), 0) as avg_risk_score,
+			COALESCE(AVG(var_95), 0) as avg_var,
+			COALESCE(AVG(max_drawdown), 0) as avg_drawdown,
+			COALESCE(AVG(leverage), 0) as avg_leverage,
+			COUNT(*) as total_positions
+		FROM risk_metrics
+		WHERE created_at >= NOW() - INTERVAL '1 hour'
+	`
+
+	var avgRiskScore, avgVar, avgDrawdown, avgLeverage float64
+	var totalPositions int
+
+	err := h.db.QueryRowContext(ctx, riskQuery).Scan(
+		&avgRiskScore, &avgVar, &avgDrawdown, &avgLeverage, &totalPositions,
+	)
+
+	// 查询风险违规次数
+	violationsQuery := `
+		SELECT COUNT(*)
+		FROM risk_alerts
+		WHERE created_at >= NOW() - INTERVAL '24 hours'
+		AND status = 'active'
+	`
+
+	var violations int
+	if err2 := h.db.QueryRowContext(ctx, violationsQuery).Scan(&violations); err2 != nil {
+		violations = 0
+	}
+
+	// 计算风险等级
+	riskLevel := "低风险"
+	if err != nil || totalPositions == 0 {
+		// 如果查询失败或没有数据，返回默认值
+		return map[string]interface{}{
+			"level":      "未知",
+			"exposure":   0.0,
+			"limit":      100000.00,
+			"violations": violations,
+			"metrics": map[string]interface{}{
+				"risk_score": 0.0,
+				"var_95":     0.0,
+				"drawdown":   0.0,
+				"leverage":   0.0,
+			},
+			"db_error": err.Error(),
+		}
+	}
+
+	// 根据风险分数确定风险等级
+	switch {
+	case avgRiskScore < 0.2:
+		riskLevel = "低风险"
+	case avgRiskScore < 0.4:
+		riskLevel = "中风险"
+	case avgRiskScore < 0.7:
+		riskLevel = "高风险"
+	default:
+		riskLevel = "极高风险"
+	}
+
+	// 计算风险暴露（基于VaR）
+	exposure := avgVar * 100000 // 假设基础资金为10万
+	limit := 100000.0           // 风险限额
+
 	return map[string]interface{}{
-		"level":      "低风险",
-		"exposure":   45000.00,
-		"limit":      100000.00,
-		"violations": 0,
+		"level":      riskLevel,
+		"exposure":   exposure,
+		"limit":      limit,
+		"violations": violations,
+		"metrics": map[string]interface{}{
+			"risk_score": avgRiskScore,
+			"var_95":     avgVar,
+			"drawdown":   avgDrawdown,
+			"leverage":   avgLeverage,
+		},
+		"positions": totalPositions,
 	}
 }
 
