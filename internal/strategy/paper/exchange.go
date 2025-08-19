@@ -3,6 +3,7 @@ package paper
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -354,6 +355,85 @@ func (e *Exchange) GetRiskLimits(ctx context.Context, symbol string) (*exchange.
 		MaxOrderQty:      1000,
 		MinOrderQty:      0.001,
 	}, nil
+}
+
+// GetMarginInfo implements exchange.Exchange
+func (e *Exchange) GetMarginInfo(ctx context.Context) (*exchange.MarginInfo, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	totalBalance := 0.0
+	for _, balance := range e.account.Balances {
+		totalBalance += balance
+	}
+
+	return &exchange.MarginInfo{
+		TotalAssetValue:   totalBalance,
+		TotalDebtValue:    0.0,
+		MarginRatio:       0.0,
+		MaintenanceMargin: 1.1,
+		MarginCallRatio:   1.5,
+		LiquidationRatio:  1.0,
+		UpdatedAt:         time.Now(),
+	}, nil
+}
+
+// SetRiskLimits implements exchange.Exchange
+func (e *Exchange) SetRiskLimits(ctx context.Context, symbol string, limits *exchange.RiskLimits) error {
+	// Paper trading doesn't enforce risk limits, just log the action
+	log.Printf("Paper trading: Set risk limits for %s: %+v", symbol, limits)
+	return nil
+}
+
+// GetPositionByID implements exchange.Exchange
+func (e *Exchange) GetPositionByID(ctx context.Context, positionID string) (*exchange.Position, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	// In paper trading, we use symbol as position ID
+	pos, exists := e.account.Positions[positionID]
+	if !exists {
+		return nil, &ErrPositionNotFound{Symbol: positionID}
+	}
+
+	return &exchange.Position{
+		Symbol:        pos.Symbol,
+		Side:          string(pos.Side),
+		Quantity:      pos.Quantity,
+		EntryPrice:    pos.EntryPrice,
+		Leverage:      pos.Leverage,
+		MarginType:    string(pos.MarginType),
+		UnrealizedPnL: pos.UnrealizedPnL,
+		UpdatedAt:     pos.UpdatedAt,
+	}, nil
+}
+
+// GetSymbolPrice implements exchange.Exchange
+func (e *Exchange) GetSymbolPrice(ctx context.Context, symbol string) (float64, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	book := e.orderBook[symbol]
+	if book == nil {
+		return 0, fmt.Errorf("no market data available for symbol: %s", symbol)
+	}
+
+	// Return mid price if both bid and ask are available
+	if len(book.Bids) > 0 && len(book.Asks) > 0 {
+		return (book.Bids[0].Price + book.Asks[0].Price) / 2, nil
+	}
+
+	// Return bid price if only bid is available
+	if len(book.Bids) > 0 {
+		return book.Bids[0].Price, nil
+	}
+
+	// Return ask price if only ask is available
+	if len(book.Asks) > 0 {
+		return book.Asks[0].Price, nil
+	}
+
+	return 0, fmt.Errorf("no price data available for symbol: %s", symbol)
 }
 
 // GetOrderHistory implements exchange.Exchange

@@ -231,7 +231,7 @@ func (oe *OrderExecutor) placeOrder(ctx context.Context, action *ExecutionAction
 	price, _ := action.Parameters["price"].(float64)
 	orderType, _ := action.Parameters["type"].(string)
 
-	log.Printf("Placing %s order for %s: %.4f @ %.4f", side, symbol, quantity, price)
+	log.Printf("Placing %s %s order for %s: %.4f @ %.4f", orderType, side, symbol, quantity, price)
 
 	// TODO: 实现下单逻辑
 	// 1. 验证订单参数

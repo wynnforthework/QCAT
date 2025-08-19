@@ -73,6 +73,7 @@ type TaskType string
 const (
 	TaskTypeOptimization       TaskType = "optimization"
 	TaskTypeRiskMonitoring     TaskType = "risk_monitoring"
+	TaskTypeRiskManagement     TaskType = "risk_management"
 	TaskTypePositionManagement TaskType = "position_management"
 	TaskTypeDataProcessing     TaskType = "data_processing"
 	TaskTypeSystemMaintenance  TaskType = "system_maintenance"
@@ -444,6 +445,162 @@ func (as *AutomationScheduler) registerDefaultTasks() {
 		Timeout:    time.Hour,
 		MaxRetries: 2,
 		Handler:    as.learningScheduler.HandleLearning,
+	})
+
+	// 7. 周期性策略优化
+	as.RegisterTask(&ScheduledTask{
+		ID:         "periodic_strategy_optimization",
+		Name:       "周期性策略优化",
+		Type:       TaskTypeOptimization,
+		Category:   CategoryStrategy,
+		Schedule:   "0 2 * * 0", // 每周日凌晨2点执行
+		Priority:   7,
+		Timeout:    time.Hour * 3,
+		MaxRetries: 2,
+		Handler:    as.strategyScheduler.HandlePeriodicOptimization,
+	})
+
+	// 8. 策略淘汰与限时禁用
+	as.RegisterTask(&ScheduledTask{
+		ID:         "strategy_elimination",
+		Name:       "策略淘汰与限时禁用",
+		Type:       TaskTypeOptimization,
+		Category:   CategoryStrategy,
+		Schedule:   "0 1 * * *", // 每天凌晨1点执行
+		Priority:   8,
+		Timeout:    time.Minute * 30,
+		MaxRetries: 2,
+		Handler:    as.strategyScheduler.HandleElimination,
+	})
+
+	// 9. 新策略引入
+	as.RegisterTask(&ScheduledTask{
+		ID:         "new_strategy_introduction",
+		Name:       "新策略引入",
+		Type:       TaskTypeOptimization,
+		Category:   CategoryStrategy,
+		Schedule:   "0 3 * * 1", // 每周一凌晨3点执行
+		Priority:   9,
+		Timeout:    time.Hour,
+		MaxRetries: 2,
+		Handler:    as.strategyScheduler.HandleNewStrategyIntroduction,
+	})
+
+	// 10. 止盈止损线自动调整
+	as.RegisterTask(&ScheduledTask{
+		ID:         "stop_loss_adjustment",
+		Name:       "止盈止损线自动调整",
+		Type:       TaskTypeRiskManagement,
+		Category:   CategoryRisk,
+		Schedule:   "*/30 * * * *", // 每30分钟执行
+		Priority:   10,
+		Timeout:    time.Minute * 10,
+		MaxRetries: 2,
+		Handler:    as.riskScheduler.HandleStopLossAdjustment,
+	})
+
+	// 11. 热门币种推荐
+	as.RegisterTask(&ScheduledTask{
+		ID:         "hot_coin_recommendation",
+		Name:       "热门币种推荐",
+		Type:       TaskTypeDataProcessing,
+		Category:   CategoryData,
+		Schedule:   "0 */4 * * *", // 每4小时执行
+		Priority:   11,
+		Timeout:    time.Minute * 20,
+		MaxRetries: 2,
+		Handler:    as.dataScheduler.HandleHotCoinRecommendation,
+	})
+
+	// 12. 利润最大化引擎
+	as.RegisterTask(&ScheduledTask{
+		ID:         "profit_maximization",
+		Name:       "利润最大化引擎",
+		Type:       TaskTypeOptimization,
+		Category:   CategoryStrategy,
+		Schedule:   "*/10 * * * *", // 每10分钟执行
+		Priority:   12,
+		Timeout:    time.Minute * 15,
+		MaxRetries: 2,
+		Handler:    as.strategyScheduler.HandleProfitMaximization,
+	})
+
+	// 13. 资金分散与转移
+	as.RegisterTask(&ScheduledTask{
+		ID:         "fund_distribution",
+		Name:       "资金分散与转移",
+		Type:       TaskTypeRiskManagement,
+		Category:   CategoryRisk,
+		Schedule:   "0 */6 * * *", // 每6小时执行
+		Priority:   13,
+		Timeout:    time.Minute * 30,
+		MaxRetries: 2,
+		Handler:    as.riskScheduler.HandleFundDistribution,
+	})
+
+	// 14. 自动化多策略对冲
+	as.RegisterTask(&ScheduledTask{
+		ID:         "multi_strategy_hedging",
+		Name:       "自动化多策略对冲",
+		Type:       TaskTypePositionManagement,
+		Category:   CategoryPosition,
+		Schedule:   "*/20 * * * *", // 每20分钟执行
+		Priority:   14,
+		Timeout:    time.Minute * 10,
+		MaxRetries: 2,
+		Handler:    as.positionScheduler.HandleMultiStrategyHedging,
+	})
+
+	// 15. 因子库动态更新
+	as.RegisterTask(&ScheduledTask{
+		ID:         "factor_library_update",
+		Name:       "因子库动态更新",
+		Type:       TaskTypeDataProcessing,
+		Category:   CategoryData,
+		Schedule:   "0 0 * * *", // 每天执行
+		Priority:   15,
+		Timeout:    time.Hour,
+		MaxRetries: 2,
+		Handler:    as.dataScheduler.HandleFactorLibraryUpdate,
+	})
+
+	// 16. 策略自学习AutoML
+	as.RegisterTask(&ScheduledTask{
+		ID:         "automl_learning",
+		Name:       "策略自学习AutoML",
+		Type:       TaskTypeLearning,
+		Category:   CategoryLearning,
+		Schedule:   "0 2 * * *", // 每天凌晨2点执行
+		Priority:   16,
+		Timeout:    time.Hour * 2,
+		MaxRetries: 2,
+		Handler:    as.learningScheduler.HandleAutoMLLearning,
+	})
+
+	// 17. 遗传淘汰制升级
+	as.RegisterTask(&ScheduledTask{
+		ID:         "genetic_evolution",
+		Name:       "遗传淘汰制升级",
+		Type:       TaskTypeLearning,
+		Category:   CategoryLearning,
+		Schedule:   "0 3 * * 0", // 每周日凌晨3点执行
+		Priority:   17,
+		Timeout:    time.Hour * 3,
+		MaxRetries: 2,
+		Handler:    as.learningScheduler.HandleGeneticEvolution,
+	})
+
+	// 18. 市场模式识别
+	as.RegisterTask(&ScheduledTask{
+		ID:         "market_pattern_recognition",
+		Name:       "市场模式识别",
+		Type:       TaskTypeDataProcessing,
+		Category:   CategoryData,
+		Schedule:   "*/5 * * * *", // 每5分钟执行
+		Priority:   18,
+		Timeout:    time.Minute * 5,
+		MaxRetries: 2,
+		Handler:    as.dataScheduler.HandleMarketPatternRecognition,
 	})
 }
 

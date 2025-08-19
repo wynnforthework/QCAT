@@ -12,8 +12,12 @@ import (
 	"qcat/internal/api"
 	"qcat/internal/automation"
 	"qcat/internal/config"
+	"qcat/internal/exchange"
+	"qcat/internal/exchange/account"
+	"qcat/internal/exchange/binance"
 	"qcat/internal/orchestrator"
 	"qcat/internal/strategy/optimizer"
+	"qcat/internal/strategy/paper"
 )
 
 func main() {
@@ -157,22 +161,61 @@ func initializeAutomationSystem(cfg *config.Config, server *api.Server) (*automa
 		return nil, fmt.Errorf("database not available")
 	}
 
+	// 获取metrics组件
+	metricsCollector := server.GetMetricsCollector()
+	if metricsCollector == nil {
+		return nil, fmt.Errorf("metrics collector not available")
+	}
+
+	// 获取Redis缓存
+	redis := server.GetRedis()
+	if redis == nil {
+		return nil, fmt.Errorf("redis cache not available")
+	}
+
 	// 创建优化器工厂
 	optimizerFactory := optimizer.NewFactory()
 
-	// 这里需要获取exchange和accountManager
-	// 由于当前架构限制，我们先创建一个简化版本
-	// 在实际部署时需要从server获取这些组件
+	// 创建exchange客户端
+	var exchangeClient exchange.Exchange
+	if cfg.Exchange.APIKey != "" && cfg.Exchange.APISecret != "" {
+		// 创建真实的exchange客户端
+		exchangeConfig := &exchange.ExchangeConfig{
+			Name:           cfg.Exchange.Name,
+			APIKey:         cfg.Exchange.APIKey,
+			APISecret:      cfg.Exchange.APISecret,
+			TestNet:        cfg.Exchange.TestNet,
+			BaseURL:        cfg.Exchange.BaseURL,
+			FuturesBaseURL: cfg.Exchange.FuturesBaseURL,
+		}
+
+		// 创建速率限制器
+		rateLimiter := exchange.NewRateLimiter(redis, time.Second)
+
+		// 创建Binance客户端
+		exchangeClient = binance.NewClient(exchangeConfig, rateLimiter)
+		log.Printf("Exchange client initialized: %s", cfg.Exchange.Name)
+	} else {
+		// 使用纸上交易exchange
+		log.Printf("Warning: Using paper trading exchange (no API credentials)")
+		exchangeClient = paper.NewExchange(nil, map[string]float64{
+			"USDT": 100000.0, // 初始资金
+		})
+	}
+
+	// 创建账户管理器
+	accountManager := account.NewManager(db.DB, redis, exchangeClient)
 
 	// 创建自动化系统
 	automationSystem := automation.NewAutomationSystem(
 		cfg,
 		db,
-		nil, // exchange - 需要从server获取
-		nil, // accountManager - 需要从server获取
-		nil, // metrics - 需要从server获取
+		exchangeClient,
+		accountManager,
+		metricsCollector,
 		optimizerFactory,
 	)
 
+	log.Println("✅ Automation system initialized with all components")
 	return automationSystem, nil
 }

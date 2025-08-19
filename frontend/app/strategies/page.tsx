@@ -23,10 +23,13 @@ export default function StrategiesPage() {
         setLoading(true)
         setError(null)
         const strategies = await apiClient.getStrategies()
-        setStrategies(strategies)
+        // 确保 strategies 始终是一个数组
+        setStrategies(Array.isArray(strategies) ? strategies : [])
       } catch (error) {
         console.error("Failed to fetch strategies:", error)
         setError('无法获取策略数据，请检查后端服务是否正常运行')
+        // 发生错误时也要确保 strategies 是空数组
+        setStrategies([])
       } finally {
         setLoading(false)
       }
@@ -72,7 +75,7 @@ export default function StrategiesPage() {
       }
       // 重新获取策略数据以更新状态
       const updatedStrategies = await apiClient.getStrategies()
-      setStrategies(updatedStrategies)
+      setStrategies(Array.isArray(updatedStrategies) ? updatedStrategies : [])
     } catch (error) {
       console.error(`Failed to execute action ${action} for strategy ${strategyId}:`, error)
     }
@@ -111,7 +114,7 @@ export default function StrategiesPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {strategies.map((strategy) => (
+        {(strategies || []).map((strategy) => (
           <Card key={strategy.id} className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-center justify-between">

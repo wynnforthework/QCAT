@@ -1,3 +1,8 @@
+-- Migration 000009: Add remaining tables with improved error handling
+-- This migration adds hotlist_scores, trading_whitelist, audit tables and fixes existing table structures
+
+BEGIN;
+
 -- Create hotlist_scores table for hot symbol scoring
 CREATE TABLE IF NOT EXISTS hotlist_scores (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -28,22 +33,97 @@ CREATE TABLE IF NOT EXISTS trading_whitelist (
     UNIQUE(symbol)
 );
 
--- Create audit_logs table for system audit logging
-CREATE TABLE IF NOT EXISTS audit_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id UUID, -- references users(id)
-    action VARCHAR(100) NOT NULL,
-    resource_type VARCHAR(50) NOT NULL, -- 'strategy', 'portfolio', 'order', 'user', etc.
-    resource_id UUID,
-    old_values JSONB,
-    new_values JSONB,
-    ip_address INET,
-    user_agent TEXT,
-    session_id VARCHAR(100),
-    status VARCHAR(20) NOT NULL DEFAULT 'success', -- 'success', 'failed', 'pending'
-    error_message TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+-- Update existing audit_logs table structure to match handler expectations
+DO $$
+BEGIN
+    -- Check if audit_logs table exists and has the old structure
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'audit_logs') THEN
+        -- Add missing columns if they don't exist
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'resource_type') THEN
+            -- If entity_type exists, rename it to resource_type
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'entity_type') THEN
+                ALTER TABLE audit_logs RENAME COLUMN entity_type TO resource_type;
+            ELSE
+                ALTER TABLE audit_logs ADD COLUMN resource_type VARCHAR(50);
+            END IF;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'resource_id') THEN
+            -- If entity_id exists, rename it to resource_id
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'entity_id') THEN
+                ALTER TABLE audit_logs RENAME COLUMN entity_id TO resource_id;
+            ELSE
+                ALTER TABLE audit_logs ADD COLUMN resource_id UUID;
+            END IF;
+        END IF;
+
+        -- Add other missing columns
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'old_values') THEN
+            -- If old_value exists, rename it to old_values
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'old_value') THEN
+                ALTER TABLE audit_logs RENAME COLUMN old_value TO old_values;
+            ELSE
+                ALTER TABLE audit_logs ADD COLUMN old_values JSONB;
+            END IF;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'new_values') THEN
+            -- If new_value exists, rename it to new_values
+            IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'new_value') THEN
+                ALTER TABLE audit_logs RENAME COLUMN new_value TO new_values;
+            ELSE
+                ALTER TABLE audit_logs ADD COLUMN new_values JSONB;
+            END IF;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'ip_address') THEN
+            ALTER TABLE audit_logs ADD COLUMN ip_address INET;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'user_agent') THEN
+            ALTER TABLE audit_logs ADD COLUMN user_agent TEXT;
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'session_id') THEN
+            ALTER TABLE audit_logs ADD COLUMN session_id VARCHAR(100);
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'status') THEN
+            ALTER TABLE audit_logs ADD COLUMN status VARCHAR(20) DEFAULT 'success';
+        END IF;
+
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'error_message') THEN
+            ALTER TABLE audit_logs ADD COLUMN error_message TEXT;
+        END IF;
+
+        -- Ensure action column has correct size
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'action' AND character_maximum_length < 100) THEN
+            ALTER TABLE audit_logs ALTER COLUMN action TYPE VARCHAR(100);
+        END IF;
+
+    ELSE
+        -- Create new audit_logs table if it doesn't exist
+        CREATE TABLE audit_logs (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            user_id UUID, -- references users(id)
+            action VARCHAR(100) NOT NULL,
+            resource_type VARCHAR(50) NOT NULL, -- 'strategy', 'portfolio', 'order', 'user', etc.
+            resource_id UUID,
+            old_values JSONB,
+            new_values JSONB,
+            ip_address INET,
+            user_agent TEXT,
+            session_id VARCHAR(100),
+            status VARCHAR(20) NOT NULL DEFAULT 'success', -- 'success', 'failed', 'pending'
+            error_message TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        -- Log error but don't fail the migration
+        RAISE NOTICE 'Error updating audit_logs table: %', SQLERRM;
+END $$;
 
 -- Create audit_decisions table for decision chain tracking
 CREATE TABLE IF NOT EXISTS audit_decisions (
@@ -125,10 +205,31 @@ CREATE INDEX IF NOT EXISTS idx_trading_whitelist_symbol ON trading_whitelist(sym
 CREATE INDEX IF NOT EXISTS idx_trading_whitelist_status ON trading_whitelist(status);
 CREATE INDEX IF NOT EXISTS idx_trading_whitelist_approved_at ON trading_whitelist(approved_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
-CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
+-- Create indexes for audit_logs only if table and columns exist
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'audit_logs') THEN
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'user_id') THEN
+            CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+        END IF;
+
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'action') THEN
+            CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
+        END IF;
+
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'resource_type')
+           AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'resource_id') THEN
+            CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
+        END IF;
+
+        IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'audit_logs' AND column_name = 'created_at') THEN
+            CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
+        END IF;
+    END IF;
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Error creating audit_logs indexes: %', SQLERRM;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_audit_decisions_strategy_id ON audit_decisions(strategy_id);
 CREATE INDEX IF NOT EXISTS idx_audit_decisions_type ON audit_decisions(decision_type);
@@ -168,3 +269,6 @@ BEGIN
         ('strategy_execution', 'momentum_strategy_cycle', 2500, 'ms', '{"strategy_type": "momentum", "symbol": "BTCUSDT"}');
     END IF;
 END $$;
+
+-- Commit the transaction
+COMMIT;

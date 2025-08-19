@@ -413,14 +413,15 @@ func NewServer(cfg *config.Config) (*Server, error) {
 			FuturesBaseURL: cfg.Exchange.FuturesBaseURL,
 		}
 
-		exchangeClient, err := binance.NewClient(exchangeConfig)
-		if err != nil {
-			log.Printf("Warning: Failed to initialize Binance client: %v", err)
-		} else {
-			// Create account manager
-			accountManager = account.NewManager(db.DB, redis, exchangeClient)
-			log.Printf("Account manager initialized successfully")
-		}
+		// Create rate limiter for Binance
+		rateLimiter := exchange.NewRateLimiter(redis, time.Second)
+
+		// Create Binance client with rate limiter
+		exchangeClient := binance.NewClient(exchangeConfig, rateLimiter)
+
+		// Create account manager
+		accountManager = account.NewManager(db.DB, redis, exchangeClient)
+		log.Printf("Account manager initialized successfully")
 	} else {
 		log.Printf("Warning: Binance API credentials not configured, using mock data")
 	}
@@ -1049,6 +1050,11 @@ func (s *Server) GetNetworkManager() *stability.NetworkReconnectManager {
 // GetHealthChecker returns the health checker
 func (s *Server) GetHealthChecker() *stability.HealthChecker {
 	return s.health
+}
+
+// GetMetricsCollector returns the metrics collector
+func (s *Server) GetMetricsCollector() *monitor.MetricsCollector {
+	return s.metricsCollector
 }
 
 // RegisterOrchestratorHandler registers the orchestrator handler routes

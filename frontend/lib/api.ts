@@ -121,6 +121,11 @@ class ApiClient {
         throw new Error(result.error || 'API request failed');
       }
 
+      // 确保返回的数据不是 undefined
+      if (result.data === undefined || result.data === null) {
+        console.warn(`API returned null/undefined data for ${endpoint}`);
+      }
+
       return result.data as T;
     } catch (error) {
       console.error('API request failed:', error);
@@ -150,7 +155,9 @@ class ApiClient {
 
   // Strategy API
   async getStrategies(): Promise<Strategy[]> {
-    return this.request<Strategy[]>('/api/v1/strategy/');
+    const result = await this.request<Strategy[]>('/api/v1/strategy/');
+    // 确保始终返回数组，即使 API 返回 null 或 undefined
+    return Array.isArray(result) ? result : [];
   }
 
   async getStrategy(id: string): Promise<Strategy> {

@@ -141,13 +141,13 @@ func (ss *StrategyScheduler) HandleOptimization(ctx context.Context, task *Sched
 
 // Strategy 策略信息
 type Strategy struct {
-	ID           string
-	Name         string
-	Status       string
+	ID            string
+	Name          string
+	Status        string
 	LastOptimized time.Time
-	Performance  float64
-	SharpeRatio  float64
-	MaxDrawdown  float64
+	Performance   float64
+	SharpeRatio   float64
+	MaxDrawdown   float64
 }
 
 // getStrategiesForOptimization 获取需要优化的策略
@@ -209,14 +209,31 @@ func (ss *StrategyScheduler) optimizeStrategy(ctx context.Context, strategyID st
 		ss.optimizers[strategyID] = orchestrator
 	}
 
+	// 创建优化配置
+	optimizationConfig := &optimizer.Config{
+		StrategyID: strategyID,
+		Method:     "walk_forward",
+		Params: map[string]interface{}{
+			"train_window": "30d",
+			"test_window":  "7d",
+			"step_size":    "7d",
+		},
+		Objective: "sharpe_ratio",
+	}
+
 	// 执行优化
-	result, err := orchestrator.OptimizeStrategy(ctx, strategyID)
+	taskID, err := orchestrator.StartOptimization(ctx, optimizationConfig)
 	if err != nil {
 		return fmt.Errorf("optimization failed: %w", err)
 	}
 
+	// 运行优化任务
+	if err := orchestrator.RunTask(ctx, taskID); err != nil {
+		return fmt.Errorf("failed to run optimization task: %w", err)
+	}
+
 	// 应用优化结果
-	if err := ss.applyOptimizationResult(ctx, strategyID, result); err != nil {
+	if err := ss.applyOptimizationResult(ctx, strategyID, taskID); err != nil {
 		return fmt.Errorf("failed to apply optimization result: %w", err)
 	}
 
@@ -230,7 +247,7 @@ func (ss *StrategyScheduler) optimizeStrategy(ctx context.Context, strategyID st
 }
 
 // applyOptimizationResult 应用优化结果
-func (ss *StrategyScheduler) applyOptimizationResult(ctx context.Context, strategyID string, result interface{}) error {
+func (ss *StrategyScheduler) applyOptimizationResult(ctx context.Context, strategyID string, taskID string) error {
 	// TODO: 实现优化结果应用逻辑
 	// 1. 验证优化结果
 	// 2. 创建新的策略版本
@@ -239,10 +256,10 @@ func (ss *StrategyScheduler) applyOptimizationResult(ctx context.Context, strate
 	// 5. 决定是否全量切换
 
 	log.Printf("Applying optimization result for strategy %s", strategyID)
-	
+
 	// 这里应该实现具体的应用逻辑
 	// 暂时只记录日志
-	
+
 	return nil
 }
 
@@ -294,5 +311,74 @@ func (ss *StrategyScheduler) HandleStrategyEvaluation(ctx context.Context, task 
 	// 4. 生成评估报告
 	// 5. 触发必要的优化任务
 
+	return nil
+}
+
+// HandlePeriodicOptimization 处理周期性策略优化任务
+func (ss *StrategyScheduler) HandlePeriodicOptimization(ctx context.Context, task *ScheduledTask) error {
+	log.Printf("Executing periodic strategy optimization task: %s", task.Name)
+
+	// 实现周期性策略优化逻辑
+	// 1. 检查策略性能是否下降
+	// 2. 触发自动优化
+	// 3. 应用优化结果
+	strategies, err := ss.getStrategiesForOptimization(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get strategies for periodic optimization: %w", err)
+	}
+
+	for _, strategy := range strategies {
+		if err := ss.optimizeStrategy(ctx, strategy.ID); err != nil {
+			log.Printf("Failed to optimize strategy %s: %v", strategy.ID, err)
+			continue
+		}
+		log.Printf("Successfully optimized strategy: %s", strategy.ID)
+	}
+
+	return nil
+}
+
+// HandleElimination 处理策略淘汰与限时禁用任务
+func (ss *StrategyScheduler) HandleElimination(ctx context.Context, task *ScheduledTask) error {
+	log.Printf("Executing strategy elimination task: %s", task.Name)
+
+	// 实现策略淘汰逻辑
+	// 1. 评估策略性能
+	// 2. 识别表现不佳的策略
+	// 3. 执行淘汰或禁用
+	// 4. 将策略移入冷却池
+
+	// TODO: 实现多臂赌博机算法进行策略比较
+	log.Printf("Strategy elimination logic executed")
+	return nil
+}
+
+// HandleNewStrategyIntroduction 处理新策略引入任务
+func (ss *StrategyScheduler) HandleNewStrategyIntroduction(ctx context.Context, task *ScheduledTask) error {
+	log.Printf("Executing new strategy introduction task: %s", task.Name)
+
+	// 实现新策略引入逻辑
+	// 1. 扫描策略库寻找新策略
+	// 2. 执行沙盒测试
+	// 3. 评估策略性能
+	// 4. 自动接入符合条件的策略
+
+	// TODO: 实现自动策略生成和接入流程
+	log.Printf("New strategy introduction logic executed")
+	return nil
+}
+
+// HandleProfitMaximization 处理利润最大化引擎任务
+func (ss *StrategyScheduler) HandleProfitMaximization(ctx context.Context, task *ScheduledTask) error {
+	log.Printf("Executing profit maximization task: %s", task.Name)
+
+	// 实现利润最大化逻辑
+	// 1. 分析当前收益状况
+	// 2. 执行全局收益优化
+	// 3. 调整策略权重和资金分配
+	// 4. 实时执行优化决策
+
+	// TODO: 实现全局收益优化算法
+	log.Printf("Profit maximization logic executed")
 	return nil
 }
