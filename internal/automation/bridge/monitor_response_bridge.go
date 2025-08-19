@@ -57,6 +57,9 @@ const (
 	EventTypeSystem        EventType = "system"
 	EventTypeStrategy      EventType = "strategy"
 	EventTypeMarket        EventType = "market"
+	EventTypeTrading       EventType = "trading"
+	EventTypeMaintenance   EventType = "maintenance"
+	EventTypeAudit         EventType = "audit"
 )
 
 // EventSeverity 事件严重程度
@@ -108,6 +111,8 @@ const (
 	ActionTypeOrder    ActionType = "order"
 	ActionTypeSystem   ActionType = "system"
 	ActionTypeAlert    ActionType = "alert"
+	ActionTypeStrategy ActionType = "strategy"
+	ActionTypeTrading  ActionType = "trading"
 )
 
 // BridgeStats 桥接器统计
@@ -153,8 +158,14 @@ func NewMonitorResponseBridge(
 		stats:         &BridgeStats{},
 	}
 
-	// 初始化默认响应规则
-	bridge.initializeDefaultRules()
+	// 使用增强的事件规则管理器初始化规则
+	ruleManager := NewEventRuleManager(bridge)
+	ruleManager.InitializeEnhancedRules()
+
+	// 验证规则
+	if err := ruleManager.ValidateRules(); err != nil {
+		log.Printf("Warning: Rule validation failed: %v", err)
+	}
 
 	// 初始化工作器
 	bridge.initializeWorkers()

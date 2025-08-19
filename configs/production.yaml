@@ -44,8 +44,8 @@ redis:
 # 交易所配置
 exchange:
   binance:
-    api_key: "${QCAT_EXCHANGE_API_KEY}"
-    api_secret: "${QCAT_EXCHANGE_API_SECRET}"
+    api_key: "${EXCHANGE_API_KEY}"
+    api_secret: "${EXCHANGE_API_SECRET}"
     testnet: false
     base_url: "https://fapi.binance.com"
     rate_limit: 1200

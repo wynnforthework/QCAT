@@ -72,7 +72,7 @@ exchange:
   retry_delay: 1s
 
 jwt:
-  secret_key: "${JWT_SECRET_KEY}"
+  secret_key: "${QCAT_JWT_SECRET_KEY}"
   duration: 24h
 
 monitoring:

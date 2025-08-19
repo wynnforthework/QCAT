@@ -585,7 +585,12 @@ func (ss *StrategyScheduler) HandleNewStrategyIntroduction(ctx context.Context, 
 	request := ss.createOnboardingRequest(coverageGaps)
 
 	// 5. 提交引入请求
-	status, err := onboardingService.SubmitOnboardingRequest(request)
+	mockService, ok := onboardingService.(*MockOnboardingService)
+	if !ok {
+		return fmt.Errorf("invalid onboarding service type")
+	}
+
+	status, err := mockService.SubmitOnboardingRequest(request)
 	if err != nil {
 		return fmt.Errorf("failed to submit onboarding request: %w", err)
 	}

@@ -1,0 +1,328 @@
+# Event Processing Rules Configuration
+# 事件处理规则配置
+
+# Global settings
+global:
+  # Enable event processing
+  enabled: true
+  # Default cooldown period for rules
+  default_cooldown: "5m"
+  # Default timeout for actions
+  default_timeout: "2m"
+  # Default max retries for actions
+  default_max_retries: 3
+  # Queue size for events
+  queue_size: 10000
+  # Number of worker threads
+  worker_count: 5
+
+# Event processing rules
+rules:
+  # Performance monitoring rules
+  performance_monitoring:
+    id: "performance_monitoring"
+    name: "性能监控事件处理"
+    event_type: "performance"
+    enabled: true
+    priority: 5
+    cooldown: "2m"
+    conditions:
+      - field: "type"
+        operator: "eq"
+        value: "performance"
+    actions:
+      - type: "system"
+        action: "log_performance_metrics"
+        parameters:
+          event_id: "{{event.id}}"
+          metrics: "{{event.metadata}}"
+        timeout: "1m"
+        max_retries: 1
+
+  strategy_performance_degradation:
+    id: "strategy_performance_degradation"
+    name: "策略性能下降处理"
+    event_type: "performance"
+    enabled: true
+    priority: 2
+    cooldown: "1h"
+    conditions:
+      - field: "metric_type"
+        operator: "eq"
+        value: "strategy_performance"
+      - field: "performance_score"
+        operator: "lt"
+        value: 0.3
+    actions:
+      - type: "strategy"
+        action: "pause_strategy"
+        parameters:
+          strategy_id: "{{event.metadata.strategy_id}}"
+          reason: "performance_degradation"
+        timeout: "5m"
+        max_retries: 2
+
+  system_performance_alert:
+    id: "system_performance_alert"
+    name: "系统性能告警处理"
+    event_type: "performance"
+    enabled: true
+    priority: 3
+    cooldown: "15m"
+    conditions:
+      - field: "metric_type"
+        operator: "eq"
+        value: "system_performance"
+      - field: "cpu_usage"
+        operator: "gt"
+        value: 0.8
+    actions:
+      - type: "system"
+        action: "optimize_system_resources"
+        parameters:
+          target: "cpu_optimization"
+        timeout: "10m"
+        max_retries: 1
+
+  # System monitoring rules
+  health_check_failure:
+    id: "health_check_failure"
+    name: "健康检查失败处理"
+    event_type: "system"
+    enabled: true
+    priority: 1
+    cooldown: "5m"
+    conditions:
+      - field: "event_type"
+        operator: "eq"
+        value: "health_check_failure"
+    actions:
+      - type: "system"
+        action: "restart_failed_service"
+        parameters:
+          service_name: "{{event.metadata.service_name}}"
+        timeout: "3m"
+        max_retries: 2
+
+  database_connection_failure:
+    id: "database_connection_failure"
+    name: "数据库连接失败处理"
+    event_type: "system"
+    enabled: true
+    priority: 1
+    cooldown: "2m"
+    conditions:
+      - field: "component"
+        operator: "eq"
+        value: "database"
+      - field: "status"
+        operator: "eq"
+        value: "connection_failed"
+    actions:
+      - type: "system"
+        action: "reconnect_database"
+        parameters:
+          max_attempts: 3
+          backoff: "exponential"
+        timeout: "2m"
+        max_retries: 3
+
+  cache_failure_handling:
+    id: "cache_failure_handling"
+    name: "缓存失败处理"
+    event_type: "system"
+    enabled: true
+    priority: 2
+    cooldown: "5m"
+    conditions:
+      - field: "component"
+        operator: "eq"
+        value: "cache"
+      - field: "status"
+        operator: "eq"
+        value: "failure"
+    actions:
+      - type: "system"
+        action: "enable_cache_fallback"
+        parameters:
+          fallback_mode: "memory"
+        timeout: "1m"
+        max_retries: 1
+
+  # Trading activity rules
+  order_execution_failure:
+    id: "order_execution_failure"
+    name: "订单执行失败处理"
+    event_type: "trading"
+    enabled: true
+    priority: 2
+    cooldown: "1m"
+    conditions:
+      - field: "event_type"
+        operator: "eq"
+        value: "order_failed"
+    actions:
+      - type: "position"
+        action: "retry_order_execution"
+        parameters:
+          order_id: "{{event.metadata.order_id}}"
+          retry_count: 3
+          retry_delay: "5s"
+        timeout: "2m"
+        max_retries: 3
+
+  position_size_limit_exceeded:
+    id: "position_size_limit_exceeded"
+    name: "仓位大小限制超出处理"
+    event_type: "risk_violation"
+    enabled: true
+    priority: 1
+    cooldown: "10m"
+    conditions:
+      - field: "violation_type"
+        operator: "eq"
+        value: "position_size_limit"
+    actions:
+      - type: "position"
+        action: "reduce_position_size"
+        parameters:
+          symbol: "{{event.metadata.symbol}}"
+          target_ratio: 0.8
+        timeout: "5m"
+        max_retries: 2
+
+  # Error handling rules
+  api_rate_limit_exceeded:
+    id: "api_rate_limit_exceeded"
+    name: "API速率限制超出处理"
+    event_type: "system"
+    enabled: true
+    priority: 3
+    cooldown: "2m"
+    conditions:
+      - field: "error_type"
+        operator: "eq"
+        value: "rate_limit_exceeded"
+    actions:
+      - type: "system"
+        action: "enable_rate_limit_backoff"
+        parameters:
+          backoff_duration: "30s"
+          endpoint: "{{event.metadata.endpoint}}"
+        timeout: "1m"
+        max_retries: 1
+
+  network_connectivity_issues:
+    id: "network_connectivity_issues"
+    name: "网络连接问题处理"
+    event_type: "system"
+    enabled: true
+    priority: 2
+    cooldown: "5m"
+    conditions:
+      - field: "error_type"
+        operator: "eq"
+        value: "network_error"
+    actions:
+      - type: "system"
+        action: "switch_to_backup_endpoint"
+        parameters:
+          primary_endpoint: "{{event.metadata.endpoint}}"
+        timeout: "2m"
+        max_retries: 2
+
+  # Risk management rules
+  risk_violation_emergency:
+    id: "risk_violation_emergency"
+    name: "风险违规紧急响应"
+    event_type: "risk_violation"
+    enabled: true
+    priority: 1
+    cooldown: "5m"
+    conditions:
+      - field: "severity"
+        operator: "eq"
+        value: "emergency"
+    actions:
+      - type: "risk"
+        action: "emergency_stop"
+        parameters: {}
+        timeout: "2m"
+        max_retries: 1
+
+  # Market monitoring rules
+  market_anomaly_hedge:
+    id: "market_anomaly_hedge"
+    name: "市场异常自动对冲"
+    event_type: "market"
+    enabled: true
+    priority: 2
+    cooldown: "30m"
+    conditions:
+      - field: "volatility"
+        operator: "gt"
+        value: 0.05
+      - field: "severity"
+        operator: "eq"
+        value: "critical"
+    actions:
+      - type: "position"
+        action: "hedge_position"
+        parameters:
+          hedge_ratio: 0.5
+        timeout: "10m"
+        max_retries: 2
+
+# Event severity levels
+severity_levels:
+  info:
+    priority: 5
+    auto_escalate: false
+  warning:
+    priority: 3
+    auto_escalate: true
+    escalate_after: "10m"
+  critical:
+    priority: 2
+    auto_escalate: true
+    escalate_after: "5m"
+  emergency:
+    priority: 1
+    auto_escalate: true
+    escalate_after: "1m"
+
+# Action types configuration
+action_types:
+  system:
+    timeout: "5m"
+    max_retries: 3
+    retry_delay: "10s"
+  position:
+    timeout: "10m"
+    max_retries: 2
+    retry_delay: "30s"
+  risk:
+    timeout: "2m"
+    max_retries: 1
+    retry_delay: "5s"
+  strategy:
+    timeout: "1h"
+    max_retries: 2
+    retry_delay: "5m"
+  trading:
+    timeout: "5m"
+    max_retries: 3
+    retry_delay: "15s"
+
+# Monitoring and alerting
+monitoring:
+  # Enable rule execution monitoring
+  enabled: true
+  # Log all rule executions
+  log_executions: true
+  # Alert on rule failures
+  alert_on_failures: true
+  # Maximum failed actions before alerting
+  max_failed_actions: 5
+  # Statistics collection interval
+  stats_interval: "1m"

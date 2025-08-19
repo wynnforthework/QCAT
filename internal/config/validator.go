@@ -502,9 +502,9 @@ func (v *Validator) ValidateRequired() error {
 	required := []string{
 		"QCAT_DATABASE_PASSWORD",
 		"QCAT_JWT_SECRET_KEY",
-		"QCAT_EXCHANGE_API_KEY",
-		"QCAT_EXCHANGE_API_SECRET",
-		"QCAT_ENCRYPTION_KEY",
+		"EXCHANGE_API_KEY",
+		"EXCHANGE_API_SECRET",
+		"ENCRYPTION_KEY",
 	}
 
 	var missing []string

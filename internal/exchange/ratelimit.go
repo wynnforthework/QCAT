@@ -100,24 +100,34 @@ func (r *RateLimiter) WaitWithFallback(ctx context.Context, exchange, name strin
 
 	// Try local rate limiter first
 	if err := r.Wait(ctx, name); err != nil {
-		// Fall back to Redis-based rate limiting
-		key := fmt.Sprintf("%s:%s", exchange, name)
-		ok, err := r.cache.CheckRateLimit(ctx, key, limit, window)
-		if err != nil {
-			// If Redis fails, use exponential backoff
-			waitTime := r.defaultWait
-			if strings.Contains(err.Error(), "rate limit") {
-				waitTime = time.Duration(float64(r.defaultWait) * 1.5) // Increase wait time
+		// Fall back to Redis-based rate limiting if cache is available
+		if r.cache != nil {
+			key := fmt.Sprintf("%s:%s", exchange, name)
+			ok, err := r.cache.CheckRateLimit(ctx, key, limit, window)
+			if err != nil {
+				// If Redis fails, use exponential backoff
+				waitTime := r.defaultWait
+				if strings.Contains(err.Error(), "rate limit") {
+					waitTime = time.Duration(float64(r.defaultWait) * 1.5) // Increase wait time
+				}
+				select {
+				case <-ctx.Done():
+					return ctx.Err()
+				case <-time.After(waitTime):
+					return nil
+				}
 			}
+			if !ok {
+				return fmt.Errorf("rate limit exceeded for %s", name)
+			}
+		} else {
+			// No cache available, use simple backoff
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case <-time.After(waitTime):
+			case <-time.After(r.defaultWait):
 				return nil
 			}
-		}
-		if !ok {
-			return fmt.Errorf("rate limit exceeded for %s", name)
 		}
 	}
 	return nil

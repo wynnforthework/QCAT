@@ -27,9 +27,11 @@ const (
 // Client represents a Binance API client
 type Client struct {
 	*exchange.BaseExchange
-	baseURL     string
-	httpClient  *http.Client
-	rateLimiter *exchange.RateLimiter
+	baseURL          string
+	httpClient       *http.Client
+	rateLimiter      *exchange.RateLimiter
+	rateLimitManager *RateLimitManager
+	errorHandler     *BinanceErrorHandler
 }
 
 // NewClient creates a new Binance client
@@ -40,10 +42,12 @@ func NewClient(config *exchange.ExchangeConfig, rateLimiter *exchange.RateLimite
 	}
 
 	return &Client{
-		BaseExchange: exchange.NewBaseExchange(config),
-		baseURL:      baseURL,
-		httpClient:   &http.Client{Timeout: 10 * time.Second},
-		rateLimiter:  rateLimiter,
+		BaseExchange:     exchange.NewBaseExchange(config),
+		baseURL:          baseURL,
+		httpClient:       &http.Client{Timeout: 10 * time.Second},
+		rateLimiter:      rateLimiter,
+		rateLimitManager: NewRateLimitManager(),
+		errorHandler:     NewBinanceErrorHandler(),
 	}
 }
 
@@ -86,12 +90,9 @@ func (c *Client) signRequest(method, endpoint string, params url.Values) (*http.
 
 // doRequest executes an API request with rate limiting and retries
 func (c *Client) doRequest(ctx context.Context, method, endpoint string, params url.Values, result interface{}) error {
-	// Configure rate limits based on endpoint
-	limit, window := c.getRateLimitForEndpoint(endpoint)
-
-	// Wait for rate limit
-	if err := c.rateLimiter.WaitWithFallback(ctx, "binance", endpoint, limit, window); err != nil {
-		return err
+	// Use the new rate limit manager for better control
+	if err := c.rateLimitManager.WaitForRateLimit(ctx, endpoint); err != nil {
+		return c.errorHandler.HandleError(err)
 	}
 
 	// Create and sign request
@@ -118,10 +119,15 @@ func (c *Client) doRequest(ctx context.Context, method, endpoint string, params 
 			if err := json.Unmarshal(body, &apiErr); err != nil {
 				return fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
 			}
-			return &exchange.Error{
+
+			// Create exchange error
+			exchangeErr := &exchange.Error{
 				Code:    apiErr.Code,
 				Message: apiErr.Msg,
 			}
+
+			// Handle with Binance-specific error handler
+			return c.errorHandler.HandleError(exchangeErr)
 		}
 
 		// Parse response

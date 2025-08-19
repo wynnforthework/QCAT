@@ -2,7 +2,6 @@ package generator
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"time"
 )
@@ -19,47 +18,47 @@ func NewMarketAnalyzer() *MarketAnalyzer {
 
 // MarketAnalysis 市场分析结果
 type MarketAnalysis struct {
-	Symbol       string    `json:"symbol"`
-	TimeRange    time.Duration `json:"time_range"`
-	Volatility   float64   `json:"volatility"`    // 波动率
-	Trend        float64   `json:"trend"`         // 趋势强度 (-1到1)
-	SharpeRatio  float64   `json:"sharpe_ratio"`  // 夏普比率
-	MaxDrawdown  float64   `json:"max_drawdown"`  // 最大回撤
-	MarketCycle  float64   `json:"market_cycle"`  // 市场周期(天)
-	Liquidity    float64   `json:"liquidity"`     // 流动性指标
-	Correlation  map[string]float64 `json:"correlation"` // 与其他资产的相关性
+	Symbol              string              `json:"symbol"`
+	TimeRange           time.Duration       `json:"time_range"`
+	Volatility          float64             `json:"volatility"`   // 波动率
+	Trend               float64             `json:"trend"`        // 趋势强度 (-1到1)
+	SharpeRatio         float64             `json:"sharpe_ratio"` // 夏普比率
+	MaxDrawdown         float64             `json:"max_drawdown"` // 最大回撤
+	MarketCycle         float64             `json:"market_cycle"` // 市场周期(天)
+	Liquidity           float64             `json:"liquidity"`    // 流动性指标
+	Correlation         map[string]float64  `json:"correlation"`  // 与其他资产的相关性
 	TechnicalIndicators TechnicalIndicators `json:"technical_indicators"`
-	MarketRegime string    `json:"market_regime"` // "trending", "ranging", "volatile"
-	Confidence   float64   `json:"confidence"`    // 分析置信度
+	MarketRegime        string              `json:"market_regime"` // "trending", "ranging", "volatile"
+	Confidence          float64             `json:"confidence"`    // 分析置信度
 }
 
 // TechnicalIndicators 技术指标
 type TechnicalIndicators struct {
-	RSI          float64 `json:"rsi"`           // RSI指标
-	MACD         float64 `json:"macd"`          // MACD指标
+	RSI            float64 `json:"rsi"`  // RSI指标
+	MACD           float64 `json:"macd"` // MACD指标
 	BollingerBands struct {
 		Upper  float64 `json:"upper"`
 		Middle float64 `json:"middle"`
 		Lower  float64 `json:"lower"`
 		Width  float64 `json:"width"`
 	} `json:"bollinger_bands"`
-	SMA20        float64 `json:"sma_20"`        // 20日简单移动平均
-	SMA50        float64 `json:"sma_50"`        // 50日简单移动平均
-	EMA12        float64 `json:"ema_12"`        // 12日指数移动平均
-	EMA26        float64 `json:"ema_26"`        // 26日指数移动平均
-	ATR          float64 `json:"atr"`           // 平均真实波幅
-	Volume       float64 `json:"volume"`        // 成交量
-	VolumeMA     float64 `json:"volume_ma"`     // 成交量移动平均
+	SMA20    float64 `json:"sma_20"`    // 20日简单移动平均
+	SMA50    float64 `json:"sma_50"`    // 50日简单移动平均
+	EMA12    float64 `json:"ema_12"`    // 12日指数移动平均
+	EMA26    float64 `json:"ema_26"`    // 26日指数移动平均
+	ATR      float64 `json:"atr"`       // 平均真实波幅
+	Volume   float64 `json:"volume"`    // 成交量
+	VolumeMA float64 `json:"volume_ma"` // 成交量移动平均
 }
 
 // AnalyzeMarket 分析市场数据
 func (ma *MarketAnalyzer) AnalyzeMarket(ctx context.Context, symbol string, timeRange time.Duration) (*MarketAnalysis, error) {
 	// 这里应该从实际的数据源获取数据
 	// 为了演示，我们使用模拟数据
-	
+
 	analysis := &MarketAnalysis{
-		Symbol:    symbol,
-		TimeRange: timeRange,
+		Symbol:      symbol,
+		TimeRange:   timeRange,
 		Correlation: make(map[string]float64),
 	}
 
@@ -126,7 +125,7 @@ func (ma *MarketAnalyzer) AnalyzeMarket(ctx context.Context, symbol string, time
 func (ma *MarketAnalyzer) calculateTechnicalIndicators(symbol string) TechnicalIndicators {
 	// 这里应该基于实际价格数据计算技术指标
 	// 为了演示，使用模拟值
-	
+
 	indicators := TechnicalIndicators{}
 
 	switch symbol {
@@ -216,19 +215,19 @@ func (ma *MarketAnalyzer) calculateCorrelations(symbol string) map[string]float6
 func (ma *MarketAnalyzer) AnalyzePerformance(ctx context.Context, strategyID string, timeRange time.Duration) (*PerformanceAnalysis, error) {
 	// 这里应该从数据库获取策略的历史表现数据
 	// 为了演示，返回模拟数据
-	
+
 	performance := &PerformanceAnalysis{
-		StrategyID:    strategyID,
-		TimeRange:     timeRange,
-		TotalReturn:   0.15,  // 15%收益
-		SharpeRatio:   1.2,
-		MaxDrawdown:   0.08,  // 8%最大回撤
-		WinRate:       0.65,  // 65%胜率
-		ProfitFactor:  1.8,
-		TotalTrades:   150,
-		AvgTrade:      0.001, // 0.1%平均收益
-		Volatility:    0.12,
-		Confidence:    0.8,
+		StrategyID:   strategyID,
+		TimeRange:    timeRange,
+		TotalReturn:  0.15, // 15%收益
+		SharpeRatio:  1.2,
+		MaxDrawdown:  0.08, // 8%最大回撤
+		WinRate:      0.65, // 65%胜率
+		ProfitFactor: 1.8,
+		TotalTrades:  150,
+		AvgTrade:     0.001, // 0.1%平均收益
+		Volatility:   0.12,
+		Confidence:   0.8,
 	}
 
 	return performance, nil

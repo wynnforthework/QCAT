@@ -11,10 +11,13 @@ import (
 	"qcat/internal/automation/executor"
 	"qcat/internal/automation/risk"
 	"qcat/internal/automation/scheduler"
+	"qcat/internal/cache"
 	"qcat/internal/config"
 	"qcat/internal/database"
 	"qcat/internal/exchange"
 	"qcat/internal/exchange/account"
+	"qcat/internal/exchange/position"
+	exchangeRisk "qcat/internal/exchange/risk"
 	"qcat/internal/monitor"
 	"qcat/internal/strategy/optimizer"
 )
@@ -94,9 +97,22 @@ func NewAutomationSystem(
 		monitorBridge, metrics, nil, nil,
 	)
 
-	// 创建智能风险控制器（暂时传入nil，内部会处理）
+	// 创建简单内存缓存（用于仓位管理器）
+	cacheFactory := cache.NewCacheFactory(&cache.CacheFactoryConfig{
+		MemoryEnabled: true,
+		MemoryMaxSize: 1000,
+	})
+	memoryCache := cacheFactory.CreateMemoryOnlyCache()
+
+	// 创建仓位管理器
+	positionManager := position.NewManager(db.DB, memoryCache, exchange)
+
+	// 创建风险引擎
+	riskEngine := exchangeRisk.NewRiskEngine(exchange, positionManager)
+
+	// 创建智能风险控制器
 	intelligentRiskController := risk.NewIntelligentRiskController(
-		cfg, db, exchange, nil, nil, realtimeExecutor, metrics,
+		cfg, db, exchange, positionManager, riskEngine, realtimeExecutor, metrics,
 	)
 
 	return &AutomationSystem{

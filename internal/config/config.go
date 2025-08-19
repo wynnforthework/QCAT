@@ -388,12 +388,16 @@ func Load(configPath string) (*Config, error) {
 		return nil, err
 	}
 
+	// Replace environment variables in YAML content
+	dataStr := string(data)
+	dataStr = envManager.ExpandEnvVars(dataStr)
+
 	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	if err := yaml.Unmarshal([]byte(dataStr), &config); err != nil {
 		return nil, err
 	}
 
-	// Override with environment variables
+	// Override with environment variables (for any remaining placeholders)
 	config.overrideWithEnv(envManager)
 
 	return &config, nil
@@ -480,20 +484,20 @@ func (c *Config) overrideWithEnv(env *EnvManager) {
 	}
 
 	// Redis configuration
-	if env.GetBool("REDIS_ENABLED", c.Redis.Enabled) != c.Redis.Enabled {
-		c.Redis.Enabled = env.GetBool("REDIS_ENABLED", c.Redis.Enabled)
+	if env.GetBool("QCAT_REDIS_ENABLED", c.Redis.Enabled) != c.Redis.Enabled {
+		c.Redis.Enabled = env.GetBool("QCAT_REDIS_ENABLED", c.Redis.Enabled)
 	}
-	if env.GetString("REDIS_ADDR", "") != "" {
-		c.Redis.Addr = env.GetString("REDIS_ADDR", c.Redis.Addr)
+	if env.GetString("QCAT_REDIS_ADDR", "") != "" {
+		c.Redis.Addr = env.GetString("QCAT_REDIS_ADDR", c.Redis.Addr)
 	}
-	if env.GetString("REDIS_PASSWORD", "") != "" {
-		c.Redis.Password = env.GetEncryptedString("REDIS_PASSWORD", c.Redis.Password)
+	if env.GetString("QCAT_REDIS_PASSWORD", "") != "" {
+		c.Redis.Password = env.GetEncryptedString("QCAT_REDIS_PASSWORD", c.Redis.Password)
 	}
-	if env.GetInt("REDIS_DB", -1) != -1 {
-		c.Redis.DB = env.GetInt("REDIS_DB", c.Redis.DB)
+	if env.GetInt("QCAT_REDIS_DB", -1) != -1 {
+		c.Redis.DB = env.GetInt("QCAT_REDIS_DB", c.Redis.DB)
 	}
-	if env.GetInt("REDIS_POOL_SIZE", 0) != 0 {
-		c.Redis.PoolSize = env.GetInt("REDIS_POOL_SIZE", c.Redis.PoolSize)
+	if env.GetInt("QCAT_REDIS_POOL_SIZE", 0) != 0 {
+		c.Redis.PoolSize = env.GetInt("QCAT_REDIS_POOL_SIZE", c.Redis.PoolSize)
 	}
 
 	// Exchange configuration
@@ -501,10 +505,20 @@ func (c *Config) overrideWithEnv(env *EnvManager) {
 		c.Exchange.Name = env.GetString("EXCHANGE_NAME", c.Exchange.Name)
 	}
 	if env.GetString("EXCHANGE_API_KEY", "") != "" {
-		c.Exchange.APIKey = env.GetEncryptedString("EXCHANGE_API_KEY", c.Exchange.APIKey)
+		// Try to get as encrypted string first, fallback to plain string
+		if encrypted := env.GetEncryptedString("EXCHANGE_API_KEY", ""); encrypted != "" {
+			c.Exchange.APIKey = encrypted
+		} else {
+			c.Exchange.APIKey = env.GetString("EXCHANGE_API_KEY", c.Exchange.APIKey)
+		}
 	}
 	if env.GetString("EXCHANGE_API_SECRET", "") != "" {
-		c.Exchange.APISecret = env.GetEncryptedString("EXCHANGE_API_SECRET", c.Exchange.APISecret)
+		// Try to get as encrypted string first, fallback to plain string
+		if encrypted := env.GetEncryptedString("EXCHANGE_API_SECRET", ""); encrypted != "" {
+			c.Exchange.APISecret = encrypted
+		} else {
+			c.Exchange.APISecret = env.GetString("EXCHANGE_API_SECRET", c.Exchange.APISecret)
+		}
 	}
 	if env.GetBool("EXCHANGE_TEST_NET", c.Exchange.TestNet) != c.Exchange.TestNet {
 		c.Exchange.TestNet = env.GetBool("EXCHANGE_TEST_NET", c.Exchange.TestNet)
@@ -517,11 +531,11 @@ func (c *Config) overrideWithEnv(env *EnvManager) {
 	}
 
 	// JWT configuration
-	if env.GetString("JWT_SECRET_KEY", "") != "" {
-		c.JWT.SecretKey = env.GetEncryptedString("JWT_SECRET_KEY", c.JWT.SecretKey)
+	if env.GetString("QCAT_JWT_SECRET_KEY", "") != "" {
+		c.JWT.SecretKey = env.GetEncryptedString("QCAT_JWT_SECRET_KEY", c.JWT.SecretKey)
 	}
-	if env.GetDuration("JWT_DURATION", 0) != 0 {
-		c.JWT.Duration = env.GetDuration("JWT_DURATION", c.JWT.Duration)
+	if env.GetDuration("QCAT_JWT_DURATION", 0) != 0 {
+		c.JWT.Duration = env.GetDuration("QCAT_JWT_DURATION", c.JWT.Duration)
 	}
 
 	// Security configuration

@@ -321,6 +321,11 @@ func (irc *IntelligentRiskController) updateRealTimeMetrics(ctx context.Context)
 	irc.riskMetrics.mu.Lock()
 	defer irc.riskMetrics.mu.Unlock()
 
+	// 检查仓位管理器是否为nil
+	if irc.posManager == nil {
+		return fmt.Errorf("position manager is not initialized")
+	}
+
 	// 获取当前组合信息
 	positions, err := irc.posManager.GetAllPositions(ctx)
 	if err != nil {
@@ -869,6 +874,12 @@ func (irc *IntelligentRiskController) stressTestingLoop() {
 // performStressTest 执行压力测试
 func (irc *IntelligentRiskController) performStressTest() error {
 	log.Println("Performing portfolio stress test")
+
+	// 检查仓位管理器是否为nil
+	if irc.posManager == nil {
+		log.Println("Position manager is not initialized, skipping stress test")
+		return nil
+	}
 
 	// 获取当前仓位
 	ctx := context.Background()

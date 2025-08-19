@@ -1,37 +1,33 @@
 package templates
 
-import (
-	"time"
-)
-
 // Template 策略模板
 type Template struct {
-	Name        string                    `json:"name"`
-	Description string                    `json:"description"`
-	Category    string                    `json:"category"`
-	Parameters  map[string]*Parameter     `json:"parameters"`
-	Indicators  []string                  `json:"indicators"`
-	Signals     map[string]*SignalConfig  `json:"signals"`
-	RiskRules   map[string]*RiskRule      `json:"risk_rules"`
-	Metadata    map[string]interface{}    `json:"metadata"`
+	Name        string                   `json:"name"`
+	Description string                   `json:"description"`
+	Category    string                   `json:"category"`
+	Parameters  map[string]*Parameter    `json:"parameters"`
+	Indicators  []string                 `json:"indicators"`
+	Signals     map[string]*SignalConfig `json:"signals"`
+	RiskRules   map[string]*RiskRule     `json:"risk_rules"`
+	Metadata    map[string]interface{}   `json:"metadata"`
 }
 
 // Parameter 策略参数定义
 type Parameter struct {
-	Name        string      `json:"name"`
-	Type        string      `json:"type"`        // "int", "float", "string", "bool"
-	Default     interface{} `json:"default"`
-	Min         interface{} `json:"min,omitempty"`
-	Max         interface{} `json:"max,omitempty"`
+	Name        string        `json:"name"`
+	Type        string        `json:"type"` // "int", "float", "string", "bool"
+	Default     interface{}   `json:"default"`
+	Min         interface{}   `json:"min,omitempty"`
+	Max         interface{}   `json:"max,omitempty"`
 	Options     []interface{} `json:"options,omitempty"` // 枚举选项
-	Description string      `json:"description"`
-	Required    bool        `json:"required"`
+	Description string        `json:"description"`
+	Required    bool          `json:"required"`
 }
 
 // SignalConfig 信号配置
 type SignalConfig struct {
-	Type        string                 `json:"type"`        // "entry", "exit", "stop"
-	Condition   string                 `json:"condition"`   // 信号条件表达式
+	Type        string                 `json:"type"`      // "entry", "exit", "stop"
+	Condition   string                 `json:"condition"` // 信号条件表达式
 	Parameters  map[string]interface{} `json:"parameters"`
 	Priority    int                    `json:"priority"`
 	Description string                 `json:"description"`
@@ -39,10 +35,10 @@ type SignalConfig struct {
 
 // RiskRule 风险规则
 type RiskRule struct {
-	Type        string                 `json:"type"`        // "stop_loss", "take_profit", "position_size"
+	Type        string                 `json:"type"` // "stop_loss", "take_profit", "position_size"
 	Condition   string                 `json:"condition"`
 	Parameters  map[string]interface{} `json:"parameters"`
-	Action      string                 `json:"action"`      // "close", "reduce", "alert"
+	Action      string                 `json:"action"` // "close", "reduce", "alert"
 	Description string                 `json:"description"`
 }
 

@@ -41,12 +41,20 @@ func NewEnvManager(encryptionKey string, prefix string) *EnvManager {
 
 // GetString gets a string environment variable
 func (em *EnvManager) GetString(key string, defaultValue string) string {
+	// Try with prefix first
 	envKey := em.prefix + strings.ToUpper(key)
 	value := os.Getenv(envKey)
-	if value == "" {
-		return defaultValue
+	if value != "" {
+		return value
 	}
-	return value
+
+	// Try without prefix as fallback
+	value = os.Getenv(strings.ToUpper(key))
+	if value != "" {
+		return value
+	}
+
+	return defaultValue
 }
 
 // GetInt gets an integer environment variable
@@ -272,4 +280,44 @@ func (em *EnvManager) ValidateRequired(required []string) error {
 	}
 
 	return nil
+}
+
+// ExpandEnvVars expands environment variables in a string
+func (em *EnvManager) ExpandEnvVars(s string) string {
+	// Replace ${VAR} and $VAR patterns
+	result := s
+
+	// Handle ${VAR} pattern
+	for {
+		start := strings.Index(result, "${")
+		if start == -1 {
+			break
+		}
+
+		end := strings.Index(result[start:], "}")
+		if end == -1 {
+			break
+		}
+		end += start
+
+		varName := result[start+2 : end]
+
+		// Try to get the variable value
+		varValue := ""
+
+		// First try with prefix
+		if val := os.Getenv(em.prefix + strings.ToUpper(varName)); val != "" {
+			varValue = val
+		} else if val := os.Getenv(strings.ToUpper(varName)); val != "" {
+			// Then try without prefix
+			varValue = val
+		} else {
+			// Use the original placeholder if not found
+			varValue = "${" + varName + "}"
+		}
+
+		result = result[:start] + varValue + result[end+1:]
+	}
+
+	return result
 }
