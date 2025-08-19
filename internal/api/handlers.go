@@ -1860,12 +1860,11 @@ func (h *MetricsHandler) GetStrategyMetrics(c *gin.Context) {
 
 // GetSystemMetrics returns system metrics
 func (h *MetricsHandler) GetSystemMetrics(c *gin.Context) {
-	// 实现获取系统指标逻辑
-	// 从监控系统获取系统指标
+	// 获取真实的系统指标
 	systemMetrics := map[string]interface{}{
-		"cpu_usage":            h.metrics.GetGaugeValue("system_cpu_usage"),
-		"memory_usage":         h.metrics.GetGaugeValue("system_memory_usage"),
-		"disk_usage":           h.metrics.GetGaugeValue("system_disk_usage"),
+		"cpu":                  h.metrics.GetGaugeValue("system_cpu_usage"),
+		"memory":               h.metrics.GetGaugeValue("system_memory_usage"),
+		"disk":                 h.metrics.GetGaugeValue("system_disk_usage"),
 		"network_io":           h.metrics.GetGaugeValue("system_network_io"),
 		"active_connections":   h.metrics.GetGaugeValue("system_active_connections"),
 		"database_connections": h.metrics.GetGaugeValue("database_connections"),
@@ -2361,29 +2360,66 @@ func (h *DashboardHandler) GetDashboardData(c *gin.Context) {
 
 // GetMarketData returns market data
 func (h *MarketHandler) GetMarketData(c *gin.Context) {
-	// 模拟市场数据，实际应该从数据库或外部API获取
-	marketData := []map[string]interface{}{
-		{
-			"symbol":     "BTCUSDT",
-			"price":      45000.0 + float64(time.Now().Unix()%1000),
-			"change24h":  2.5,
-			"volume":     1000000.0,
-			"lastUpdate": time.Now().Format(time.RFC3339),
-		},
-		{
-			"symbol":     "ETHUSDT",
-			"price":      3000.0 + float64(time.Now().Unix()%100),
-			"change24h":  1.8,
-			"volume":     800000.0,
-			"lastUpdate": time.Now().Format(time.RFC3339),
-		},
-		{
-			"symbol":     "ADAUSDT",
-			"price":      0.5 + float64(time.Now().Unix()%10)/100,
-			"change24h":  -0.5,
-			"volume":     500000.0,
-			"lastUpdate": time.Now().Format(time.RFC3339),
-		},
+	ctx := c.Request.Context()
+
+	// 尝试从数据库获取最新市场数据
+	query := `
+		SELECT symbol, price, change_24h, volume_24h, updated_at
+		FROM market_data
+		WHERE updated_at >= NOW() - INTERVAL '5 minutes'
+		ORDER BY updated_at DESC
+		LIMIT 20
+	`
+
+	rows, err := h.db.QueryContext(ctx, query)
+	if err != nil {
+		// 如果数据库查询失败，返回模拟数据
+		marketData := []map[string]interface{}{
+			{
+				"symbol":     "BTCUSDT",
+				"price":      45000.0 + float64(time.Now().Unix()%1000),
+				"change24h":  2.5,
+				"volume":     1000000.0,
+				"lastUpdate": time.Now().Format(time.RFC3339),
+				"source":     "fallback",
+			},
+			{
+				"symbol":     "ETHUSDT",
+				"price":      3000.0 + float64(time.Now().Unix()%100),
+				"change24h":  1.8,
+				"volume":     800000.0,
+				"lastUpdate": time.Now().Format(time.RFC3339),
+				"source":     "fallback",
+			},
+		}
+
+		c.JSON(http.StatusOK, Response{
+			Success: true,
+			Data:    marketData,
+		})
+		return
+	}
+	defer rows.Close()
+
+	var marketData []map[string]interface{}
+	for rows.Next() {
+		var symbol string
+		var price, change24h, volume24h float64
+		var updatedAt time.Time
+
+		if err := rows.Scan(&symbol, &price, &change24h, &volume24h, &updatedAt); err != nil {
+			continue
+		}
+
+		data := map[string]interface{}{
+			"symbol":     symbol,
+			"price":      price,
+			"change24h":  change24h,
+			"volume":     volume24h,
+			"lastUpdate": updatedAt.Format(time.RFC3339),
+			"source":     "database",
+		}
+		marketData = append(marketData, data)
 	}
 
 	// 记录指标
@@ -2406,24 +2442,70 @@ func (h *TradingHandler) GetTradingActivity(c *gin.Context) {
 		}
 	}
 
-	// 模拟交易活动数据，实际应该从数据库获取
-	activities := make([]map[string]interface{}, 0, limit)
+	ctx := c.Request.Context()
 
-	symbols := []string{"BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT"}
-	types := []string{"order", "fill", "cancel"}
-	sides := []string{"BUY", "SELL"}
-	statuses := []string{"success", "pending", "failed"}
+	// 从数据库获取真实交易活动
+	query := `
+		SELECT
+			id, symbol, side, quantity, price, status, created_at, order_type
+		FROM orders
+		WHERE created_at >= NOW() - INTERVAL '24 hours'
+		ORDER BY created_at DESC
+		LIMIT $1
+	`
 
-	for i := 0; i < limit; i++ {
+	rows, err := h.db.QueryContext(ctx, query, limit)
+	if err != nil {
+		// 如果查询失败，返回模拟数据
+		activities := make([]map[string]interface{}, 0, limit)
+		symbols := []string{"BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT"}
+		types := []string{"order", "fill", "cancel"}
+		sides := []string{"BUY", "SELL"}
+		statuses := []string{"success", "pending", "failed"}
+
+		for i := 0; i < limit; i++ {
+			activity := map[string]interface{}{
+				"id":        fmt.Sprintf("activity_%d_%d", time.Now().Unix(), i),
+				"type":      types[i%len(types)],
+				"symbol":    symbols[i%len(symbols)],
+				"side":      sides[i%len(sides)],
+				"amount":    float64(1 + i%10),
+				"price":     45000.0 + float64(i*100),
+				"timestamp": time.Now().Add(-time.Duration(i) * time.Minute).Format(time.RFC3339),
+				"status":    statuses[i%len(statuses)],
+				"source":    "fallback",
+			}
+			activities = append(activities, activity)
+		}
+
+		c.JSON(http.StatusOK, Response{
+			Success: true,
+			Data:    activities,
+		})
+		return
+	}
+	defer rows.Close()
+
+	var activities []map[string]interface{}
+	for rows.Next() {
+		var id, symbol, side, status, orderType string
+		var quantity, price float64
+		var createdAt time.Time
+
+		if err := rows.Scan(&id, &symbol, &side, &quantity, &price, &status, &createdAt, &orderType); err != nil {
+			continue
+		}
+
 		activity := map[string]interface{}{
-			"id":        fmt.Sprintf("activity_%d_%d", time.Now().Unix(), i),
-			"type":      types[i%len(types)],
-			"symbol":    symbols[i%len(symbols)],
-			"side":      sides[i%len(sides)],
-			"amount":    float64(1 + i%10),
-			"price":     45000.0 + float64(i*100),
-			"timestamp": time.Now().Add(-time.Duration(i) * time.Minute).Format(time.RFC3339),
-			"status":    statuses[i%len(statuses)],
+			"id":        id,
+			"type":      orderType,
+			"symbol":    symbol,
+			"side":      side,
+			"amount":    quantity,
+			"price":     price,
+			"timestamp": createdAt.Format(time.RFC3339),
+			"status":    status,
+			"source":    "database",
 		}
 		activities = append(activities, activity)
 	}
