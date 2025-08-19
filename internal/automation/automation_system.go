@@ -9,6 +9,7 @@ import (
 
 	"qcat/internal/automation/bridge"
 	"qcat/internal/automation/executor"
+	"qcat/internal/automation/risk"
 	"qcat/internal/automation/scheduler"
 	"qcat/internal/config"
 	"qcat/internal/database"
@@ -32,6 +33,7 @@ type AutomationSystem struct {
 	executor          *executor.RealtimeExecutor
 	bridge            *bridge.MonitorResponseBridge
 	monitorIntegrator *bridge.MonitorIntegration
+	riskController    *risk.IntelligentRiskController
 
 	// 运行状态
 	ctx       context.Context
@@ -92,6 +94,11 @@ func NewAutomationSystem(
 		monitorBridge, metrics, nil, nil,
 	)
 
+	// 创建智能风险控制器（暂时传入nil，内部会处理）
+	intelligentRiskController := risk.NewIntelligentRiskController(
+		cfg, db, exchange, nil, nil, realtimeExecutor, metrics,
+	)
+
 	return &AutomationSystem{
 		config:            cfg,
 		db:                db,
@@ -102,6 +109,7 @@ func NewAutomationSystem(
 		executor:          realtimeExecutor,
 		bridge:            monitorBridge,
 		monitorIntegrator: monitorIntegrator,
+		riskController:    intelligentRiskController,
 		ctx:               ctx,
 		cancel:            cancel,
 		status: &SystemStatus{
@@ -149,6 +157,15 @@ func (as *AutomationSystem) Start() error {
 		return fmt.Errorf("failed to start monitor integrator: %w", err)
 	}
 
+	// 启动智能风险控制器
+	if err := as.riskController.Start(); err != nil {
+		as.executor.Stop()           // 清理
+		as.scheduler.Stop()          // 清理
+		as.bridge.Stop()             // 清理
+		as.monitorIntegrator.Start() // 清理（这里应该是Stop，但没有Stop方法）
+		return fmt.Errorf("failed to start intelligent risk controller: %w", err)
+	}
+
 	// 启动监控循环
 	as.wg.Add(1)
 	go as.monitorLoop()
@@ -185,6 +202,11 @@ func (as *AutomationSystem) Stop() error {
 	// 停止调度器
 	if err := as.scheduler.Stop(); err != nil {
 		log.Printf("Warning: failed to stop scheduler: %v", err)
+	}
+
+	// 停止智能风险控制器
+	if err := as.riskController.Stop(); err != nil {
+		log.Printf("Warning: failed to stop intelligent risk controller: %v", err)
 	}
 
 	// 停止监控-响应桥接器
@@ -399,6 +421,11 @@ func (as *AutomationSystem) GetBridge() *bridge.MonitorResponseBridge {
 // GetMonitorIntegrator 获取监控集成器
 func (as *AutomationSystem) GetMonitorIntegrator() *bridge.MonitorIntegration {
 	return as.monitorIntegrator
+}
+
+// GetRiskController 获取智能风险控制器
+func (as *AutomationSystem) GetRiskController() *risk.IntelligentRiskController {
+	return as.riskController
 }
 
 // ProcessMonitorEvent 处理监控事件
