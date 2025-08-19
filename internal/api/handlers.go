@@ -2496,13 +2496,70 @@ func (h *DashboardHandler) getAccountData() map[string]interface{} {
 
 // getStrategyStatistics retrieves strategy statistics
 func (h *DashboardHandler) getStrategyStatistics() map[string]interface{} {
-	// 实际应该查询数据库中的策略状态
-	// 这里使用模拟数据
+	ctx := context.Background()
+
+	// 查询策略状态统计
+	query := `
+		SELECT
+			status,
+			COUNT(*) as count
+		FROM strategies
+		WHERE deleted_at IS NULL
+		GROUP BY status
+	`
+
+	rows, err := h.db.QueryContext(ctx, query)
+	if err != nil {
+		// 如果查询失败，返回模拟数据
+		return map[string]interface{}{
+			"total":    0,
+			"running":  0,
+			"stopped":  0,
+			"error":    0,
+			"db_error": err.Error(),
+		}
+	}
+	defer rows.Close()
+
+	stats := map[string]int{
+		"running": 0,
+		"stopped": 0,
+		"error":   0,
+		"paused":  0,
+		"draft":   0,
+	}
+
+	total := 0
+	for rows.Next() {
+		var status string
+		var count int
+		if err := rows.Scan(&status, &count); err != nil {
+			continue
+		}
+
+		// 映射状态到统计类别
+		switch status {
+		case "running", "active":
+			stats["running"] += count
+		case "stopped", "inactive", "disabled":
+			stats["stopped"] += count
+		case "error", "failed":
+			stats["error"] += count
+		case "paused":
+			stats["paused"] += count
+		case "draft", "pending":
+			stats["draft"] += count
+		}
+		total += count
+	}
+
 	return map[string]interface{}{
-		"total":   15,
-		"running": 8,
-		"stopped": 5,
-		"error":   2,
+		"total":   total,
+		"running": stats["running"],
+		"stopped": stats["stopped"],
+		"error":   stats["error"],
+		"paused":  stats["paused"],
+		"draft":   stats["draft"],
 	}
 }
 
