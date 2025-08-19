@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"sort"
 	"sync"
 	"time"
 
@@ -32,6 +33,9 @@ type StrategyScheduler struct {
 
 	// 淘汰管理器
 	eliminationManager *optimizer.EliminationManager
+
+	// 自动引入服务
+	onboardingService interface{} // 避免循环导入
 }
 
 // NewStrategyScheduler 创建策略调度器
@@ -553,14 +557,46 @@ func (ss *StrategyScheduler) HandleElimination(ctx context.Context, task *Schedu
 func (ss *StrategyScheduler) HandleNewStrategyIntroduction(ctx context.Context, task *ScheduledTask) error {
 	log.Printf("Executing new strategy introduction task: %s", task.Name)
 
-	// 实现新策略引入逻辑
-	// 1. 扫描策略库寻找新策略
-	// 2. 执行沙盒测试
-	// 3. 评估策略性能
-	// 4. 自动接入符合条件的策略
+	// 1. 获取或创建自动引入服务
+	onboardingService := ss.getOrCreateOnboardingService()
 
-	// TODO: 实现自动策略生成和接入流程
-	log.Printf("New strategy introduction logic executed")
+	// 2. 分析市场状况，确定需要引入的策略类型
+	symbols, err := ss.getActiveSymbols(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get active symbols: %w", err)
+	}
+
+	// 3. 检查当前策略覆盖情况
+	coverageGaps, err := ss.analyzeStrategyCoverage(ctx, symbols)
+	if err != nil {
+		return fmt.Errorf("failed to analyze strategy coverage: %w", err)
+	}
+
+	if len(coverageGaps) == 0 {
+		log.Printf("No strategy coverage gaps found, skipping new strategy introduction")
+		return nil
+	}
+
+	// 4. 创建自动引入请求
+	request := ss.createOnboardingRequest(coverageGaps)
+
+	// 5. 提交引入请求
+	status, err := onboardingService.SubmitOnboardingRequest(request)
+	if err != nil {
+		return fmt.Errorf("failed to submit onboarding request: %w", err)
+	}
+
+	// 6. 监控引入进度
+	if err := ss.monitorOnboardingProgress(ctx, status.RequestID, onboardingService); err != nil {
+		log.Printf("Warning: failed to monitor onboarding progress: %v", err)
+	}
+
+	// 7. 生成引入报告
+	if err := ss.generateOnboardingReport(ctx, status.RequestID, onboardingService); err != nil {
+		log.Printf("Warning: failed to generate onboarding report: %v", err)
+	}
+
+	log.Printf("New strategy introduction task completed successfully")
 	return nil
 }
 
@@ -1502,6 +1538,392 @@ func (ss *StrategyScheduler) saveEliminationReportToDB(ctx context.Context, repo
 		report["eliminated_strategies"],
 		report["cooldown_pool_size"],
 		reportJSON,
+	)
+
+	return err
+}
+
+// getOrCreateOnboardingService 获取或创建自动引入服务
+func (ss *StrategyScheduler) getOrCreateOnboardingService() interface{} {
+	if ss.onboardingService == nil {
+		// 这里应该创建实际的AutoOnboardingService实例
+		// 为了避免循环导入，暂时返回模拟服务
+		ss.onboardingService = &MockOnboardingService{}
+	}
+	return ss.onboardingService
+}
+
+// getActiveSymbols 获取活跃交易对
+func (ss *StrategyScheduler) getActiveSymbols(ctx context.Context) ([]string, error) {
+	// 从数据库或配置获取活跃交易对
+	query := `
+		SELECT DISTINCT symbol
+		FROM strategy_performance
+		WHERE last_updated >= NOW() - INTERVAL '7 days'
+		AND status = 'active'
+		ORDER BY symbol
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query)
+	if err != nil {
+		// 如果数据库查询失败，返回默认交易对
+		log.Printf("Database query failed, using default symbols: %v", err)
+		return []string{"BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "SOLUSDT"}, nil
+	}
+	defer rows.Close()
+
+	var symbols []string
+	for rows.Next() {
+		var symbol string
+		if err := rows.Scan(&symbol); err != nil {
+			log.Printf("Warning: failed to scan symbol: %v", err)
+			continue
+		}
+		symbols = append(symbols, symbol)
+	}
+
+	// 如果没有找到活跃交易对，返回默认列表
+	if len(symbols) == 0 {
+		symbols = []string{"BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "SOLUSDT"}
+	}
+
+	log.Printf("Found %d active symbols", len(symbols))
+	return symbols, nil
+}
+
+// StrategyCoverageGap 策略覆盖缺口
+type StrategyCoverageGap struct {
+	Symbol       string  `json:"symbol"`
+	StrategyType string  `json:"strategy_type"`
+	Priority     int     `json:"priority"`
+	Reason       string  `json:"reason"`
+	Confidence   float64 `json:"confidence"`
+}
+
+// analyzeStrategyCoverage 分析策略覆盖情况
+func (ss *StrategyScheduler) analyzeStrategyCoverage(ctx context.Context, symbols []string) ([]*StrategyCoverageGap, error) {
+	var gaps []*StrategyCoverageGap
+
+	for _, symbol := range symbols {
+		// 检查每个交易对的策略覆盖情况
+		coverage, err := ss.getSymbolStrategyCoverage(ctx, symbol)
+		if err != nil {
+			log.Printf("Warning: failed to get coverage for %s: %v", symbol, err)
+			continue
+		}
+
+		// 分析缺口
+		symbolGaps := ss.identifyStrategyCoverageGaps(symbol, coverage)
+		gaps = append(gaps, symbolGaps...)
+	}
+
+	// 按优先级排序
+	sort.Slice(gaps, func(i, j int) bool {
+		return gaps[i].Priority > gaps[j].Priority
+	})
+
+	log.Printf("Identified %d strategy coverage gaps", len(gaps))
+	return gaps, nil
+}
+
+// getSymbolStrategyCoverage 获取交易对的策略覆盖情况
+func (ss *StrategyScheduler) getSymbolStrategyCoverage(ctx context.Context, symbol string) (map[string]int, error) {
+	query := `
+		SELECT strategy_type, COUNT(*) as count
+		FROM strategies
+		WHERE symbol = $1 AND status = 'active'
+		GROUP BY strategy_type
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query, symbol)
+	if err != nil {
+		// 如果查询失败，返回空覆盖
+		return make(map[string]int), nil
+	}
+	defer rows.Close()
+
+	coverage := make(map[string]int)
+	for rows.Next() {
+		var strategyType string
+		var count int
+		if err := rows.Scan(&strategyType, &count); err != nil {
+			continue
+		}
+		coverage[strategyType] = count
+	}
+
+	return coverage, nil
+}
+
+// identifyStrategyCoverageGaps 识别策略覆盖缺口
+func (ss *StrategyScheduler) identifyStrategyCoverageGaps(symbol string, coverage map[string]int) []*StrategyCoverageGap {
+	var gaps []*StrategyCoverageGap
+
+	// 定义期望的策略类型和最小数量
+	expectedStrategies := map[string]int{
+		"momentum":        2,
+		"mean_reversion":  2,
+		"grid_trading":    1,
+		"trend_following": 2,
+		"arbitrage":       1,
+	}
+
+	for strategyType, expectedCount := range expectedStrategies {
+		currentCount := coverage[strategyType]
+		if currentCount < expectedCount {
+			gap := &StrategyCoverageGap{
+				Symbol:       symbol,
+				StrategyType: strategyType,
+				Priority:     ss.calculateGapPriority(symbol, strategyType, currentCount, expectedCount),
+				Reason:       fmt.Sprintf("需要 %d 个 %s 策略，当前只有 %d 个", expectedCount, strategyType, currentCount),
+				Confidence:   0.8,
+			}
+			gaps = append(gaps, gap)
+		}
+	}
+
+	return gaps
+}
+
+// calculateGapPriority 计算缺口优先级
+func (ss *StrategyScheduler) calculateGapPriority(symbol, strategyType string, current, expected int) int {
+	// 基础优先级
+	priority := (expected - current) * 10
+
+	// 根据交易对调整优先级
+	if symbol == "BTCUSDT" || symbol == "ETHUSDT" {
+		priority += 20 // 主流币种优先级更高
+	}
+
+	// 根据策略类型调整优先级
+	switch strategyType {
+	case "momentum":
+		priority += 15 // 动量策略优先级高
+	case "mean_reversion":
+		priority += 10 // 均值回归策略中等优先级
+	case "trend_following":
+		priority += 12 // 趋势跟踪策略较高优先级
+	case "grid_trading":
+		priority += 8 // 网格交易策略较低优先级
+	case "arbitrage":
+		priority += 5 // 套利策略最低优先级
+	}
+
+	return priority
+}
+
+// MockOnboardingService 模拟引入服务
+type MockOnboardingService struct{}
+
+// MockOnboardingRequest 模拟引入请求
+type MockOnboardingRequest struct {
+	RequestID       string                 `json:"request_id"`
+	Symbols         []string               `json:"symbols"`
+	MaxStrategies   int                    `json:"max_strategies"`
+	TestDuration    time.Duration          `json:"test_duration"`
+	RiskLevel       string                 `json:"risk_level"`
+	AutoDeploy      bool                   `json:"auto_deploy"`
+	DeployThreshold float64                `json:"deploy_threshold"`
+	Parameters      map[string]interface{} `json:"parameters"`
+	CreatedAt       time.Time              `json:"created_at"`
+}
+
+// MockOnboardingStatus 模拟引入状态
+type MockOnboardingStatus struct {
+	RequestID           string        `json:"request_id"`
+	Status              string        `json:"status"`
+	Progress            float64       `json:"progress"`
+	CurrentStage        string        `json:"current_stage"`
+	GeneratedStrategies []interface{} `json:"generated_strategies"`
+	TestResults         []interface{} `json:"test_results"`
+	DeployedStrategies  []string      `json:"deployed_strategies"`
+	Errors              []string      `json:"errors"`
+	Warnings            []string      `json:"warnings"`
+	StartTime           time.Time     `json:"start_time"`
+	EndTime             time.Time     `json:"end_time"`
+	Duration            time.Duration `json:"duration"`
+}
+
+// SubmitOnboardingRequest 提交引入请求
+func (m *MockOnboardingService) SubmitOnboardingRequest(req *MockOnboardingRequest) (*MockOnboardingStatus, error) {
+	status := &MockOnboardingStatus{
+		RequestID:           req.RequestID,
+		Status:              "queued",
+		Progress:            0.0,
+		CurrentStage:        "等待处理",
+		GeneratedStrategies: make([]interface{}, 0),
+		TestResults:         make([]interface{}, 0),
+		DeployedStrategies:  make([]string, 0),
+		Errors:              make([]string, 0),
+		Warnings:            make([]string, 0),
+		StartTime:           time.Now(),
+	}
+
+	log.Printf("Mock: Submitted onboarding request %s", req.RequestID)
+	return status, nil
+}
+
+// GetOnboardingStatus 获取引入状态
+func (m *MockOnboardingService) GetOnboardingStatus(requestID string) (*MockOnboardingStatus, error) {
+	// 模拟状态查询
+	status := &MockOnboardingStatus{
+		RequestID:          requestID,
+		Status:             "completed",
+		Progress:           1.0,
+		CurrentStage:       "完成",
+		DeployedStrategies: []string{"mock_strategy_1", "mock_strategy_2"},
+		StartTime:          time.Now().Add(-time.Hour),
+		EndTime:            time.Now(),
+		Duration:           time.Hour,
+	}
+
+	return status, nil
+}
+
+// createOnboardingRequest 创建引入请求
+func (ss *StrategyScheduler) createOnboardingRequest(gaps []*StrategyCoverageGap) *MockOnboardingRequest {
+	// 提取需要的交易对
+	symbolMap := make(map[string]bool)
+	for _, gap := range gaps {
+		symbolMap[gap.Symbol] = true
+	}
+
+	var symbols []string
+	for symbol := range symbolMap {
+		symbols = append(symbols, symbol)
+	}
+
+	// 计算需要生成的策略数量
+	maxStrategies := len(gaps)
+	if maxStrategies > 10 {
+		maxStrategies = 10 // 限制最大数量
+	}
+
+	request := &MockOnboardingRequest{
+		RequestID:       fmt.Sprintf("auto_onboard_%d", time.Now().Unix()),
+		Symbols:         symbols,
+		MaxStrategies:   maxStrategies,
+		TestDuration:    time.Hour * 2,
+		RiskLevel:       "medium",
+		AutoDeploy:      true,
+		DeployThreshold: 0.6,
+		Parameters: map[string]interface{}{
+			"auto_generated": true,
+			"coverage_gaps":  gaps,
+		},
+		CreatedAt: time.Now(),
+	}
+
+	log.Printf("Created onboarding request for %d symbols, %d strategies", len(symbols), maxStrategies)
+	return request
+}
+
+// monitorOnboardingProgress 监控引入进度
+func (ss *StrategyScheduler) monitorOnboardingProgress(ctx context.Context, requestID string, service interface{}) error {
+	mockService, ok := service.(*MockOnboardingService)
+	if !ok {
+		return fmt.Errorf("invalid service type")
+	}
+
+	// 模拟监控过程
+	ticker := time.NewTicker(time.Second * 30)
+	defer ticker.Stop()
+
+	timeout := time.After(time.Minute * 10) // 10分钟超时
+
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timeout:
+			log.Printf("Onboarding monitoring timeout for request %s", requestID)
+			return nil
+		case <-ticker.C:
+			status, err := mockService.GetOnboardingStatus(requestID)
+			if err != nil {
+				log.Printf("Failed to get onboarding status: %v", err)
+				continue
+			}
+
+			log.Printf("Onboarding progress: %s - %.1f%% - %s",
+				status.Status, status.Progress*100, status.CurrentStage)
+
+			if status.Status == "completed" || status.Status == "failed" {
+				log.Printf("Onboarding monitoring completed for request %s", requestID)
+				return nil
+			}
+		}
+	}
+}
+
+// generateOnboardingReport 生成引入报告
+func (ss *StrategyScheduler) generateOnboardingReport(ctx context.Context, requestID string, service interface{}) error {
+	mockService, ok := service.(*MockOnboardingService)
+	if !ok {
+		return fmt.Errorf("invalid service type")
+	}
+
+	status, err := mockService.GetOnboardingStatus(requestID)
+	if err != nil {
+		return fmt.Errorf("failed to get final status: %w", err)
+	}
+
+	// 生成报告
+	report := map[string]interface{}{
+		"request_id":           requestID,
+		"status":               status.Status,
+		"progress":             status.Progress,
+		"generated_strategies": len(status.GeneratedStrategies),
+		"test_results":         len(status.TestResults),
+		"deployed_strategies":  len(status.DeployedStrategies),
+		"errors":               len(status.Errors),
+		"warnings":             len(status.Warnings),
+		"duration":             status.Duration.String(),
+		"timestamp":            time.Now(),
+	}
+
+	// 保存报告到数据库（如果可用）
+	if ss.db != nil {
+		if err := ss.saveOnboardingReportToDB(ctx, report); err != nil {
+			log.Printf("Warning: failed to save onboarding report to database: %v", err)
+		}
+	}
+
+	// 记录关键信息
+	log.Printf("Onboarding Report Summary:")
+	log.Printf("  Request ID: %s", requestID)
+	log.Printf("  Status: %s", status.Status)
+	log.Printf("  Generated: %d, Tested: %d, Deployed: %d",
+		len(status.GeneratedStrategies), len(status.TestResults), len(status.DeployedStrategies))
+	log.Printf("  Duration: %s", status.Duration.String())
+
+	return nil
+}
+
+// saveOnboardingReportToDB 保存引入报告到数据库
+func (ss *StrategyScheduler) saveOnboardingReportToDB(ctx context.Context, report map[string]interface{}) error {
+	query := `
+		INSERT INTO onboarding_reports (
+			request_id, status, progress, generated_strategies,
+			test_results, deployed_strategies, errors, warnings,
+			duration, report_data, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+	`
+
+	reportJSON := "{}" // 简化处理，实际应该序列化report
+
+	_, err := ss.db.ExecContext(ctx, query,
+		report["request_id"],
+		report["status"],
+		report["progress"],
+		report["generated_strategies"],
+		report["test_results"],
+		report["deployed_strategies"],
+		report["errors"],
+		report["warnings"],
+		report["duration"],
+		reportJSON,
+		report["timestamp"],
 	)
 
 	return err

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"sort"
 	"time"
 
 	"qcat/internal/strategy"
@@ -333,4 +334,499 @@ func (s *Service) calculateConfidence(config *strategy.Config, req *GenerationRe
 	}
 
 	return confidence
+}
+
+// AutoGenerationService 自动策略生成服务
+type AutoGenerationService struct {
+	generator       *Generator
+	marketAnalyzer  *MarketAnalyzer
+	performanceDB   map[string]*StrategyPerformance // 策略性能数据库
+	generationRules []*GenerationRule               // 生成规则
+}
+
+// StrategyPerformance 策略性能记录
+type StrategyPerformance struct {
+	StrategyType    string
+	Symbol          string
+	TimeRange       time.Duration
+	Returns         []float64
+	SharpeRatio     float64
+	MaxDrawdown     float64
+	WinRate         float64
+	TotalTrades     int
+	LastUpdated     time.Time
+	MarketCondition string
+}
+
+// GenerationRule 策略生成规则
+type GenerationRule struct {
+	Name            string
+	Condition       func(*MarketAnalysis) bool
+	StrategyType    string
+	ParameterRanges map[string]ParameterRange
+	Priority        int
+	Enabled         bool
+}
+
+// ParameterRange 参数范围
+type ParameterRange struct {
+	Min     float64
+	Max     float64
+	Step    float64
+	Default float64
+}
+
+// NewAutoGenerationService 创建自动生成服务
+func NewAutoGenerationService() *AutoGenerationService {
+	service := &AutoGenerationService{
+		generator:       NewGenerator(),
+		marketAnalyzer:  NewMarketAnalyzer(),
+		performanceDB:   make(map[string]*StrategyPerformance),
+		generationRules: make([]*GenerationRule, 0),
+	}
+
+	service.generator.LoadDefaultTemplates()
+	service.loadDefaultGenerationRules()
+
+	return service
+}
+
+// loadDefaultGenerationRules 加载默认生成规则
+func (s *AutoGenerationService) loadDefaultGenerationRules() {
+	// 高波动市场规则
+	s.generationRules = append(s.generationRules, &GenerationRule{
+		Name: "high_volatility_momentum",
+		Condition: func(analysis *MarketAnalysis) bool {
+			return analysis.Volatility > 0.05 && analysis.Trend > 0.3
+		},
+		StrategyType: "momentum_breakout",
+		ParameterRanges: map[string]ParameterRange{
+			"stop_loss":   {Min: 0.02, Max: 0.08, Step: 0.01, Default: 0.04},
+			"take_profit": {Min: 0.04, Max: 0.12, Step: 0.01, Default: 0.08},
+			"rsi_period":  {Min: 8, Max: 16, Step: 2, Default: 12},
+			"ma_period":   {Min: 5, Max: 15, Step: 2, Default: 10},
+		},
+		Priority: 8,
+		Enabled:  true,
+	})
+
+	// 低波动网格交易规则
+	s.generationRules = append(s.generationRules, &GenerationRule{
+		Name: "low_volatility_grid",
+		Condition: func(analysis *MarketAnalysis) bool {
+			return analysis.Volatility < 0.02 && math.Abs(analysis.Trend) < 0.2
+		},
+		StrategyType: "grid_trading",
+		ParameterRanges: map[string]ParameterRange{
+			"grid_spacing":  {Min: 0.005, Max: 0.02, Step: 0.001, Default: 0.01},
+			"grid_levels":   {Min: 5, Max: 20, Step: 1, Default: 10},
+			"position_size": {Min: 0.05, Max: 0.2, Step: 0.01, Default: 0.1},
+		},
+		Priority: 7,
+		Enabled:  true,
+	})
+
+	// 趋势跟踪规则
+	s.generationRules = append(s.generationRules, &GenerationRule{
+		Name: "strong_trend_following",
+		Condition: func(analysis *MarketAnalysis) bool {
+			return math.Abs(analysis.Trend) > 0.5
+		},
+		StrategyType: "trend_following",
+		ParameterRanges: map[string]ParameterRange{
+			"fast_ma":     {Min: 5, Max: 15, Step: 1, Default: 10},
+			"slow_ma":     {Min: 20, Max: 50, Step: 5, Default: 30},
+			"stop_loss":   {Min: 0.03, Max: 0.1, Step: 0.01, Default: 0.05},
+			"take_profit": {Min: 0.06, Max: 0.2, Step: 0.01, Default: 0.1},
+		},
+		Priority: 9,
+		Enabled:  true,
+	})
+
+	// 均值回归规则
+	s.generationRules = append(s.generationRules, &GenerationRule{
+		Name: "mean_reversion_ranging",
+		Condition: func(analysis *MarketAnalysis) bool {
+			return analysis.Volatility > 0.02 && math.Abs(analysis.Trend) < 0.3
+		},
+		StrategyType: "mean_reversion",
+		ParameterRanges: map[string]ParameterRange{
+			"rsi_oversold":   {Min: 20, Max: 35, Step: 1, Default: 30},
+			"rsi_overbought": {Min: 65, Max: 80, Step: 1, Default: 70},
+			"bb_period":      {Min: 15, Max: 25, Step: 1, Default: 20},
+			"bb_std":         {Min: 1.5, Max: 2.5, Step: 0.1, Default: 2.0},
+		},
+		Priority: 6,
+		Enabled:  true,
+	})
+}
+
+// AutoGenerateStrategies 自动生成策略
+func (s *AutoGenerationService) AutoGenerateStrategies(ctx context.Context, symbols []string, maxStrategies int) ([]*GenerationResult, error) {
+	log.Printf("Starting auto-generation for %d symbols, max strategies: %d", len(symbols), maxStrategies)
+
+	var results []*GenerationResult
+
+	for _, symbol := range symbols {
+		// 分析市场数据
+		analysis, err := s.marketAnalyzer.AnalyzeMarket(ctx, symbol, 30*24*time.Hour)
+		if err != nil {
+			log.Printf("Failed to analyze market for %s: %v", symbol, err)
+			continue
+		}
+
+		// 找到匹配的生成规则
+		matchingRules := s.findMatchingRules(analysis)
+		if len(matchingRules) == 0 {
+			log.Printf("No matching rules found for %s", symbol)
+			continue
+		}
+
+		// 按优先级排序
+		sort.Slice(matchingRules, func(i, j int) bool {
+			return matchingRules[i].Priority > matchingRules[j].Priority
+		})
+
+		// 为每个匹配的规则生成策略
+		for _, rule := range matchingRules {
+			if len(results) >= maxStrategies {
+				break
+			}
+
+			result, err := s.generateStrategyFromRule(ctx, symbol, analysis, rule)
+			if err != nil {
+				log.Printf("Failed to generate strategy from rule %s for %s: %v", rule.Name, symbol, err)
+				continue
+			}
+
+			results = append(results, result)
+		}
+
+		if len(results) >= maxStrategies {
+			break
+		}
+	}
+
+	log.Printf("Auto-generated %d strategies", len(results))
+	return results, nil
+}
+
+// findMatchingRules 找到匹配的生成规则
+func (s *AutoGenerationService) findMatchingRules(analysis *MarketAnalysis) []*GenerationRule {
+	var matchingRules []*GenerationRule
+
+	for _, rule := range s.generationRules {
+		if rule.Enabled && rule.Condition(analysis) {
+			matchingRules = append(matchingRules, rule)
+		}
+	}
+
+	return matchingRules
+}
+
+// generateStrategyFromRule 从规则生成策略
+func (s *AutoGenerationService) generateStrategyFromRule(ctx context.Context, symbol string, analysis *MarketAnalysis, rule *GenerationRule) (*GenerationResult, error) {
+	// 创建生成请求
+	req := &GenerationRequest{
+		Symbol:     symbol,
+		Exchange:   "binance",
+		TimeRange:  30 * 24 * time.Hour,
+		Objective:  "sharpe",
+		RiskLevel:  s.determineRiskLevel(analysis),
+		MarketType: s.determineMarketType(analysis),
+	}
+
+	// 生成基础策略
+	config, err := s.generator.GenerateStrategy(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate base strategy: %w", err)
+	}
+
+	// 使用规则优化参数
+	optimizedParams := s.optimizeParametersWithRule(config.Params, rule, analysis)
+	config.Params = optimizedParams
+
+	// 添加规则信息到策略名称
+	config.Name = fmt.Sprintf("Auto_%s_%s_%d", rule.Name, symbol, time.Now().Unix())
+	config.Description = fmt.Sprintf("Auto-generated %s strategy for %s based on rule: %s",
+		rule.StrategyType, symbol, rule.Name)
+
+	// 估算性能
+	expectedReturn, expectedSharpe, expectedDrawdown := s.estimatePerformanceWithHistory(config, req, rule)
+
+	// 计算置信度
+	confidence := s.calculateAdvancedConfidence(config, req, analysis, rule)
+
+	result := &GenerationResult{
+		Strategy:         config,
+		ExpectedReturn:   expectedReturn,
+		ExpectedSharpe:   expectedSharpe,
+		ExpectedDrawdown: expectedDrawdown,
+		Confidence:       confidence,
+	}
+
+	return result, nil
+}
+
+// determineRiskLevel 确定风险等级
+func (s *AutoGenerationService) determineRiskLevel(analysis *MarketAnalysis) string {
+	if analysis.Volatility > 0.08 || analysis.MaxDrawdown > 0.2 {
+		return "high"
+	} else if analysis.Volatility > 0.04 || analysis.MaxDrawdown > 0.1 {
+		return "medium"
+	}
+	return "low"
+}
+
+// determineMarketType 确定市场类型
+func (s *AutoGenerationService) determineMarketType(analysis *MarketAnalysis) string {
+	if math.Abs(analysis.Trend) > 0.5 {
+		return "trending"
+	} else if analysis.Volatility > 0.05 {
+		return "volatile"
+	}
+	return "ranging"
+}
+
+// optimizeParametersWithRule 使用规则优化参数
+func (s *AutoGenerationService) optimizeParametersWithRule(baseParams map[string]interface{}, rule *GenerationRule, analysis *MarketAnalysis) map[string]interface{} {
+	optimizedParams := make(map[string]interface{})
+
+	// 复制基础参数
+	for k, v := range baseParams {
+		optimizedParams[k] = v
+	}
+
+	// 应用规则参数范围
+	for paramName, paramRange := range rule.ParameterRanges {
+		// 基于市场分析调整参数
+		value := s.calculateOptimalParameterValue(paramName, paramRange, analysis)
+		optimizedParams[paramName] = value
+	}
+
+	return optimizedParams
+}
+
+// calculateOptimalParameterValue 计算最优参数值
+func (s *AutoGenerationService) calculateOptimalParameterValue(paramName string, paramRange ParameterRange, analysis *MarketAnalysis) float64 {
+	// 基于市场分析在参数范围内选择最优值
+	switch paramName {
+	case "stop_loss":
+		// 高波动市场使用更大的止损
+		factor := 1.0 + analysis.Volatility*5
+		value := paramRange.Default * factor
+		return math.Max(paramRange.Min, math.Min(paramRange.Max, value))
+
+	case "take_profit":
+		// 趋势市场使用更大的止盈
+		factor := 1.0 + math.Abs(analysis.Trend)*2
+		value := paramRange.Default * factor
+		return math.Max(paramRange.Min, math.Min(paramRange.Max, value))
+
+	case "rsi_period":
+		// 高波动市场使用更短的RSI周期
+		if analysis.Volatility > 0.05 {
+			return paramRange.Min
+		} else if analysis.Volatility < 0.02 {
+			return paramRange.Max
+		}
+		return paramRange.Default
+
+	case "ma_period":
+		// 强趋势市场使用更短的MA周期
+		if math.Abs(analysis.Trend) > 0.5 {
+			return paramRange.Min
+		} else if math.Abs(analysis.Trend) < 0.2 {
+			return paramRange.Max
+		}
+		return paramRange.Default
+
+	case "grid_spacing":
+		// 低波动市场使用更小的网格间距
+		factor := 1.0 / (1.0 + analysis.Volatility*10)
+		value := paramRange.Default * factor
+		return math.Max(paramRange.Min, math.Min(paramRange.Max, value))
+
+	default:
+		return paramRange.Default
+	}
+}
+
+// estimatePerformanceWithHistory 基于历史数据估算性能
+func (s *AutoGenerationService) estimatePerformanceWithHistory(config *strategy.Config, req *GenerationRequest, rule *GenerationRule) (float64, float64, float64) {
+	// 查找历史性能数据
+	historyKey := fmt.Sprintf("%s_%s", rule.StrategyType, req.Symbol)
+	if performance, exists := s.performanceDB[historyKey]; exists {
+		// 基于历史数据调整预期
+		baseReturn := performance.SharpeRatio * 0.1 // 假设无风险利率为0，简化计算
+		baseSharpe := performance.SharpeRatio
+		baseDrawdown := performance.MaxDrawdown
+
+		// 根据市场条件调整
+		marketAdjustment := s.calculateMarketAdjustment(req)
+
+		return baseReturn * marketAdjustment,
+			baseSharpe * marketAdjustment,
+			baseDrawdown / marketAdjustment
+	}
+
+	// 如果没有历史数据，使用基础估算
+	return s.estimatePerformanceBaseline(config, req, rule)
+}
+
+// estimatePerformanceBaseline 基础性能估算
+func (s *AutoGenerationService) estimatePerformanceBaseline(config *strategy.Config, req *GenerationRequest, rule *GenerationRule) (float64, float64, float64) {
+	// 基于策略类型的基础性能
+	var baseReturn, baseSharpe, baseDrawdown float64
+
+	switch rule.StrategyType {
+	case "momentum_breakout":
+		baseReturn = 0.15   // 15%年化收益
+		baseSharpe = 1.2    // 夏普比率1.2
+		baseDrawdown = 0.12 // 12%最大回撤
+	case "mean_reversion":
+		baseReturn = 0.12
+		baseSharpe = 1.5
+		baseDrawdown = 0.08
+	case "grid_trading":
+		baseReturn = 0.08
+		baseSharpe = 2.0
+		baseDrawdown = 0.05
+	case "trend_following":
+		baseReturn = 0.18
+		baseSharpe = 1.0
+		baseDrawdown = 0.15
+	default:
+		baseReturn = 0.10
+		baseSharpe = 1.0
+		baseDrawdown = 0.10
+	}
+
+	// 根据风险等级调整
+	switch req.RiskLevel {
+	case "low":
+		baseReturn *= 0.7
+		baseSharpe *= 1.3
+		baseDrawdown *= 0.6
+	case "high":
+		baseReturn *= 1.4
+		baseSharpe *= 0.8
+		baseDrawdown *= 1.5
+	}
+
+	// 根据市场类型调整
+	marketAdjustment := s.calculateMarketAdjustment(req)
+
+	return baseReturn * marketAdjustment,
+		baseSharpe * marketAdjustment,
+		baseDrawdown / marketAdjustment
+}
+
+// calculateMarketAdjustment 计算市场调整因子
+func (s *AutoGenerationService) calculateMarketAdjustment(req *GenerationRequest) float64 {
+	adjustment := 1.0
+
+	switch req.MarketType {
+	case "trending":
+		adjustment = 1.2 // 趋势市场表现更好
+	case "volatile":
+		adjustment = 0.9 // 波动市场表现稍差
+	case "ranging":
+		adjustment = 1.0 // 震荡市场正常表现
+	}
+
+	// 根据币种调整
+	if req.Symbol == "BTCUSDT" || req.Symbol == "ETHUSDT" {
+		adjustment *= 1.1 // 主流币种表现更好
+	}
+
+	return adjustment
+}
+
+// calculateAdvancedConfidence 计算高级置信度
+func (s *AutoGenerationService) calculateAdvancedConfidence(config *strategy.Config, req *GenerationRequest, analysis *MarketAnalysis, rule *GenerationRule) float64 {
+	confidence := 0.6 // 基础置信度
+
+	// 基于历史数据调整置信度
+	historyKey := fmt.Sprintf("%s_%s", rule.StrategyType, req.Symbol)
+	if performance, exists := s.performanceDB[historyKey]; exists {
+		// 有历史数据，提高置信度
+		confidence += 0.2
+
+		// 基于历史表现调整
+		if performance.SharpeRatio > 1.5 {
+			confidence += 0.1
+		}
+		if performance.WinRate > 0.6 {
+			confidence += 0.1
+		}
+	}
+
+	// 基于市场分析质量调整
+	if req.TimeRange >= 30*24*time.Hour {
+		confidence += 0.1 // 数据充足
+	}
+
+	// 基于规则优先级调整
+	if rule.Priority >= 8 {
+		confidence += 0.1 // 高优先级规则
+	}
+
+	// 基于市场条件匹配度调整
+	if analysis.Volatility > 0.02 && analysis.Volatility < 0.08 {
+		confidence += 0.05 // 适中波动率
+	}
+
+	// 限制置信度范围
+	if confidence > 0.95 {
+		confidence = 0.95
+	}
+	if confidence < 0.3 {
+		confidence = 0.3
+	}
+
+	return confidence
+}
+
+// UpdatePerformanceHistory 更新策略性能历史
+func (s *AutoGenerationService) UpdatePerformanceHistory(strategyType, symbol string, performance *StrategyPerformance) {
+	historyKey := fmt.Sprintf("%s_%s", strategyType, symbol)
+	s.performanceDB[historyKey] = performance
+	log.Printf("Updated performance history for %s: Sharpe=%.2f, Drawdown=%.2f",
+		historyKey, performance.SharpeRatio, performance.MaxDrawdown)
+}
+
+// GetGenerationRules 获取生成规则
+func (s *AutoGenerationService) GetGenerationRules() []*GenerationRule {
+	return s.generationRules
+}
+
+// AddGenerationRule 添加生成规则
+func (s *AutoGenerationService) AddGenerationRule(rule *GenerationRule) {
+	s.generationRules = append(s.generationRules, rule)
+	log.Printf("Added generation rule: %s", rule.Name)
+}
+
+// EnableRule 启用规则
+func (s *AutoGenerationService) EnableRule(ruleName string) error {
+	for _, rule := range s.generationRules {
+		if rule.Name == ruleName {
+			rule.Enabled = true
+			log.Printf("Enabled generation rule: %s", ruleName)
+			return nil
+		}
+	}
+	return fmt.Errorf("rule not found: %s", ruleName)
+}
+
+// DisableRule 禁用规则
+func (s *AutoGenerationService) DisableRule(ruleName string) error {
+	for _, rule := range s.generationRules {
+		if rule.Name == ruleName {
+			rule.Enabled = false
+			log.Printf("Disabled generation rule: %s", ruleName)
+			return nil
+		}
+	}
+	return fmt.Errorf("rule not found: %s", ruleName)
 }
