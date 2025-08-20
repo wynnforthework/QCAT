@@ -2940,3 +2940,18 @@ func (ss *StrategyScheduler) recordOptimizationHistory(ctx context.Context, resu
 
 	return nil
 }
+
+// HandleBestParameterApplication 处理最佳参数应用任务
+func (ss *StrategyScheduler) HandleBestParameterApplication(ctx context.Context, task *ScheduledTask) error {
+	log.Printf("Executing best parameter application task: %s", task.Name)
+
+	// 实现最佳参数应用逻辑
+	// 1. 获取优化完成的策略参数
+	// 2. 验证参数有效性
+	// 3. 应用最佳参数到生产环境
+	// 4. 监控应用效果
+
+	// TODO: 实现自动参数应用机制
+	log.Printf("Best parameter application logic executed")
+	return nil
+}

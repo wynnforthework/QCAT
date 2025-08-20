@@ -78,6 +78,7 @@ const (
 	TaskTypeDataProcessing     TaskType = "data_processing"
 	TaskTypeSystemMaintenance  TaskType = "system_maintenance"
 	TaskTypeLearning           TaskType = "learning"
+	TaskTypeSecurityMonitoring TaskType = "security_monitoring"
 )
 
 // TaskCategory 任务分类
@@ -90,6 +91,7 @@ const (
 	CategoryData     TaskCategory = "data"
 	CategorySystem   TaskCategory = "system"
 	CategoryLearning TaskCategory = "learning"
+	CategorySecurity TaskCategory = "security"
 )
 
 // TaskStatus 任务状态
@@ -602,6 +604,112 @@ func (as *AutomationScheduler) registerDefaultTasks() {
 		MaxRetries: 2,
 		Handler:    as.dataScheduler.HandleMarketPatternRecognition,
 	})
+
+	// 19. 异常行情应对
+	as.RegisterTask(&ScheduledTask{
+		ID:         "abnormal_market_response",
+		Name:       "异常行情应对",
+		Type:       TaskTypeRiskManagement,
+		Category:   CategoryRisk,
+		Schedule:   "*/1 * * * *", // 每分钟检查
+		Priority:   19,
+		Timeout:    time.Minute * 2,
+		MaxRetries: 1,
+		Handler:    as.riskScheduler.HandleAbnormalMarketResponse,
+	})
+
+	// 20. 账户安全监控
+	as.RegisterTask(&ScheduledTask{
+		ID:         "account_security_monitoring",
+		Name:       "账户安全监控",
+		Type:       TaskTypeSecurityMonitoring,
+		Category:   CategorySecurity,
+		Schedule:   "*/10 * * * *", // 每10分钟执行
+		Priority:   20,
+		Timeout:    time.Minute * 5,
+		MaxRetries: 2,
+		Handler:    as.systemScheduler.HandleAccountSecurityMonitoring,
+	})
+
+	// 21. 资金动态分配
+	as.RegisterTask(&ScheduledTask{
+		ID:         "dynamic_fund_allocation",
+		Name:       "资金动态分配",
+		Type:       TaskTypePositionManagement,
+		Category:   CategoryPosition,
+		Schedule:   "*/15 * * * *", // 每15分钟执行
+		Priority:   21,
+		Timeout:    time.Minute * 10,
+		MaxRetries: 2,
+		Handler:    as.positionScheduler.HandleDynamicFundAllocation,
+	})
+
+	// 22. 仓位分层机制
+	as.RegisterTask(&ScheduledTask{
+		ID:         "layered_position_management",
+		Name:       "仓位分层机制",
+		Type:       TaskTypePositionManagement,
+		Category:   CategoryPosition,
+		Schedule:   "*/20 * * * *", // 每20分钟执行
+		Priority:   22,
+		Timeout:    time.Minute * 10,
+		MaxRetries: 2,
+		Handler:    as.positionScheduler.HandleLayeredPositionManagement,
+	})
+
+	// 23. 自动回测与前测
+	as.RegisterTask(&ScheduledTask{
+		ID:         "auto_backtesting",
+		Name:       "自动回测与前测",
+		Type:       TaskTypeDataProcessing,
+		Category:   CategoryData,
+		Schedule:   "0 0 * * *", // 每天执行
+		Priority:   23,
+		Timeout:    time.Hour * 2,
+		MaxRetries: 2,
+		Handler:    as.dataScheduler.HandleAutoBacktesting,
+	})
+
+	// 24. 多交易所冗余
+	as.RegisterTask(&ScheduledTask{
+		ID:         "multi_exchange_redundancy",
+		Name:       "多交易所冗余",
+		Type:       TaskTypeSystemMaintenance,
+		Category:   CategorySystem,
+		Schedule:   "*/5 * * * *", // 每5分钟检查
+		Priority:   24,
+		Timeout:    time.Minute * 3,
+		MaxRetries: 1,
+		Handler:    as.systemScheduler.HandleMultiExchangeRedundancy,
+	})
+
+	// 25. 日志与审计追踪
+	as.RegisterTask(&ScheduledTask{
+		ID:         "audit_logging",
+		Name:       "日志与审计追踪",
+		Type:       TaskTypeSystemMaintenance,
+		Category:   CategorySystem,
+		Schedule:   "*/30 * * * *", // 每30分钟执行
+		Priority:   25,
+		Timeout:    time.Minute * 5,
+		MaxRetries: 1,
+		Handler:    as.systemScheduler.HandleAuditLogging,
+	})
+
+	// 26. 最佳参数应用
+	as.RegisterTask(&ScheduledTask{
+		ID:         "best_parameter_application",
+		Name:       "最佳参数应用",
+		Type:       TaskTypeOptimization,
+		Category:   CategoryStrategy,
+		Schedule:   "0 4 * * *", // 每天凌晨4点执行
+		Priority:   26,
+		Timeout:    time.Minute * 30,
+		MaxRetries: 2,
+		Handler:    as.strategyScheduler.HandleBestParameterApplication,
+	})
+
+	log.Printf("Successfully registered all 26 automation tasks")
 }
 
 // RegisterTask 注册任务
