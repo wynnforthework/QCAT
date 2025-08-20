@@ -339,6 +339,30 @@ class ApiClient {
     const endpoint = queryString ? `/api/v1/trading/history?${queryString}` : '/api/v1/trading/history';
     return this.request<TradeHistoryItem[]>(endpoint);
   }
+
+  // Automation System API
+  async getAutomationStatus(): Promise<AutomationStatus[]> {
+    return this.request<AutomationStatus[]>('/api/v1/automation/status');
+  }
+
+  async getAutomationHealthMetrics(): Promise<HealthMetrics> {
+    return this.request<HealthMetrics>('/api/v1/automation/health');
+  }
+
+  async getAutomationExecutionStats(): Promise<ExecutionStats> {
+    return this.request<ExecutionStats>('/api/v1/automation/stats');
+  }
+
+  async getAutomationSystemStatus(): Promise<SystemStatus> {
+    return this.request<SystemStatus>('/api/v1/automation/system');
+  }
+
+  async toggleAutomation(id: string, enabled: boolean): Promise<void> {
+    return this.request<void>(`/api/v1/automation/${id}/toggle`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled }),
+    });
+  }
 }
 
 // Type definitions
@@ -701,6 +725,58 @@ export interface TradeHistoryFilters {
   startTime?: string;
   endTime?: string;
   limit?: number;
+}
+
+// Automation System Types
+export interface AutomationStatus {
+  id: string;
+  name: string;
+  category: string;
+  status: string;
+  enabled: boolean;
+  lastExecution: string;
+  nextExecution: string;
+  successRate: number;
+  avgExecutionTime: number;
+  executionCount: number;
+  errorCount: number;
+  description: string;
+}
+
+export interface HealthMetrics {
+  overallHealth: number;
+  automationCoverage: number;
+  successRate: number;
+  avgResponseTime: number;
+  activeAutomations: number;
+  totalAutomations: number;
+}
+
+export interface ExecutionStats {
+  today: ExecutionPeriod;
+  thisWeek: ExecutionPeriod;
+  thisMonth: ExecutionPeriod;
+}
+
+export interface ExecutionPeriod {
+  successful: number;
+  failed: number;
+  pending: number;
+}
+
+export interface SystemStatus {
+  startTime: string;
+  isRunning: boolean;
+  schedulerStatus: string;
+  executorStatus: string;
+  activeTasks: number;
+  completedTasks: number;
+  failedTasks: number;
+  activeActions: number;
+  completedActions: number;
+  failedActions: number;
+  lastHealthCheck: string;
+  healthScore: number;
 }
 
 // Create and export a default instance

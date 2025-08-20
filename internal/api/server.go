@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"qcat/internal/auth"
+	"qcat/internal/automation"
 	"qcat/internal/cache"
 	"qcat/internal/config"
 	"qcat/internal/database"
@@ -53,24 +54,28 @@ type Server struct {
 	// Security services
 	keyManager  *security.KeyManager
 	auditLogger *security.AuditLogger
+
+	// Automation system
+	automationSystem *automation.AutomationSystem
 }
 
 // Handlers contains all API handlers
 type Handlers struct {
-	Optimizer *OptimizerHandler
-	Strategy  *StrategyHandler
-	Portfolio *PortfolioHandler
-	Risk      *RiskHandler
-	Hotlist   *HotlistHandler
-	Metrics   *MetricsHandler
-	Audit     *AuditHandler
-	WebSocket *WebSocketHandler
-	Auth      *AuthHandler
-	Cache     *CacheHandler
-	Security  *SecurityHandler
-	Dashboard *DashboardHandler
-	Market    *MarketHandler
-	Trading   *TradingHandler
+	Optimizer  *OptimizerHandler
+	Strategy   *StrategyHandler
+	Portfolio  *PortfolioHandler
+	Risk       *RiskHandler
+	Hotlist    *HotlistHandler
+	Metrics    *MetricsHandler
+	Audit      *AuditHandler
+	WebSocket  *WebSocketHandler
+	Auth       *AuthHandler
+	Cache      *CacheHandler
+	Security   *SecurityHandler
+	Dashboard  *DashboardHandler
+	Market     *MarketHandler
+	Trading    *TradingHandler
+	Automation *AutomationHandler
 }
 
 // RateLimiter 速率限制器结构
@@ -426,22 +431,53 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		log.Printf("Warning: Binance API credentials not configured, using mock data")
 	}
 
+	// Initialize automation system
+	var automationSystem *automation.AutomationSystem
+	if db != nil && accountManager != nil {
+		// Create a mock exchange client for automation system if needed
+		var exchangeClient exchange.Exchange
+		if cfg.Exchange.APIKey != "" && cfg.Exchange.APISecret != "" {
+			exchangeConfig := &exchange.ExchangeConfig{
+				Name:           cfg.Exchange.Name,
+				APIKey:         cfg.Exchange.APIKey,
+				APISecret:      cfg.Exchange.APISecret,
+				TestNet:        cfg.Exchange.TestNet,
+				BaseURL:        cfg.Exchange.BaseURL,
+				FuturesBaseURL: cfg.Exchange.FuturesBaseURL,
+			}
+			rateLimiter := exchange.NewRateLimiter(redis, time.Second)
+			exchangeClient = binance.NewClient(exchangeConfig, rateLimiter)
+		}
+
+		// Create automation system
+		automationSystem = automation.NewAutomationSystem(
+			cfg, db, exchangeClient, accountManager, metricsCollector, nil,
+		)
+		log.Printf("Automation system initialized successfully")
+	} else {
+		log.Printf("Warning: Automation system not initialized due to missing dependencies")
+	}
+
+	// Store automation system in server
+	server.automationSystem = automationSystem
+
 	// Initialize handlers with dependencies
 	server.handlers = &Handlers{
-		Optimizer: NewOptimizerHandler(db, redis, metricsCollector),
-		Strategy:  NewStrategyHandler(db, redis, metricsCollector),
-		Portfolio: NewPortfolioHandler(db, redis, metricsCollector),
-		Risk:      NewRiskHandler(db, redis, metricsCollector),
-		Hotlist:   NewHotlistHandler(db, redis, metricsCollector),
-		Metrics:   NewMetricsHandler(db, metricsCollector),
-		Audit:     NewAuditHandler(db, metricsCollector),
-		WebSocket: NewWebSocketHandler(server.upgrader, metrics),
-		Auth:      NewAuthHandler(jwtManager, db),
-		Cache:     NewCacheHandler(cacheManagerRef),
-		Security:  NewSecurityHandler(keyManager, auditLogger),
-		Dashboard: NewDashboardHandler(db, metricsCollector, accountManager),
-		Market:    NewMarketHandler(db, metricsCollector),
-		Trading:   NewTradingHandler(db, metricsCollector),
+		Optimizer:  NewOptimizerHandler(db, redis, metricsCollector),
+		Strategy:   NewStrategyHandler(db, redis, metricsCollector),
+		Portfolio:  NewPortfolioHandler(db, redis, metricsCollector),
+		Risk:       NewRiskHandler(db, redis, metricsCollector),
+		Hotlist:    NewHotlistHandler(db, redis, metricsCollector),
+		Metrics:    NewMetricsHandler(db, metricsCollector),
+		Audit:      NewAuditHandler(db, metricsCollector),
+		WebSocket:  NewWebSocketHandler(server.upgrader, metrics),
+		Auth:       NewAuthHandler(jwtManager, db),
+		Cache:      NewCacheHandler(cacheManagerRef),
+		Security:   NewSecurityHandler(keyManager, auditLogger),
+		Dashboard:  NewDashboardHandler(db, metricsCollector, accountManager),
+		Market:     NewMarketHandler(db, metricsCollector),
+		Trading:    NewTradingHandler(db, metricsCollector),
+		Automation: NewAutomationHandler(db, metricsCollector, automationSystem),
 	}
 
 	// Store security components for middleware
@@ -629,6 +665,11 @@ func (s *Server) setupRoutes() {
 			// Security management routes
 			if s.handlers.Security != nil {
 				s.handlers.Security.RegisterRoutes(protected)
+			}
+
+			// Automation system routes
+			if s.handlers.Automation != nil {
+				s.handlers.Automation.RegisterRoutes(protected)
 			}
 		}
 	}
