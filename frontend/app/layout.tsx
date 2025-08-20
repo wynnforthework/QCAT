@@ -29,7 +29,8 @@ import {
   User,
   Bell,
   HelpCircle,
-  LogOut
+  LogOut,
+  Bot
 } from "lucide-react";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -58,6 +59,12 @@ const navigation = [
     href: "/risk",
     icon: Shield,
     description: "风险监控和限额管理"
+  },
+  {
+    name: "自动化系统",
+    href: "/automation",
+    icon: Bot,
+    description: "26项自动化功能监控和管理"
   },
   {
     name: "热门币种",
