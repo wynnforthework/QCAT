@@ -83,32 +83,214 @@ automation:
     enabled: true
     check_interval_seconds: 10       # 每10秒检查一次
     alert_cooldown_minutes: 5        # 5分钟告警冷却
-    
+
     # 监控指标
     metrics:
       portfolio_var_threshold: 0.02   # 2% VaR阈值
       concentration_risk_threshold: 0.3  # 30% 集中度风险
       correlation_risk_threshold: 0.9    # 90% 相关性风险
       liquidity_risk_threshold: 0.1      # 10% 流动性风险
-      
+
     # 自动执行动作
     auto_actions:
       emergency_stop_enabled: true     # 紧急停止
       auto_hedge_enabled: true         # 自动对冲
       position_scaling_enabled: true   # 仓位缩放
 
+  # 止盈止损线自动调整
+  stop_loss_take_profit_adjustment:
+    enabled: true
+    adjustment_interval: "5m"        # 每5分钟调整一次
+
+    # ATR基础动态调整
+    atr_based_adjustment:
+      enabled: true
+      atr_period: 14                 # ATR计算周期
+      atr_multiplier: 2.0            # ATR倍数
+      min_stop_distance: 0.005       # 最小止损距离0.5%
+      max_stop_distance: 0.05        # 最大止损距离5%
+
+    # 市场状态感知调整
+    market_state_adjustment:
+      enabled: true
+      volatility_threshold: 0.02     # 波动率阈值2%
+      trend_strength_threshold: 0.1  # 趋势强度阈值
+      high_vol_multiplier: 1.5       # 高波动率倍数
+      low_vol_multiplier: 0.8        # 低波动率倍数
+
+    # 移动止盈功能
+    trailing_take_profit:
+      enabled: true
+      trail_distance: 0.01           # 跟踪距离1%
+      min_profit_threshold: 0.02     # 最小盈利阈值2%
+
+  # 策略淘汰与限时禁用
+  strategy_elimination:
+    enabled: true
+    evaluation_interval: "daily"     # 每日评估
+    evaluation_time: "23:00"         # 评估时间
+
+    # 淘汰条件
+    elimination_criteria:
+      min_performance_days: 30       # 最少运行30天
+      sharpe_ratio_threshold: 0.3    # 夏普比率低于0.3
+      max_drawdown_threshold: 0.15   # 最大回撤超过15%
+      consecutive_loss_days: 7       # 连续亏损7天
+
+    # 冷却池机制
+    cooling_pool:
+      enabled: true
+      cooling_period_days: 30        # 冷却期30天
+      max_pool_size: 10              # 最大冷却池大小
+      reactivation_threshold: 0.5    # 重新激活阈值
+
+    # 自动淘汰执行
+    auto_elimination:
+      enabled: true
+      confirmation_required: false   # 不需要人工确认
+      backup_before_elimination: true # 淘汰前备份
+
+  # 新策略引入
+  new_strategy_introduction:
+    enabled: true
+    introduction_interval: "weekly"  # 每周检查
+    introduction_day: "monday"       # 周一执行
+    introduction_time: "09:00"       # 执行时间
+
+    # 自动策略生成
+    auto_generation:
+      enabled: true
+      generation_algorithms: ["genetic", "random_search", "bayesian"]
+      max_new_strategies_per_week: 3 # 每周最多3个新策略
+
+    # 沙盒测试
+    sandbox_testing:
+      enabled: true
+      test_duration_days: 7          # 测试期7天
+      test_capital_ratio: 0.01       # 测试资金比例1%
+      min_test_performance: 0.02     # 最小测试表现2%
+
+    # 自动接入流程
+    auto_onboarding:
+      enabled: true
+      approval_threshold: 0.05       # 自动批准阈值5%
+      manual_review_threshold: 0.02  # 人工审核阈值2%
+
+  # 异常行情应对
+  abnormal_market_response:
+    enabled: true
+    detection_interval: "1s"         # 每秒检测
+
+    # 异常检测条件
+    detection_criteria:
+      flash_crash_threshold: 0.1     # 闪崩阈值10%
+      spike_threshold: 0.15          # 插针阈值15%
+      liquidity_dry_threshold: 0.05  # 流动性枯竭阈值
+      volume_spike_multiplier: 10    # 成交量异常倍数
+
+    # 自动应对措施
+    response_actions:
+      circuit_breaker_enabled: true  # 熔断保护
+      auto_leverage_reduction: true  # 自动降杠杆
+      emergency_position_close: true # 紧急平仓
+      trading_halt_enabled: true     # 暂停交易
+
+    # 降杠杆配置
+    leverage_reduction:
+      trigger_threshold: 0.05        # 触发阈值5%
+      reduction_ratio: 0.5           # 降杠杆比例50%
+      min_leverage: 1.0              # 最小杠杆1倍
+      recovery_time_minutes: 30      # 恢复时间30分钟
+
+  # 资金分散与转移
+  fund_diversification_transfer:
+    enabled: true
+    transfer_interval: "daily"       # 每日检查
+    transfer_time: "02:00"           # 转移时间
+
+    # 自动转移配置
+    auto_transfer:
+      profit_transfer_enabled: true  # 盈利转移
+      profit_threshold: 0.1          # 盈利转移阈值10%
+      transfer_ratio: 0.3            # 转移比例30%
+
+    # 冷钱包集成
+    cold_wallet_integration:
+      enabled: true
+      cold_wallet_address: ""        # 冷钱包地址(需配置)
+      min_transfer_amount: 1000      # 最小转移金额
+      max_daily_transfer: 50000      # 日最大转移金额
+
+    # 备用账户配置
+    backup_accounts:
+      enabled: true
+      backup_account_ids: []         # 备用账户ID列表(需配置)
+      distribution_strategy: "equal" # 分配策略：equal/weighted
+      rebalance_threshold: 0.2       # 再平衡阈值20%
+
+  # 数据清洗与校正
+  data_cleaning_correction:
+    enabled: true
+    cleaning_interval: "1m"          # 每分钟清洗
+
+    # 异常值检测
+    anomaly_detection:
+      enabled: true
+      z_score_threshold: 3.0         # Z分数阈值
+      iqr_multiplier: 1.5            # IQR倍数
+      rolling_window: 100            # 滚动窗口
+
+    # 数据质量监控
+    quality_monitoring:
+      enabled: true
+      completeness_threshold: 0.95   # 完整性阈值95%
+      timeliness_threshold: 5        # 及时性阈值5秒
+      accuracy_threshold: 0.99       # 准确性阈值99%
+
+    # 自动校正规则
+    auto_correction:
+      enabled: true
+      price_spike_correction: true   # 价格异常校正
+      volume_anomaly_correction: true # 成交量异常校正
+      missing_data_interpolation: true # 缺失数据插值
+
+  # 市场模式识别
+  market_pattern_recognition:
+    enabled: true
+    recognition_interval: "5m"       # 每5分钟识别
+
+    # 模式识别算法
+    recognition_algorithms:
+      trend_detection: true          # 趋势检测
+      volatility_regime: true        # 波动率状态
+      correlation_analysis: true     # 相关性分析
+      momentum_analysis: true        # 动量分析
+
+    # 实时模式识别
+    real_time_recognition:
+      enabled: true
+      pattern_confidence_threshold: 0.7 # 模式置信度阈值
+      pattern_persistence_minutes: 15   # 模式持续时间
+
+    # 策略切换配置
+    strategy_switching:
+      enabled: true
+      switching_threshold: 0.8       # 切换阈值
+      switching_cooldown_minutes: 30 # 切换冷却时间
+      max_switches_per_day: 10       # 日最大切换次数
+
 # 通知配置
 notifications:
   automation_alerts:
     enabled: true
     channels: ["email", "webhook"]
-    
+
   performance_reports:
     enabled: true
     frequency: "daily"
     time_utc: "08:00"
     recipients: ["admin@example.com"]
-    
+
   risk_alerts:
     enabled: true
     immediate_notification: true

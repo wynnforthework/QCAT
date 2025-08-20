@@ -61,11 +61,26 @@ intelligence:
 
   # 利润最大化引擎
   profit_maximizer:
+    enabled: true                  # 启用利润最大化引擎
     optimization_interval: "1h"    # 优化间隔1小时
     risk_tolerance: 0.15           # 风险容忍度15%
     max_leverage: 3.0              # 最大杠杆3倍
     min_cash_reserve: 0.05         # 最小现金储备5%
     transaction_cost_rate: 0.001   # 交易成本率0.1%
+
+    # 全局收益优化
+    global_optimization:
+      enabled: true
+      optimization_method: "multi_objective" # 多目标优化
+      rebalance_frequency: "hourly"          # 再平衡频率
+      min_improvement_threshold: 0.001       # 最小改进阈值
+
+    # 实时执行配置
+    real_time_execution:
+      enabled: true
+      execution_delay_ms: 100       # 执行延迟100毫秒
+      batch_execution: true         # 批量执行
+      execution_priority: "high"    # 执行优先级
     
     # 目标函数权重
     objective_weights:
