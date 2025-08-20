@@ -32,8 +32,12 @@ func NewManager(db *sql.DB, cache cache.Cacher, exchange exch.Exchange) *Manager
 		subscribers: make(map[string][]chan *exch.Position),
 	}
 
-	// Start position monitor
-	go m.monitorPositions()
+	// Start position monitor only if exchange is available
+	if exchange != nil {
+		go m.monitorPositions()
+	} else {
+		log.Printf("Warning: Exchange not available, position monitoring disabled")
+	}
 
 	return m
 }
@@ -261,12 +265,27 @@ func (m *Manager) monitorPositions() {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
+	consecutiveErrors := 0
+	maxConsecutiveErrors := 5
+
 	for range ticker.C {
 		ctx := context.Background()
 		positions, err := m.GetAllPositions(ctx)
 		if err != nil {
-			log.Printf("Failed to update positions: %v", err)
+			consecutiveErrors++
+			if consecutiveErrors <= maxConsecutiveErrors {
+				log.Printf("Failed to update positions: %v", err)
+			} else if consecutiveErrors == maxConsecutiveErrors+1 {
+				log.Printf("Position monitoring disabled after %d consecutive errors. Last error: %v", maxConsecutiveErrors, err)
+			}
+			// Stop logging after max errors to prevent spam
 			continue
+		}
+
+		// Reset error counter on success
+		if consecutiveErrors > 0 {
+			log.Printf("Position monitoring recovered after %d errors", consecutiveErrors)
+			consecutiveErrors = 0
 		}
 
 		// Store positions in database
