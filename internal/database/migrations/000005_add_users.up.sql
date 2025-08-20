@@ -30,5 +30,7 @@ CREATE INDEX idx_user_sessions_refresh_token ON user_sessions(refresh_token);
 CREATE INDEX idx_user_sessions_expires_at ON user_sessions(expires_at);
 
 -- Insert default admin user (password: admin123)
-INSERT INTO users (username, email, password_hash, role, status) VALUES 
-('admin', 'admin@qcat.local', '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', 'active');
+-- Hash generated using: bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+INSERT INTO users (username, email, password_hash, role, status) VALUES
+('admin', 'admin@qcat.local', '$2a$10$N9qo8uLOickgx2ZMRZoMye.IjPeOXe.2p5l/q/FQcre8HdkL6Q262', 'admin', 'active')
+ON CONFLICT (username) DO NOTHING;
