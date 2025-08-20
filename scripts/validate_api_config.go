@@ -60,8 +60,13 @@ func main() {
 		BaseURL:   cfg.Exchange.FuturesBaseURL,
 	}
 
-	// Create rate limiter
+	// Create rate limiter with proper limits
 	rateLimiter := exchange.NewRateLimiter(nil, 100*time.Millisecond)
+	rateLimiter.AddLimit("server_time", time.Second, 10)
+	rateLimiter.AddLimit("exchange_info", time.Second, 10)
+	rateLimiter.AddLimit("account", time.Second, 5)
+	rateLimiter.AddLimit("positions", time.Second, 5)
+	rateLimiter.AddLimit("get_symbol_price", time.Second, 10)
 
 	// Create client
 	client := binance.NewClient(exchangeConfig, rateLimiter)

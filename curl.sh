@@ -1,0 +1,1 @@
+curl -H "X-MBX-APIKEY: ebaf74024d70971033b514c568e1b0810d15f2734968c770533efb25ddb774bf" -X POST 'https://fapi.binance.com/fapi/v1/order?symbol=BTCUSDT&side=BUY&type=LIMIT&timeInForce=GTC' -d 'quantity=1&price=9000&recvWindow=5000&timestamp=1591702613943&signature=a669a7b40a29b9d405a865cb24cd85b9dd38806e5a05df96e5cca7be21570b0c'
