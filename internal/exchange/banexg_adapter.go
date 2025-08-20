@@ -28,8 +28,10 @@ func NewBanexgAdapter(config *ExchangeConfig) (*BanexgAdapter, error) {
 
 	// Set testnet if configured
 	if config.TestNet {
-		// For testnet, we might need to set specific hosts
-		// This depends on banexg implementation
+		// Set environment to testnet
+		options[banexg.OptEnv] = "test"
+		// Enable debug for better error messages
+		options[banexg.OptDebugApi] = true
 	}
 
 	// Create banexg exchange instance
@@ -163,14 +165,21 @@ func (a *BanexgAdapter) GetPosition(ctx context.Context, symbol string) (*Positi
 
 // GetLeverage implements exchange.Exchange
 func (a *BanexgAdapter) GetLeverage(ctx context.Context, symbol string) (int, error) {
-	// banexg doesn't have a direct get leverage method
-	// We can get it from position info
-	position, err := a.GetPosition(ctx, symbol)
+	// Try to get leverage from position info first
+	positions, err := a.GetPositions(ctx)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to get positions: %w", err)
 	}
 
-	return int(position.Leverage), nil
+	// Look for the symbol in positions
+	for _, pos := range positions {
+		if pos.Symbol == symbol && pos.Size > 0 {
+			return int(pos.Leverage), nil
+		}
+	}
+
+	// If no position found, return default leverage (20x for Binance futures)
+	return 20, nil
 }
 
 // SetLeverage implements exchange.Exchange

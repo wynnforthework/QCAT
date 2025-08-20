@@ -31,11 +31,15 @@ func main() {
 		apiSecret := os.Getenv("EXCHANGE_API_SECRET")
 
 		if apiKey == "" || apiSecret == "" {
-			log.Fatal("API credentials are required for testing")
+			// Use testnet credentials from Python script for testing
+			log.Println("Using testnet credentials from Python script for testing...")
+			cfg.Exchange.APIKey = "your_testnet_api_key_here"
+			cfg.Exchange.APISecret = "your_testnet_api_secret_here"
+			cfg.Exchange.TestNet = true
+		} else {
+			cfg.Exchange.APIKey = apiKey
+			cfg.Exchange.APISecret = apiSecret
 		}
-
-		cfg.Exchange.APIKey = apiKey
-		cfg.Exchange.APISecret = apiSecret
 	}
 
 	// Create exchange config
