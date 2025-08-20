@@ -36,6 +36,34 @@ func NewRateLimiter(cache cache.Cacher, defaultWait time.Duration) *RateLimiter 
 	}
 }
 
+// NewSimpleRateLimiter creates a simple rate limiter without cache
+func NewSimpleRateLimiter(requestsPerMinute int, interval time.Duration) *RateLimiter {
+	rl := &RateLimiter{
+		cache:       nil,
+		limits:      make(map[string]*Limit),
+		defaultWait: time.Minute / time.Duration(requestsPerMinute),
+	}
+
+	// Add common limits for Binance API
+	commonLimits := []string{
+		"default", "account", "positions", "server_time", "exchange_info",
+		"get_symbol_price", "get_leverage", "get_margin_info", "orders",
+		"klines", "orderbook", "trades",
+	}
+
+	for _, name := range commonLimits {
+		rl.limits[name] = &Limit{
+			Name:      name,
+			Interval:  interval,
+			MaxTokens: requestsPerMinute,
+			Tokens:    requestsPerMinute,
+			LastReset: time.Now(),
+		}
+	}
+
+	return rl
+}
+
 // AddLimit adds a new rate limit
 func (r *RateLimiter) AddLimit(name string, interval time.Duration, maxTokens int) {
 	r.mu.Lock()

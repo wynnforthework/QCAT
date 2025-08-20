@@ -31,6 +31,7 @@ type Client struct {
 	baseURL     string
 	httpClient  *http.Client
 	rateLimiter *exchange.RateLimiter
+	adapter     *exchange.BanexgAdapter // banexg adapter
 }
 
 // NewClient creates a new Binance client
@@ -40,12 +41,27 @@ func NewClient(config *exchange.ExchangeConfig, rateLimiter *exchange.RateLimite
 		baseURL = BaseTestnetURL
 	}
 
+	// Create banexg adapter
+	adapter, err := exchange.NewBanexgAdapter(config)
+	if err != nil {
+		// Fallback to original implementation if banexg fails
+		return &Client{
+			BaseExchange: exchange.NewBaseExchange(config),
+			config:       config,
+			baseURL:      baseURL,
+			httpClient:   &http.Client{Timeout: 10 * time.Second},
+			rateLimiter:  rateLimiter,
+			adapter:      nil,
+		}
+	}
+
 	return &Client{
 		BaseExchange: exchange.NewBaseExchange(config),
 		config:       config,
 		baseURL:      baseURL,
 		httpClient:   &http.Client{Timeout: 10 * time.Second},
 		rateLimiter:  rateLimiter,
+		adapter:      adapter,
 	}
 }
 
@@ -100,6 +116,12 @@ func (c *Client) makeRequest(ctx context.Context, method, endpoint string, param
 
 // GetServerTime implements exchange.Exchange
 func (c *Client) GetServerTime(ctx context.Context) (time.Time, error) {
+	// Use banexg adapter if available
+	if c.adapter != nil {
+		return c.adapter.GetServerTime(ctx)
+	}
+
+	// Fallback to original implementation
 	if c.rateLimiter != nil {
 		if err := c.rateLimiter.Wait(ctx, "server_time"); err != nil {
 			return time.Time{}, err
@@ -130,6 +152,12 @@ func (c *Client) GetServerTime(ctx context.Context) (time.Time, error) {
 
 // GetAccountBalance implements exchange.Exchange
 func (c *Client) GetAccountBalance(ctx context.Context) (map[string]*exchange.AccountBalance, error) {
+	// Use banexg adapter if available
+	if c.adapter != nil {
+		return c.adapter.GetAccountBalance(ctx)
+	}
+
+	// Fallback to original implementation
 	if c.rateLimiter != nil {
 		if err := c.rateLimiter.Wait(ctx, "account"); err != nil {
 			return nil, err
@@ -172,6 +200,12 @@ func (c *Client) GetAccountBalance(ctx context.Context) (map[string]*exchange.Ac
 
 // GetPositions implements exchange.Exchange
 func (c *Client) GetPositions(ctx context.Context) ([]*exchange.Position, error) {
+	// Use banexg adapter if available
+	if c.adapter != nil {
+		return c.adapter.GetPositions(ctx)
+	}
+
+	// Fallback to original implementation
 	if c.rateLimiter != nil {
 		if err := c.rateLimiter.Wait(ctx, "positions"); err != nil {
 			return nil, err
@@ -1271,5 +1305,13 @@ func (c *Client) SetRiskLimits(ctx context.Context, symbol string, limits *excha
 	fmt.Printf("Risk limits set for %s: MaxLeverage=%d, MaxPositionValue=%.2f, MaxOrderValue=%.2f\n",
 		symbol, limits.MaxLeverage, limits.MaxPositionValue, limits.MaxOrderValue)
 
+	return nil
+}
+
+// Close implements cleanup for the client
+func (c *Client) Close() error {
+	if c.adapter != nil {
+		return c.adapter.Close()
+	}
 	return nil
 }
