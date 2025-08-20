@@ -462,30 +462,43 @@ func (as *AutomationScheduler) registerDefaultTasks() {
 		Handler:    as.strategyScheduler.HandlePeriodicOptimization,
 	})
 
-	// 8. 策略淘汰与限时禁用
+	// 8. 策略淘汰与限时禁用 (降低频率，更谨慎)
 	as.RegisterTask(&ScheduledTask{
 		ID:         "strategy_elimination",
 		Name:       "策略淘汰与限时禁用",
 		Type:       TaskTypeOptimization,
 		Category:   CategoryStrategy,
-		Schedule:   "0 1 * * *", // 每天凌晨1点执行
+		Schedule:   "0 1 * * 0", // 每周日凌晨1点执行 (从每天改为每周)
 		Priority:   8,
 		Timeout:    time.Minute * 30,
 		MaxRetries: 2,
 		Handler:    as.strategyScheduler.HandleElimination,
 	})
 
-	// 9. 新策略引入
+	// 9. 新策略引入 (增加频率，确保有足够策略)
 	as.RegisterTask(&ScheduledTask{
 		ID:         "new_strategy_introduction",
 		Name:       "新策略引入",
 		Type:       TaskTypeOptimization,
 		Category:   CategoryStrategy,
-		Schedule:   "0 3 * * 1", // 每周一凌晨3点执行
+		Schedule:   "0 3 * * *", // 每天凌晨3点执行 (从每周改为每天)
 		Priority:   9,
 		Timeout:    time.Hour,
 		MaxRetries: 2,
 		Handler:    as.strategyScheduler.HandleNewStrategyIntroduction,
+	})
+
+	// 9.1. 最小策略数量检查 (新增任务，更频繁检查)
+	as.RegisterTask(&ScheduledTask{
+		ID:         "minimum_strategy_check",
+		Name:       "最小策略数量检查",
+		Type:       TaskTypeOptimization,
+		Category:   CategoryStrategy,
+		Schedule:   "*/30 * * * *", // 每30分钟检查一次
+		Priority:   1,              // 高优先级
+		Timeout:    time.Minute * 10,
+		MaxRetries: 3,
+		Handler:    as.strategyScheduler.HandleMinimumStrategyCheck,
 	})
 
 	// 10. 止盈止损线自动调整

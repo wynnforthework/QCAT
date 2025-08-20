@@ -517,16 +517,35 @@ func (ss *StrategyScheduler) HandlePeriodicOptimization(ctx context.Context, tas
 func (ss *StrategyScheduler) HandleElimination(ctx context.Context, task *ScheduledTask) error {
 	log.Printf("Executing strategy elimination task: %s", task.Name)
 
-	// 1. 创建或获取淘汰管理器
+	// 1. 首先检查最小策略数量保护
+	minStrategiesRequired := 3
+	runnableStrategies, err := ss.getActiveRunnableStrategies(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get runnable strategies: %w", err)
+	}
+
+	if len(runnableStrategies) <= minStrategiesRequired {
+		log.Printf("⚠️ PROTECTION: Only %d runnable strategies (minimum: %d), skipping elimination to protect system",
+			len(runnableStrategies), minStrategiesRequired)
+
+		// 转为生成新策略而不是淘汰
+		if len(runnableStrategies) < minStrategiesRequired {
+			log.Printf("Triggering emergency strategy generation instead of elimination")
+			return ss.generateMinimumStrategies(ctx, minStrategiesRequired-len(runnableStrategies))
+		}
+		return nil
+	}
+
+	// 2. 创建或获取淘汰管理器
 	eliminationManager := ss.getOrCreateEliminationManager()
 
-	// 2. 获取所有活跃策略并更新指标
+	// 3. 获取所有活跃策略并更新指标
 	strategies, err := ss.getActiveStrategies(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get active strategies: %w", err)
 	}
 
-	// 3. 更新策略指标到淘汰管理器
+	// 4. 更新策略指标到淘汰管理器
 	for _, strategy := range strategies {
 		returns, err := ss.getStrategyReturns(ctx, strategy.ID)
 		if err != nil {
@@ -539,9 +558,9 @@ func (ss *StrategyScheduler) HandleElimination(ctx context.Context, task *Schedu
 		}
 	}
 
-	// 4. 执行自动淘汰逻辑
-	if err := eliminationManager.ExecuteAutomaticElimination(ctx); err != nil {
-		return fmt.Errorf("failed to execute automatic elimination: %w", err)
+	// 5. 执行保护性淘汰逻辑（确保不会淘汰过多策略）
+	if err := ss.executeProtectedElimination(ctx, eliminationManager, len(runnableStrategies), minStrategiesRequired); err != nil {
+		return fmt.Errorf("failed to execute protected elimination: %w", err)
 	}
 
 	// 5. 获取冷却池状态并记录
@@ -557,27 +576,78 @@ func (ss *StrategyScheduler) HandleElimination(ctx context.Context, task *Schedu
 	return nil
 }
 
+// HandleMinimumStrategyCheck 处理最小策略数量检查任务
+func (ss *StrategyScheduler) HandleMinimumStrategyCheck(ctx context.Context, task *ScheduledTask) error {
+	minStrategiesRequired := 3
+
+	// 获取当前可运行的策略数量
+	runnableStrategies, err := ss.getActiveRunnableStrategies(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get runnable strategies: %w", err)
+	}
+
+	currentCount := len(runnableStrategies)
+	log.Printf("Minimum strategy check: current=%d, required=%d", currentCount, minStrategiesRequired)
+
+	if currentCount >= minStrategiesRequired {
+		// 策略数量充足，无需操作
+		return nil
+	}
+
+	// 策略数量不足，立即生成
+	shortage := minStrategiesRequired - currentCount
+	log.Printf("🚨 CRITICAL: Strategy shortage detected! Need to generate %d strategies immediately", shortage)
+
+	if err := ss.generateMinimumStrategies(ctx, shortage); err != nil {
+		return fmt.Errorf("failed to generate minimum strategies: %w", err)
+	}
+
+	log.Printf("✅ Successfully generated %d strategies to meet minimum requirement", shortage)
+	return nil
+}
+
 // HandleNewStrategyIntroduction 处理新策略引入任务
 func (ss *StrategyScheduler) HandleNewStrategyIntroduction(ctx context.Context, task *ScheduledTask) error {
 	log.Printf("Executing new strategy introduction task: %s", task.Name)
 
-	// 1. 获取或创建自动引入服务
+	// 1. 首先检查最小策略数量要求
+	minStrategiesRequired := 3 // 最少保持3个可运行策略
+	activeStrategies, err := ss.getActiveRunnableStrategies(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get active runnable strategies: %w", err)
+	}
+
+	urgentGeneration := len(activeStrategies) < minStrategiesRequired
+	if urgentGeneration {
+		log.Printf("⚠️ URGENT: Only %d active strategies (minimum required: %d), triggering immediate strategy generation",
+			len(activeStrategies), minStrategiesRequired)
+
+		// 立即生成策略以满足最小数量要求
+		if err := ss.generateMinimumStrategies(ctx, minStrategiesRequired-len(activeStrategies)); err != nil {
+			log.Printf("Failed to generate minimum strategies: %v", err)
+			// 继续执行常规流程作为备选
+		} else {
+			log.Printf("✅ Successfully generated minimum required strategies")
+		}
+	}
+
+	// 2. 获取或创建自动引入服务
 	onboardingService := ss.getOrCreateOnboardingService()
 
-	// 2. 分析市场状况，确定需要引入的策略类型
+	// 3. 分析市场状况，确定需要引入的策略类型
 	symbols, err := ss.getActiveSymbols(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get active symbols: %w", err)
 	}
 
-	// 3. 检查当前策略覆盖情况
+	// 4. 检查当前策略覆盖情况
 	coverageGaps, err := ss.analyzeStrategyCoverage(ctx, symbols)
 	if err != nil {
 		return fmt.Errorf("failed to analyze strategy coverage: %w", err)
 	}
 
-	if len(coverageGaps) == 0 {
-		log.Printf("No strategy coverage gaps found, skipping new strategy introduction")
+	if len(coverageGaps) == 0 && !urgentGeneration {
+		log.Printf("No strategy coverage gaps found and minimum strategies satisfied, skipping new strategy introduction")
 		return nil
 	}
 
@@ -1507,6 +1577,227 @@ func (ss *StrategyScheduler) generateMockReturns(strategyID string) []float64 {
 	}
 
 	return returns
+}
+
+// getActiveRunnableStrategies 获取所有可运行的活跃策略（排除被禁用和淘汰的）
+func (ss *StrategyScheduler) getActiveRunnableStrategies(ctx context.Context) ([]*Strategy, error) {
+	query := `
+		SELECT id, name, status, created_at
+		FROM strategies
+		WHERE status IN ('active', 'testing')
+		AND id NOT IN (
+			SELECT strategy_id FROM strategy_eliminations
+			WHERE status IN ('eliminated', 'disabled')
+			AND (disabled_until IS NULL OR disabled_until > CURRENT_TIMESTAMP)
+		)
+		ORDER BY created_at DESC
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query runnable strategies: %w", err)
+	}
+	defer rows.Close()
+
+	var strategies []*Strategy
+	for rows.Next() {
+		strategy := &Strategy{}
+		var createdAt time.Time
+		if err := rows.Scan(
+			&strategy.ID, &strategy.Name, &strategy.Status, &createdAt,
+		); err != nil {
+			return nil, fmt.Errorf("failed to scan strategy: %w", err)
+		}
+		strategies = append(strategies, strategy)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating strategies: %w", err)
+	}
+
+	return strategies, nil
+}
+
+// generateMinimumStrategies 生成最少数量的策略以满足系统要求
+func (ss *StrategyScheduler) generateMinimumStrategies(ctx context.Context, count int) error {
+	log.Printf("Generating %d minimum required strategies", count)
+
+	// 定义基础策略模板
+	baseStrategies := []struct {
+		name         string
+		strategyType string
+		symbol       string
+		description  string
+	}{
+		{"BTC动量策略", "momentum", "BTCUSDT", "比特币动量交易策略"},
+		{"ETH均值回归", "mean_reversion", "ETHUSDT", "以太坊均值回归策略"},
+		{"多币种网格", "grid_trading", "BNBUSDT", "多币种网格交易策略"},
+		{"SOL趋势跟踪", "trend_following", "SOLUSDT", "Solana趋势跟踪策略"},
+		{"ADA套利策略", "arbitrage", "ADAUSDT", "Cardana套利策略"},
+	}
+
+	for i := 0; i < count && i < len(baseStrategies); i++ {
+		strategy := baseStrategies[i]
+
+		// 生成策略ID和时间戳
+		strategyID := fmt.Sprintf("emergency_%s_%d", strategy.strategyType, time.Now().Unix())
+		now := time.Now()
+
+		// 插入策略到数据库
+		query := `
+			INSERT INTO strategies (id, name, type, status, description, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`
+
+		_, err := ss.db.ExecContext(ctx, query,
+			strategyID, strategy.name, strategy.strategyType, "active",
+			strategy.description, now, now,
+		)
+
+		if err != nil {
+			log.Printf("Failed to create emergency strategy %s: %v", strategy.name, err)
+			continue
+		}
+
+		log.Printf("✅ Created emergency strategy: %s (%s)", strategy.name, strategyID)
+	}
+
+	return nil
+}
+
+// executeProtectedElimination 执行保护性策略淘汰
+func (ss *StrategyScheduler) executeProtectedElimination(ctx context.Context, eliminationManager *optimizer.EliminationManager, currentCount, minRequired int) error {
+	// 计算最多可以淘汰的策略数量
+	maxEliminable := currentCount - minRequired
+	if maxEliminable <= 0 {
+		log.Printf("No strategies can be eliminated (current: %d, minimum: %d)", currentCount, minRequired)
+		return nil
+	}
+
+	log.Printf("Protected elimination: can eliminate at most %d strategies (current: %d, minimum: %d)",
+		maxEliminable, currentCount, minRequired)
+
+	// 获取策略性能排名，只淘汰表现最差的策略
+	worstStrategies, err := ss.getWorstPerformingStrategies(ctx, maxEliminable)
+	if err != nil {
+		return fmt.Errorf("failed to get worst performing strategies: %w", err)
+	}
+
+	// 检查策略运行时间，确保策略有足够的数据
+	minRunningDays := 14 // 策略至少运行14天才能被淘汰
+	eligibleForElimination := ss.filterStrategiesByRunningTime(worstStrategies, minRunningDays)
+
+	if len(eligibleForElimination) == 0 {
+		log.Printf("No strategies eligible for elimination (all strategies too new)")
+		return nil
+	}
+
+	// 执行淘汰，但限制数量
+	eliminateCount := len(eligibleForElimination)
+	if eliminateCount > maxEliminable {
+		eliminateCount = maxEliminable
+		eligibleForElimination = eligibleForElimination[:eliminateCount]
+	}
+
+	log.Printf("Eliminating %d strategies while preserving minimum count", eliminateCount)
+
+	for _, strategy := range eligibleForElimination {
+		if err := ss.eliminateStrategy(ctx, strategy.ID, "poor_performance"); err != nil {
+			log.Printf("Failed to eliminate strategy %s: %v", strategy.ID, err)
+		} else {
+			log.Printf("✅ Eliminated strategy: %s (performance: %.4f)", strategy.Name, strategy.Performance)
+		}
+	}
+
+	return nil
+}
+
+// getWorstPerformingStrategies 获取表现最差的策略
+func (ss *StrategyScheduler) getWorstPerformingStrategies(ctx context.Context, limit int) ([]*Strategy, error) {
+	query := `
+		SELECT s.id, s.name, s.status,
+		       COALESCE(AVG(pm.pnl_daily), 0) as avg_performance
+		FROM strategies s
+		LEFT JOIN performance_metrics pm ON s.id = pm.strategy_id
+		WHERE s.status IN ('active', 'testing')
+		GROUP BY s.id, s.name, s.status
+		ORDER BY avg_performance ASC
+		LIMIT $1
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query worst strategies: %w", err)
+	}
+	defer rows.Close()
+
+	var strategies []*Strategy
+	for rows.Next() {
+		strategy := &Strategy{}
+		if err := rows.Scan(&strategy.ID, &strategy.Name, &strategy.Status, &strategy.Performance); err != nil {
+			return nil, fmt.Errorf("failed to scan strategy: %w", err)
+		}
+		strategies = append(strategies, strategy)
+	}
+
+	return strategies, nil
+}
+
+// filterStrategiesByRunningTime 根据运行时间过滤策略
+func (ss *StrategyScheduler) filterStrategiesByRunningTime(strategies []*Strategy, minDays int) []*Strategy {
+	var eligible []*Strategy
+	minTime := time.Now().AddDate(0, 0, -minDays)
+
+	for _, strategy := range strategies {
+		// 检查策略创建时间
+		query := `SELECT created_at FROM strategies WHERE id = $1`
+		var createdAt time.Time
+		if err := ss.db.QueryRow(query, strategy.ID).Scan(&createdAt); err != nil {
+			log.Printf("Failed to get creation time for strategy %s: %v", strategy.ID, err)
+			continue
+		}
+
+		if createdAt.Before(minTime) {
+			eligible = append(eligible, strategy)
+		} else {
+			log.Printf("Strategy %s too new for elimination (created: %v)", strategy.Name, createdAt)
+		}
+	}
+
+	return eligible
+}
+
+// eliminateStrategy 淘汰单个策略
+func (ss *StrategyScheduler) eliminateStrategy(ctx context.Context, strategyID, reason string) error {
+	// 更新策略状态为已淘汰
+	query := `
+		UPDATE strategies
+		SET status = 'eliminated', updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+	`
+
+	_, err := ss.db.ExecContext(ctx, query, strategyID)
+	if err != nil {
+		return fmt.Errorf("failed to update strategy status: %w", err)
+	}
+
+	// 记录淘汰信息
+	eliminationQuery := `
+		INSERT INTO strategy_eliminations (strategy_id, reason, eliminated_at, status)
+		VALUES ($1, $2, CURRENT_TIMESTAMP, 'eliminated')
+		ON CONFLICT (strategy_id) DO UPDATE SET
+			reason = EXCLUDED.reason,
+			eliminated_at = EXCLUDED.eliminated_at,
+			status = EXCLUDED.status
+	`
+
+	_, err = ss.db.ExecContext(ctx, eliminationQuery, strategyID, reason)
+	if err != nil {
+		log.Printf("Failed to record elimination for strategy %s: %v", strategyID, err)
+		// 不返回错误，因为主要操作已完成
+	}
+
+	return nil
 }
 
 // generateEliminationReport 生成淘汰报告

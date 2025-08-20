@@ -5,6 +5,7 @@ go 1.23.0
 toolchain go1.24.1
 
 require (
+	github.com/banbox/banexg v0.2.33-beta.4
 	github.com/gin-gonic/gin v1.9.1
 	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/golang-migrate/migrate/v4 v4.18.3
@@ -30,7 +31,6 @@ require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
-	github.com/banbox/banexg v0.2.33-beta.4 // indirect
 	github.com/beevik/ntp v1.4.3 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bytedance/sonic v1.13.2 // indirect

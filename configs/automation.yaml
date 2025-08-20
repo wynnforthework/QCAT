@@ -144,24 +144,40 @@ automation:
       max_pool_size: 10              # 最大冷却池大小
       reactivation_threshold: 0.5    # 重新激活阈值
 
+    # 保护性淘汰设置
+    protection_settings:
+      minimum_strategies: 3           # 最少保持策略数量
+      minimum_running_days: 14        # 策略至少运行14天才能被淘汰
+      max_elimination_per_cycle: 1    # 每次最多淘汰1个策略
+      elimination_interval: "weekly"  # 每周检查 (更谨慎)
+
     # 自动淘汰执行
     auto_elimination:
       enabled: true
       confirmation_required: false   # 不需要人工确认
       backup_before_elimination: true # 淘汰前备份
+      preserve_training_data: true   # 保留训练数据用于后续优化
 
   # 新策略引入
   new_strategy_introduction:
     enabled: true
-    introduction_interval: "weekly"  # 每周检查
+    introduction_interval: "daily"   # 每天检查 (从weekly改为daily)
     introduction_day: "monday"       # 周一执行
-    introduction_time: "09:00"       # 执行时间
+    introduction_time: "03:00"       # 执行时间 (凌晨3点)
+
+    # 最小策略数量保证
+    minimum_strategy_protection:
+      enabled: true
+      minimum_strategies: 3          # 最少保持3个可运行策略
+      check_interval: "30m"          # 每30分钟检查一次
+      emergency_generation: true     # 启用紧急策略生成
 
     # 自动策略生成
     auto_generation:
       enabled: true
       generation_algorithms: ["genetic", "random_search", "bayesian"]
-      max_new_strategies_per_week: 3 # 每周最多3个新策略
+      max_new_strategies_per_day: 2  # 每天最多2个新策略 (从per_week改为per_day)
+      max_new_strategies_per_week: 10 # 每周最多10个新策略
 
     # 沙盒测试
     sandbox_testing:

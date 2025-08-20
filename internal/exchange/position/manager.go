@@ -118,9 +118,8 @@ func (m *Manager) GetAllPositions(ctx context.Context) ([]*exch.Position, error)
 // GetPositionHistory returns historical position data
 func (m *Manager) GetPositionHistory(ctx context.Context, symbol string, startTime, endTime time.Time) ([]*exch.Position, error) {
 	query := `
-		SELECT symbol, side, quantity, entry_price, mark_price,
-			   liq_price, leverage, margin_type, unrealized_pnl,
-			   realized_pnl, updated_at
+		SELECT symbol, side, size, entry_price, leverage,
+			   unrealized_pnl, realized_pnl, status, updated_at
 		FROM positions
 		WHERE symbol = $1 AND updated_at BETWEEN $2 AND $3
 		ORDER BY updated_at DESC
@@ -135,21 +134,24 @@ func (m *Manager) GetPositionHistory(ctx context.Context, symbol string, startTi
 	var history []*exch.Position
 	for rows.Next() {
 		var position exch.Position
+		var status string
 		if err := rows.Scan(
 			&position.Symbol,
 			&position.Side,
-			&position.Quantity,
+			&position.Size, // Use Size instead of Quantity
 			&position.EntryPrice,
-			&position.MarkPrice,
-			&position.LiqPrice,
 			&position.Leverage,
-			&position.MarginType,
 			&position.UnrealizedPnL,
 			&position.RealizedPnL,
+			&status,
 			&position.UpdatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan position: %w", err)
 		}
+
+		// Set Quantity field for compatibility (since Position struct has both Size and Quantity)
+		position.Quantity = position.Size
+
 		history = append(history, &position)
 	}
 
@@ -206,25 +208,28 @@ func (m *Manager) SetMarginType(ctx context.Context, symbol string, marginType e
 func (m *Manager) storePosition(position *exch.Position) error {
 	query := `
 		INSERT INTO positions (
-			symbol, side, quantity, entry_price, mark_price,
-			liq_price, leverage, margin_type, unrealized_pnl,
-			realized_pnl, updated_at
+			symbol, side, size, entry_price, leverage,
+			unrealized_pnl, realized_pnl, status, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
 		)
 	`
+
+	// Use Size field instead of Quantity, and set a default status
+	status := "open"
+	if position.Size == 0 {
+		status = "closed"
+	}
 
 	_, err := m.db.Exec(query,
 		position.Symbol,
 		position.Side,
-		position.Quantity,
+		position.Size, // Use Size instead of Quantity
 		position.EntryPrice,
-		position.MarkPrice,
-		position.LiqPrice,
 		position.Leverage,
-		position.MarginType,
 		position.UnrealizedPnL,
 		position.RealizedPnL,
+		status,
 		position.UpdatedAt,
 	)
 

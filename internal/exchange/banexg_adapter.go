@@ -31,7 +31,7 @@ func NewBanexgAdapter(config *ExchangeConfig) (*BanexgAdapter, error) {
 		// Set environment to testnet
 		options[banexg.OptEnv] = "test"
 		// Enable debug for better error messages
-		options[banexg.OptDebugApi] = true
+		options[banexg.OptDebugApi] = false
 	}
 
 	// Create banexg exchange instance
