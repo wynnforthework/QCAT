@@ -27,6 +27,9 @@ type RealtimeExecutor struct {
 	positionExecutor *PositionExecutor
 	riskExecutor     *RiskExecutor
 	orderExecutor    *OrderExecutor
+	strategyExecutor *StrategyExecutor
+	dataExecutor     *DataExecutor
+	systemExecutor   *SystemExecutor
 
 	// 运行状态
 	ctx       context.Context
@@ -63,11 +66,21 @@ type ExecutionAction struct {
 type ActionType string
 
 const (
-	ActionTypePosition ActionType = "position"
-	ActionTypeRisk     ActionType = "risk"
-	ActionTypeOrder    ActionType = "order"
-	ActionTypeStop     ActionType = "stop"
-	ActionTypeHedge    ActionType = "hedge"
+	ActionTypePosition  ActionType = "position"
+	ActionTypeRisk      ActionType = "risk"
+	ActionTypeOrder     ActionType = "order"
+	ActionTypeStop      ActionType = "stop"
+	ActionTypeHedge     ActionType = "hedge"
+	ActionTypeStrategy  ActionType = "strategy"
+	ActionTypeData      ActionType = "data"
+	ActionTypeSecurity  ActionType = "security"
+	ActionTypeSystem    ActionType = "system"
+	ActionTypeLearning  ActionType = "learning"
+	ActionTypeOptimize  ActionType = "optimize"
+	ActionTypeRebalance ActionType = "rebalance"
+	ActionTypeTransfer  ActionType = "transfer"
+	ActionTypeNotify    ActionType = "notify"
+	ActionTypeBacktest  ActionType = "backtest"
 )
 
 // ActionHandler 动作处理器
@@ -207,6 +220,30 @@ func (re *RealtimeExecutor) getActionHandler(actionType ActionType) (ActionHandl
 		return re.riskExecutor.HandleAction, nil
 	case ActionTypeOrder:
 		return re.orderExecutor.HandleAction, nil
+	case ActionTypeStrategy:
+		return re.strategyExecutor.HandleAction, nil
+	case ActionTypeData:
+		return re.dataExecutor.HandleAction, nil
+	case ActionTypeSystem:
+		return re.systemExecutor.HandleAction, nil
+	case ActionTypeStop:
+		return re.riskExecutor.HandleAction, nil // 止损由风险执行器处理
+	case ActionTypeHedge:
+		return re.positionExecutor.HandleAction, nil // 对冲由仓位执行器处理
+	case ActionTypeOptimize:
+		return re.strategyExecutor.HandleAction, nil // 优化由策略执行器处理
+	case ActionTypeRebalance:
+		return re.positionExecutor.HandleAction, nil // 再平衡由仓位执行器处理
+	case ActionTypeTransfer:
+		return re.riskExecutor.HandleAction, nil // 资金转移由风险执行器处理
+	case ActionTypeBacktest:
+		return re.dataExecutor.HandleAction, nil // 回测由数据执行器处理
+	case ActionTypeSecurity:
+		return re.systemExecutor.HandleAction, nil // 安全由系统执行器处理
+	case ActionTypeLearning:
+		return re.strategyExecutor.HandleAction, nil // 学习由策略执行器处理
+	case ActionTypeNotify:
+		return re.systemExecutor.HandleAction, nil // 通知由系统执行器处理
 	default:
 		return nil, fmt.Errorf("unknown action type: %s", actionType)
 	}
@@ -275,6 +312,9 @@ func (re *RealtimeExecutor) initializeExecutors() {
 	re.positionExecutor = NewPositionExecutor(re.config, re.db, re.exchange, re.accountManager)
 	re.riskExecutor = NewRiskExecutor(re.config, re.db, re.exchange, re.accountManager)
 	re.orderExecutor = NewOrderExecutor(re.config, re.db, re.exchange, re.accountManager)
+	re.strategyExecutor = NewStrategyExecutor(re.config, re.db, re.exchange, re.accountManager)
+	re.dataExecutor = NewDataExecutor(re.config, re.db, re.exchange, re.accountManager)
+	re.systemExecutor = NewSystemExecutor(re.config, re.db, re.exchange, re.accountManager)
 }
 
 // initializeWorkers 初始化工作线程

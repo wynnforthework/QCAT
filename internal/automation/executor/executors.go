@@ -575,3 +575,204 @@ func (oe *OrderExecutor) placeTakeProfit(ctx context.Context, action *ExecutionA
 	// TODO: 实现止盈逻辑
 	return nil
 }
+
+// StrategyExecutor 策略执行器
+type StrategyExecutor struct {
+	config         *config.Config
+	db             *database.DB
+	exchange       exchange.Exchange
+	accountManager *account.Manager
+}
+
+// NewStrategyExecutor 创建策略执行器
+func NewStrategyExecutor(
+	cfg *config.Config,
+	db *database.DB,
+	exchange exchange.Exchange,
+	accountManager *account.Manager,
+) *StrategyExecutor {
+	return &StrategyExecutor{
+		config:         cfg,
+		db:             db,
+		exchange:       exchange,
+		accountManager: accountManager,
+	}
+}
+
+// HandleAction 处理策略动作
+func (se *StrategyExecutor) HandleAction(ctx context.Context, action *ExecutionAction) error {
+	switch action.Action {
+	case "apply_parameters":
+		return se.applyParameters(ctx, action)
+	case "eliminate_strategy":
+		return se.eliminateStrategy(ctx, action)
+	case "introduce_strategy":
+		return se.introduceStrategy(ctx, action)
+	case "optimize_strategy":
+		return se.optimizeStrategy(ctx, action)
+	default:
+		return fmt.Errorf("unknown strategy action: %s", action.Action)
+	}
+}
+
+// applyParameters 应用策略参数
+func (se *StrategyExecutor) applyParameters(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Applying strategy parameters")
+	// TODO: 实现参数应用逻辑
+	return nil
+}
+
+// eliminateStrategy 淘汰策略
+func (se *StrategyExecutor) eliminateStrategy(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Eliminating strategy")
+	// TODO: 实现策略淘汰逻辑
+	return nil
+}
+
+// introduceStrategy 引入新策略
+func (se *StrategyExecutor) introduceStrategy(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Introducing new strategy")
+	// TODO: 实现新策略引入逻辑
+	return nil
+}
+
+// optimizeStrategy 优化策略
+func (se *StrategyExecutor) optimizeStrategy(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Optimizing strategy")
+	// TODO: 实现策略优化逻辑
+	return nil
+}
+
+// DataExecutor 数据执行器
+type DataExecutor struct {
+	config         *config.Config
+	db             *database.DB
+	exchange       exchange.Exchange
+	accountManager *account.Manager
+}
+
+// NewDataExecutor 创建数据执行器
+func NewDataExecutor(
+	cfg *config.Config,
+	db *database.DB,
+	exchange exchange.Exchange,
+	accountManager *account.Manager,
+) *DataExecutor {
+	return &DataExecutor{
+		config:         cfg,
+		db:             db,
+		exchange:       exchange,
+		accountManager: accountManager,
+	}
+}
+
+// HandleAction 处理数据动作
+func (de *DataExecutor) HandleAction(ctx context.Context, action *ExecutionAction) error {
+	switch action.Action {
+	case "clean_data":
+		return de.cleanData(ctx, action)
+	case "update_factors":
+		return de.updateFactors(ctx, action)
+	case "run_backtest":
+		return de.runBacktest(ctx, action)
+	case "recognize_pattern":
+		return de.recognizePattern(ctx, action)
+	default:
+		return fmt.Errorf("unknown data action: %s", action.Action)
+	}
+}
+
+// cleanData 清洗数据
+func (de *DataExecutor) cleanData(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Cleaning data")
+	// TODO: 实现数据清洗逻辑
+	return nil
+}
+
+// updateFactors 更新因子
+func (de *DataExecutor) updateFactors(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Updating factors")
+	// TODO: 实现因子更新逻辑
+	return nil
+}
+
+// runBacktest 运行回测
+func (de *DataExecutor) runBacktest(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Running backtest")
+	// TODO: 实现回测逻辑
+	return nil
+}
+
+// recognizePattern 识别模式
+func (de *DataExecutor) recognizePattern(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Recognizing market pattern")
+	// TODO: 实现模式识别逻辑
+	return nil
+}
+
+// SystemExecutor 系统执行器
+type SystemExecutor struct {
+	config         *config.Config
+	db             *database.DB
+	exchange       exchange.Exchange
+	accountManager *account.Manager
+}
+
+// NewSystemExecutor 创建系统执行器
+func NewSystemExecutor(
+	cfg *config.Config,
+	db *database.DB,
+	exchange exchange.Exchange,
+	accountManager *account.Manager,
+) *SystemExecutor {
+	return &SystemExecutor{
+		config:         cfg,
+		db:             db,
+		exchange:       exchange,
+		accountManager: accountManager,
+	}
+}
+
+// HandleAction 处理系统动作
+func (se *SystemExecutor) HandleAction(ctx context.Context, action *ExecutionAction) error {
+	switch action.Action {
+	case "health_check":
+		return se.healthCheck(ctx, action)
+	case "security_monitor":
+		return se.securityMonitor(ctx, action)
+	case "exchange_failover":
+		return se.exchangeFailover(ctx, action)
+	case "audit_log":
+		return se.auditLog(ctx, action)
+	default:
+		return fmt.Errorf("unknown system action: %s", action.Action)
+	}
+}
+
+// healthCheck 健康检查
+func (se *SystemExecutor) healthCheck(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Performing system health check")
+	// TODO: 实现健康检查逻辑
+	return nil
+}
+
+// securityMonitor 安全监控
+func (se *SystemExecutor) securityMonitor(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Performing security monitoring")
+	// TODO: 实现安全监控逻辑
+	return nil
+}
+
+// exchangeFailover 交易所故障切换
+func (se *SystemExecutor) exchangeFailover(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Performing exchange failover")
+	// TODO: 实现交易所故障切换逻辑
+	return nil
+}
+
+// auditLog 审计日志
+func (se *SystemExecutor) auditLog(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Processing audit logs")
+	// TODO: 实现审计日志处理逻辑
+	return nil
+}
