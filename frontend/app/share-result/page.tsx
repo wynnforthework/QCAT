@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { 
   Upload, 
   FileText, 
@@ -21,11 +22,15 @@ import {
   CheckCircle,
   AlertCircle,
   Plus,
-  X
+  X,
+  RefreshCw
 } from 'lucide-react'
 
 export default function ShareResultPage() {
   const [activeTab, setActiveTab] = useState('basic')
+  const [strategies, setStrategies] = useState<any[]>([])
+  const [selectedStrategy, setSelectedStrategy] = useState<string>('')
+  const [loadingStrategies, setLoadingStrategies] = useState(false)
   const [formData, setFormData] = useState({
     // 基本信息
     task_id: '',
@@ -163,6 +168,56 @@ export default function ShareResultPage() {
   const [newDataSource, setNewDataSource] = useState('')
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle')
+
+  // 加载策略列表
+  useEffect(() => {
+    loadStrategies()
+  }, [])
+
+  const loadStrategies = async () => {
+    setLoadingStrategies(true)
+    try {
+      const response = await fetch('/api/strategies')
+      if (response.ok) {
+        const data = await response.json()
+        setStrategies(data.data || [])
+      }
+    } catch (error) {
+      console.error('Failed to load strategies:', error)
+    } finally {
+      setLoadingStrategies(false)
+    }
+  }
+
+  // 选择策略时自动填充数据
+  const handleStrategySelect = (strategyId: string) => {
+    setSelectedStrategy(strategyId)
+    const strategy = strategies.find(s => s.id === strategyId)
+
+    if (strategy) {
+      setFormData(prev => ({
+        ...prev,
+        task_id: strategy.id,
+        strategy_name: strategy.name,
+        parameters: {
+          strategy_type: strategy.type,
+          description: strategy.description,
+          created_at: strategy.created_at,
+          updated_at: strategy.updated_at
+        },
+        performance: {
+          ...prev.performance,
+          total_return: strategy.performance?.total_return || strategy.performance?.pnl || 0,
+          sharpe_ratio: strategy.performance?.sharpe_ratio || strategy.performance?.sharpe || 0,
+          max_drawdown: Math.abs(strategy.performance?.max_drawdown || strategy.performance?.maxDrawdown || 0),
+          win_rate: (strategy.performance?.win_rate || strategy.performance?.winRate || 0) * 100,
+          total_trades: strategy.performance?.totalTrades || 0,
+          volatility: strategy.performance?.volatility || 0,
+          profit_factor: strategy.performance?.profit_factor || 0
+        }
+      }))
+    }
+  }
 
   const handleInputChange = (section: keyof typeof formData, field: string, value: any) => {
     setFormData(prev => ({
@@ -470,6 +525,36 @@ export default function ShareResultPage() {
               <CardDescription>填写策略的基本信息</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* 策略选择器 */}
+              <div>
+                <Label htmlFor="strategy_select">选择现有策略（可选）</Label>
+                <div className="flex gap-2">
+                  <Select value={selectedStrategy} onValueChange={handleStrategySelect}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder={loadingStrategies ? "加载中..." : "选择策略以自动填充数据"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {strategies.map((strategy) => (
+                        <SelectItem key={strategy.id} value={strategy.id}>
+                          {strategy.name} ({strategy.type})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={loadStrategies}
+                    disabled={loadingStrategies}
+                  >
+                    <RefreshCw className={`w-4 h-4 ${loadingStrategies ? 'animate-spin' : ''}`} />
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  选择策略后将自动填充基本信息和性能数据，您也可以手动填写
+                </p>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="task_id">任务ID *</Label>
