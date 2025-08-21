@@ -458,76 +458,76 @@ func (mc *MetricsCollector) IncrementCounter(name string, labels map[string]stri
 	}
 }
 
-// 新增：GetGaugeValue 获取Gauge值
+// GetGaugeValue 获取真实的系统指标值
 func (mc *MetricsCollector) GetGaugeValue(name string) float64 {
-	// 由于Prometheus Gauge没有Get()方法，我们返回模拟值
-	// 在实际应用中，这些值应该从系统监控中获取
 	switch name {
 	case "system_cpu_usage":
-		return 45.5 // 模拟CPU使用率
+		return mc.getRealCPUUsage()
 	case "system_memory_usage":
-		return 67.2 // 模拟内存使用率
+		return mc.getRealMemoryUsage()
 	case "system_disk_usage":
-		return 23.8 // 模拟磁盘使用率
+		return mc.getRealDiskUsage()
 	case "system_network_io":
-		return 1024000.0 // 模拟网络IO字节数
+		return mc.getRealNetworkIO()
 	case "system_active_connections":
-		return 150.0 // 模拟活跃连接数
+		return mc.getRealActiveConnections()
 	case "database_connections":
-		return 25.0 // 模拟数据库连接数
+		return mc.getRealDatabaseConnections()
 	case "redis_connections":
-		return 10.0 // 模拟Redis连接数
+		return mc.getRealRedisConnections()
 	case "system_uptime":
-		return 86400.0 // 模拟系统运行时间（秒）
+		return mc.getRealSystemUptime()
 	default:
 		return 0.0
 	}
 }
 
-// 新增：GetHistogramValue 获取Histogram值
+// GetHistogramValue 获取Histogram统计值
 func (mc *MetricsCollector) GetHistogramValue(name string) map[string]interface{} {
+	// TODO: 实现从Prometheus Histogram获取真实统计数据
+	// 由于Prometheus客户端库的限制，这里返回空值表示数据不可用
 	switch name {
 	case "api_response_time":
 		return map[string]interface{}{
-			"avg":   0.15, // 模拟平均值
-			"p95":   0.25, // 模拟95分位数
-			"p99":   0.50, // 模拟99分位数
-			"count": 1000, // 模拟计数
+			"avg":   0.0,
+			"p95":   0.0,
+			"p99":   0.0,
+			"count": 0,
 		}
 	case "database_query_time":
 		return map[string]interface{}{
-			"avg":   0.05,
-			"p95":   0.10,
-			"p99":   0.20,
-			"count": 5000,
+			"avg":   0.0,
+			"p95":   0.0,
+			"p99":   0.0,
+			"count": 0,
 		}
 	case "redis_operation_time":
 		return map[string]interface{}{
-			"avg":   0.01,
-			"p95":   0.02,
-			"p99":   0.05,
-			"count": 10000,
+			"avg":   0.0,
+			"p95":   0.0,
+			"p99":   0.0,
+			"count": 0,
 		}
 	case "strategy_execution_time":
 		return map[string]interface{}{
-			"avg":   0.50,
-			"p95":   1.00,
-			"p99":   2.00,
-			"count": 100,
+			"avg":   0.0,
+			"p95":   0.0,
+			"p99":   0.0,
+			"count": 0,
 		}
 	case "optimization_time":
 		return map[string]interface{}{
-			"avg":   30.0,
-			"p95":   60.0,
-			"p99":   120.0,
-			"count": 50,
+			"avg":   0.0,
+			"p95":   0.0,
+			"p99":   0.0,
+			"count": 0,
 		}
 	case "backtest_time":
 		return map[string]interface{}{
-			"avg":   120.0,
-			"p95":   300.0,
-			"p99":   600.0,
-			"count": 20,
+			"avg":   0.0,
+			"p95":   0.0,
+			"p99":   0.0,
+			"count": 0,
 		}
 	default:
 		return map[string]interface{}{
@@ -539,13 +539,15 @@ func (mc *MetricsCollector) GetHistogramValue(name string) map[string]interface{
 	}
 }
 
-// 新增：GetCounterValue 获取Counter值
+// GetCounterValue 获取Counter值
 func (mc *MetricsCollector) GetCounterValue(name string) float64 {
+	// TODO: 实现从Prometheus Counter获取真实计数值
+	// 由于Prometheus客户端库的限制，这里返回0表示数据不可用
 	switch name {
 	case "api_errors_total":
-		return 5.0 // 模拟错误计数
+		return 0.0
 	case "api_requests_total":
-		return 10000.0 // 模拟请求计数
+		return 0.0
 	default:
 		return 0.0
 	}
@@ -609,4 +611,63 @@ func (mc *MetricsCollector) RecordBacktestTime(strategyID string, duration time.
 // 新增：RecordStrategyExecutionTime 记录策略执行时间
 func (mc *MetricsCollector) RecordStrategyExecutionTime(strategyID string, duration time.Duration) {
 	mc.strategyExecutionTime.WithLabelValues(strategyID).Observe(duration.Seconds())
+}
+
+// 真实系统指标获取方法
+
+// getRealCPUUsage 获取真实CPU使用率
+func (mc *MetricsCollector) getRealCPUUsage() float64 {
+	// TODO: 实现真实的CPU使用率获取
+	// 可以使用 github.com/shirou/gopsutil/cpu 包
+	// 目前返回0表示数据不可用
+	return 0.0
+}
+
+// getRealMemoryUsage 获取真实内存使用率
+func (mc *MetricsCollector) getRealMemoryUsage() float64 {
+	// TODO: 实现真实的内存使用率获取
+	// 可以使用 github.com/shirou/gopsutil/mem 包
+	return 0.0
+}
+
+// getRealDiskUsage 获取真实磁盘使用率
+func (mc *MetricsCollector) getRealDiskUsage() float64 {
+	// TODO: 实现真实的磁盘使用率获取
+	// 可以使用 github.com/shirou/gopsutil/disk 包
+	return 0.0
+}
+
+// getRealNetworkIO 获取真实网络IO
+func (mc *MetricsCollector) getRealNetworkIO() float64 {
+	// TODO: 实现真实的网络IO获取
+	// 可以使用 github.com/shirou/gopsutil/net 包
+	return 0.0
+}
+
+// getRealActiveConnections 获取真实活跃连接数
+func (mc *MetricsCollector) getRealActiveConnections() float64 {
+	// TODO: 实现真实的活跃连接数获取
+	// 可以通过系统调用或/proc文件系统获取
+	return 0.0
+}
+
+// getRealDatabaseConnections 获取真实数据库连接数
+func (mc *MetricsCollector) getRealDatabaseConnections() float64 {
+	// TODO: 实现真实的数据库连接数获取
+	// 需要从数据库连接池获取统计信息
+	return 0.0
+}
+
+// getRealRedisConnections 获取真实Redis连接数
+func (mc *MetricsCollector) getRealRedisConnections() float64 {
+	// TODO: 实现真实的Redis连接数获取
+	// 需要从Redis客户端获取连接池信息
+	return 0.0
+}
+
+// getRealSystemUptime 获取真实系统运行时间
+func (mc *MetricsCollector) getRealSystemUptime() float64 {
+	// TODO: 实现真实的系统运行时间获取
+	// 可以使用 github.com/shirou/gopsutil/host 包
+	return 0.0
 }
