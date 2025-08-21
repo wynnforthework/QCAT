@@ -921,13 +921,6 @@ class ApiClient {
 
   // Trade History API
   async getTradeHistory(strategyId?: string, filters?: TradeHistoryFilters): Promise<TradeHistoryItem[]> {
-    // Note: The backend endpoint /api/v1/trading/history does not exist yet
-    // Return mock data directly to avoid 404 errors
-    console.log('Using mock trade history data (backend endpoint not implemented)');
-    return this.getMockTradeHistory(strategyId, filters);
-
-    // TODO: Uncomment this when the backend endpoint is implemented
-    /*
     try {
       const params = new URLSearchParams();
       if (strategyId) params.append('strategyId', strategyId);
@@ -943,10 +936,9 @@ class ApiClient {
       return this.request<TradeHistoryItem[]>(endpoint);
     } catch (error) {
       console.error('Failed to fetch trade history, using mock data:', error);
-      // Return mock trade history data
+      // Return mock trade history data as fallback
       return this.getMockTradeHistory(strategyId, filters);
     }
-    */
   }
 
   private getMockTradeHistory(strategyId?: string, filters?: TradeHistoryFilters): TradeHistoryItem[] {

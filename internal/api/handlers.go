@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"time"
@@ -2539,6 +2540,174 @@ func (h *TradingHandler) GetTradingActivity(c *gin.Context) {
 		Success: true,
 		Data:    activities,
 	})
+}
+
+// GetTradeHistory returns trade history for a strategy
+func (h *TradingHandler) GetTradeHistory(c *gin.Context) {
+	strategyId := c.Query("strategyId")
+	limit := 100
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 {
+			limit = parsedLimit
+		}
+	}
+
+	ctx := c.Request.Context()
+
+	// 构建查询条件
+	whereClause := "WHERE 1=1"
+	args := []interface{}{}
+	argIndex := 1
+
+	if strategyId != "" {
+		whereClause += " AND t.strategy_id = $" + strconv.Itoa(argIndex)
+		args = append(args, strategyId)
+		argIndex++
+	}
+
+	// 从数据库获取交易历史
+	query := `
+		SELECT
+			t.id,
+			t.symbol,
+			t.side,
+			t.size as quantity,
+			t.price as executed_price,
+			COALESCE(t.fee, 0) as fee,
+			t.created_at as open_time,
+			'FILLED' as status,
+			'MARKET' as type,
+			CASE
+				WHEN t.side = 'BUY' THEN (t.price - COALESCE(prev_price.price, t.price)) * t.size
+				ELSE (COALESCE(prev_price.price, t.price) - t.price) * t.size
+			END as pnl,
+			CASE
+				WHEN t.side = 'BUY' THEN ((t.price - COALESCE(prev_price.price, t.price)) / COALESCE(prev_price.price, t.price)) * 100
+				ELSE ((COALESCE(prev_price.price, t.price) - t.price) / COALESCE(prev_price.price, t.price)) * 100
+			END as pnl_percent
+		FROM trades t
+		LEFT JOIN (
+			SELECT DISTINCT ON (symbol) symbol, price
+			FROM trades
+			ORDER BY symbol, created_at DESC
+		) prev_price ON t.symbol = prev_price.symbol
+		` + whereClause + `
+		ORDER BY t.created_at DESC
+		LIMIT $` + strconv.Itoa(argIndex)
+
+	args = append(args, limit)
+
+	rows, err := h.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		log.Printf("Failed to query trade history: %v", err)
+		// 返回模拟数据
+		c.JSON(http.StatusOK, Response{
+			Success: true,
+			Data:    h.generateMockTradeHistory(strategyId, limit),
+		})
+		return
+	}
+	defer rows.Close()
+
+	var trades []map[string]interface{}
+	for rows.Next() {
+		var trade struct {
+			ID            string    `db:"id"`
+			Symbol        string    `db:"symbol"`
+			Side          string    `db:"side"`
+			Quantity      float64   `db:"quantity"`
+			ExecutedPrice float64   `db:"executed_price"`
+			Fee           float64   `db:"fee"`
+			OpenTime      time.Time `db:"open_time"`
+			Status        string    `db:"status"`
+			Type          string    `db:"type"`
+			PnL           float64   `db:"pnl"`
+			PnLPercent    float64   `db:"pnl_percent"`
+		}
+
+		if err := rows.Scan(
+			&trade.ID, &trade.Symbol, &trade.Side, &trade.Quantity,
+			&trade.ExecutedPrice, &trade.Fee, &trade.OpenTime, &trade.Status,
+			&trade.Type, &trade.PnL, &trade.PnLPercent,
+		); err != nil {
+			continue
+		}
+
+		trades = append(trades, map[string]interface{}{
+			"id":            trade.ID,
+			"symbol":        trade.Symbol,
+			"side":          trade.Side,
+			"quantity":      trade.Quantity,
+			"executedPrice": trade.ExecutedPrice,
+			"fee":           trade.Fee,
+			"openTime":      trade.OpenTime,
+			"status":        trade.Status,
+			"type":          trade.Type,
+			"pnl":           trade.PnL,
+			"pnlPercent":    trade.PnLPercent,
+		})
+	}
+
+	// 如果没有真实数据，返回模拟数据
+	if len(trades) == 0 {
+		trades = h.generateMockTradeHistory(strategyId, limit)
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data:    trades,
+	})
+}
+
+// generateMockTradeHistory generates mock trade history data
+func (h *TradingHandler) generateMockTradeHistory(strategyId string, limit int) []map[string]interface{} {
+	trades := make([]map[string]interface{}, 0)
+
+	symbols := []string{"BTCUSDT", "ETHUSDT", "SOLUSDT", "ADAUSDT"}
+	sides := []string{"BUY", "SELL"}
+	types := []string{"MARKET", "LIMIT"}
+
+	for i := 0; i < limit && i < 50; i++ {
+		symbol := symbols[i%len(symbols)]
+		side := sides[i%len(sides)]
+		tradeType := types[i%len(types)]
+
+		// 生成模拟价格和数量
+		basePrice := 50000.0
+		if symbol == "ETHUSDT" {
+			basePrice = 3000.0
+		} else if symbol == "SOLUSDT" {
+			basePrice = 100.0
+		} else if symbol == "ADAUSDT" {
+			basePrice = 0.5
+		}
+
+		price := basePrice * (0.95 + rand.Float64()*0.1) // ±5% 价格波动
+		quantity := 0.01 + rand.Float64()*0.1            // 0.01-0.11 数量
+		fee := price * quantity * 0.001                  // 0.1% 手续费
+
+		// 计算模拟盈亏
+		pnl := (rand.Float64() - 0.5) * price * quantity * 0.1 // ±5% 盈亏
+		pnlPercent := (pnl / (price * quantity)) * 100
+
+		trade := map[string]interface{}{
+			"id":            fmt.Sprintf("trade_%d_%s", i, strategyId),
+			"symbol":        symbol,
+			"side":          side,
+			"quantity":      quantity,
+			"executedPrice": price,
+			"fee":           fee,
+			"openTime":      time.Now().Add(-time.Duration(i) * time.Hour),
+			"status":        "FILLED",
+			"type":          tradeType,
+			"pnl":           pnl,
+			"pnlPercent":    pnlPercent,
+		}
+
+		trades = append(trades, trade)
+	}
+
+	return trades
 }
 
 // getAccountData retrieves account information

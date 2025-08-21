@@ -461,6 +461,15 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	// Store automation system in server
 	server.automationSystem = automationSystem
 
+	// Start automation system if initialized
+	if automationSystem != nil {
+		if err := automationSystem.Start(); err != nil {
+			log.Printf("Warning: Failed to start automation system: %v", err)
+		} else {
+			log.Printf("Automation system started successfully")
+		}
+	}
+
 	// Initialize handlers with dependencies
 	server.handlers = &Handlers{
 		Optimizer:  NewOptimizerHandler(db, redis, metricsCollector),
@@ -552,6 +561,7 @@ func (s *Server) setupRoutes() {
 
 			// Trading activity routes (now protected)
 			protected.GET("/trading/activity", s.handlers.Trading.GetTradingActivity)
+			protected.GET("/trading/history", s.handlers.Trading.GetTradeHistory)
 
 			// System metrics (now protected)
 			protected.GET("/metrics/system", s.handlers.Metrics.GetSystemMetrics)
@@ -773,6 +783,15 @@ func (s *Server) Stop(ctx context.Context) error {
 	// Stop graceful shutdown manager
 	if s.shutdown != nil {
 		s.shutdown.Stop()
+	}
+
+	// Stop automation system
+	if s.automationSystem != nil {
+		if err := s.automationSystem.Stop(); err != nil {
+			log.Printf("Warning: Failed to stop automation system: %v", err)
+		} else {
+			log.Printf("Automation system stopped successfully")
+		}
 	}
 
 	// Close database connection
