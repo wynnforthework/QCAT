@@ -221,15 +221,16 @@ func (m *Manager) storeKlines(klines []*Kline) error {
 
 	stmt, err := tx.Prepare(`
 		INSERT INTO market_data (
-			symbol, interval, timestamp, open, high, low, close, volume
+			symbol, interval, timestamp, open, high, low, close, volume, complete
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8
+			$1, $2, $3, $4, $5, $6, $7, $8, $9
 		) ON CONFLICT (symbol, timestamp, interval) DO UPDATE SET
 			open = EXCLUDED.open,
 			high = EXCLUDED.high,
 			low = EXCLUDED.low,
 			close = EXCLUDED.close,
-			volume = EXCLUDED.volume
+			volume = EXCLUDED.volume,
+			complete = EXCLUDED.complete
 	`)
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
@@ -246,6 +247,7 @@ func (m *Manager) storeKlines(klines []*Kline) error {
 			k.Low,
 			k.Close,
 			k.Volume,
+			k.Complete,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to execute statement: %w", err)

@@ -28,8 +28,8 @@ export default function AuditPage() {
   const [decisionChains, setDecisionChains] = useState<DecisionChain[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [actionFilter, setActionFilter] = useState("");
-  const [outcomeFilter, setOutcomeFilter] = useState("");
+  const [actionFilter, setActionFilter] = useState("all");
+  const [outcomeFilter, setOutcomeFilter] = useState("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -40,16 +40,31 @@ export default function AuditPage() {
       const filters = {
         startTime: dateFrom || undefined,
         endTime: dateTo || undefined,
-        action: actionFilter || undefined,
-        outcome: (outcomeFilter as 'success' | 'failure') || undefined,
+        action: actionFilter === "all" ? undefined : actionFilter,
+        outcome: outcomeFilter === "all" ? undefined : (outcomeFilter as 'success' | 'failure'),
         limit: 100
       };
       
-      const [logs, chains] = await Promise.all([
-        apiClient.getAuditLogs(filters),
-        apiClient.getDecisionChains({ limit: 50 })
-      ]);
-      
+      // Call APIs individually to handle errors better
+      let logs: AuditLog[] = [];
+      let chains: DecisionChain[] = [];
+
+      try {
+        logs = await apiClient.getAuditLogs(filters);
+      } catch (error) {
+        console.error('Failed to fetch audit logs:', error);
+        // API client should handle this with mock data, but just in case
+        logs = [];
+      }
+
+      try {
+        chains = await apiClient.getDecisionChains({ limit: 50 });
+      } catch (error) {
+        console.error('Failed to fetch decision chains:', error);
+        // API client should handle this with mock data, but just in case
+        chains = [];
+      }
+
       setAuditLogs(logs);
       setDecisionChains(chains);
     } catch (error) {
@@ -255,8 +270,8 @@ export default function AuditPage() {
       log.resource.toLowerCase().includes(searchTerm.toLowerCase()) ||
       log.userId.toLowerCase().includes(searchTerm.toLowerCase());
     
-    const matchesAction = !actionFilter || log.action === actionFilter;
-    const matchesOutcome = !outcomeFilter || log.outcome === outcomeFilter;
+    const matchesAction = actionFilter === "all" || log.action === actionFilter;
+    const matchesOutcome = outcomeFilter === "all" || log.outcome === outcomeFilter;
     
     return matchesSearch && matchesAction && matchesOutcome;
   });
@@ -320,7 +335,7 @@ export default function AuditPage() {
                 <SelectValue placeholder="操作类型" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部操作</SelectItem>
+                <SelectItem value="all">全部操作</SelectItem>
                 <SelectItem value="strategy_start">启动策略</SelectItem>
                 <SelectItem value="strategy_stop">停止策略</SelectItem>
                 <SelectItem value="portfolio_rebalance">投资组合再平衡</SelectItem>
@@ -334,7 +349,7 @@ export default function AuditPage() {
                 <SelectValue placeholder="执行结果" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">全部结果</SelectItem>
+                <SelectItem value="all">全部结果</SelectItem>
                 <SelectItem value="success">成功</SelectItem>
                 <SelectItem value="failure">失败</SelectItem>
               </SelectContent>
@@ -372,8 +387,8 @@ export default function AuditPage() {
               size="sm"
               onClick={() => {
                 setSearchTerm('');
-                setActionFilter('');
-                setOutcomeFilter('');
+                setActionFilter('all');
+                setOutcomeFilter('all');
                 setDateFrom('');
                 setDateTo('');
               }}

@@ -21,7 +21,7 @@ import {
   Flame,
   Activity
 } from "lucide-react";
-import apiClient, { HotSymbol, WhitelistItem } from "@/lib/api";
+import apiClient, { HotSymbol, WhitelistItem, ApiError } from "@/lib/api";
 
 export default function HotlistPage() {
   const [hotSymbols, setHotSymbols] = useState<HotSymbol[]>([]);
@@ -61,13 +61,24 @@ export default function HotlistPage() {
       alert(`${symbol} 已添加到白名单`);
     } catch (error) {
       console.error('Failed to approve symbol:', error);
-      alert('操作失败，请重试');
+
+      if (error instanceof ApiError) {
+        if (error.status === 409) {
+          alert(`${symbol} 已经在白名单中`);
+        } else if (error.status === 400) {
+          alert('请输入有效的交易对格式');
+        } else {
+          alert('操作失败，请重试');
+        }
+      } else {
+        alert('操作失败，请重试');
+      }
     }
   };
 
   const addToWhitelist = async () => {
     if (!newSymbol.trim()) return;
-    
+
     try {
       await apiClient.addToWhitelist(newSymbol.toUpperCase(), '手动添加');
       setNewSymbol('');
@@ -75,20 +86,41 @@ export default function HotlistPage() {
       alert(`${newSymbol.toUpperCase()} 已添加到白名单`);
     } catch (error) {
       console.error('Failed to add to whitelist:', error);
-      alert('添加失败，请检查交易对格式');
+
+      // Handle specific error cases
+      if (error instanceof ApiError) {
+        if (error.status === 409) {
+          alert(`${newSymbol.toUpperCase()} 已经在白名单中`);
+        } else if (error.status === 400) {
+          alert('请输入有效的交易对格式');
+        } else {
+          alert('添加失败，请重试');
+        }
+      } else {
+        alert('添加失败，请重试');
+      }
     }
   };
 
   const removeFromWhitelist = async (symbol: string) => {
     if (!confirm(`确定要从白名单中移除 ${symbol} 吗？`)) return;
-    
+
     try {
       await apiClient.removeFromWhitelist(symbol);
       await loadHotlistData();
       alert(`${symbol} 已从白名单中移除`);
     } catch (error) {
       console.error('Failed to remove from whitelist:', error);
-      alert('移除失败，请重试');
+
+      if (error instanceof ApiError) {
+        if (error.status === 404) {
+          alert(`${symbol} 不在白名单中`);
+        } else {
+          alert('移除失败，请重试');
+        }
+      } else {
+        alert('移除失败，请重试');
+      }
     }
   };
 
@@ -189,8 +221,8 @@ export default function HotlistPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">最高评分</p>
-                <p className={`text-2xl font-bold ${getScoreColor(Math.max(...hotSymbols.map(s => s.score)))}`}>
-                  {Math.max(...hotSymbols.map(s => s.score)).toFixed(1)}
+                <p className={`text-2xl font-bold ${getScoreColor(Math.max(...hotSymbols.map(s => s.score || 0)))}`}>
+                  {hotSymbols.length > 0 ? Math.max(...hotSymbols.map(s => s.score || 0)).toFixed(1) : '0.0'}
                 </p>
               </div>
               <Activity className="h-8 w-8 text-blue-500" />
@@ -204,7 +236,7 @@ export default function HotlistPage() {
               <div>
                 <p className="text-sm text-gray-600">平均涨幅</p>
                 <p className="text-2xl font-bold text-green-600">
-                  +{(hotSymbols.reduce((sum, s) => sum + s.change24h, 0) / hotSymbols.length).toFixed(1)}%
+                  +{hotSymbols.length > 0 ? (hotSymbols.reduce((sum, s) => sum + (s.change24h || 0), 0) / hotSymbols.length).toFixed(1) : '0.0'}%
                 </p>
               </div>
               <TrendingUp className="h-8 w-8 text-green-500" />
@@ -262,40 +294,40 @@ export default function HotlistPage() {
                       </TableCell>
                       <TableCell className="font-medium">{symbol.symbol}</TableCell>
                       <TableCell>
-                        <Badge variant={getScoreBadge(symbol.score)}>
-                          {symbol.score.toFixed(1)}
+                        <Badge variant={getScoreBadge(symbol.score || 0)}>
+                          {symbol.score?.toFixed(1) || '0.0'}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className={`flex items-center ${symbol.change24h >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {symbol.change24h >= 0 ? (
+                        <div className={`flex items-center ${(symbol.change24h || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                          {(symbol.change24h || 0) >= 0 ? (
                             <TrendingUp className="h-4 w-4 mr-1" />
                           ) : (
                             <TrendingDown className="h-4 w-4 mr-1" />
                           )}
-                          {symbol.change24h >= 0 ? '+' : ''}{symbol.change24h.toFixed(2)}%
+                          {(symbol.change24h || 0) >= 0 ? '+' : ''}{symbol.change24h?.toFixed(2) || '0.00'}%
                         </div>
                       </TableCell>
-                      <TableCell>{formatVolume(symbol.volume24h)}</TableCell>
-                      <TableCell>{formatMarketCap(symbol.marketCap)}</TableCell>
+                      <TableCell>{formatVolume(symbol.volume24h || 0)}</TableCell>
+                      <TableCell>{formatMarketCap(symbol.marketCap || 0)}</TableCell>
                       <TableCell>
                         <div className="space-y-1">
                           <div className="flex justify-between text-xs">
                             <span>动量:</span>
-                            <span className={getScoreColor(symbol.indicators.momentum)}>
-                              {symbol.indicators.momentum.toFixed(1)}
+                            <span className={getScoreColor(symbol.indicators?.momentum || 0)}>
+                              {symbol.indicators?.momentum?.toFixed(1) || '0.0'}
                             </span>
                           </div>
                           <div className="flex justify-between text-xs">
                             <span>成交量:</span>
-                            <span className={getScoreColor(symbol.indicators.volume)}>
-                              {symbol.indicators.volume.toFixed(1)}
+                            <span className={getScoreColor(symbol.indicators?.volume || 0)}>
+                              {symbol.indicators?.volume?.toFixed(1) || '0.0'}
                             </span>
                           </div>
                           <div className="flex justify-between text-xs">
                             <span>情绪:</span>
-                            <span className={getScoreColor(symbol.indicators.sentiment)}>
-                              {symbol.indicators.sentiment.toFixed(1)}
+                            <span className={getScoreColor(symbol.indicators?.sentiment || 0)}>
+                              {symbol.indicators?.sentiment?.toFixed(1) || '0.0'}
                             </span>
                           </div>
                         </div>
@@ -341,7 +373,7 @@ export default function HotlistPage() {
                     value={newSymbol}
                     onChange={(e) => setNewSymbol(e.target.value)}
                     className="w-48"
-                    onKeyPress={(e) => e.key === 'Enter' && addToWhitelist()}
+                    onKeyDown={(e) => e.key === 'Enter' && addToWhitelist()}
                   />
                   <Button onClick={addToWhitelist} disabled={!newSymbol.trim()}>
                     <Plus className="h-4 w-4 mr-1" />

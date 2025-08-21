@@ -15,6 +15,8 @@ import (
 	"qcat/internal/exchange/account"
 	"qcat/internal/hotlist"
 	"qcat/internal/monitor"
+
+	"github.com/lib/pq"
 )
 
 // RiskScheduler 风险调度器
@@ -2900,9 +2902,9 @@ func (ps *PositionScheduler) updateHedgeHistory(ctx context.Context,
 	// 记录历史，使用正确的表结构字段
 	query := `
 		INSERT INTO hedge_history (
-			hedge_id, hedge_type, total_exposure, net_exposure,
+			hedge_id, strategy_ids, hedge_type, total_exposure, net_exposure,
 			hedge_ratio, pnl, status, start_time, success_rate, metadata
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10)
 	`
 
 	// 创建元数据JSON
@@ -2919,16 +2921,27 @@ func (ps *PositionScheduler) updateHedgeHistory(ctx context.Context,
 
 	hedgeID := fmt.Sprintf("hedge_%d", time.Now().UnixNano())
 
+	// Extract strategy IDs from correlation matrix or hedge ratios
+	var strategyIDs []string
+	if correlationMatrix != nil && len(correlationMatrix.Strategies) > 0 {
+		strategyIDs = correlationMatrix.Strategies
+	}
+	// If no strategy IDs found, use empty array
+	if len(strategyIDs) == 0 {
+		strategyIDs = []string{}
+	}
+
 	_, err = ps.db.ExecContext(ctx, query,
-		hedgeID,              // hedge_id
-		"correlation_hedge",  // hedge_type
-		0.0,                  // total_exposure
-		0.0,                  // net_exposure
-		0.0,                  // hedge_ratio
-		0.0,                  // pnl
-		"completed",          // status
-		successRate,          // success_rate
-		string(metadataJSON), // metadata
+		hedgeID,               // hedge_id
+		pq.Array(strategyIDs), // strategy_ids (PostgreSQL array)
+		"correlation_hedge",   // hedge_type
+		0.0,                   // total_exposure
+		0.0,                   // net_exposure
+		0.0,                   // hedge_ratio
+		0.0,                   // pnl
+		"completed",           // status
+		successRate,           // success_rate
+		string(metadataJSON),  // metadata
 	)
 
 	if err != nil {

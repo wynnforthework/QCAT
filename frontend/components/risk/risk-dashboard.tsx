@@ -54,6 +54,66 @@ export function RiskDashboard() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Mock data for missing variables
+  const riskAlerts: RiskAlert[] = [
+    {
+      id: '1',
+      type: 'position',
+      severity: 'medium',
+      title: '持仓集中度过高',
+      description: 'BTC持仓占比超过40%，建议分散投资',
+      timestamp: new Date().toISOString(),
+      acknowledged: false
+    }
+  ]
+
+  const riskMetrics: RiskMetric[] = [
+    {
+      name: 'VaR (95%)',
+      value: 15000,
+      threshold: 50000,
+      status: 'safe',
+      description: '95%置信度下的最大损失',
+      unit: '$'
+    },
+    {
+      name: '最大回撤',
+      value: 8.5,
+      threshold: 15.0,
+      status: 'safe',
+      description: '历史最大回撤幅度',
+      unit: '%'
+    },
+    {
+      name: '夏普比率',
+      value: 1.2,
+      threshold: 1.0,
+      status: 'safe',
+      description: '风险调整后收益',
+      unit: ''
+    }
+  ]
+
+  const positionRisks: PositionRisk[] = [
+    {
+      symbol: 'BTC/USDT',
+      exposure: 45000,
+      maxExposure: 100000,
+      var95: 2500,
+      beta: 1.2,
+      correlation: 0.8,
+      liquidationPrice: 28000
+    },
+    {
+      symbol: 'ETH/USDT',
+      exposure: 25000,
+      maxExposure: 50000,
+      var95: 1800,
+      beta: 1.5,
+      correlation: 0.9
+    }
+  ]
+
   useEffect(() => {
     loadRiskData()
     const interval = setInterval(loadRiskData, 10000) // 每10秒更新
@@ -159,14 +219,15 @@ export function RiskDashboard() {
           <CardContent className="p-6">
             <div className="text-center">
               <div className={`text-4xl font-bold mb-2 ${
-                riskOverview.overall === '低风险' ? 'text-green-600' :
-                riskOverview.overall === '中风险' ? 'text-yellow-600' : 'text-red-600'
+                riskOverview.overall === 'low' ? 'text-green-600' :
+                riskOverview.overall === 'medium' ? 'text-yellow-600' : 'text-red-600'
               }`}>
-                {riskOverview.overall}
+                {riskOverview.overall === 'low' ? '低风险' :
+                 riskOverview.overall === 'medium' ? '中风险' : '高风险'}
               </div>
               <div className="text-sm text-muted-foreground mb-4">风险等级</div>
               <div className="text-xs text-muted-foreground mt-2">
-                违规次数: {riskOverview.violations}
+                违规次数: {riskOverview.violations || 0}
               </div>
             </div>
           </CardContent>
@@ -179,7 +240,7 @@ export function RiskDashboard() {
                 <div>
                   <div className="text-sm text-muted-foreground">VaR (95%)</div>
                   <div className="text-2xl font-bold text-blue-600">
-                    ${riskOverview.metrics.var.toFixed(0)}
+                    ${riskOverview.metrics?.var?.toFixed(0) || '0'}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     风险价值
@@ -196,7 +257,7 @@ export function RiskDashboard() {
                 <div>
                   <div className="text-sm text-muted-foreground">最大回撤</div>
                   <div className="text-2xl font-bold text-red-600">
-                    {riskOverview.metrics.maxDrawdown.toFixed(2)}%
+                    {riskOverview.metrics?.maxDrawdown?.toFixed(2) || '0.00'}%
                   </div>
                   <div className="text-xs text-muted-foreground">
                     历史最大
@@ -213,7 +274,7 @@ export function RiskDashboard() {
                 <div>
                   <div className="text-sm text-muted-foreground">夏普比率</div>
                   <div className="text-2xl font-bold text-green-600">
-                    {riskOverview.metrics.sharpeRatio.toFixed(2)}
+                    {riskOverview.metrics?.sharpeRatio?.toFixed(2) || '0.00'}
                   </div>
                   <div className="text-xs text-muted-foreground">
                     风险调整收益

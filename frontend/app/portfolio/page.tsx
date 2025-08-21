@@ -90,7 +90,7 @@ export default function PortfolioPage() {
   }
 
   const totalPnl = allocations.reduce((sum, allocation) => sum + allocation.pnl, 0);
-  const totalPnlPercent = (totalPnl / portfolio.totalValue) * 100;
+  const totalPnlPercent = portfolio.totalValue ? (totalPnl / portfolio.totalValue) * 100 : 0;
   const needsRebalancing = allocations.some(a => Math.abs(a.currentWeight - a.targetWeight) > 2);
 
   return (
@@ -132,7 +132,7 @@ export default function PortfolioPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">总资产价值</p>
-                <p className="text-2xl font-bold">${portfolio.totalValue.toLocaleString()}</p>
+                <p className="text-2xl font-bold">${portfolio.totalValue?.toLocaleString() || '0'}</p>
               </div>
               <DollarSign className="h-8 w-8 text-blue-500" />
             </div>
@@ -165,7 +165,7 @@ export default function PortfolioPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">目标波动率</p>
-                <p className="text-2xl font-bold">{portfolio.targetVolatility.toFixed(1)}%</p>
+                <p className="text-2xl font-bold">{portfolio.targetVolatility?.toFixed(1) || '0.0'}%</p>
               </div>
               <Target className="h-8 w-8 text-purple-500" />
             </div>
@@ -178,9 +178,9 @@ export default function PortfolioPage() {
               <div>
                 <p className="text-sm text-gray-600">当前波动率</p>
                 <p className={`text-2xl font-bold ${
-                  portfolio.currentVolatility <= portfolio.targetVolatility ? 'text-green-600' : 'text-orange-600'
+                  (portfolio.currentVolatility || 0) <= (portfolio.targetVolatility || 0) ? 'text-green-600' : 'text-orange-600'
                 }`}>
-                  {portfolio.currentVolatility.toFixed(1)}%
+                  {portfolio.currentVolatility?.toFixed(1) || '0.0'}%
                 </p>
               </div>
               <BarChart3 className="h-8 w-8 text-orange-500" />
@@ -319,7 +319,7 @@ export default function PortfolioPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {portfolio.rebalanceHistory.map((record, index) => (
+                {(portfolio.rebalanceHistory || []).map((record, index) => (
                   <div key={index} className="border rounded p-4">
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center space-x-2">
