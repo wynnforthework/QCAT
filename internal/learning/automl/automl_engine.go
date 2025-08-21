@@ -1239,32 +1239,20 @@ func (engine *AutoMLEngine) preprocessData(task *MLTask) (*PreprocessedData, err
 	log.Printf("Preprocessing data for task: %s", task.ID)
 
 	// TODO: 实现实际的数据预处理逻辑
-	// 1. 加载数据
+	// 1. 从数据源加载真实数据
 	// 2. 应用预处理策略
 	// 3. 数据清理和转换
 
-	// 模拟预处理结果
-	data := &PreprocessedData{
-		Features:       make([][]float64, 1000), // 模拟1000个样本
-		Target:         make([]float64, 1000),
-		FeatureColumns: []string{"feature1", "feature2", "feature3", "feature4", "feature5"},
-		TrainIndices:   make([]int, 800), // 训练集索引
-		TestIndices:    make([]int, 200), // 测试集索引
+	// 尝试从数据源加载数据
+	rawData, err := engine.loadRawData(task.DataSource)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load raw data: %w", err)
 	}
 
-	// 生成模拟数据
-	for i := 0; i < 1000; i++ {
-		data.Features[i] = make([]float64, 5)
-		for j := 0; j < 5; j++ {
-			data.Features[i][j] = rand.NormFloat64()
-		}
-		data.Target[i] = rand.Float64()
-
-		if i < 800 {
-			data.TrainIndices[i] = i
-		} else {
-			data.TestIndices[i-800] = i
-		}
+	// 应用预处理策略
+	data, err := engine.applyPreprocessingStrategies(rawData, task.PreprocessingConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to apply preprocessing: %w", err)
 	}
 
 	return data, nil
@@ -1330,50 +1318,15 @@ func (engine *AutoMLEngine) trainModels(task *MLTask, data *PreprocessedData) ([
 
 // trainSingleModel 训练单个模型
 func (engine *AutoMLEngine) trainSingleModel(task *MLTask, modelType string, data *PreprocessedData) (*TrainedModel, error) {
-	startTime := time.Now()
-
 	// TODO: 实现实际的模型训练逻辑
 	// 1. 创建模型
 	// 2. 超参数优化
 	// 3. 训练模型
 	// 4. 验证性能
 
-	// 模拟训练过程
-	time.Sleep(100 * time.Millisecond) // 模拟训练时间
-
-	// 模拟性能分数
-	score := 0.7 + rand.Float64()*0.25 // 0.7-0.95之间的分数
-
-	model := &TrainedModel{
-		ID:              engine.generateModelID(),
-		TaskID:          task.ID,
-		Name:            fmt.Sprintf("%s_%s", task.Name, modelType),
-		Algorithm:       modelType,
-		Version:         "1.0",
-		ModelType:       modelType,
-		Hyperparameters: engine.generateMockHyperparameters(modelType),
-		FeatureColumns:  data.FeatureColumns,
-		TargetColumn:    task.TargetVariable,
-		TrainingScore:   score + 0.02, // 训练分数略高
-		ValidationScore: score,
-		TestScore:       score - 0.01, // 测试分数略低
-		Metrics: map[string]float64{
-			"accuracy":  score,
-			"precision": score - 0.01,
-			"recall":    score + 0.01,
-			"f1":        score,
-		},
-		ModelPath:        fmt.Sprintf("/models/%s.pkl", engine.generateModelID()),
-		TrainingTime:     time.Since(startTime),
-		TrainingDataSize: len(data.TrainIndices),
-		FeatureCount:     len(data.FeatureColumns),
-		CreatedAt:        time.Now(),
-		TrainedBy:        "automl_engine",
-		Tags:             []string{"automl", modelType},
-		Metadata:         make(map[string]interface{}),
-	}
-
-	return model, nil
+	// TODO: 实现真实的模型训练过程
+	// 目前返回错误表示训练功能未实现
+	return nil, fmt.Errorf("model training not yet implemented for model type: %s", modelType)
 }
 
 // evaluateModels 评估模型
@@ -1495,25 +1448,24 @@ func (engine *AutoMLEngine) monitorDeployedModels() {
 // evaluateModelPerformance 评估模型性能
 func (engine *AutoMLEngine) evaluateModelPerformance(model *DeployedModel) *ModelPerformance {
 	// TODO: 实现实际的在线性能评估
-	// 这里返回模拟的性能数据
+	// 需要从监控系统获取真实的性能指标
 
 	performance := &ModelPerformance{
 		ModelID:            model.ModelID,
 		OnlineMetrics:      make(map[string]float64),
-		PredictionLatency:  50 * time.Millisecond,
-		ThroughputQPS:      100.0,
-		AccuracyDrift:      rand.Float64() * 0.05, // 0-5%的准确性漂移
+		PredictionLatency:  0,
+		ThroughputQPS:      0.0,
+		AccuracyDrift:      0.0,
 		FeatureDrift:       make(map[string]float64),
-		ConceptDrift:       rand.Float64() * 0.03, // 0-3%的概念漂移
-		BusinessImpact:     rand.Float64() * 1000.0,
+		ConceptDrift:       0.0,
+		BusinessImpact:     0.0,
 		PerformanceHistory: make([]PerformancePoint, 0),
 		LastEvaluated:      time.Now(),
 	}
 
-	// 模拟在线指标
-	performance.OnlineMetrics["accuracy"] = 0.85 + rand.Float64()*0.1
-	performance.OnlineMetrics["precision"] = 0.83 + rand.Float64()*0.1
-	performance.OnlineMetrics["recall"] = 0.87 + rand.Float64()*0.1
+	// TODO: 从监控系统获取真实的在线指标
+	// 目前返回空值表示指标不可用
+	log.Printf("Model performance evaluation not yet implemented for model: %s", model.ModelID)
 
 	return performance
 }
@@ -1830,4 +1782,60 @@ func (engine *AutoMLEngine) convertOptimizationResultToModel(result *Optimizatio
 			"adoption_count": result.AdoptionCount,
 		},
 	}
+}
+
+// loadRawData 从数据源加载原始数据
+func (engine *AutoMLEngine) loadRawData(dataSource DataSource) (interface{}, error) {
+	// TODO: 实现从不同数据源加载数据的逻辑
+	// 支持数据库、文件、API、流等数据源
+
+	log.Printf("Attempting to load data from source: %s", dataSource.Type)
+
+	switch dataSource.Type {
+	case "DATABASE":
+		return engine.loadFromDatabase(dataSource)
+	case "FILE":
+		return engine.loadFromFile(dataSource)
+	case "API":
+		return engine.loadFromAPI(dataSource)
+	case "STREAM":
+		return engine.loadFromStream(dataSource)
+	default:
+		return nil, fmt.Errorf("unsupported data source type: %s", dataSource.Type)
+	}
+}
+
+// applyPreprocessingStrategies 应用预处理策略
+func (engine *AutoMLEngine) applyPreprocessingStrategies(rawData interface{}, config interface{}) (*PreprocessedData, error) {
+	// TODO: 实现数据预处理策略应用
+	// 包括数据清理、转换、特征工程等
+
+	log.Printf("Applying preprocessing strategies to raw data")
+
+	// 目前返回错误表示预处理功能未实现
+	return nil, fmt.Errorf("data preprocessing not yet implemented")
+}
+
+// loadFromDatabase 从数据库加载数据
+func (engine *AutoMLEngine) loadFromDatabase(dataSource DataSource) (interface{}, error) {
+	// TODO: 实现数据库数据加载
+	return nil, fmt.Errorf("database data loading not implemented")
+}
+
+// loadFromFile 从文件加载数据
+func (engine *AutoMLEngine) loadFromFile(dataSource DataSource) (interface{}, error) {
+	// TODO: 实现文件数据加载
+	return nil, fmt.Errorf("file data loading not implemented")
+}
+
+// loadFromAPI 从API加载数据
+func (engine *AutoMLEngine) loadFromAPI(dataSource DataSource) (interface{}, error) {
+	// TODO: 实现API数据加载
+	return nil, fmt.Errorf("API data loading not implemented")
+}
+
+// loadFromStream 从流加载数据
+func (engine *AutoMLEngine) loadFromStream(dataSource DataSource) (interface{}, error) {
+	// TODO: 实现流数据加载
+	return nil, fmt.Errorf("stream data loading not implemented")
 }

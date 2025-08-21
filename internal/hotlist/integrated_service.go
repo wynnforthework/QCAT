@@ -11,6 +11,19 @@ import (
 	"qcat/internal/database"
 )
 
+// MarketData 市场数据结构
+type MarketData struct {
+	Symbol          string  `json:"symbol"`
+	Price           float64 `json:"price"`
+	Volume24h       float64 `json:"volume_24h"`
+	VolumeChange24h float64 `json:"volume_change_24h"`
+	PriceChange24h  float64 `json:"price_change_24h"`
+	Volatility      float64 `json:"volatility"`
+	FundingRate     float64 `json:"funding_rate"`
+	OpenInterest    float64 `json:"open_interest"`
+	OIChange24h     float64 `json:"oi_change_24h"`
+}
+
 // IntegratedService 集成的热门币种服务
 type IntegratedService struct {
 	config               *config.Config
@@ -293,15 +306,18 @@ func (is *IntegratedService) collectMarketData(ctx context.Context) error {
 
 	log.Printf("Collecting market data for %d symbols", len(symbols))
 
-	// 这里应该实现实际的市场数据收集逻辑
-	// 目前使用模拟数据
+	// 实际的市场数据收集逻辑
+	successCount := 0
 	for _, symbol := range symbols {
 		err := is.updateMarketDataForSymbol(ctx, symbol)
 		if err != nil {
 			log.Printf("Failed to update market data for %s: %v", symbol, err)
 			continue
 		}
+		successCount++
 	}
+
+	log.Printf("Successfully updated market data for %d/%d symbols", successCount, len(symbols))
 
 	return nil
 }
@@ -404,8 +420,12 @@ func (is *IntegratedService) getActiveSymbols(ctx context.Context) ([]string, er
 
 // updateMarketDataForSymbol 更新单个符号的市场数据
 func (is *IntegratedService) updateMarketDataForSymbol(ctx context.Context, symbol string) error {
-	// 这里应该调用实际的市场数据API
-	// 目前使用模拟数据
+	// 从市场数据API获取真实数据
+	marketData, err := is.fetchMarketDataFromAPI(ctx, symbol)
+	if err != nil {
+		log.Printf("Failed to fetch market data from API for %s: %v", symbol, err)
+		return fmt.Errorf("market data not available for %s: %w", symbol, err)
+	}
 
 	query := `
 		INSERT INTO market_data (
@@ -425,20 +445,10 @@ func (is *IntegratedService) updateMarketDataForSymbol(ctx context.Context, symb
 			updated_at = NOW()
 	`
 
-	// 生成模拟数据
-	price := 50000.0 + float64(len(symbol)*1000)
-	volume24h := 1000000.0 + float64(len(symbol)*100000)
-	volumeChange24h := -10.0 + float64(len(symbol)%20)
-	priceChange24h := -5.0 + float64(len(symbol)%10)
-	volatility := 0.02 + float64(len(symbol)%5)*0.01
-	fundingRate := 0.0001 + float64(len(symbol)%3)*0.0001
-	openInterest := 500000.0 + float64(len(symbol)*50000)
-	oiChange24h := -5.0 + float64(len(symbol)%10)
-
-	_, err := is.db.ExecContext(ctx, query,
-		symbol, price, volume24h, volumeChange24h,
-		priceChange24h, volatility, fundingRate,
-		openInterest, oiChange24h,
+	_, err = is.db.ExecContext(ctx, query,
+		symbol, marketData.Price, marketData.Volume24h, marketData.VolumeChange24h,
+		marketData.PriceChange24h, marketData.Volatility, marketData.FundingRate,
+		marketData.OpenInterest, marketData.OIChange24h,
 	)
 
 	if err != nil {
@@ -720,4 +730,15 @@ func (is *IntegratedService) ForceUpdate(ctx context.Context) error {
 func (is *IntegratedService) ClearCache() {
 	is.recommendationEngine.ClearCache()
 	log.Printf("All caches cleared")
+}
+
+// fetchMarketDataFromAPI 从API获取市场数据
+func (is *IntegratedService) fetchMarketDataFromAPI(ctx context.Context, symbol string) (*MarketData, error) {
+	// TODO: 实现从实际交易所API获取市场数据
+	// 可以集成Binance、OKX、Bybit等交易所的API
+
+	log.Printf("Attempting to fetch market data for %s from API", symbol)
+
+	// 目前返回错误表示API不可用
+	return nil, fmt.Errorf("market data API not configured for symbol: %s", symbol)
 }
