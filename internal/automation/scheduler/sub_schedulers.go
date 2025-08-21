@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -1969,21 +1970,25 @@ func (rs *RiskScheduler) calculateNewRiskParameters(distribution *OptimalFundDis
 		}
 	}
 
-	params["max_single_allocation"] = maxSingleAllocation
-	params["concentration_threshold"] = maxSingleAllocation * 1.2 // 120%作为告警阈值
-	params["hot_wallet_limit"] = 0.15                             // 热钱包限制15%
-	params["emergency_threshold"] = 0.8                           // 紧急阈值80%
-
 	// 基于转移成功率调整参数
 	successRate := rs.calculateTransferSuccessRate(transferResults)
-	params["transfer_success_rate"] = successRate
-
-	if successRate < 0.9 {
-		// 如果成功率低于90%，提高保护级别
-		params["protection_level"] = 0.9
-	} else {
-		params["protection_level"] = 0.7
+	riskAdjustment := 1.0
+	if successRate < 0.8 {
+		riskAdjustment = 1.2 // 增加风险控制
+	} else if successRate > 0.95 {
+		riskAdjustment = 0.9 // 适度放松
 	}
+
+	// 设置新的风险参数，匹配risk_thresholds表结构
+	params["max_margin_ratio"] = 0.8 * riskAdjustment
+	params["warning_margin_ratio"] = 0.7 * riskAdjustment
+	params["max_daily_loss"] = 5000.0 * riskAdjustment
+	params["max_total_loss"] = 10000.0 * riskAdjustment
+	params["max_drawdown_percent"] = 0.2 * riskAdjustment
+	params["max_position_loss"] = 1000.0 * riskAdjustment
+	params["max_position_loss_percent"] = 0.1 * riskAdjustment
+	params["min_account_balance"] = 10000.0 / riskAdjustment
+	params["max_leverage"] = 10.0 / riskAdjustment
 
 	return params
 }
@@ -2006,26 +2011,36 @@ func (rs *RiskScheduler) calculateTransferSuccessRate(transferResults []*Transfe
 
 // updateProtectionThresholds 更新保护阈值
 func (rs *RiskScheduler) updateProtectionThresholds(ctx context.Context, riskParams map[string]float64) error {
+	// 使用现有的risk_thresholds表而不是不存在的fund_protection_thresholds表
 	query := `
-		INSERT INTO fund_protection_thresholds (
-			max_single_allocation, concentration_threshold, hot_wallet_limit,
-			emergency_threshold, protection_level, updated_at
-		) VALUES ($1, $2, $3, $4, $5, NOW())
-		ON CONFLICT (id) DO UPDATE SET
-			max_single_allocation = EXCLUDED.max_single_allocation,
-			concentration_threshold = EXCLUDED.concentration_threshold,
-			hot_wallet_limit = EXCLUDED.hot_wallet_limit,
-			emergency_threshold = EXCLUDED.emergency_threshold,
-			protection_level = EXCLUDED.protection_level,
-			updated_at = NOW()
+		INSERT INTO risk_thresholds (
+			name, max_margin_ratio, warning_margin_ratio, max_daily_loss,
+			max_total_loss, max_drawdown_percent, max_position_loss,
+			max_position_loss_percent, min_account_balance, max_leverage
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT (name) DO UPDATE SET
+			max_margin_ratio = EXCLUDED.max_margin_ratio,
+			warning_margin_ratio = EXCLUDED.warning_margin_ratio,
+			max_daily_loss = EXCLUDED.max_daily_loss,
+			max_total_loss = EXCLUDED.max_total_loss,
+			max_drawdown_percent = EXCLUDED.max_drawdown_percent,
+			max_position_loss = EXCLUDED.max_position_loss,
+			max_position_loss_percent = EXCLUDED.max_position_loss_percent,
+			min_account_balance = EXCLUDED.min_account_balance,
+			max_leverage = EXCLUDED.max_leverage
 	`
 
 	_, err := rs.db.ExecContext(ctx, query,
-		riskParams["max_single_allocation"],
-		riskParams["concentration_threshold"],
-		riskParams["hot_wallet_limit"],
-		riskParams["emergency_threshold"],
-		riskParams["protection_level"],
+		"fund_protection",                       // name
+		riskParams["max_margin_ratio"],          // max_margin_ratio
+		riskParams["warning_margin_ratio"],      // warning_margin_ratio
+		riskParams["max_daily_loss"],            // max_daily_loss
+		riskParams["max_total_loss"],            // max_total_loss
+		riskParams["max_drawdown_percent"],      // max_drawdown_percent
+		riskParams["max_position_loss"],         // max_position_loss
+		riskParams["max_position_loss_percent"], // max_position_loss_percent
+		riskParams["min_account_balance"],       // min_account_balance
+		int(riskParams["max_leverage"]),         // max_leverage
 	)
 
 	return err
@@ -2882,17 +2897,38 @@ func (ps *PositionScheduler) updateHedgeHistory(ctx context.Context,
 	avgCost := totalCost / float64(totalOperations)
 	avgRiskReduction := totalRiskReduction / float64(totalOperations)
 
-	// 记录历史
+	// 记录历史，使用正确的表结构字段
 	query := `
 		INSERT INTO hedge_history (
-			correlation_matrix, total_operations, successful_operations,
-			success_rate, avg_cost, avg_risk_reduction, created_at
-		) VALUES ($1, $2, $3, $4, $5, $6, NOW())
+			hedge_id, hedge_type, total_exposure, net_exposure,
+			hedge_ratio, pnl, status, start_time, success_rate, metadata
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9)
 	`
 
-	_, err := ps.db.ExecContext(ctx, query,
-		matrixJSON, totalOperations, successfulOperations,
-		successRate, avgCost, avgRiskReduction,
+	// 创建元数据JSON
+	metadata := map[string]interface{}{
+		"correlation_matrix": matrixJSON,
+		"total_operations":   totalOperations,
+		"avg_cost":           avgCost,
+		"avg_risk_reduction": avgRiskReduction,
+	}
+	metadataJSON, err := json.Marshal(metadata)
+	if err != nil {
+		metadataJSON = []byte("{}")
+	}
+
+	hedgeID := fmt.Sprintf("hedge_%d", time.Now().UnixNano())
+
+	_, err = ps.db.ExecContext(ctx, query,
+		hedgeID,              // hedge_id
+		"correlation_hedge",  // hedge_type
+		0.0,                  // total_exposure
+		0.0,                  // net_exposure
+		0.0,                  // hedge_ratio
+		0.0,                  // pnl
+		"completed",          // status
+		successRate,          // success_rate
+		string(metadataJSON), // metadata
 	)
 
 	if err != nil {

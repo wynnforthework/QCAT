@@ -201,6 +201,7 @@ func calculateConfidence(result *OverfitResult) float64 {
 
 	return confidence
 }
+
 // fetchRealMarketData fetches real market data for optimization
 func (o *Orchestrator) fetchRealMarketData(ctx context.Context, strategyID string) (*DataSet, error) {
 	// 首先获取策略配置以确定需要的交易对和时间范围
@@ -269,9 +270,10 @@ func (o *Orchestrator) fetchRealMarketData(ctx context.Context, strategyID strin
 
 // getStrategyConfig retrieves strategy configuration from database
 func (o *Orchestrator) getStrategyConfig(ctx context.Context, strategyID string) (*StrategyConfig, error) {
+	// First get basic strategy info (strategies table doesn't have symbol column)
 	query := `
-		SELECT id, name, symbol, config 
-		FROM strategies 
+		SELECT id, name, COALESCE(parameters, '{}') as config
+		FROM strategies
 		WHERE id = $1
 	`
 
@@ -281,7 +283,6 @@ func (o *Orchestrator) getStrategyConfig(ctx context.Context, strategyID string)
 	err := o.db.QueryRowContext(ctx, query, strategyID).Scan(
 		&config.ID,
 		&config.Name,
-		&config.Symbol,
 		&configJSON,
 	)
 
@@ -289,7 +290,39 @@ func (o *Orchestrator) getStrategyConfig(ctx context.Context, strategyID string)
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("strategy not found: %s", strategyID)
 		}
+		if err == context.Canceled {
+			return nil, fmt.Errorf("optimization canceled: %w", err)
+		}
+		if err == context.DeadlineExceeded {
+			return nil, fmt.Errorf("optimization timeout: %w", err)
+		}
 		return nil, fmt.Errorf("failed to query strategy: %w", err)
+	}
+
+	// Get symbol from strategy_params table
+	symbolQuery := `
+		SELECT param_value
+		FROM strategy_params
+		WHERE strategy_id = $1 AND param_name = 'symbol'
+		LIMIT 1
+	`
+
+	var symbol sql.NullString
+	err = o.db.QueryRowContext(ctx, symbolQuery, strategyID).Scan(&symbol)
+	if err != nil && err != sql.ErrNoRows {
+		if err == context.Canceled {
+			return nil, fmt.Errorf("optimization canceled while querying symbol: %w", err)
+		}
+		if err == context.DeadlineExceeded {
+			return nil, fmt.Errorf("optimization timeout while querying symbol: %w", err)
+		}
+		return nil, fmt.Errorf("failed to query strategy symbol: %w", err)
+	}
+
+	if symbol.Valid {
+		config.Symbol = symbol.String
+	} else {
+		config.Symbol = "BTCUSDT" // Default symbol if not found
 	}
 
 	// 解析配置JSON
@@ -299,6 +332,8 @@ func (o *Orchestrator) getStrategyConfig(ctx context.Context, strategyID string)
 			return nil, fmt.Errorf("failed to parse strategy config: %w", err)
 		}
 		config.Params = params
+	} else {
+		config.Params = make(map[string]interface{})
 	}
 
 	return &config, nil

@@ -2461,31 +2461,11 @@ func (h *TradingHandler) GetTradingActivity(c *gin.Context) {
 
 	rows, err := h.db.QueryContext(ctx, query, limit)
 	if err != nil {
-		// 如果查询失败，返回模拟数据
-		activities := make([]map[string]interface{}, 0, limit)
-		symbols := []string{"BTCUSDT", "ETHUSDT", "ADAUSDT", "DOTUSDT"}
-		types := []string{"order", "fill", "cancel"}
-		sides := []string{"BUY", "SELL"}
-		statuses := []string{"success", "pending", "failed"}
-
-		for i := 0; i < limit; i++ {
-			activity := map[string]interface{}{
-				"id":        fmt.Sprintf("activity_%d_%d", time.Now().Unix(), i),
-				"type":      types[i%len(types)],
-				"symbol":    symbols[i%len(symbols)],
-				"side":      sides[i%len(sides)],
-				"amount":    float64(1 + i%10),
-				"price":     45000.0 + float64(i*100),
-				"timestamp": time.Now().Add(-time.Duration(i) * time.Minute).Format(time.RFC3339),
-				"status":    statuses[i%len(statuses)],
-				"source":    "fallback",
-			}
-			activities = append(activities, activity)
-		}
-
+		// 如果查询失败，返回空数组和错误信息
+		log.Printf("Failed to query trading activity: %v", err)
 		c.JSON(http.StatusOK, Response{
 			Success: true,
-			Data:    activities,
+			Data:    []map[string]interface{}{}, // 返回空数组
 		})
 		return
 	}
@@ -2515,52 +2495,8 @@ func (h *TradingHandler) GetTradingActivity(c *gin.Context) {
 		activities = append(activities, activity)
 	}
 
-	// 如果没有真实数据，提供示例数据
-	if len(activities) == 0 {
-		now := time.Now()
-		sampleActivities := []map[string]interface{}{
-			{
-				"id":        "sample-1",
-				"type":      "market",
-				"symbol":    "BTC/USDT",
-				"side":      "buy",
-				"amount":    0.1,
-				"price":     43250.50,
-				"timestamp": now.Add(-5 * time.Minute).Format(time.RFC3339),
-				"status":    "filled",
-				"source":    "sample",
-			},
-			{
-				"id":        "sample-2",
-				"type":      "limit",
-				"symbol":    "ETH/USDT",
-				"side":      "sell",
-				"amount":    2.5,
-				"price":     2580.75,
-				"timestamp": now.Add(-12 * time.Minute).Format(time.RFC3339),
-				"status":    "filled",
-				"source":    "sample",
-			},
-			{
-				"id":        "sample-3",
-				"type":      "market",
-				"symbol":    "BNB/USDT",
-				"side":      "buy",
-				"amount":    15.0,
-				"price":     315.20,
-				"timestamp": now.Add(-25 * time.Minute).Format(time.RFC3339),
-				"status":    "filled",
-				"source":    "sample",
-			},
-		}
-
-		// 只返回请求的数量
-		if limit < len(sampleActivities) {
-			activities = sampleActivities[:limit]
-		} else {
-			activities = sampleActivities
-		}
-	}
+	// 如果没有真实数据，返回空数组（不提供示例数据）
+	// 这确保只显示真实的交易活动数据
 
 	// 记录指标
 	h.metrics.IncrementCounter("trading_activity_requests", map[string]string{

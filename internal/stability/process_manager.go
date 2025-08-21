@@ -901,13 +901,16 @@ func (pm *ProcessManager) runStrategyProcess(process *Process) {
 	// 新增：创建速率限制器
 	// 新增：从配置获取速率限制间隔
 	rateLimitInterval := 100 * time.Millisecond
+	requestsPerMinute := 60 // Default 60 requests per minute
 	if cfg != nil && cfg.RateLimit.Enabled {
 		// 新增：根据配置的每分钟请求数计算间隔
 		if cfg.RateLimit.RequestsPerMinute > 0 {
+			requestsPerMinute = cfg.RateLimit.RequestsPerMinute
 			rateLimitInterval = time.Minute / time.Duration(cfg.RateLimit.RequestsPerMinute)
 		}
 	}
-	rateLimiter := exchange.NewRateLimiter(redisCache, rateLimitInterval)
+	// Use SimpleRateLimiter which includes common limits like place_order
+	rateLimiter := exchange.NewSimpleRateLimiter(requestsPerMinute, rateLimitInterval)
 
 	// 新增：根据交易所类型创建连接器
 	var exchangeConn exchange.Exchange
@@ -1279,23 +1282,25 @@ func (pm *ProcessManager) runExchangeProcess(process *Process) {
 		PoolSize: cfg.Redis.PoolSize,
 	}
 
-	redisCache, err := cache.NewRedisCache(redisConfig)
+	_, err := cache.NewRedisCache(redisConfig)
 	if err != nil {
 		log.Printf("Failed to initialize Redis for exchange process: %v", err)
-		process.Status = "failed"
-		return
+		// Continue without Redis cache for rate limiting
 	}
 
 	// 新增：创建速率限制器
 	// 新增：从配置获取速率限制间隔
 	rateLimitInterval := 100 * time.Millisecond
+	requestsPerMinute := 60 // Default 60 requests per minute
 	if cfg != nil && cfg.RateLimit.Enabled {
 		// 新增：根据配置的每分钟请求数计算间隔
 		if cfg.RateLimit.RequestsPerMinute > 0 {
+			requestsPerMinute = cfg.RateLimit.RequestsPerMinute
 			rateLimitInterval = time.Minute / time.Duration(cfg.RateLimit.RequestsPerMinute)
 		}
 	}
-	rateLimiter := exchange.NewRateLimiter(redisCache, rateLimitInterval)
+	// Use SimpleRateLimiter which includes common limits like place_order
+	rateLimiter := exchange.NewSimpleRateLimiter(requestsPerMinute, rateLimitInterval)
 
 	// 新增：根据交易所类型创建连接器
 	var exchangeConn exchange.Exchange

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"time"
 
 	"qcat/internal/config"
 	"qcat/internal/database"
@@ -944,6 +945,8 @@ func (se *SystemExecutor) HandleAction(ctx context.Context, action *ExecutionAct
 		return se.exchangeFailover(ctx, action)
 	case "audit_log":
 		return se.auditLog(ctx, action)
+	case "log_performance_metrics":
+		return se.logPerformanceMetrics(ctx, action)
 	default:
 		return fmt.Errorf("unknown system action: %s", action.Action)
 	}
@@ -974,5 +977,60 @@ func (se *SystemExecutor) exchangeFailover(ctx context.Context, action *Executio
 func (se *SystemExecutor) auditLog(ctx context.Context, action *ExecutionAction) error {
 	log.Printf("Processing audit logs")
 	// TODO: 实现审计日志处理逻辑
+	return nil
+}
+
+// logPerformanceMetrics 记录性能指标
+func (se *SystemExecutor) logPerformanceMetrics(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Logging performance metrics")
+
+	// 从参数中获取指标信息
+	metrics := make(map[string]interface{})
+	if action.Parameters != nil {
+		for key, value := range action.Parameters {
+			metrics[key] = value
+		}
+	}
+
+	// 记录基本系统指标
+	metrics["timestamp"] = time.Now().Unix()
+	metrics["action_type"] = "performance_metrics"
+
+	// 如果有数据库连接，可以将指标存储到数据库
+	if se.db != nil {
+		query := `
+			INSERT INTO system_metrics (
+				metric_name, metric_value, metric_type, recorded_at
+			) VALUES ($1, $2, $3, $4)
+		`
+
+		for key, value := range metrics {
+			if key == "timestamp" || key == "action_type" {
+				continue // 跳过元数据字段
+			}
+
+			// 尝试将值转换为数字
+			var numValue float64
+			switch v := value.(type) {
+			case float64:
+				numValue = v
+			case int:
+				numValue = float64(v)
+			case int64:
+				numValue = float64(v)
+			default:
+				// 如果不是数字，跳过
+				continue
+			}
+
+			_, err := se.db.ExecContext(ctx, query, key, numValue, "performance", time.Now())
+			if err != nil {
+				log.Printf("Failed to store metric %s: %v", key, err)
+				// 不返回错误，继续处理其他指标
+			}
+		}
+	}
+
+	log.Printf("Performance metrics logged: %+v", metrics)
 	return nil
 }

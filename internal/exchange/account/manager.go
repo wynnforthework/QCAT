@@ -207,6 +207,12 @@ func (m *Manager) storeBalance(balance *exch.AccountBalance) error {
 		exchangeName = "binance"
 	}
 
+	// 确保exchange_name不为空
+	if exchangeName == "" {
+		exchangeName = "binance" // 默认值
+	}
+
+	// 使用UPSERT操作避免重复键冲突
 	query := `
 		INSERT INTO account_balances (
 			exchange_name, asset, total, available, locked, cross_margin,
@@ -214,6 +220,16 @@ func (m *Manager) storeBalance(balance *exch.AccountBalance) error {
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 		)
+		ON CONFLICT (exchange_name, asset)
+		DO UPDATE SET
+			total = EXCLUDED.total,
+			available = EXCLUDED.available,
+			locked = EXCLUDED.locked,
+			cross_margin = EXCLUDED.cross_margin,
+			isolated_margin = EXCLUDED.isolated_margin,
+			unrealized_pnl = EXCLUDED.unrealized_pnl,
+			realized_pnl = EXCLUDED.realized_pnl,
+			updated_at = EXCLUDED.updated_at
 	`
 
 	_, err := m.db.Exec(query,
