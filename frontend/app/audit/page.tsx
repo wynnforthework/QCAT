@@ -22,6 +22,7 @@ import {
   XCircle
 } from "lucide-react";
 import apiClient, { AuditLog, DecisionChain } from "@/lib/api";
+import AuditReportGenerator from "@/components/AuditReportGenerator";
 
 export default function AuditPage() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
@@ -528,21 +529,7 @@ export default function AuditPage() {
         </TabsContent>
 
         <TabsContent value="reports" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>审计报告</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-gray-500">
-                <BookOpen className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>审计报告功能正在开发中...</p>
-                <Button variant="outline" className="mt-4" onClick={exportAuditReport}>
-                  <Download className="h-4 w-4 mr-2" />
-                  导出当前数据
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <AuditReportGenerator auditLogs={auditLogs} decisionChains={decisionChains} />
         </TabsContent>
       </Tabs>
     </div>
