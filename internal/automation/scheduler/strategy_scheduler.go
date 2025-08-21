@@ -2421,13 +2421,21 @@ func (m *MockDynamicStopLossService) GetServiceStatus() map[string]interface{} {
 
 // getActivePositions 获取活跃持仓
 func (ss *StrategyScheduler) getActivePositions(ctx context.Context) ([]*MockPositionState, error) {
-	// 从数据库获取活跃持仓
+	// 从数据库获取活跃持仓，使用positions表
 	query := `
-		SELECT strategy_id, symbol, side, entry_price, current_price,
-		       quantity, stop_loss, take_profit, created_at
-		FROM active_positions
-		WHERE status = 'active'
-		ORDER BY created_at DESC
+		SELECT
+			p.strategy_id,
+			p.symbol,
+			p.side,
+			p.entry_price,
+			p.entry_price as current_price,  -- Use entry_price as current_price approximation
+			p.size as quantity,
+			0 as stop_loss,  -- Default value
+			0 as take_profit,  -- Default value
+			p.created_at
+		FROM positions p
+		WHERE p.status IN ('open', 'active') AND p.size != 0
+		ORDER BY p.created_at DESC
 	`
 
 	rows, err := ss.db.QueryContext(ctx, query)
@@ -2718,10 +2726,17 @@ func (ss *StrategyScheduler) getCurrentPortfolio(ctx context.Context) (*Portfoli
 // getPortfolioAllocations 获取投资组合配置
 func (ss *StrategyScheduler) getPortfolioAllocations(ctx context.Context) ([]*Allocation, error) {
 	query := `
-		SELECT symbol, quantity, value, weight, pnl, pnl_percent
-		FROM portfolio_allocations
-		WHERE updated_at > NOW() - INTERVAL '1 hour'
-		ORDER BY value DESC
+		SELECT
+			s.name as symbol,
+			pa.weight * 100000 as quantity,  -- Use weight as quantity approximation
+			pa.exposure as value,
+			pa.weight,
+			pa.pnl,
+			CASE WHEN pa.exposure > 0 THEN (pa.pnl / pa.exposure) * 100 ELSE 0 END as pnl_percent
+		FROM portfolio_allocations pa
+		JOIN strategies s ON pa.strategy_id = s.id
+		WHERE pa.updated_at > NOW() - INTERVAL '1 hour'
+		ORDER BY pa.exposure DESC
 	`
 
 	rows, err := ss.db.QueryContext(ctx, query)
