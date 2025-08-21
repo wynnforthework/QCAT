@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"qcat/internal/common"
 	"qcat/internal/config"
 	"qcat/internal/database"
 	"qcat/internal/strategy/optimizer"
@@ -1170,11 +1171,12 @@ func (ss *StrategyScheduler) getActiveStrategies(ctx context.Context) ([]*Strate
 	var strategies []*Strategy
 	for rows.Next() {
 		strategy := &Strategy{}
+		var lastOptimized *time.Time
 		err := rows.Scan(
 			&strategy.ID,
 			&strategy.Name,
 			&strategy.Status,
-			&strategy.LastOptimized,
+			&lastOptimized,
 			&strategy.Performance,
 			&strategy.SharpeRatio,
 			&strategy.MaxDrawdown,
@@ -1183,6 +1185,11 @@ func (ss *StrategyScheduler) getActiveStrategies(ctx context.Context) ([]*Strate
 			log.Printf("Warning: failed to scan strategy row: %v", err)
 			continue
 		}
+
+		if lastOptimized != nil {
+			strategy.LastOptimized = *lastOptimized
+		}
+
 		strategies = append(strategies, strategy)
 	}
 
@@ -1639,8 +1646,8 @@ func (ss *StrategyScheduler) generateMinimumStrategies(ctx context.Context, coun
 	for i := 0; i < count && i < len(baseStrategies); i++ {
 		strategy := baseStrategies[i]
 
-		// 生成策略ID和时间戳
-		strategyID := fmt.Sprintf("emergency_%s_%d", strategy.strategyType, time.Now().Unix())
+		// 生成策略ID和时间戳 - 使用UUID而不是字符串
+		strategyID := common.GenerateUUID() // 使用UUID生成函数
 		now := time.Now()
 
 		// 插入策略到数据库

@@ -363,11 +363,12 @@ func (is *IntegratedService) generateRecommendations(ctx context.Context) ([]*En
 // getActiveSymbols 获取活跃的交易对
 func (is *IntegratedService) getActiveSymbols(ctx context.Context) ([]string, error) {
 	query := `
-		SELECT DISTINCT symbol
+		SELECT DISTINCT symbol, MAX(volume_24h) as max_volume
 		FROM market_data
 		WHERE updated_at > NOW() - INTERVAL '2 hours'
 		AND volume_24h > 500000  -- 最小交易量过滤
-		ORDER BY volume_24h DESC
+		GROUP BY symbol
+		ORDER BY max_volume DESC
 		LIMIT 100
 	`
 
@@ -380,7 +381,8 @@ func (is *IntegratedService) getActiveSymbols(ctx context.Context) ([]string, er
 	var symbols []string
 	for rows.Next() {
 		var symbol string
-		if err := rows.Scan(&symbol); err != nil {
+		var maxVolume float64
+		if err := rows.Scan(&symbol, &maxVolume); err != nil {
 			return nil, fmt.Errorf("failed to scan symbol: %w", err)
 		}
 		symbols = append(symbols, symbol)
