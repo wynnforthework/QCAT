@@ -10,13 +10,13 @@ import (
 	"time"
 
 	"qcat/internal/cache"
-	"qcat/internal/common"
 	"qcat/internal/database"
 	"qcat/internal/exchange/account"
 	"qcat/internal/monitor"
 	"qcat/internal/strategy/optimizer"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // Response represents a standard API response
@@ -2280,7 +2280,7 @@ func (h *AuditHandler) ExportReport(c *gin.Context) {
 
 // 新增：生成UUID的辅助函数
 func generateUUID() string {
-	return common.GenerateUUID()
+	return uuid.New().String()
 }
 
 // DashboardHandler handles dashboard-related API requests

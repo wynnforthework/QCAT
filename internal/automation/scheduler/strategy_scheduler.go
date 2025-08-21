@@ -10,10 +10,11 @@ import (
 	"sync"
 	"time"
 
-	"qcat/internal/common"
 	"qcat/internal/config"
 	"qcat/internal/database"
 	"qcat/internal/strategy/optimizer"
+
+	"github.com/google/uuid"
 )
 
 // StrategyScheduler 策略调度器
@@ -1647,7 +1648,7 @@ func (ss *StrategyScheduler) generateMinimumStrategies(ctx context.Context, coun
 		strategy := baseStrategies[i]
 
 		// 生成策略ID和时间戳 - 使用UUID而不是字符串
-		strategyID := common.GenerateUUID() // 使用UUID生成函数
+		strategyID := uuid.New().String() // 使用标准UUID库
 		now := time.Now()
 
 		// 插入策略到数据库
