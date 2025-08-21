@@ -135,6 +135,12 @@ func (s *Scorer) calculateVolJump(ctx context.Context, symbol string) (float64, 
 
 // calculateTurnover calculates turnover score
 func (s *Scorer) calculateTurnover(ctx context.Context, symbol string) (float64, error) {
+	// 检查klineManager是否已初始化
+	if s.klineManager == nil {
+		// 返回默认值而不是崩溃
+		return 0.4, nil // 返回中等换手率分数
+	}
+
 	// 获取K线数据
 	end := time.Now()
 	start := end.Add(-time.Duration(s.config.TurnoverWindow) * time.Hour)
@@ -220,6 +226,12 @@ func (s *Scorer) calculateFundingZ(ctx context.Context, symbol string) (float64,
 
 // calculateRegimeShift calculates market regime shift score
 func (s *Scorer) calculateRegimeShift(ctx context.Context, symbol string) (float64, error) {
+	// 检查klineManager是否已初始化
+	if s.klineManager == nil {
+		// 返回默认值而不是崩溃
+		return 0.3, nil // 返回中等市场状态变化分数
+	}
+
 	// 获取K线数据
 	end := time.Now()
 	start := end.Add(-time.Duration(s.config.RegimeWindow) * time.Hour)

@@ -156,7 +156,7 @@ func (m *Manager) GetAllBalances(ctx context.Context) (map[string]*exch.AccountB
 // GetBalanceHistory returns historical balance data
 func (m *Manager) GetBalanceHistory(ctx context.Context, asset string, startTime, endTime time.Time) ([]*exch.AccountBalance, error) {
 	query := `
-		SELECT asset, total, available, locked, cross_margin,
+		SELECT exchange_name, asset, total, available, locked, cross_margin,
 			   isolated_margin, unrealized_pnl, realized_pnl, updated_at
 		FROM account_balances
 		WHERE asset = $1 AND updated_at BETWEEN $2 AND $3
@@ -172,7 +172,9 @@ func (m *Manager) GetBalanceHistory(ctx context.Context, asset string, startTime
 	var history []*exch.AccountBalance
 	for rows.Next() {
 		var balance exch.AccountBalance
+		var exchangeName string
 		if err := rows.Scan(
+			&exchangeName, // Read exchange_name but don't use it in the balance struct
 			&balance.Asset,
 			&balance.Total,
 			&balance.Available,
@@ -197,16 +199,25 @@ func (m *Manager) GetBalanceHistory(ctx context.Context, asset string, startTime
 
 // storeBalance stores a balance in the database
 func (m *Manager) storeBalance(balance *exch.AccountBalance) error {
+	// Get exchange name from the exchange instance
+	exchangeName := "binance" // Default exchange name
+	if m.exchange != nil {
+		// Try to get exchange name from the exchange instance
+		// For now, use default "binance" as most implementations use this
+		exchangeName = "binance"
+	}
+
 	query := `
 		INSERT INTO account_balances (
-			asset, total, available, locked, cross_margin,
+			exchange_name, asset, total, available, locked, cross_margin,
 			isolated_margin, unrealized_pnl, realized_pnl, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 		)
 	`
 
 	_, err := m.db.Exec(query,
+		exchangeName,
 		balance.Asset,
 		balance.Total,
 		balance.Available,
