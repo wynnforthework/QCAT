@@ -343,17 +343,7 @@ func (h *StrategyHandler) ListStrategies(c *gin.Context) {
 			"runtime_status": runtimeStatus,
 			"created_at":     strategy.CreatedAt,
 			"updated_at":     strategy.UpdatedAt,
-			// 添加一些模拟的性能数据
-			"performance": map[string]interface{}{
-				"total_return": 0.0,
-				"sharpe_ratio": 0.0,
-				"max_drawdown": 0.0,
-				"win_rate":     0.0,
-			},
-			"risk": map[string]interface{}{
-				"level":      "medium",
-				"violations": 0,
-			},
+			// 不再添加模拟性能数据，让前端处理空数据
 		})
 	}
 
@@ -2410,29 +2400,14 @@ func (h *MarketHandler) GetMarketData(c *gin.Context) {
 
 	rows, err := h.db.QueryContext(ctx, query)
 	if err != nil {
-		// 如果数据库查询失败，返回模拟数据
-		marketData := []map[string]interface{}{
-			{
-				"symbol":     "BTCUSDT",
-				"price":      45000.0 + float64(time.Now().Unix()%1000),
-				"change24h":  2.5,
-				"volume":     1000000.0,
-				"lastUpdate": time.Now().Format(time.RFC3339),
-				"source":     "fallback",
-			},
-			{
-				"symbol":     "ETHUSDT",
-				"price":      3000.0 + float64(time.Now().Unix()%100),
-				"change24h":  1.8,
-				"volume":     800000.0,
-				"lastUpdate": time.Now().Format(time.RFC3339),
-				"source":     "fallback",
-			},
-		}
+		// 记录数据库查询失败的错误
+		log.Printf("Failed to query market data: %v", err)
 
+		// 返回空数据
 		c.JSON(http.StatusOK, Response{
 			Success: true,
-			Data:    marketData,
+			Data:    []map[string]interface{}{}, // 返回空数组
+			Message: "Market data temporarily unavailable",
 		})
 		return
 	}
@@ -2660,17 +2635,16 @@ func (h *TradingHandler) GetTradeHistory(c *gin.Context) {
 
 // getAccountData retrieves account information
 func (h *DashboardHandler) getAccountData() map[string]interface{} {
-	// 如果账户管理器不可用，返回模拟数据
+	// 如果账户管理器不可用，返回空数据
 	if h.accountManager == nil {
-		baseEquity := 125000.50
-		variation := float64(time.Now().Unix()%1000) / 10.0 // 0-100的变化
-
+		log.Printf("Account manager not available")
 		return map[string]interface{}{
-			"equity":      baseEquity + variation,
-			"pnl":         8250.30 + variation*0.1,
-			"pnlPercent":  7.05 + variation*0.01,
-			"drawdown":    2.35,
-			"maxDrawdown": 5.20,
+			"equity":      0.0,
+			"pnl":         0.0,
+			"pnlPercent":  0.0,
+			"drawdown":    0.0,
+			"maxDrawdown": 0.0,
+			"error":       "Account manager not configured",
 		}
 	}
 
@@ -2678,14 +2652,15 @@ func (h *DashboardHandler) getAccountData() map[string]interface{} {
 	ctx := context.Background()
 	balances, err := h.accountManager.GetAllBalances(ctx)
 	if err != nil {
-		// 如果获取失败，返回模拟数据
+		// 如果获取失败，记录错误并返回空数据
+		log.Printf("Failed to get account balances: %v", err)
 		return map[string]interface{}{
 			"equity":      0.0,
 			"pnl":         0.0,
 			"pnlPercent":  0.0,
 			"drawdown":    0.0,
 			"maxDrawdown": 0.0,
-			"error":       err.Error(),
+			"error":       "Account data temporarily unavailable",
 		}
 	}
 
@@ -2759,13 +2734,14 @@ func (h *DashboardHandler) getStrategyStatistics() map[string]interface{} {
 
 	rows, err := h.db.QueryContext(ctx, query)
 	if err != nil {
-		// 如果查询失败，返回基于总数的模拟数据
+		// 如果查询失败，记录错误并返回空统计
+		log.Printf("Failed to query strategy status statistics: %v", err)
 		return map[string]interface{}{
-			"total":    totalCount,
-			"running":  1,
-			"stopped":  totalCount - 1,
+			"total":    0,
+			"running":  0,
+			"stopped":  0,
 			"error":    0,
-			"db_error": err.Error(),
+			"db_error": "Strategy statistics temporarily unavailable",
 		}
 	}
 	defer rows.Close()
@@ -3269,17 +3245,19 @@ func (h *StrategyHandler) OnboardStrategy(c *gin.Context) {
 		req.RiskProfile.StopLoss = 0.05 // 5%
 	}
 
-	// 模拟接入流程结果
+	// TODO: 实现真实的策略接入流程
+	// 目前返回处理中状态，需要实现实际的验证逻辑
 	result := map[string]interface{}{
 		"success":     true,
 		"strategy_id": req.StrategyID,
-		"status":      "processing",
+		"status":      "pending",
+		"message":     "Strategy onboarding request received and queued for processing",
 		"validation_result": map[string]interface{}{
-			"is_valid": true,
-			"score":    85.0,
-			"errors":   []string{},
-			"warnings": []string{"Consider adding more detailed risk controls"},
-			"passed":   []string{"config_validation", "parameter_validation", "security_validation"},
+			"is_valid": false,
+			"score":    0.0,
+			"errors":   []string{"Validation not yet implemented"},
+			"warnings": []string{},
+			"passed":   []string{},
 		},
 		"risk_assessment": map[string]interface{}{
 			"overall_score":     75.0,
@@ -3378,13 +3356,15 @@ func (h *StrategyHandler) GetOnboardingStatus(c *gin.Context) {
 		return
 	}
 
-	// 模拟接入状态
+	// TODO: 实现真实的策略接入状态查询
+	// 目前返回未找到状态，需要实现实际的状态跟踪
 	status := map[string]interface{}{
 		"strategy_id":    strategyID,
-		"current_stage":  "deployed",
-		"progress":       100,
+		"current_stage":  "not_found",
+		"progress":       0,
 		"last_updated":   time.Now(),
 		"estimated_time": 0,
+		"message":        "Strategy onboarding status tracking not yet implemented",
 		"stages": []map[string]interface{}{
 			{
 				"name":     "validation",

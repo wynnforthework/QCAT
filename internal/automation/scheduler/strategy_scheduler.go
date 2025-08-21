@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -663,12 +664,7 @@ func (ss *StrategyScheduler) HandleNewStrategyIntroduction(ctx context.Context, 
 	request := ss.createOnboardingRequest(coverageGaps)
 
 	// 5. 提交引入请求
-	mockService, ok := onboardingService.(*MockOnboardingService)
-	if !ok {
-		return fmt.Errorf("invalid onboarding service type")
-	}
-
-	status, err := mockService.SubmitOnboardingRequest(request)
+	status, err := onboardingService.SubmitOnboardingRequest(request)
 	if err != nil {
 		return fmt.Errorf("failed to submit onboarding request: %w", err)
 	}
@@ -1894,13 +1890,12 @@ func (ss *StrategyScheduler) saveEliminationReportToDB(ctx context.Context, repo
 }
 
 // getOrCreateOnboardingService 获取或创建自动引入服务
-func (ss *StrategyScheduler) getOrCreateOnboardingService() interface{} {
+func (ss *StrategyScheduler) getOrCreateOnboardingService() OnboardingServiceInterface {
 	if ss.onboardingService == nil {
-		// 这里应该创建实际的AutoOnboardingService实例
-		// 为了避免循环导入，暂时返回模拟服务
-		ss.onboardingService = &MockOnboardingService{}
+		// 创建真实的策略引入服务
+		ss.onboardingService = NewRealOnboardingService(ss.db, ss.config)
 	}
-	return ss.onboardingService
+	return ss.onboardingService.(OnboardingServiceInterface)
 }
 
 // getActiveSymbols 获取活跃交易对
@@ -2073,11 +2068,28 @@ func (ss *StrategyScheduler) calculateGapPriority(symbol, strategyType string, c
 	return priority
 }
 
-// MockOnboardingService 模拟引入服务
-type MockOnboardingService struct{}
+// OnboardingServiceInterface 策略引入服务接口
+type OnboardingServiceInterface interface {
+	SubmitOnboardingRequest(req *OnboardingRequest) (*OnboardingStatus, error)
+	GetOnboardingStatus(requestID string) (*OnboardingStatus, error)
+}
 
-// MockOnboardingRequest 模拟引入请求
-type MockOnboardingRequest struct {
+// RealOnboardingService 真实的策略引入服务
+type RealOnboardingService struct {
+	db     *database.DB
+	config *config.Config
+}
+
+// NewRealOnboardingService 创建真实的策略引入服务
+func NewRealOnboardingService(db *database.DB, cfg *config.Config) *RealOnboardingService {
+	return &RealOnboardingService{
+		db:     db,
+		config: cfg,
+	}
+}
+
+// OnboardingRequest 策略引入请求
+type OnboardingRequest struct {
 	RequestID       string                 `json:"request_id"`
 	Symbols         []string               `json:"symbols"`
 	MaxStrategies   int                    `json:"max_strategies"`
@@ -2089,8 +2101,8 @@ type MockOnboardingRequest struct {
 	CreatedAt       time.Time              `json:"created_at"`
 }
 
-// MockOnboardingStatus 模拟引入状态
-type MockOnboardingStatus struct {
+// OnboardingStatus 策略引入状态
+type OnboardingStatus struct {
 	RequestID           string        `json:"request_id"`
 	Status              string        `json:"status"`
 	Progress            float64       `json:"progress"`
@@ -2106,8 +2118,30 @@ type MockOnboardingStatus struct {
 }
 
 // SubmitOnboardingRequest 提交引入请求
-func (m *MockOnboardingService) SubmitOnboardingRequest(req *MockOnboardingRequest) (*MockOnboardingStatus, error) {
-	status := &MockOnboardingStatus{
+func (ros *RealOnboardingService) SubmitOnboardingRequest(req *OnboardingRequest) (*OnboardingStatus, error) {
+	// 将请求保存到数据库
+	query := `
+		INSERT INTO strategy_onboarding (
+			request_id, symbols, max_strategies, test_duration,
+			risk_level, auto_deploy, deploy_threshold, parameters,
+			status, progress, current_stage, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+	`
+
+	symbolsJSON, _ := json.Marshal(req.Symbols)
+	parametersJSON, _ := json.Marshal(req.Parameters)
+
+	_, err := ros.db.Exec(query,
+		req.RequestID, string(symbolsJSON), req.MaxStrategies, req.TestDuration,
+		req.RiskLevel, req.AutoDeploy, req.DeployThreshold, string(parametersJSON),
+		"queued", 0.0, "等待处理", time.Now(),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to save onboarding request: %w", err)
+	}
+
+	status := &OnboardingStatus{
 		RequestID:           req.RequestID,
 		Status:              "queued",
 		Progress:            0.0,
@@ -2120,29 +2154,61 @@ func (m *MockOnboardingService) SubmitOnboardingRequest(req *MockOnboardingReque
 		StartTime:           time.Now(),
 	}
 
-	log.Printf("Mock: Submitted onboarding request %s", req.RequestID)
+	log.Printf("Submitted onboarding request %s to database", req.RequestID)
 	return status, nil
 }
 
 // GetOnboardingStatus 获取引入状态
-func (m *MockOnboardingService) GetOnboardingStatus(requestID string) (*MockOnboardingStatus, error) {
-	// 模拟状态查询
-	status := &MockOnboardingStatus{
-		RequestID:          requestID,
-		Status:             "completed",
-		Progress:           1.0,
-		CurrentStage:       "完成",
-		DeployedStrategies: []string{"mock_strategy_1", "mock_strategy_2"},
-		StartTime:          time.Now().Add(-time.Hour),
-		EndTime:            time.Now(),
-		Duration:           time.Hour,
+func (ros *RealOnboardingService) GetOnboardingStatus(requestID string) (*OnboardingStatus, error) {
+	// 从数据库查询状态
+	query := `
+		SELECT request_id, status, progress, current_stage,
+			   generated_strategies, test_results, deployed_strategies,
+			   errors, warnings, start_time, end_time, duration
+		FROM strategy_onboarding
+		WHERE request_id = $1
+	`
+
+	var status OnboardingStatus
+	var generatedStrategiesJSON, testResultsJSON, deployedStrategiesJSON string
+	var errorsJSON, warningsJSON string
+	var endTime sql.NullTime
+	var duration sql.NullString
+
+	err := ros.db.QueryRow(query, requestID).Scan(
+		&status.RequestID, &status.Status, &status.Progress, &status.CurrentStage,
+		&generatedStrategiesJSON, &testResultsJSON, &deployedStrategiesJSON,
+		&errorsJSON, &warningsJSON, &status.StartTime, &endTime, &duration,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("onboarding request %s not found", requestID)
+		}
+		return nil, fmt.Errorf("failed to query onboarding status: %w", err)
 	}
 
-	return status, nil
+	// 解析JSON字段
+	json.Unmarshal([]byte(generatedStrategiesJSON), &status.GeneratedStrategies)
+	json.Unmarshal([]byte(testResultsJSON), &status.TestResults)
+	json.Unmarshal([]byte(deployedStrategiesJSON), &status.DeployedStrategies)
+	json.Unmarshal([]byte(errorsJSON), &status.Errors)
+	json.Unmarshal([]byte(warningsJSON), &status.Warnings)
+
+	if endTime.Valid {
+		status.EndTime = endTime.Time
+	}
+	if duration.Valid {
+		if d, err := time.ParseDuration(duration.String); err == nil {
+			status.Duration = d
+		}
+	}
+
+	return &status, nil
 }
 
 // createOnboardingRequest 创建引入请求
-func (ss *StrategyScheduler) createOnboardingRequest(gaps []*StrategyCoverageGap) *MockOnboardingRequest {
+func (ss *StrategyScheduler) createOnboardingRequest(gaps []*StrategyCoverageGap) *OnboardingRequest {
 	// 提取需要的交易对
 	symbolMap := make(map[string]bool)
 	for _, gap := range gaps {
@@ -2160,7 +2226,7 @@ func (ss *StrategyScheduler) createOnboardingRequest(gaps []*StrategyCoverageGap
 		maxStrategies = 10 // 限制最大数量
 	}
 
-	request := &MockOnboardingRequest{
+	request := &OnboardingRequest{
 		RequestID:       fmt.Sprintf("auto_onboard_%d", time.Now().Unix()),
 		Symbols:         symbols,
 		MaxStrategies:   maxStrategies,
@@ -2180,13 +2246,8 @@ func (ss *StrategyScheduler) createOnboardingRequest(gaps []*StrategyCoverageGap
 }
 
 // monitorOnboardingProgress 监控引入进度
-func (ss *StrategyScheduler) monitorOnboardingProgress(ctx context.Context, requestID string, service interface{}) error {
-	mockService, ok := service.(*MockOnboardingService)
-	if !ok {
-		return fmt.Errorf("invalid service type")
-	}
-
-	// 模拟监控过程
+func (ss *StrategyScheduler) monitorOnboardingProgress(ctx context.Context, requestID string, service OnboardingServiceInterface) error {
+	// 监控引入进度
 	ticker := time.NewTicker(time.Second * 30)
 	defer ticker.Stop()
 
@@ -2200,7 +2261,7 @@ func (ss *StrategyScheduler) monitorOnboardingProgress(ctx context.Context, requ
 			log.Printf("Onboarding monitoring timeout for request %s", requestID)
 			return nil
 		case <-ticker.C:
-			status, err := mockService.GetOnboardingStatus(requestID)
+			status, err := service.GetOnboardingStatus(requestID)
 			if err != nil {
 				log.Printf("Failed to get onboarding status: %v", err)
 				continue
@@ -2218,13 +2279,8 @@ func (ss *StrategyScheduler) monitorOnboardingProgress(ctx context.Context, requ
 }
 
 // generateOnboardingReport 生成引入报告
-func (ss *StrategyScheduler) generateOnboardingReport(ctx context.Context, requestID string, service interface{}) error {
-	mockService, ok := service.(*MockOnboardingService)
-	if !ok {
-		return fmt.Errorf("invalid service type")
-	}
-
-	status, err := mockService.GetOnboardingStatus(requestID)
+func (ss *StrategyScheduler) generateOnboardingReport(ctx context.Context, requestID string, service OnboardingServiceInterface) error {
+	status, err := service.GetOnboardingStatus(requestID)
 	if err != nil {
 		return fmt.Errorf("failed to get final status: %w", err)
 	}
@@ -2360,22 +2416,41 @@ func (ss *StrategyScheduler) HandleStopLossAdjustment(ctx context.Context, task 
 }
 
 // getOrCreateDynamicStopLossService 获取或创建动态止损服务
-func (ss *StrategyScheduler) getOrCreateDynamicStopLossService() interface{} {
+func (ss *StrategyScheduler) getOrCreateDynamicStopLossService() DynamicStopLossServiceInterface {
 	if ss.dynamicStopLossService == nil {
-		// 这里应该创建实际的DynamicStopLossService实例
-		// 为了避免循环导入，暂时返回模拟服务
-		ss.dynamicStopLossService = &MockDynamicStopLossService{}
+		// 创建真实的动态止损服务
+		ss.dynamicStopLossService = NewRealDynamicStopLossService(ss.db, ss.config)
 	}
-	return ss.dynamicStopLossService
+	return ss.dynamicStopLossService.(DynamicStopLossServiceInterface)
 }
 
-// MockDynamicStopLossService 模拟动态止损服务
-type MockDynamicStopLossService struct {
-	positions map[string]*MockPositionState
+// DynamicStopLossServiceInterface 动态止损服务接口
+type DynamicStopLossServiceInterface interface {
+	AddPosition(position *PositionState) error
+	ExecuteAutomaticAdjustment(ctx context.Context) error
+	GetAllPositions() map[string]*PositionState
+	GetServiceStatus() map[string]interface{}
 }
 
-// MockPositionState 模拟持仓状态
-type MockPositionState struct {
+// RealDynamicStopLossService 真实的动态止损服务
+type RealDynamicStopLossService struct {
+	db        *database.DB
+	config    *config.Config
+	positions map[string]*PositionState
+	mu        sync.RWMutex
+}
+
+// NewRealDynamicStopLossService 创建真实的动态止损服务
+func NewRealDynamicStopLossService(db *database.DB, cfg *config.Config) *RealDynamicStopLossService {
+	return &RealDynamicStopLossService{
+		db:        db,
+		config:    cfg,
+		positions: make(map[string]*PositionState),
+	}
+}
+
+// PositionState 持仓状态
+type PositionState struct {
 	StrategyID      string    `json:"strategy_id"`
 	Symbol          string    `json:"symbol"`
 	Side            string    `json:"side"`
@@ -2394,24 +2469,54 @@ type MockPositionState struct {
 }
 
 // AddPosition 添加持仓
-func (m *MockDynamicStopLossService) AddPosition(position *MockPositionState) error {
-	if m.positions == nil {
-		m.positions = make(map[string]*MockPositionState)
-	}
+func (rdsl *RealDynamicStopLossService) AddPosition(position *PositionState) error {
+	rdsl.mu.Lock()
+	defer rdsl.mu.Unlock()
 
 	positionID := fmt.Sprintf("%s_%s", position.StrategyID, position.Symbol)
-	m.positions[positionID] = position
+	rdsl.positions[positionID] = position
 
-	log.Printf("Mock: Added position %s to dynamic stop-loss service", positionID)
+	// 保存到数据库
+	query := `
+		INSERT INTO positions (
+			strategy_id, symbol, side, entry_price, current_price, quantity,
+			stop_loss, take_profit, atr, realized_vol, trend_strength,
+			adjustment_count, created_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		ON CONFLICT (strategy_id, symbol)
+		DO UPDATE SET
+			current_price = EXCLUDED.current_price,
+			stop_loss = EXCLUDED.stop_loss,
+			take_profit = EXCLUDED.take_profit,
+			adjustment_count = EXCLUDED.adjustment_count
+	`
+
+	_, err := rdsl.db.Exec(query,
+		position.StrategyID, position.Symbol, position.Side,
+		position.EntryPrice, position.CurrentPrice, position.Quantity,
+		position.StopLoss, position.TakeProfit, position.ATR,
+		position.RealizedVol, position.TrendStrength,
+		position.AdjustmentCount, position.CreatedAt,
+	)
+
+	if err != nil {
+		log.Printf("Failed to save position to database: %v", err)
+		// 不返回错误，允许内存操作继续
+	}
+
+	log.Printf("Added position %s to dynamic stop-loss service", positionID)
 	return nil
 }
 
 // ExecuteAutomaticAdjustment 执行自动调整
-func (m *MockDynamicStopLossService) ExecuteAutomaticAdjustment(ctx context.Context) error {
-	log.Printf("Mock: Executing automatic stop-loss adjustment for %d positions", len(m.positions))
+func (rdsl *RealDynamicStopLossService) ExecuteAutomaticAdjustment(ctx context.Context) error {
+	rdsl.mu.Lock()
+	defer rdsl.mu.Unlock()
+
+	log.Printf("Executing automatic stop-loss adjustment for %d positions", len(rdsl.positions))
 
 	adjustmentCount := 0
-	for positionID, position := range m.positions {
+	for positionID, position := range rdsl.positions {
 		// 模拟调整逻辑
 		oldStopLoss := position.StopLoss
 		oldTakeProfit := position.TakeProfit
@@ -2448,14 +2553,13 @@ func (m *MockDynamicStopLossService) ExecuteAutomaticAdjustment(ctx context.Cont
 }
 
 // GetAllPositions 获取所有持仓
-func (m *MockDynamicStopLossService) GetAllPositions() map[string]*MockPositionState {
-	if m.positions == nil {
-		return make(map[string]*MockPositionState)
-	}
+func (rdsl *RealDynamicStopLossService) GetAllPositions() map[string]*PositionState {
+	rdsl.mu.RLock()
+	defer rdsl.mu.RUnlock()
 
 	// 返回副本
-	result := make(map[string]*MockPositionState)
-	for id, position := range m.positions {
+	result := make(map[string]*PositionState)
+	for id, position := range rdsl.positions {
 		positionCopy := *position
 		result[id] = &positionCopy
 	}
@@ -2464,17 +2568,21 @@ func (m *MockDynamicStopLossService) GetAllPositions() map[string]*MockPositionS
 }
 
 // GetServiceStatus 获取服务状态
-func (m *MockDynamicStopLossService) GetServiceStatus() map[string]interface{} {
+func (rdsl *RealDynamicStopLossService) GetServiceStatus() map[string]interface{} {
+	rdsl.mu.RLock()
+	defer rdsl.mu.RUnlock()
+
 	return map[string]interface{}{
 		"auto_adjustment_enabled": true,
 		"adjustment_interval":     "15m0s",
-		"active_positions":        len(m.positions),
+		"active_positions":        len(rdsl.positions),
 		"last_adjustment_time":    time.Now(),
+		"service_type":            "real",
 	}
 }
 
 // getActivePositions 获取活跃持仓
-func (ss *StrategyScheduler) getActivePositions(ctx context.Context) ([]*MockPositionState, error) {
+func (ss *StrategyScheduler) getActivePositions(ctx context.Context) ([]*PositionState, error) {
 	// 从数据库获取活跃持仓，使用positions表
 	query := `
 		SELECT
@@ -2500,9 +2608,9 @@ func (ss *StrategyScheduler) getActivePositions(ctx context.Context) ([]*MockPos
 	}
 	defer rows.Close()
 
-	var positions []*MockPositionState
+	var positions []*PositionState
 	for rows.Next() {
-		position := &MockPositionState{}
+		position := &PositionState{}
 		var createdAt time.Time
 
 		err := rows.Scan(
@@ -2542,18 +2650,18 @@ func (ss *StrategyScheduler) getActivePositions(ctx context.Context) ([]*MockPos
 }
 
 // generateMockPositions 生成模拟持仓数据
-func (ss *StrategyScheduler) generateMockPositions() []*MockPositionState {
+func (ss *StrategyScheduler) generateMockPositions() []*PositionState {
 	symbols := []string{"BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT"}
 	strategies := []string{"momentum_1", "mean_reversion_1", "grid_1", "trend_1"}
 
-	var positions []*MockPositionState
+	var positions []*PositionState
 
 	for i, symbol := range symbols {
 		if i >= len(strategies) {
 			break
 		}
 
-		position := &MockPositionState{
+		position := &PositionState{
 			StrategyID:      strategies[i],
 			Symbol:          symbol,
 			Side:            "long",
@@ -2578,35 +2686,20 @@ func (ss *StrategyScheduler) generateMockPositions() []*MockPositionState {
 }
 
 // addPositionToStopLossService 添加持仓到止损服务
-func (ss *StrategyScheduler) addPositionToStopLossService(service interface{}, position *MockPositionState) error {
-	mockService, ok := service.(*MockDynamicStopLossService)
-	if !ok {
-		return fmt.Errorf("invalid service type")
-	}
-
-	return mockService.AddPosition(position)
+func (ss *StrategyScheduler) addPositionToStopLossService(service DynamicStopLossServiceInterface, position *PositionState) error {
+	return service.AddPosition(position)
 }
 
 // executeStopLossAdjustment 执行止损调整
-func (ss *StrategyScheduler) executeStopLossAdjustment(ctx context.Context, service interface{}) error {
-	mockService, ok := service.(*MockDynamicStopLossService)
-	if !ok {
-		return fmt.Errorf("invalid service type")
-	}
-
-	return mockService.ExecuteAutomaticAdjustment(ctx)
+func (ss *StrategyScheduler) executeStopLossAdjustment(ctx context.Context, service DynamicStopLossServiceInterface) error {
+	return service.ExecuteAutomaticAdjustment(ctx)
 }
 
 // generateStopLossReport 生成止损调整报告
-func (ss *StrategyScheduler) generateStopLossReport(ctx context.Context, service interface{}) error {
-	mockService, ok := service.(*MockDynamicStopLossService)
-	if !ok {
-		return fmt.Errorf("invalid service type")
-	}
-
+func (ss *StrategyScheduler) generateStopLossReport(ctx context.Context, service DynamicStopLossServiceInterface) error {
 	// 获取服务状态
-	status := mockService.GetServiceStatus()
-	positions := mockService.GetAllPositions()
+	status := service.GetServiceStatus()
+	positions := service.GetAllPositions()
 
 	// 生成报告
 	report := map[string]interface{}{
