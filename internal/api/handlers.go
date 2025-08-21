@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"math/rand/v2"
 	"net/http"
 	"strconv"
 	"time"
@@ -2600,10 +2599,10 @@ func (h *TradingHandler) GetTradeHistory(c *gin.Context) {
 	rows, err := h.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		log.Printf("Failed to query trade history: %v", err)
-		// 返回模拟数据
+		// 返回空数据
 		c.JSON(http.StatusOK, Response{
 			Success: true,
-			Data:    h.generateMockTradeHistory(strategyId, limit),
+			Data:    []map[string]interface{}{},
 		})
 		return
 	}
@@ -2648,66 +2647,15 @@ func (h *TradingHandler) GetTradeHistory(c *gin.Context) {
 		})
 	}
 
-	// 如果没有真实数据，返回模拟数据
+	// 如果没有真实数据，返回空数组
 	if len(trades) == 0 {
-		trades = h.generateMockTradeHistory(strategyId, limit)
+		trades = []map[string]interface{}{}
 	}
 
 	c.JSON(http.StatusOK, Response{
 		Success: true,
 		Data:    trades,
 	})
-}
-
-// generateMockTradeHistory generates mock trade history data
-func (h *TradingHandler) generateMockTradeHistory(strategyId string, limit int) []map[string]interface{} {
-	trades := make([]map[string]interface{}, 0)
-
-	symbols := []string{"BTCUSDT", "ETHUSDT", "SOLUSDT", "ADAUSDT"}
-	sides := []string{"BUY", "SELL"}
-	types := []string{"MARKET", "LIMIT"}
-
-	for i := 0; i < limit && i < 50; i++ {
-		symbol := symbols[i%len(symbols)]
-		side := sides[i%len(sides)]
-		tradeType := types[i%len(types)]
-
-		// 生成模拟价格和数量
-		basePrice := 50000.0
-		if symbol == "ETHUSDT" {
-			basePrice = 3000.0
-		} else if symbol == "SOLUSDT" {
-			basePrice = 100.0
-		} else if symbol == "ADAUSDT" {
-			basePrice = 0.5
-		}
-
-		price := basePrice * (0.95 + rand.Float64()*0.1) // ±5% 价格波动
-		quantity := 0.01 + rand.Float64()*0.1            // 0.01-0.11 数量
-		fee := price * quantity * 0.001                  // 0.1% 手续费
-
-		// 计算模拟盈亏
-		pnl := (rand.Float64() - 0.5) * price * quantity * 0.1 // ±5% 盈亏
-		pnlPercent := (pnl / (price * quantity)) * 100
-
-		trade := map[string]interface{}{
-			"id":            fmt.Sprintf("trade_%d_%s", i, strategyId),
-			"symbol":        symbol,
-			"side":          side,
-			"quantity":      quantity,
-			"executedPrice": price,
-			"fee":           fee,
-			"openTime":      time.Now().Add(-time.Duration(i) * time.Hour),
-			"status":        "FILLED",
-			"type":          tradeType,
-			"pnl":           pnl,
-			"pnlPercent":    pnlPercent,
-		}
-
-		trades = append(trades, trade)
-	}
-
-	return trades
 }
 
 // getAccountData retrieves account information
@@ -2784,10 +2732,14 @@ func (h *DashboardHandler) getStrategyStatistics() map[string]interface{} {
 		}
 	}
 
-	// 如果没有策略数据，创建一些示例策略
+	// 如果没有策略数据，直接返回0
 	if totalCount == 0 {
-		h.createSampleStrategies(ctx)
-		totalCount = 3 // 创建了3个示例策略
+		return map[string]interface{}{
+			"total":   0,
+			"running": 0,
+			"stopped": 0,
+			"error":   0,
+		}
 	}
 
 	// 查询策略运行状态统计 - 基于is_running和enabled字段

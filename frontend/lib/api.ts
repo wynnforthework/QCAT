@@ -492,91 +492,13 @@ class ApiClient {
         lastUpdate: item.updated_at || new Date().toISOString()
       }));
     } catch (error) {
-      console.error('Failed to fetch hot symbols, using mock data:', error);
-      // Return comprehensive mock data
-      return this.getMockHotSymbols();
+      console.error('Failed to fetch hot symbols:', error);
+      // Return empty array when API fails
+      return [];
     }
   }
 
-  private getMockHotSymbols(): HotSymbol[] {
-    return [
-      {
-        symbol: 'BTC/USDT',
-        score: 8.5,
-        rank: 1,
-        change24h: 3.45,
-        volume24h: 2500000000,
-        marketCap: 850000000000,
-        indicators: {
-          momentum: 7.8,
-          volume: 9.2,
-          volatility: 6.5,
-          sentiment: 8.1
-        },
-        lastUpdate: new Date().toISOString()
-      },
-      {
-        symbol: 'ETH/USDT',
-        score: 7.9,
-        rank: 2,
-        change24h: 2.18,
-        volume24h: 1800000000,
-        marketCap: 420000000000,
-        indicators: {
-          momentum: 7.2,
-          volume: 8.5,
-          volatility: 7.1,
-          sentiment: 7.8
-        },
-        lastUpdate: new Date().toISOString()
-      },
-      {
-        symbol: 'BNB/USDT',
-        score: 7.3,
-        rank: 3,
-        change24h: -1.25,
-        volume24h: 950000000,
-        marketCap: 85000000000,
-        indicators: {
-          momentum: 6.8,
-          volume: 7.9,
-          volatility: 6.2,
-          sentiment: 7.5
-        },
-        lastUpdate: new Date().toISOString()
-      },
-      {
-        symbol: 'ADA/USDT',
-        score: 6.8,
-        rank: 4,
-        change24h: 4.67,
-        volume24h: 680000000,
-        marketCap: 18000000000,
-        indicators: {
-          momentum: 6.5,
-          volume: 7.2,
-          volatility: 5.8,
-          sentiment: 6.9
-        },
-        lastUpdate: new Date().toISOString()
-      },
-      {
-        symbol: 'SOL/USDT',
-        score: 6.2,
-        rank: 5,
-        change24h: -2.34,
-        volume24h: 520000000,
-        marketCap: 45000000000,
-        indicators: {
-          momentum: 6.1,
-          volume: 6.8,
-          volatility: 5.5,
-          sentiment: 6.4
-        },
-        lastUpdate: new Date().toISOString()
-      }
-    ];
-  }
+
 
   async approveSymbol(symbol: string): Promise<void> {
     return this.request<void>('/api/v1/hotlist/approve', {
@@ -604,10 +526,23 @@ class ApiClient {
 
   // Audit API
   async getAuditLogs(filters?: AuditLogFilters): Promise<AuditLog[]> {
-    // Note: The backend audit endpoints are returning 500 errors
-    // Return mock data directly to avoid errors
-    console.log('Using mock audit logs data (backend endpoint has issues)');
-    return this.getMockAuditLogs(filters);
+    try {
+      const params = new URLSearchParams();
+      if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            params.append(key, String(value));
+          }
+        });
+      }
+      const queryString = params.toString();
+      const endpoint = queryString ? `/api/v1/audit/logs?${queryString}` : '/api/v1/audit/logs';
+      return this.request<AuditLog[]>(endpoint);
+    } catch (error) {
+      console.error('Failed to fetch audit logs:', error);
+      // Return empty array when API fails
+      return [];
+    }
 
     // TODO: Uncomment this when the backend audit endpoints are fixed
     /*
@@ -630,108 +565,26 @@ class ApiClient {
     */
   }
 
-  private getMockAuditLogs(filters?: AuditLogFilters): AuditLog[] {
-    const mockLogs: AuditLog[] = [
-      {
-        id: 'audit_001',
-        timestamp: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        userId: 'admin',
-        action: 'strategy_start',
-        resource: 'strategy/trend_following',
-        outcome: 'success',
-        details: {
-          strategyId: 'trend_following',
-          parameters: { period: 20, threshold: 0.02 }
-        },
-        ipAddress: '192.168.1.100'
-      },
-      {
-        id: 'audit_002',
-        timestamp: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-        userId: 'trader1',
-        action: 'portfolio_rebalance',
-        resource: 'portfolio/main',
-        outcome: 'success',
-        details: {
-          oldWeights: { BTC: 0.4, ETH: 0.3, BNB: 0.3 },
-          newWeights: { BTC: 0.35, ETH: 0.35, BNB: 0.3 }
-        },
-        ipAddress: '192.168.1.101'
-      },
-      {
-        id: 'audit_003',
-        timestamp: new Date(Date.now() - 10800000).toISOString(), // 3 hours ago
-        userId: 'system',
-        action: 'risk_limit_breach',
-        resource: 'risk/position_limit',
-        outcome: 'failure',
-        details: {
-          symbol: 'BTC/USDT',
-          currentExposure: 120000,
-          limit: 100000,
-          action: 'position_reduced'
-        },
-        ipAddress: '127.0.0.1'
-      },
-      {
-        id: 'audit_004',
-        timestamp: new Date(Date.now() - 14400000).toISOString(), // 4 hours ago
-        userId: 'admin',
-        action: 'strategy_stop',
-        resource: 'strategy/mean_reversion',
-        outcome: 'success',
-        details: {
-          strategyId: 'mean_reversion',
-          reason: 'manual_stop',
-          finalPnl: -250.5
-        },
-        ipAddress: '192.168.1.100'
-      },
-      {
-        id: 'audit_005',
-        timestamp: new Date(Date.now() - 18000000).toISOString(), // 5 hours ago
-        userId: 'trader2',
-        action: 'whitelist_add',
-        resource: 'hotlist/whitelist',
-        outcome: 'success',
-        details: {
-          symbol: 'SOL/USDT',
-          reason: 'high_volume_breakout',
-          riskLevel: 'medium'
-        },
-        ipAddress: '192.168.1.102'
-      }
-    ];
 
-    // Apply filters if provided
-    let filteredLogs = mockLogs;
-
-    if (filters?.userId) {
-      filteredLogs = filteredLogs.filter(log => log.userId === filters.userId);
-    }
-
-    if (filters?.action) {
-      filteredLogs = filteredLogs.filter(log =>
-        log.action.toLowerCase().includes(filters.action!.toLowerCase())
-      );
-    }
-
-    if (filters?.outcome) {
-      filteredLogs = filteredLogs.filter(log => log.outcome === filters.outcome);
-    }
-
-    if (filters?.limit) {
-      filteredLogs = filteredLogs.slice(0, filters.limit);
-    }
-
-    return filteredLogs;
-  }
 
   async getDecisionChains(filters?: DecisionChainFilters): Promise<DecisionChain[]> {
-    // Note: The backend audit endpoints are returning 500 errors
-    // Return mock data directly to avoid errors
-    console.log('Using mock decision chains data (backend endpoint has issues)');
-    return this.getMockDecisionChains(filters);
+    try {
+      const params = new URLSearchParams();
+      if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            params.append(key, String(value));
+          }
+        });
+      }
+      const queryString = params.toString();
+      const endpoint = queryString ? `/api/v1/audit/decisions?${queryString}` : '/api/v1/audit/decisions';
+      return this.request<DecisionChain[]>(endpoint);
+    } catch (error) {
+      console.error('Failed to fetch decision chains:', error);
+      // Return empty array when API fails
+      return [];
+    }
 
     // TODO: Uncomment this when the backend audit endpoints are fixed
     /*
@@ -754,138 +607,7 @@ class ApiClient {
     */
   }
 
-  private getMockDecisionChains(filters?: DecisionChainFilters): DecisionChain[] {
-    const mockChains: DecisionChain[] = [
-      {
-        id: 'chain_001',
-        timestamp: new Date(Date.now() - 1800000).toISOString(), // 30 min ago
-        type: 'strategy',
-        trigger: 'price_breakout',
-        decisions: [
-          {
-            step: 1,
-            description: 'Signal Generation',
-            reasoning: 'Price breakout detected above resistance level with high volume confirmation',
-            parameters: { symbol: 'BTC/USDT', price: 45000, volume: 1000000, signal: 'BUY', confidence: 0.85 },
-            timestamp: new Date(Date.now() - 1800000).toISOString()
-          },
-          {
-            step: 2,
-            description: 'Risk Assessment',
-            reasoning: 'Position size adjusted based on current exposure and risk limits',
-            parameters: { originalSize: 0.1, adjustedSize: 0.08, riskScore: 0.6, approved: true },
-            timestamp: new Date(Date.now() - 1799000).toISOString()
-          },
-          {
-            step: 3,
-            description: 'Order Execution',
-            reasoning: 'Market order executed successfully with minimal slippage',
-            parameters: { orderId: 'order_123', executedPrice: 45050, status: 'FILLED', slippage: 0.11 },
-            timestamp: new Date(Date.now() - 1798000).toISOString()
-          }
-        ],
-        outcome: 'executed',
-        metadata: {
-          strategyId: 'trend_following',
-          symbol: 'BTC/USDT',
-          totalProcessingTime: 143,
-          finalPnl: 125.5
-        }
-      },
-      {
-        id: 'chain_002',
-        timestamp: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        type: 'portfolio',
-        trigger: 'rebalance_threshold',
-        decisions: [
-          {
-            step: 1,
-            description: 'Portfolio Weight Calculation',
-            reasoning: 'Current weights have drifted beyond rebalance threshold, recalculating optimal allocation',
-            parameters: {
-              currentWeights: { BTC: 0.45, ETH: 0.35, BNB: 0.2 },
-              targetWeights: { BTC: 0.4, ETH: 0.35, BNB: 0.25 },
-              drift: { BTC: 0.05, ETH: 0.0, BNB: -0.05 }
-            },
-            timestamp: new Date(Date.now() - 3600000).toISOString()
-          },
-          {
-            step: 2,
-            description: 'Rebalance Execution',
-            reasoning: 'Executing trades to achieve target portfolio weights with minimal market impact',
-            parameters: {
-              trades: [{ symbol: 'BTC/USDT', side: 'SELL', amount: 0.05 }],
-              executed: true,
-              totalCost: 15.2,
-              marketImpact: 0.02
-            },
-            timestamp: new Date(Date.now() - 3599000).toISOString()
-          }
-        ],
-        outcome: 'completed',
-        metadata: {
-          portfolioId: 'main_portfolio',
-          rebalanceReason: 'drift_threshold_exceeded',
-          totalProcessingTime: 225
-        }
-      },
-      {
-        id: 'chain_003',
-        timestamp: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-        type: 'risk',
-        trigger: 'position_limit_breach',
-        decisions: [
-          {
-            step: 1,
-            description: 'Risk Limit Assessment',
-            reasoning: 'Position exposure exceeded maximum limit, immediate action required to reduce risk',
-            parameters: {
-              symbol: 'ETH/USDT',
-              currentExposure: 55000,
-              limit: 50000,
-              breach: true,
-              severity: 'medium'
-            },
-            timestamp: new Date(Date.now() - 7200000).toISOString()
-          },
-          {
-            step: 2,
-            description: 'Position Size Adjustment',
-            reasoning: 'Reducing position size to comply with risk limits while minimizing market impact',
-            parameters: {
-              symbol: 'ETH/USDT',
-              targetReduction: 5000,
-              orderId: 'order_456',
-              reducedAmount: 5000,
-              newExposure: 50000
-            },
-            timestamp: new Date(Date.now() - 7199000).toISOString()
-          }
-        ],
-        outcome: 'risk_mitigated',
-        metadata: {
-          riskType: 'position_limit',
-          symbol: 'ETH/USDT',
-          originalExposure: 55000,
-          finalExposure: 50000,
-          totalProcessingTime: 185
-        }
-      }
-    ];
 
-    // Apply filters if provided
-    let filteredChains = mockChains;
-
-    if (filters?.type) {
-      filteredChains = filteredChains.filter(chain => chain.type === filters.type);
-    }
-
-    if (filters?.limit) {
-      filteredChains = filteredChains.slice(0, filters.limit);
-    }
-
-    return filteredChains;
-  }
 
   // Report API
   async exportReport(config: ExportReportConfig): Promise<void> {
@@ -935,127 +657,13 @@ class ApiClient {
       const endpoint = queryString ? `/api/v1/trading/history?${queryString}` : '/api/v1/trading/history';
       return this.request<TradeHistoryItem[]>(endpoint);
     } catch (error) {
-      console.error('Failed to fetch trade history, using mock data:', error);
-      // Return mock trade history data as fallback
-      return this.getMockTradeHistory(strategyId, filters);
+      console.error('Failed to fetch trade history:', error);
+      // Return empty array when API fails
+      return [];
     }
   }
 
-  private getMockTradeHistory(strategyId?: string, filters?: TradeHistoryFilters): TradeHistoryItem[] {
-    const mockTrades: TradeHistoryItem[] = [
-      {
-        id: 'trade_001',
-        symbol: 'BTC/USDT',
-        side: 'BUY',
-        type: 'MARKET',
-        quantity: 0.1,
-        price: 45000,
-        executedPrice: 45050,
-        pnl: 250.5,
-        pnlPercent: 2.34,
-        fee: 4.5,
-        status: 'FILLED',
-        openTime: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        closeTime: new Date(Date.now() - 1800000).toISOString(), // 30 min ago
-        duration: 1800000, // 30 minutes
-        strategy: strategyId || 'trend_following',
-        tags: ['long', 'breakout']
-      },
-      {
-        id: 'trade_002',
-        symbol: 'ETH/USDT',
-        side: 'SELL',
-        type: 'LIMIT',
-        quantity: 2.5,
-        price: 3200,
-        executedPrice: 3195,
-        pnl: -45.2,
-        pnlPercent: -1.42,
-        fee: 8.0,
-        status: 'FILLED',
-        openTime: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-        closeTime: new Date(Date.now() - 5400000).toISOString(), // 1.5 hours ago
-        duration: 1800000, // 30 minutes
-        strategy: strategyId || 'mean_reversion',
-        tags: ['short', 'resistance']
-      },
-      {
-        id: 'trade_003',
-        symbol: 'BNB/USDT',
-        side: 'BUY',
-        type: 'STOP',
-        quantity: 10,
-        price: 320,
-        executedPrice: 322,
-        pnl: 180.0,
-        pnlPercent: 5.63,
-        fee: 3.2,
-        status: 'FILLED',
-        openTime: new Date(Date.now() - 10800000).toISOString(), // 3 hours ago
-        closeTime: new Date(Date.now() - 9000000).toISOString(), // 2.5 hours ago
-        duration: 1800000, // 30 minutes
-        strategy: strategyId || 'arbitrage',
-        tags: ['long', 'momentum']
-      },
-      {
-        id: 'trade_004',
-        symbol: 'ADA/USDT',
-        side: 'SELL',
-        type: 'MARKET',
-        quantity: 1000,
-        price: 0.45,
-        executedPrice: 0.448,
-        pnl: -12.5,
-        pnlPercent: -2.78,
-        fee: 0.45,
-        status: 'PARTIAL',
-        openTime: new Date(Date.now() - 14400000).toISOString(), // 4 hours ago
-        strategy: strategyId || 'trend_following',
-        tags: ['short', 'breakdown']
-      },
-      {
-        id: 'trade_005',
-        symbol: 'SOL/USDT',
-        side: 'BUY',
-        type: 'LIMIT',
-        quantity: 5,
-        price: 95,
-        executedPrice: 94.8,
-        pnl: 47.5,
-        pnlPercent: 1.0,
-        fee: 0.95,
-        status: 'FILLED',
-        openTime: new Date(Date.now() - 18000000).toISOString(), // 5 hours ago
-        closeTime: new Date(Date.now() - 16200000).toISOString(), // 4.5 hours ago
-        duration: 1800000, // 30 minutes
-        strategy: strategyId || 'mean_reversion',
-        tags: ['long', 'support']
-      }
-    ];
 
-    // Apply filters if provided
-    let filteredTrades = mockTrades;
-
-    if (filters?.symbol) {
-      filteredTrades = filteredTrades.filter(trade =>
-        trade.symbol.toLowerCase().includes(filters.symbol!.toLowerCase())
-      );
-    }
-
-    if (filters?.side) {
-      filteredTrades = filteredTrades.filter(trade => trade.side === filters.side);
-    }
-
-    if (filters?.status) {
-      filteredTrades = filteredTrades.filter(trade => trade.status === filters.status);
-    }
-
-    if (filters?.limit) {
-      filteredTrades = filteredTrades.slice(0, filters.limit);
-    }
-
-    return filteredTrades;
-  }
 
   // Automation System API
   async getAutomationStatus(): Promise<AutomationStatus[]> {

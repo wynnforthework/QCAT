@@ -298,10 +298,10 @@ func (as *AutomationSystem) updateSystemStatus() {
 		as.status.CompletedTasks = schedulerStats.CompletedTasks
 		as.status.FailedTasks = schedulerStats.FailedTasks
 	} else {
-		// 模拟调度器统计数据
-		as.status.ActiveTasks = 5
-		as.status.CompletedTasks += 2
-		as.status.FailedTasks += 0
+		// 没有调度器时返回0
+		as.status.ActiveTasks = 0
+		as.status.CompletedTasks = 0
+		as.status.FailedTasks = 0
 	}
 
 	// 获取执行器统计
@@ -311,10 +311,10 @@ func (as *AutomationSystem) updateSystemStatus() {
 		as.status.CompletedActions = executorStats.ExecutedActions
 		as.status.FailedActions = executorStats.FailedActions
 	} else {
-		// 模拟执行器统计数据
-		as.status.ActiveActions = 3
-		as.status.CompletedActions += 8
-		as.status.FailedActions += 1
+		// 没有执行器时返回0
+		as.status.ActiveActions = 0
+		as.status.CompletedActions = 0
+		as.status.FailedActions = 0
 	}
 }
 
