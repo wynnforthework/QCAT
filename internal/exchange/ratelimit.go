@@ -48,7 +48,8 @@ func NewSimpleRateLimiter(requestsPerMinute int, interval time.Duration) *RateLi
 	commonLimits := []string{
 		"default", "account", "positions", "server_time", "exchange_info",
 		"get_symbol_price", "get_leverage", "get_margin_info", "orders",
-		"klines", "orderbook", "trades",
+		"klines", "orderbook", "trades", "get_open_orders", "set_margin_type",
+		"place_order", "cancel_order", "get_balance", "get_position",
 	}
 
 	for _, name := range commonLimits {

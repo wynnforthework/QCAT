@@ -4,12 +4,18 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 
 	"qcat/internal/config"
 	"qcat/internal/database"
 	"qcat/internal/exchange"
 	"qcat/internal/exchange/account"
 )
+
+// absFloat returns the absolute value of a float64
+func absFloat(x float64) float64 {
+	return math.Abs(x)
+}
 
 // PositionExecutor 仓位执行器
 type PositionExecutor struct {
@@ -249,12 +255,22 @@ func (re *RiskExecutor) HandleAction(ctx context.Context, action *ExecutionActio
 	switch action.Action {
 	case "emergency_stop":
 		return re.emergencyStop(ctx, action)
+	case "close_all_positions":
+		return re.closeAllPositions(ctx, action)
 	case "reduce_leverage":
 		return re.reduceLeverage(ctx, action)
 	case "hedge_position":
 		return re.hedgePosition(ctx, action)
 	case "circuit_breaker":
 		return re.circuitBreaker(ctx, action)
+	case "reduce_high_risk_positions":
+		return re.reduceHighRiskPositions(ctx, action)
+	case "suspend_new_positions":
+		return re.suspendNewPositions(ctx, action)
+	case "adjust_position_sizes":
+		return re.adjustPositionSizes(ctx, action)
+	case "tighten_stop_loss":
+		return re.tightenStopLoss(ctx, action)
 	default:
 		return fmt.Errorf("unknown risk action: %s", action.Action)
 	}
@@ -368,6 +384,190 @@ func (re *RiskExecutor) circuitBreaker(ctx context.Context, action *ExecutionAct
 	// 1. 暂停交易
 	// 2. 评估风险
 	// 3. 决定后续动作
+
+	return nil
+}
+
+// closeAllPositions 关闭所有仓位
+func (re *RiskExecutor) closeAllPositions(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Closing all positions")
+
+	// 获取所有持仓
+	positions, err := re.exchange.GetPositions(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get positions: %w", err)
+	}
+
+	log.Printf("Found %d positions to close", len(positions))
+
+	// 逐个关闭仓位
+	for _, position := range positions {
+		if position.Size == 0 {
+			continue
+		}
+
+		// 确定平仓方向
+		var side exchange.OrderSide
+		if position.Size > 0 {
+			side = exchange.OrderSideSell
+		} else {
+			side = exchange.OrderSideBuy
+		}
+
+		// 创建市价平仓单
+		order := &exchange.OrderRequest{
+			Symbol:   position.Symbol,
+			Side:     string(side),
+			Type:     string(exchange.OrderTypeMarket),
+			Quantity: absFloat(position.Size),
+		}
+
+		_, err := re.exchange.PlaceOrder(ctx, order)
+		if err != nil {
+			log.Printf("Failed to close position %s: %v", position.Symbol, err)
+			continue
+		}
+
+		log.Printf("Successfully closed position for %s", position.Symbol)
+	}
+
+	return nil
+}
+
+// reduceHighRiskPositions 减少高风险仓位
+func (re *RiskExecutor) reduceHighRiskPositions(ctx context.Context, action *ExecutionAction) error {
+	reductionRatio, ok := action.Parameters["reduction_ratio"].(float64)
+	if !ok {
+		reductionRatio = 0.5 // 默认减少50%
+	}
+
+	log.Printf("Reducing high risk positions by %.1f%%", reductionRatio*100)
+
+	// 获取所有持仓
+	positions, err := re.exchange.GetPositions(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get positions: %w", err)
+	}
+
+	// 识别高风险仓位并减仓
+	for _, position := range positions {
+		if position.Size == 0 {
+			continue
+		}
+
+		// 简单的风险评估：基于未实现盈亏
+		if position.UnrealizedPnL < 0 && absFloat(position.UnrealizedPnL) > absFloat(position.Size*position.EntryPrice*0.05) {
+			// 如果亏损超过5%，认为是高风险仓位
+			reduceSize := absFloat(position.Size) * reductionRatio
+
+			var side exchange.OrderSide
+			if position.Size > 0 {
+				side = exchange.OrderSideSell
+			} else {
+				side = exchange.OrderSideBuy
+			}
+
+			order := &exchange.OrderRequest{
+				Symbol:   position.Symbol,
+				Side:     string(side),
+				Type:     string(exchange.OrderTypeMarket),
+				Quantity: reduceSize,
+			}
+
+			_, err := re.exchange.PlaceOrder(ctx, order)
+			if err != nil {
+				log.Printf("Failed to reduce position %s: %v", position.Symbol, err)
+				continue
+			}
+
+			log.Printf("Reduced high risk position %s by %.2f", position.Symbol, reduceSize)
+		}
+	}
+
+	return nil
+}
+
+// suspendNewPositions 暂停新开仓
+func (re *RiskExecutor) suspendNewPositions(ctx context.Context, action *ExecutionAction) error {
+	log.Printf("Suspending new position openings")
+
+	// TODO: 实现暂停新开仓逻辑
+	// 这通常需要在交易系统中设置一个全局标志
+	// 暂时只记录日志
+
+	return nil
+}
+
+// adjustPositionSizes 调整仓位大小
+func (re *RiskExecutor) adjustPositionSizes(ctx context.Context, action *ExecutionAction) error {
+	adjustmentFactor, ok := action.Parameters["adjustment_factor"].(float64)
+	if !ok {
+		adjustmentFactor = 0.8 // 默认调整为80%
+	}
+
+	log.Printf("Adjusting position sizes by factor: %.2f", adjustmentFactor)
+
+	// 获取所有持仓
+	positions, err := re.exchange.GetPositions(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get positions: %w", err)
+	}
+
+	// 调整每个仓位的大小
+	for _, position := range positions {
+		if position.Size == 0 {
+			continue
+		}
+
+		// 计算需要调整的数量
+		currentSize := absFloat(position.Size)
+		targetSize := currentSize * adjustmentFactor
+		adjustSize := currentSize - targetSize
+
+		if adjustSize <= 0 {
+			continue
+		}
+
+		// 确定平仓方向
+		var side exchange.OrderSide
+		if position.Size > 0 {
+			side = exchange.OrderSideSell
+		} else {
+			side = exchange.OrderSideBuy
+		}
+
+		order := &exchange.OrderRequest{
+			Symbol:   position.Symbol,
+			Side:     string(side),
+			Type:     string(exchange.OrderTypeMarket),
+			Quantity: adjustSize,
+		}
+
+		_, err := re.exchange.PlaceOrder(ctx, order)
+		if err != nil {
+			log.Printf("Failed to adjust position %s: %v", position.Symbol, err)
+			continue
+		}
+
+		log.Printf("Adjusted position %s by %.2f", position.Symbol, adjustSize)
+	}
+
+	return nil
+}
+
+// tightenStopLoss 收紧止损
+func (re *RiskExecutor) tightenStopLoss(ctx context.Context, action *ExecutionAction) error {
+	tighteningFactor, ok := action.Parameters["tightening_factor"].(float64)
+	if !ok {
+		tighteningFactor = 0.8 // 默认收紧到80%
+	}
+
+	log.Printf("Tightening stop loss by factor: %.2f", tighteningFactor)
+
+	// TODO: 实现收紧止损逻辑
+	// 1. 获取所有持仓的当前止损价格
+	// 2. 根据收紧因子调整止损价格
+	// 3. 更新止损订单
 
 	return nil
 }
