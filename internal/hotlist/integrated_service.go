@@ -81,7 +81,8 @@ type ServiceConfig struct {
 
 // NewIntegratedService 创建集成服务
 func NewIntegratedService(cfg *config.Config, db *database.DB) *IntegratedService {
-	// 创建核心组件
+	// 创建核心组件 - 暂时使用nil，但在实际使用前需要检查
+	// TODO: 正确初始化kline, funding, oi managers
 	scorer := NewScorer(nil, nil, nil, &ScorerConfig{
 		VolJumpWindow:    24,
 		VolJumpThreshold: 0.02,

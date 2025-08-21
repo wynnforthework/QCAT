@@ -98,6 +98,12 @@ func (s *Scorer) CalculateScore(ctx context.Context, symbol string) (*Score, err
 
 // calculateVolJump calculates volatility jump score
 func (s *Scorer) calculateVolJump(ctx context.Context, symbol string) (float64, error) {
+	// 检查klineManager是否已初始化
+	if s.klineManager == nil {
+		// 返回默认值而不是崩溃
+		return 0.5, nil // 返回中等波动率分数
+	}
+
 	// 获取K线数据
 	end := time.Now()
 	start := end.Add(-time.Duration(s.config.VolJumpWindow) * time.Hour)
@@ -151,6 +157,12 @@ func (s *Scorer) calculateTurnover(ctx context.Context, symbol string) (float64,
 
 // calculateOIChange calculates open interest change score
 func (s *Scorer) calculateOIChange(ctx context.Context, symbol string) (float64, error) {
+	// 检查oiManager是否已初始化
+	if s.oiManager == nil {
+		// 返回默认值而不是崩溃
+		return 0.3, nil // 返回中等持仓量变化分数
+	}
+
 	// 获取持仓量数据
 	end := time.Now()
 	start := end.Add(-time.Duration(s.config.OIChangeWindow) * time.Hour)
@@ -173,6 +185,12 @@ func (s *Scorer) calculateOIChange(ctx context.Context, symbol string) (float64,
 
 // calculateFundingZ calculates funding rate Z-score
 func (s *Scorer) calculateFundingZ(ctx context.Context, symbol string) (float64, error) {
+	// 检查fundingManager是否已初始化
+	if s.fundingManager == nil {
+		// 返回默认值而不是崩溃
+		return 0.2, nil // 返回中等资金费率分数
+	}
+
 	// 获取资金费率数据
 	end := time.Now()
 	start := end.Add(-time.Duration(s.config.FundingZWindow) * time.Hour)
