@@ -206,12 +206,28 @@ func (m *Manager) SetMarginType(ctx context.Context, symbol string, marginType e
 
 // storePosition stores a position in the database
 func (m *Manager) storePosition(position *exch.Position) error {
+	return m.storePositionWithStrategy(position, "")
+}
+
+// storePositionWithStrategy stores a position in the database with a specific strategy ID
+func (m *Manager) storePositionWithStrategy(position *exch.Position, strategyID string) error {
+	// If no strategy ID provided, try to get or create a default one
+	if strategyID == "" {
+		defaultStrategyID, err := m.getOrCreateDefaultStrategy()
+		if err != nil {
+			log.Printf("Warning: failed to get default strategy, using NULL: %v", err)
+			// Use NULL for strategy_id if we can't get a default strategy
+			return m.storePositionWithNullStrategy(position)
+		}
+		strategyID = defaultStrategyID
+	}
+
 	query := `
 		INSERT INTO positions (
-			symbol, side, size, entry_price, leverage,
+			strategy_id, symbol, side, size, entry_price, leverage,
 			unrealized_pnl, realized_pnl, status, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 		)
 	`
 
@@ -222,6 +238,7 @@ func (m *Manager) storePosition(position *exch.Position) error {
 	}
 
 	_, err := m.db.Exec(query,
+		strategyID,
 		position.Symbol,
 		position.Side,
 		position.Size, // Use Size instead of Quantity
@@ -235,6 +252,73 @@ func (m *Manager) storePosition(position *exch.Position) error {
 
 	if err != nil {
 		return fmt.Errorf("failed to store position: %w", err)
+	}
+
+	return nil
+}
+
+// getOrCreateDefaultStrategy gets or creates a default strategy for positions without strategy association
+func (m *Manager) getOrCreateDefaultStrategy() (string, error) {
+	// First try to get existing default strategy
+	var strategyID string
+	query := `SELECT id FROM strategies WHERE name = 'Default Position Strategy' LIMIT 1`
+	err := m.db.QueryRow(query).Scan(&strategyID)
+	if err == nil {
+		return strategyID, nil
+	}
+
+	// If not found, create a new default strategy
+	createQuery := `
+		INSERT INTO strategies (id, name, type, status, description, created_at, updated_at)
+		VALUES (uuid_generate_v4(), 'Default Position Strategy', 'manual', 'active',
+				'Default strategy for positions without specific strategy association',
+				CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+		RETURNING id
+	`
+
+	err = m.db.QueryRow(createQuery).Scan(&strategyID)
+	if err != nil {
+		return "", fmt.Errorf("failed to create default strategy: %w", err)
+	}
+
+	log.Printf("Created default strategy with ID: %s", strategyID)
+	return strategyID, nil
+}
+
+// storePositionWithNullStrategy stores position with NULL strategy_id (fallback method)
+func (m *Manager) storePositionWithNullStrategy(position *exch.Position) error {
+	// First, check if we can modify the schema to allow NULL strategy_id temporarily
+	// This is a fallback method when we can't create a default strategy
+
+	// Try to insert with a placeholder strategy_id
+	query := `
+		INSERT INTO positions (
+			strategy_id, symbol, side, size, entry_price, leverage,
+			unrealized_pnl, realized_pnl, status, updated_at
+		) VALUES (
+			(SELECT id FROM strategies LIMIT 1), $1, $2, $3, $4, $5, $6, $7, $8, $9
+		)
+	`
+
+	status := "open"
+	if position.Size == 0 {
+		status = "closed"
+	}
+
+	_, err := m.db.Exec(query,
+		position.Symbol,
+		position.Side,
+		position.Size,
+		position.EntryPrice,
+		position.Leverage,
+		position.UnrealizedPnL,
+		position.RealizedPnL,
+		status,
+		position.UpdatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to store position with fallback strategy: %w", err)
 	}
 
 	return nil
