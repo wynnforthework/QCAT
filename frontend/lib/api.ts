@@ -1123,21 +1123,30 @@ export interface Strategy {
   id: string;
   name: string;
   description: string;
-  status: "running" | "stopped" | "error" | "inactive";
+  status: "running" | "stopped" | "error" | "inactive" | "active";
   type?: string;
   version?: string;
+  // 新增运行状态字段
+  is_running?: boolean;
+  enabled?: boolean;
+  runtime_status?: "running" | "stopped" | "disabled" | "error";
   performance?: {
-    pnl: number;
-    pnlPercent: number;
-    sharpe: number;
-    maxDrawdown: number;
-    winRate: number;
-    totalTrades: number;
+    pnl?: number;
+    pnlPercent?: number;
+    sharpe?: number;
+    maxDrawdown?: number;
+    winRate?: number;
+    totalTrades?: number;
+    total_return?: number;
+    sharpe_ratio?: number;
+    max_drawdown?: number;
+    win_rate?: number;
   };
   risk?: {
-    exposure: number;
-    limit: number;
-    violations: number;
+    exposure?: number;
+    limit?: number;
+    violations?: number;
+    level?: string;
   };
   lastUpdate?: string;
   symbols?: string[];

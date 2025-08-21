@@ -5,7 +5,7 @@ import apiClient, { type Strategy } from "@/lib/api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Progress } from "@/components/ui/progress"
+
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Play, Pause, Settings, BarChart3, Download, Upload } from "lucide-react" // 修复: 移除未使用的 History
@@ -38,22 +38,41 @@ export default function StrategiesPage() {
     fetchStrategies()
   }, [])
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
+  const getStatusColor = (strategy: any) => {
+    const runtimeStatus = strategy.runtime_status || strategy.status
+    switch (runtimeStatus) {
       case "running": return "text-green-600 bg-green-100"
       case "stopped": return "text-yellow-600 bg-yellow-100"
+      case "disabled": return "text-gray-600 bg-gray-100"
       case "error": return "text-red-600 bg-red-100"
       default: return "text-gray-600 bg-gray-100"
     }
   }
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
+  const getStatusIcon = (strategy: any) => {
+    const runtimeStatus = strategy.runtime_status || strategy.status
+    switch (runtimeStatus) {
       case "running": return <Play className="h-4 w-4" />
       case "stopped": return <Pause className="h-4 w-4" />
+      case "disabled": return <Settings className="h-4 w-4" />
       case "error": return <Settings className="h-4 w-4" />
       default: return <Pause className="h-4 w-4" />
     }
+  }
+
+  const getStatusText = (strategy: any) => {
+    const runtimeStatus = strategy.runtime_status || strategy.status
+    switch (runtimeStatus) {
+      case "running": return "运行中"
+      case "stopped": return "已停止"
+      case "disabled": return "已禁用"
+      case "error": return "错误"
+      default: return "未知"
+    }
+  }
+
+  const isStrategyRunning = (strategy: any) => {
+    return strategy.is_running === true || strategy.runtime_status === "running"
   }
 
   const handleStrategyAction = async (strategyId: string, action: string) => {
@@ -119,30 +138,48 @@ export default function StrategiesPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">{strategy.name}</CardTitle>
-                <Badge variant="outline" className={getStatusColor(strategy.status)}>
-                  {getStatusIcon(strategy.status)}
-                  <span className="ml-1">{strategy.status}</span>
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" className={getStatusColor(strategy)}>
+                    {getStatusIcon(strategy)}
+                    <span className="ml-1">{getStatusText(strategy)}</span>
+                  </Badge>
+                  {/* 运行状态指示器 */}
+                  <div className={`w-3 h-3 rounded-full ${isStrategyRunning(strategy) ? 'bg-green-500 animate-pulse' : 'bg-gray-300'}`}
+                       title={isStrategyRunning(strategy) ? '运行中' : '已停止'} />
+                </div>
               </div>
               <CardDescription>{strategy.description}</CardDescription>
               <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>版本: {strategy.version || '1.0.0'}</span>
-                <span>更新: {strategy.lastUpdate || new Date().toLocaleDateString()}</span>
+                <span>类型: {strategy.type || 'unknown'}</span>
+                <span>更新: {strategy.updated_at ? new Date(strategy.updated_at).toLocaleDateString() : new Date().toLocaleDateString()}</span>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* 运行状态信息 */}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${isStrategyRunning(strategy) ? 'bg-green-500' : 'bg-gray-400'}`} />
+                  <span className="text-sm font-medium">
+                    {isStrategyRunning(strategy) ? '运行中' : '已停止'}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {strategy.enabled === false ? '已禁用' : '已启用'}
+                </div>
+              </div>
+
               {/* 绩效指标 */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <div className="text-2xl font-bold text-green-600">
-                    +${strategy.performance?.pnl?.toFixed(2) || '0.00'}
+                    +${(strategy.performance?.pnl || strategy.performance?.total_return || 0).toFixed(2)}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {(strategy.performance?.pnlPercent || 0) >= 0 ? "+" : ""}{(strategy.performance?.pnlPercent || 0).toFixed(2)}%
+                    {((strategy.performance?.pnlPercent || 0) >= 0 ? "+" : "")}{(strategy.performance?.pnlPercent || 0).toFixed(2)}%
                   </div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold">{strategy.performance?.sharpe?.toFixed(2) || '0.00'}</div>
+                  <div className="text-2xl font-bold">{(strategy.performance?.sharpe || strategy.performance?.sharpe_ratio || 0).toFixed(2)}</div>
                   <div className="text-sm text-muted-foreground">夏普比率</div>
                 </div>
               </div>
@@ -150,10 +187,21 @@ export default function StrategiesPage() {
               {/* 风险指标 */}
               <div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span>风险敞口</span>
-                  <span>${(strategy.risk?.exposure || 0).toLocaleString()} / ${(strategy.risk?.limit || 100000).toLocaleString()}</span>
+                  <span>风险等级</span>
+                  <span className={`font-medium ${
+                    strategy.risk?.level === 'high' ? 'text-red-600' :
+                    strategy.risk?.level === 'medium' ? 'text-yellow-600' : 'text-green-600'
+                  }`}>
+                    {strategy.risk?.level === 'high' ? '高风险' :
+                     strategy.risk?.level === 'medium' ? '中风险' : '低风险'}
+                  </span>
                 </div>
-                <Progress value={((strategy.risk?.exposure || 0) / (strategy.risk?.limit || 100000)) * 100} className="h-2" />
+                <div className="flex justify-between text-sm">
+                  <span>违规次数</span>
+                  <span className={`font-medium ${(strategy.risk?.violations || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    {strategy.risk?.violations || 0}
+                  </span>
+                </div>
               </div>
 
               {/* 交易统计 */}
@@ -163,11 +211,11 @@ export default function StrategiesPage() {
                   <div className="text-muted-foreground">总交易</div>
                 </div>
                 <div>
-                  <div className="font-bold">{((strategy.performance?.winRate || 0) * 100).toFixed(1)}%</div>
+                  <div className="font-bold">{(((strategy.performance?.winRate || strategy.performance?.win_rate) || 0) * 100).toFixed(1)}%</div>
                   <div className="text-muted-foreground">胜率</div>
                 </div>
                 <div>
-                  <div className="font-bold text-red-600">${Math.abs(strategy.performance?.maxDrawdown || 0).toFixed(0)}</div>
+                  <div className="font-bold text-red-600">${Math.abs((strategy.performance?.maxDrawdown || strategy.performance?.max_drawdown) || 0).toFixed(0)}</div>
                   <div className="text-muted-foreground">最大回撤</div>
                 </div>
               </div>
@@ -273,11 +321,12 @@ export default function StrategiesPage() {
                 </Dialog>
 
                 <Button
-                  variant="outline"
+                  variant={isStrategyRunning(strategy) ? "destructive" : "default"}
                   size="sm"
-                  onClick={() => handleStrategyAction(strategy.id, strategy.status === "running" ? "stop" : "start")}
+                  onClick={() => handleStrategyAction(strategy.id, isStrategyRunning(strategy) ? "stop" : "start")}
+                  disabled={strategy.runtime_status === "disabled"}
                 >
-                  {strategy.status === "running" ? (
+                  {isStrategyRunning(strategy) ? (
                     <>
                       <Pause className="h-4 w-4 mr-1" />
                       停止
