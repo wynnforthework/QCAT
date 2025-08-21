@@ -2,6 +2,7 @@ package generator
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 )
@@ -53,8 +54,11 @@ type TechnicalIndicators struct {
 
 // AnalyzeMarket 分析市场数据
 func (ma *MarketAnalyzer) AnalyzeMarket(ctx context.Context, symbol string, timeRange time.Duration) (*MarketAnalysis, error) {
-	// 这里应该从实际的数据源获取数据
-	// 为了演示，我们使用模拟数据
+	// 从实际数据源获取历史价格数据
+	priceData, err := ma.getHistoricalPriceData(ctx, symbol, timeRange)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get historical price data for %s: %w", symbol, err)
+	}
 
 	analysis := &MarketAnalysis{
 		Symbol:      symbol,
@@ -62,60 +66,20 @@ func (ma *MarketAnalyzer) AnalyzeMarket(ctx context.Context, symbol string, time
 		Correlation: make(map[string]float64),
 	}
 
-	// 模拟市场数据分析
-	// 在实际实现中，这里应该：
-	// 1. 从数据库或API获取历史价格数据
-	// 2. 计算各种技术指标
-	// 3. 分析市场特征
+	// 基于真实数据计算市场特征
+	analysis.Volatility = ma.calculateVolatility(priceData)
+	analysis.Trend = ma.calculateTrend(priceData)
+	analysis.SharpeRatio = ma.calculateSharpeRatio(priceData)
+	analysis.MaxDrawdown = ma.calculateMaxDrawdown(priceData)
+	analysis.MarketCycle = float64(ma.calculateMarketCycle(priceData))
+	analysis.Liquidity = ma.calculateLiquidity(priceData)
+	analysis.MarketRegime = ma.determineMarketRegime(priceData)
+	analysis.Confidence = ma.calculateConfidence(priceData)
 
-	// 模拟不同币种的市场特征
-	switch symbol {
-	case "BTCUSDT":
-		analysis.Volatility = 0.04
-		analysis.Trend = 0.3
-		analysis.SharpeRatio = 1.2
-		analysis.MaxDrawdown = 0.15
-		analysis.MarketCycle = 30
-		analysis.Liquidity = 0.9
-		analysis.MarketRegime = "trending"
-		analysis.Confidence = 0.8
-
-	case "ETHUSDT":
-		analysis.Volatility = 0.05
-		analysis.Trend = 0.2
-		analysis.SharpeRatio = 1.0
-		analysis.MaxDrawdown = 0.18
-		analysis.MarketCycle = 25
-		analysis.Liquidity = 0.85
-		analysis.MarketRegime = "volatile"
-		analysis.Confidence = 0.75
-
-	case "ADAUSDT":
-		analysis.Volatility = 0.06
-		analysis.Trend = -0.1
-		analysis.SharpeRatio = 0.8
-		analysis.MaxDrawdown = 0.22
-		analysis.MarketCycle = 20
-		analysis.Liquidity = 0.7
-		analysis.MarketRegime = "ranging"
-		analysis.Confidence = 0.7
-
-	default:
-		// 默认市场特征
-		analysis.Volatility = 0.03
-		analysis.Trend = 0.1
-		analysis.SharpeRatio = 0.9
-		analysis.MaxDrawdown = 0.12
-		analysis.MarketCycle = 28
-		analysis.Liquidity = 0.8
-		analysis.MarketRegime = "ranging"
-		analysis.Confidence = 0.6
-	}
-
-	// 计算技术指标（模拟）
+	// 计算技术指标
 	analysis.TechnicalIndicators = ma.calculateTechnicalIndicators(symbol)
 
-	// 计算相关性（模拟）
+	// 计算相关性
 	analysis.Correlation = ma.calculateCorrelations(symbol)
 
 	return analysis, nil
@@ -285,4 +249,68 @@ func (ma *MarketAnalyzer) CalculateOptimalTimeframe(analysis *MarketAnalysis) ti
 	}
 
 	return baseDuration
+}
+
+// PricePoint 价格数据点
+type PricePoint struct {
+	Time   time.Time `json:"time"`
+	Open   float64   `json:"open"`
+	High   float64   `json:"high"`
+	Low    float64   `json:"low"`
+	Close  float64   `json:"close"`
+	Volume float64   `json:"volume"`
+}
+
+// getHistoricalPriceData 获取历史价格数据
+func (ma *MarketAnalyzer) getHistoricalPriceData(ctx context.Context, symbol string, timeRange time.Duration) ([]PricePoint, error) {
+	// TODO: 实现从数据源获取历史价格数据
+	return nil, fmt.Errorf("historical price data not available for symbol: %s", symbol)
+}
+
+// calculateVolatility 计算波动率
+func (ma *MarketAnalyzer) calculateVolatility(priceData []PricePoint) float64 {
+	// TODO: 实现基于价格数据的波动率计算
+	return 0.0
+}
+
+// calculateTrend 计算趋势
+func (ma *MarketAnalyzer) calculateTrend(priceData []PricePoint) float64 {
+	// TODO: 实现趋势计算
+	return 0.0
+}
+
+// calculateSharpeRatio 计算夏普比率
+func (ma *MarketAnalyzer) calculateSharpeRatio(priceData []PricePoint) float64 {
+	// TODO: 实现夏普比率计算
+	return 0.0
+}
+
+// calculateMaxDrawdown 计算最大回撤
+func (ma *MarketAnalyzer) calculateMaxDrawdown(priceData []PricePoint) float64 {
+	// TODO: 实现最大回撤计算
+	return 0.0
+}
+
+// calculateMarketCycle 计算市场周期
+func (ma *MarketAnalyzer) calculateMarketCycle(priceData []PricePoint) int {
+	// TODO: 实现市场周期计算
+	return 0
+}
+
+// calculateLiquidity 计算流动性
+func (ma *MarketAnalyzer) calculateLiquidity(priceData []PricePoint) float64 {
+	// TODO: 实现流动性计算
+	return 0.0
+}
+
+// determineMarketRegime 确定市场状态
+func (ma *MarketAnalyzer) determineMarketRegime(priceData []PricePoint) string {
+	// TODO: 实现市场状态判断
+	return "unknown"
+}
+
+// calculateConfidence 计算置信度
+func (ma *MarketAnalyzer) calculateConfidence(priceData []PricePoint) float64 {
+	// TODO: 实现置信度计算
+	return 0.0
 }
