@@ -49,29 +49,44 @@ func NewDatabaseCache(db *database.DB, tableName string) (*DatabaseCacheImpl, er
 
 // createTable creates the cache table if it doesn't exist
 func (dbc *DatabaseCacheImpl) createTable() error {
-	query := fmt.Sprintf(`
+	// Create table with PostgreSQL compatible syntax
+	createTableQuery := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
 			key VARCHAR(255) PRIMARY KEY,
 			value TEXT NOT NULL,
-			expiration TIMESTAMP NOT NULL,
-			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-			INDEX idx_expiration (expiration)
+			expiration TIMESTAMP WITH TIME ZONE NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 		)
 	`, dbc.tableName)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	_, err := dbc.db.ExecContext(ctx, query)
-	return err
+	// Create table
+	_, err := dbc.db.ExecContext(ctx, createTableQuery)
+	if err != nil {
+		return fmt.Errorf("failed to create table: %w", err)
+	}
+
+	// Create index separately (PostgreSQL compatible)
+	indexQuery := fmt.Sprintf(`
+		CREATE INDEX IF NOT EXISTS idx_%s_expiration ON %s (expiration)
+	`, dbc.tableName, dbc.tableName)
+
+	_, err = dbc.db.ExecContext(ctx, indexQuery)
+	if err != nil {
+		return fmt.Errorf("failed to create index: %w", err)
+	}
+
+	return nil
 }
 
 // Get retrieves a value from database cache
 func (dbc *DatabaseCacheImpl) Get(ctx context.Context, key string) (interface{}, error) {
 	query := fmt.Sprintf(`
-		SELECT value FROM %s 
-		WHERE key = ? AND expiration > NOW()
+		SELECT value FROM %s
+		WHERE key = $1 AND expiration > NOW()
 	`, dbc.tableName)
 
 	var valueStr string
@@ -107,11 +122,11 @@ func (dbc *DatabaseCacheImpl) Set(ctx context.Context, key string, value interfa
 	}
 
 	query := fmt.Sprintf(`
-		INSERT INTO %s (key, value, expiration) 
-		VALUES (?, ?, ?)
-		ON DUPLICATE KEY UPDATE 
-			value = VALUES(value),
-			expiration = VALUES(expiration),
+		INSERT INTO %s (key, value, expiration)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (key) DO UPDATE SET
+			value = EXCLUDED.value,
+			expiration = EXCLUDED.expiration,
 			updated_at = CURRENT_TIMESTAMP
 	`, dbc.tableName)
 
@@ -125,7 +140,7 @@ func (dbc *DatabaseCacheImpl) Set(ctx context.Context, key string, value interfa
 
 // Delete removes a value from database cache
 func (dbc *DatabaseCacheImpl) Delete(ctx context.Context, key string) error {
-	query := fmt.Sprintf(`DELETE FROM %s WHERE key = ?`, dbc.tableName)
+	query := fmt.Sprintf(`DELETE FROM %s WHERE key = $1`, dbc.tableName)
 
 	_, err := dbc.db.ExecContext(ctx, query, key)
 	if err != nil {
@@ -138,8 +153,8 @@ func (dbc *DatabaseCacheImpl) Delete(ctx context.Context, key string) error {
 // Exists checks if a key exists in database cache
 func (dbc *DatabaseCacheImpl) Exists(ctx context.Context, key string) (bool, error) {
 	query := fmt.Sprintf(`
-		SELECT 1 FROM %s 
-		WHERE key = ? AND expiration > NOW() 
+		SELECT 1 FROM %s
+		WHERE key = $1 AND expiration > NOW()
 		LIMIT 1
 	`, dbc.tableName)
 
@@ -253,9 +268,9 @@ func (dbc *DatabaseCacheImpl) cleanup() {
 // GetEntry retrieves a complete cache entry
 func (dbc *DatabaseCacheImpl) GetEntry(ctx context.Context, key string) (*CacheEntry, error) {
 	query := fmt.Sprintf(`
-		SELECT key, value, expiration, created_at, updated_at 
-		FROM %s 
-		WHERE key = ?
+		SELECT key, value, expiration, created_at, updated_at
+		FROM %s
+		WHERE key = $1
 	`, dbc.tableName)
 
 	var entry CacheEntry
@@ -281,9 +296,9 @@ func (dbc *DatabaseCacheImpl) SetTTL(ctx context.Context, key string, ttl time.D
 	expirationTime := time.Now().Add(ttl)
 
 	query := fmt.Sprintf(`
-		UPDATE %s 
-		SET expiration = ?, updated_at = CURRENT_TIMESTAMP 
-		WHERE key = ?
+		UPDATE %s
+		SET expiration = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE key = $2
 	`, dbc.tableName)
 
 	result, err := dbc.db.ExecContext(ctx, query, expirationTime, key)
@@ -306,8 +321,8 @@ func (dbc *DatabaseCacheImpl) SetTTL(ctx context.Context, key string, ttl time.D
 // GetTTL returns the time to live for a key
 func (dbc *DatabaseCacheImpl) GetTTL(ctx context.Context, key string) (time.Duration, error) {
 	query := fmt.Sprintf(`
-		SELECT expiration FROM %s 
-		WHERE key = ?
+		SELECT expiration FROM %s
+		WHERE key = $1
 	`, dbc.tableName)
 
 	var expiration time.Time
