@@ -22,6 +22,7 @@ import {
   Activity
 } from "lucide-react";
 import apiClient, { HotSymbol, WhitelistItem, ApiError } from "@/lib/api";
+import MarketAnalysisReport from "@/components/MarketAnalysisReport";
 
 export default function HotlistPage() {
   const [hotSymbols, setHotSymbols] = useState<HotSymbol[]>([]);
@@ -245,12 +246,26 @@ export default function HotlistPage() {
         </Card>
       </div>
 
-      <Alert>
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>
-          热门币种推荐基于多维度分析，仅供参考。添加到白名单后才会被策略使用，请谨慎评估风险。
-        </AlertDescription>
-      </Alert>
+      {/* 白名单重要提示 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Alert className="border-amber-200 bg-amber-50">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800">
+            <strong>重要提示：</strong>热门币种推荐基于多维度分析，仅供参考。
+            <span className="font-semibold text-amber-900">添加到白名单后才会被策略使用</span>，请谨慎评估风险。
+          </AlertDescription>
+        </Alert>
+
+        {whitelist.length === 0 && (
+          <Alert className="border-red-200 bg-red-50">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">
+              <strong>警告：</strong>当前白名单为空！策略将无法执行交易。
+              请从热门币种中选择合适的交易对添加到白名单。
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
 
       <Tabs defaultValue="hotlist" className="space-y-4">
         <TabsList>
@@ -427,16 +442,7 @@ export default function HotlistPage() {
         </TabsContent>
 
         <TabsContent value="analysis" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>市场分析报告</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8 text-gray-500">
-                市场分析报告功能正在开发中...
-              </div>
-            </CardContent>
-          </Card>
+          <MarketAnalysisReport hotSymbols={hotSymbols} whitelist={whitelist} />
         </TabsContent>
       </Tabs>
     </div>
