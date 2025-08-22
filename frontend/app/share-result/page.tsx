@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import apiClient from '@/lib/api'
 import { 
   Upload, 
   FileText, 
@@ -177,13 +178,14 @@ export default function ShareResultPage() {
   const loadStrategies = async () => {
     setLoadingStrategies(true)
     try {
-      const response = await fetch('/api/strategies')
-      if (response.ok) {
-        const data = await response.json()
-        setStrategies(data.data || [])
-      }
+      // 使用正确的API客户端获取策略数据
+      const strategies = await apiClient.getStrategies()
+      // 只显示已启用的策略
+      const enabledStrategies = strategies.filter(s => s.enabled !== false && s.runtime_status !== 'disabled')
+      setStrategies(enabledStrategies)
     } catch (error) {
       console.error('Failed to load strategies:', error)
+      setStrategies([])
     } finally {
       setLoadingStrategies(false)
     }
@@ -345,9 +347,20 @@ export default function ShareResultPage() {
   }
 
   const handleSubmit = async () => {
+    // 验证必填字段
+    if (!selectedStrategy) {
+      alert('请选择一个策略')
+      return
+    }
+
+    if (!formData.shared_by) {
+      alert('请填写分享者姓名')
+      return
+    }
+
     setLoading(true)
     setStatus('idle')
-    
+
     try {
       const response = await fetch('/api/share-result', {
         method: 'POST',
@@ -527,18 +540,24 @@ export default function ShareResultPage() {
             <CardContent className="space-y-4">
               {/* 策略选择器 */}
               <div>
-                <Label htmlFor="strategy_select">选择现有策略（可选）</Label>
+                <Label htmlFor="strategy_select">选择现有策略（必选）<span className="text-red-500">*</span></Label>
                 <div className="flex gap-2">
-                  <Select value={selectedStrategy} onValueChange={handleStrategySelect}>
+                  <Select value={selectedStrategy} onValueChange={handleStrategySelect} required>
                     <SelectTrigger className="flex-1">
-                      <SelectValue placeholder={loadingStrategies ? "加载中..." : "选择策略以自动填充数据"} />
+                      <SelectValue placeholder={loadingStrategies ? "加载中..." : "请选择一个已启用的策略"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {strategies.map((strategy) => (
-                        <SelectItem key={strategy.id} value={strategy.id}>
-                          {strategy.name} ({strategy.type})
+                      {strategies.length === 0 && !loadingStrategies ? (
+                        <SelectItem value="" disabled>
+                          暂无已启用的策略
                         </SelectItem>
-                      ))}
+                      ) : (
+                        strategies.map((strategy) => (
+                          <SelectItem key={strategy.id} value={strategy.id}>
+                            {strategy.name} ({strategy.type || 'unknown'}) - {strategy.runtime_status === 'running' ? '运行中' : '已停止'}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   <Button
@@ -551,7 +570,7 @@ export default function ShareResultPage() {
                   </Button>
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">
-                  选择策略后将自动填充基本信息和性能数据，您也可以手动填写
+                  必须选择一个已启用的策略才能分享结果，这确保了分享内容的真实性和可靠性
                 </p>
               </div>
 
@@ -1051,9 +1070,9 @@ export default function ShareResultPage() {
         <Button variant="outline" onClick={() => setActiveTab('basic')}>
           重置
         </Button>
-        <Button 
-          onClick={handleSubmit} 
-          disabled={loading || !formData.task_id || !formData.strategy_name || !formData.shared_by}
+        <Button
+          onClick={handleSubmit}
+          disabled={loading || !selectedStrategy || !formData.shared_by}
         >
           {loading ? '分享中...' : '分享结果'}
         </Button>
