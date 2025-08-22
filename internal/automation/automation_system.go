@@ -448,6 +448,19 @@ func (as *AutomationSystem) GetBridge() *bridge.MonitorResponseBridge {
 	return as.bridge
 }
 
+// ToggleTask 切换自动化任务的启用状态
+func (as *AutomationSystem) ToggleTask(taskID string, enabled bool) error {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+
+	// 通过调度器切换任务状态
+	if as.scheduler != nil {
+		return as.scheduler.ToggleTask(taskID, enabled)
+	}
+
+	return fmt.Errorf("scheduler not available")
+}
+
 // GetMonitorIntegrator 获取监控集成器
 func (as *AutomationSystem) GetMonitorIntegrator() *bridge.MonitorIntegration {
 	return as.monitorIntegrator

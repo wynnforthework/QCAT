@@ -57,6 +57,7 @@ type ScheduledTask struct {
 	NextRun    time.Time
 	LastRun    time.Time
 	Status     TaskStatus
+	Enabled    bool // 是否启用
 	Priority   int
 	Timeout    time.Duration
 	RetryCount int
@@ -103,6 +104,7 @@ const (
 	TaskStatusCompleted TaskStatus = "completed"
 	TaskStatusFailed    TaskStatus = "failed"
 	TaskStatusSkipped   TaskStatus = "skipped"
+	TaskStatusStopped   TaskStatus = "stopped"
 )
 
 // TaskHandler 任务处理器
@@ -735,6 +737,7 @@ func (as *AutomationScheduler) RegisterTask(task *ScheduledTask) {
 	}
 
 	task.Status = TaskStatusPending
+	task.Enabled = false // 默认禁用，需要手动启用
 	task.CreatedAt = time.Now()
 	task.UpdatedAt = time.Now()
 	task.NextRun = time.Now().Add(time.Minute) // 1分钟后开始
@@ -774,4 +777,44 @@ func (as *AutomationScheduler) stopSubSchedulers() {
 	as.dataScheduler.Stop()
 	as.systemScheduler.Stop()
 	as.learningScheduler.Stop()
+}
+
+// ToggleTask 切换任务的启用状态
+func (as *AutomationScheduler) ToggleTask(taskID string, enabled bool) error {
+	as.mu.Lock()
+	defer as.mu.Unlock()
+
+	task, exists := as.tasks[taskID]
+	if !exists {
+		return fmt.Errorf("task not found: %s", taskID)
+	}
+
+	// 更新任务状态
+	task.Enabled = enabled
+	task.UpdatedAt = time.Now()
+
+	if enabled {
+		// 启用任务
+		task.Status = TaskStatusPending
+		task.NextRun = time.Now().Add(time.Minute) // 1分钟后开始
+		log.Printf("Enabled task: %s (%s)", task.Name, task.ID)
+	} else {
+		// 禁用任务
+		task.Status = TaskStatusStopped
+		log.Printf("Disabled task: %s (%s)", task.Name, task.ID)
+	}
+
+	as.tasks[taskID] = task
+	return nil
+}
+
+// GetTask 获取指定ID的任务
+func (as *AutomationScheduler) GetTask(taskID string) *ScheduledTask {
+	as.mu.RLock()
+	defer as.mu.RUnlock()
+
+	if task, exists := as.tasks[taskID]; exists {
+		return task
+	}
+	return nil
 }
