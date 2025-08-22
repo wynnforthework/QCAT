@@ -414,15 +414,19 @@ export default function HotlistPage() {
                     <TableRow key={item.symbol}>
                       <TableCell className="font-medium">{item.symbol}</TableCell>
                       <TableCell>
-                        <Badge variant={item.status === 'active' ? 'default' : 'secondary'}>
-                          {item.status === 'active' ? '活跃' : '待定'}
+                        <Badge variant={
+                          item.status === 'active' || item.status === 'approved' ? 'default' :
+                          item.status === 'suspended' ? 'destructive' : 'secondary'
+                        }>
+                          {item.status === 'active' || item.status === 'approved' ? '已批准' :
+                           item.status === 'suspended' ? '已暂停' : '待定'}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        {new Date(item.addedDate).toLocaleDateString()}
+                        {item.approved_at ? new Date(item.approved_at).toLocaleDateString() : '-'}
                       </TableCell>
-                      <TableCell>{item.addedBy}</TableCell>
-                      <TableCell>{item.reason}</TableCell>
+                      <TableCell>{item.approved_by || '系统'}</TableCell>
+                      <TableCell>{item.reason || '-'}</TableCell>
                       <TableCell>
                         <Button
                           variant="outline"

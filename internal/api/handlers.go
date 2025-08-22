@@ -1638,13 +1638,14 @@ func (h *HotlistHandler) GetWhitelist(c *gin.Context) {
 
 	// 从数据库获取白名单数据
 	query := `
-		SELECT 
+		SELECT
 			symbol,
-			approved_by,
+			COALESCE(approved_by, '') as approved_by,
 			approved_at,
 			status,
-			updated_at
-		FROM trading_whitelist 
+			updated_at,
+			COALESCE(reason, '') as reason
+		FROM trading_whitelist
 		ORDER BY approved_at DESC
 	`
 
@@ -1666,10 +1667,11 @@ func (h *HotlistHandler) GetWhitelist(c *gin.Context) {
 			ApprovedAt time.Time `db:"approved_at"`
 			Status     string    `db:"status"`
 			UpdatedAt  time.Time `db:"updated_at"`
+			Reason     string    `db:"reason"`
 		}
 
 		if err := rows.Scan(&item.Symbol, &item.ApprovedBy, &item.ApprovedAt,
-			&item.Status, &item.UpdatedAt); err != nil {
+			&item.Status, &item.UpdatedAt, &item.Reason); err != nil {
 			continue
 		}
 
@@ -1679,6 +1681,7 @@ func (h *HotlistHandler) GetWhitelist(c *gin.Context) {
 			"approved_at": item.ApprovedAt,
 			"status":      item.Status,
 			"updated_at":  item.UpdatedAt,
+			"reason":      item.Reason,
 		})
 	}
 

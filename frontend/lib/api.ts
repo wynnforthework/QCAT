@@ -910,10 +910,14 @@ export interface HotSymbol {
 
 export interface WhitelistItem {
   symbol: string;
-  addedDate: string;
-  addedBy: string;
+  approved_at: string;
+  approved_by: string;
   reason: string;
-  status: "active" | "pending" | "rejected";
+  status: "active" | "pending" | "rejected" | "approved" | "suspended";
+  updated_at: string;
+  // 为了向后兼容，保留旧字段名
+  addedDate?: string;
+  addedBy?: string;
 }
 
 export interface AuditLog {
