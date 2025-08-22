@@ -2693,7 +2693,7 @@ func (h *DashboardHandler) getStrategyStatistics() map[string]interface{} {
 	ctx := context.Background()
 
 	// 首先检查strategies表是否存在数据
-	totalQuery := `SELECT COUNT(*) FROM strategies WHERE deleted_at IS NULL`
+	totalQuery := `SELECT COUNT(*) FROM strategies`
 	var totalCount int
 	err := h.db.QueryRowContext(ctx, totalQuery).Scan(&totalCount)
 	if err != nil {
@@ -2728,7 +2728,6 @@ func (h *DashboardHandler) getStrategyStatistics() map[string]interface{} {
 			END as runtime_status,
 			COUNT(*) as count
 		FROM strategies
-		WHERE deleted_at IS NULL
 		GROUP BY runtime_status
 	`
 
