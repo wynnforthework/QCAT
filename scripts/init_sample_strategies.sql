@@ -1,16 +1,21 @@
 -- 初始化示例策略数据
 -- 这个脚本会创建一些示例策略，用于演示和测试
 
--- 插入示例策略
-INSERT INTO strategies (id, name, description, type, status, created_at, updated_at) VALUES
-(uuid_generate_v4(), 'BTC动量策略', '基于比特币价格动量的交易策略，使用移动平均线和RSI指标', 'momentum', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(uuid_generate_v4(), 'ETH均值回归策略', '以太坊均值回归策略，利用价格偏离均值时的回归特性', 'mean_reversion', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(uuid_generate_v4(), 'SOL趋势跟踪策略', 'Solana趋势跟踪策略，使用布林带和MACD指标', 'trend_following', 'inactive', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(uuid_generate_v4(), 'ADA网格交易策略', 'Cardano网格交易策略，在震荡市场中获取收益', 'grid_trading', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(uuid_generate_v4(), 'BNB套利策略', 'Binance Coin套利策略，利用不同交易对之间的价差', 'arbitrage', 'inactive', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(uuid_generate_v4(), 'DOGE高频交易策略', 'Dogecoin高频交易策略，基于微小价格波动', 'high_frequency', 'testing', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(uuid_generate_v4(), 'MATIC波段交易策略', 'Polygon波段交易策略，捕捉中期价格波动', 'swing_trading', 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-(uuid_generate_v4(), 'AVAX突破策略', 'Avalanche突破策略，在价格突破关键阻力位时入场', 'breakout', 'inactive', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+-- 确保strategies表有必要的字段
+ALTER TABLE strategies ADD COLUMN IF NOT EXISTS is_running BOOLEAN DEFAULT false;
+ALTER TABLE strategies ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT true;
+ALTER TABLE strategies ADD COLUMN IF NOT EXISTS parameters JSONB DEFAULT '{}';
+
+-- 插入示例策略（包含新字段）
+INSERT INTO strategies (id, name, description, type, status, is_running, enabled, parameters, created_at, updated_at) VALUES
+(uuid_generate_v4(), 'BTC动量策略', '基于比特币价格动量的交易策略，使用移动平均线和RSI指标', 'momentum', 'active', true, true, '{"symbol": "BTCUSDT", "timeframe": "1h"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(uuid_generate_v4(), 'ETH均值回归策略', '以太坊均值回归策略，利用价格偏离均值时的回归特性', 'mean_reversion', 'active', false, true, '{"symbol": "ETHUSDT", "timeframe": "4h"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(uuid_generate_v4(), 'SOL趋势跟踪策略', 'Solana趋势跟踪策略，使用布林带和MACD指标', 'trend_following', 'inactive', false, false, '{"symbol": "SOLUSDT", "timeframe": "1h"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(uuid_generate_v4(), 'ADA网格交易策略', 'Cardano网格交易策略，在震荡市场中获取收益', 'grid_trading', 'active', false, true, '{"symbol": "ADAUSDT", "timeframe": "15m"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(uuid_generate_v4(), 'BNB套利策略', 'Binance Coin套利策略，利用不同交易对之间的价差', 'arbitrage', 'inactive', false, true, '{"symbol": "BNBUSDT", "timeframe": "5m"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(uuid_generate_v4(), 'DOGE高频交易策略', 'Dogecoin高频交易策略，基于微小价格波动', 'high_frequency', 'testing', false, true, '{"symbol": "DOGEUSDT", "timeframe": "1m"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(uuid_generate_v4(), 'MATIC波段交易策略', 'Polygon波段交易策略，捕捉中期价格波动', 'swing_trading', 'active', true, true, '{"symbol": "MATICUSDT", "timeframe": "1d"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+(uuid_generate_v4(), 'AVAX突破策略', 'Avalanche突破策略，在价格突破关键阻力位时入场', 'breakout', 'inactive', false, true, '{"symbol": "AVAXUSDT", "timeframe": "4h"}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
 ON CONFLICT (id) DO NOTHING;
 
 -- 为策略创建版本信息
