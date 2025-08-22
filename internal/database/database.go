@@ -83,12 +83,34 @@ func NewConnection(cfg *Config) (*DB, error) {
 	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
 	db.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
 
-	// Test connection
+	// Test connection with retry logic
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.Timeout)
 	defer cancel()
 
-	if err := db.PingContext(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ping database: %w", err)
+	var pingErr error
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		pingErr = db.PingContext(ctx)
+		if pingErr == nil {
+			break
+		}
+
+		log.Printf("Database ping attempt %d/%d failed: %v", i+1, maxRetries, pingErr)
+		if i < maxRetries-1 {
+			time.Sleep(time.Second * time.Duration(i+1)) // 递增延迟
+		}
+	}
+
+	if pingErr != nil {
+		// 提供更详细的错误信息和建议
+		return nil, fmt.Errorf("failed to ping database after %d attempts: %w\n"+
+			"Suggestions:\n"+
+			"1. Check if PostgreSQL is running: sudo systemctl status postgresql\n"+
+			"2. Verify database connection settings in config file\n"+
+			"3. Check if database '%s' exists\n"+
+			"4. Verify user '%s' has proper permissions\n"+
+			"5. Check firewall settings for port %d",
+			maxRetries, pingErr, cfg.DBName, cfg.User, cfg.Port)
 	}
 
 	log.Printf("Database connection established successfully with pool config: max_open=%d, max_idle=%d, max_lifetime=%v, max_idle_time=%v",
@@ -207,8 +229,19 @@ func (db *DB) IsHealthy() bool {
 func (db *DB) GetHealthStatus() map[string]interface{} {
 	stats := db.GetPoolStats()
 
+	// 尝试执行简单查询来测试连接
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var pingResult bool = true
+	if err := db.PingContext(ctx); err != nil {
+		pingResult = false
+		log.Printf("Database health check ping failed: %v", err)
+	}
+
 	return map[string]interface{}{
-		"healthy":              db.IsHealthy(),
+		"healthy":              db.IsHealthy() && pingResult,
+		"ping_successful":      pingResult,
 		"max_open_connections": stats.MaxOpenConnections,
 		"open_connections":     stats.OpenConnections,
 		"in_use":               stats.InUse,
@@ -220,4 +253,45 @@ func (db *DB) GetHealthStatus() map[string]interface{} {
 		"last_updated":         stats.LastUpdated,
 		"utilization_percent":  float64(stats.InUse) / float64(stats.MaxOpenConnections) * 100,
 	}
+}
+
+// RecoverConnection attempts to recover database connection
+func (db *DB) RecoverConnection() error {
+	log.Println("Attempting to recover database connection...")
+
+	// 关闭现有连接
+	if err := db.DB.Close(); err != nil {
+		log.Printf("Error closing existing database connection: %v", err)
+	}
+
+	// 重新建立连接
+	dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		db.config.Host, db.config.Port, db.config.User, db.config.Password,
+		db.config.DBName, db.config.SSLMode)
+
+	newDB, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return fmt.Errorf("failed to reopen database: %w", err)
+	}
+
+	// 重新配置连接池
+	newDB.SetMaxOpenConns(db.config.MaxOpen)
+	newDB.SetMaxIdleConns(db.config.MaxIdle)
+	newDB.SetConnMaxLifetime(db.config.ConnMaxLifetime)
+	newDB.SetConnMaxIdleTime(db.config.ConnMaxIdleTime)
+
+	// 测试新连接
+	ctx, cancel := context.WithTimeout(context.Background(), db.config.Timeout)
+	defer cancel()
+
+	if err := newDB.PingContext(ctx); err != nil {
+		newDB.Close()
+		return fmt.Errorf("failed to ping recovered database: %w", err)
+	}
+
+	// 替换连接
+	db.DB = newDB
+	log.Println("Database connection recovered successfully")
+
+	return nil
 }

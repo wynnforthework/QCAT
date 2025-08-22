@@ -1249,8 +1249,16 @@ func (engine *AutoMLEngine) preprocessData(task *MLTask) (*PreprocessedData, err
 		return nil, fmt.Errorf("failed to load raw data: %w", err)
 	}
 
+	// 选择预处理策略
+	var strategyName string
+	if task.TrainingConfig.AutoFeatureEngineering {
+		strategyName = "advanced"
+	} else {
+		strategyName = "basic"
+	}
+
 	// 应用预处理策略
-	data, err := engine.applyPreprocessingStrategies(rawData, task.PreprocessingConfig)
+	data, err := engine.applyPreprocessingStrategies(rawData, strategyName)
 	if err != nil {
 		return nil, fmt.Errorf("failed to apply preprocessing: %w", err)
 	}
@@ -1806,11 +1814,23 @@ func (engine *AutoMLEngine) loadRawData(dataSource DataSource) (interface{}, err
 }
 
 // applyPreprocessingStrategies 应用预处理策略
-func (engine *AutoMLEngine) applyPreprocessingStrategies(rawData interface{}, config interface{}) (*PreprocessedData, error) {
+func (engine *AutoMLEngine) applyPreprocessingStrategies(rawData interface{}, strategyName string) (*PreprocessedData, error) {
+	log.Printf("Applying preprocessing strategy '%s' to raw data", strategyName)
+
+	// 获取预处理策略
+	engine.dataPreprocessor.mu.RLock()
+	strategy, exists := engine.dataPreprocessor.strategies[strategyName]
+	engine.dataPreprocessor.mu.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("preprocessing strategy '%s' not found", strategyName)
+	}
+
 	// TODO: 实现数据预处理策略应用
 	// 包括数据清理、转换、特征工程等
+	// 根据strategy的配置执行相应的预处理步骤
 
-	log.Printf("Applying preprocessing strategies to raw data")
+	log.Printf("Applied preprocessing strategy: %s", strategy.Name)
 
 	// 目前返回错误表示预处理功能未实现
 	return nil, fmt.Errorf("data preprocessing not yet implemented")

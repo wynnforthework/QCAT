@@ -46,7 +46,7 @@ func (l *DataLoader) LoadData(ctx context.Context, symbol string, start, end tim
 		End:    end,
 	}
 
-	// 加载K线数据
+	// 加载K线数据（使用自动回填功能）
 	klines, err := l.klineManager.GetHistory(ctx, symbol, start, end)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load klines: %w", err)

@@ -9,6 +9,7 @@ import (
 	"math"
 	"math/rand"
 	"sort"
+	"strconv"
 	"sync"
 	"time"
 
@@ -759,9 +760,9 @@ func (ss *StrategyScheduler) getOptimizationResult(ctx context.Context, taskID s
 	)
 
 	if err != nil {
-		// 如果数据库中没有结果，创建一个模拟结果
-		log.Printf("No optimization result found in database for task %s, creating mock result", taskID)
-		return ss.createMockOptimizationResult(taskID), nil
+		// 如果数据库中没有结果，尝试从策略管理器获取默认参数
+		log.Printf("No optimization result found in database for task %s, using default parameters", taskID)
+		return ss.createDefaultOptimizationResult(taskID), nil
 	}
 
 	// 解析JSON字段（这里简化处理）
@@ -787,37 +788,47 @@ func (ss *StrategyScheduler) getOptimizationResult(ctx context.Context, taskID s
 	return &result, nil
 }
 
-// createMockOptimizationResult 创建模拟优化结果
-func (ss *StrategyScheduler) createMockOptimizationResult(taskID string) *OptimizationResult {
+// createDefaultOptimizationResult 创建默认优化结果
+func (ss *StrategyScheduler) createDefaultOptimizationResult(taskID string) *OptimizationResult {
+	// 尝试从策略模板获取默认参数
+	defaultParams := ss.getDefaultStrategyParameters(taskID)
+
 	return &OptimizationResult{
 		TaskID:     taskID,
 		StrategyID: "strategy_" + taskID,
-		Parameters: map[string]interface{}{
-			"fast_period":   12,
-			"slow_period":   26,
-			"signal_period": 9,
-			"stop_loss":     0.02,
-			"take_profit":   0.04,
-		},
+		Parameters: defaultParams,
 		Performance: &PerformanceMetrics{
-			SharpeRatio:  1.35,
-			MaxDrawdown:  0.06,
-			TotalReturn:  0.18,
-			WinRate:      0.68,
-			ProfitFactor: 2.1,
-			Volatility:   0.10,
+			SharpeRatio:  0.0, // 未优化的默认值
+			MaxDrawdown:  0.0,
+			TotalReturn:  0.0,
+			WinRate:      0.0,
+			ProfitFactor: 0.0,
+			Volatility:   0.0,
 		},
 		BacktestResult: &BacktestResult{
-			StartDate:     time.Now().AddDate(0, -3, 0),
+			StartDate:     time.Now().AddDate(0, -1, 0), // 默认1个月
 			EndDate:       time.Now(),
-			TotalTrades:   200,
-			WinningTrades: 136,
-			LosingTrades:  64,
-			TotalProfit:   18000.0,
-			TotalLoss:     -8500.0,
+			TotalTrades:   0,
+			WinningTrades: 0,
+			LosingTrades:  0,
+			TotalProfit:   0.0,
+			TotalLoss:     0.0,
 		},
 		CreatedAt: time.Now(),
-		Status:    "completed",
+		Status:    "pending", // 标记为待优化
+	}
+}
+
+// getDefaultStrategyParameters 获取策略默认参数
+func (ss *StrategyScheduler) getDefaultStrategyParameters(taskID string) map[string]interface{} {
+	// 从策略配置或模板中获取默认参数
+	// 这里可以根据策略类型返回不同的默认参数
+	return map[string]interface{}{
+		"fast_period":   12,
+		"slow_period":   26,
+		"signal_period": 9,
+		"stop_loss":     0.02,
+		"take_profit":   0.04,
 	}
 }
 
@@ -1023,16 +1034,178 @@ func (ss *StrategyScheduler) monitorCanaryPerformance(ctx context.Context, deplo
 
 // getCanaryMetrics 获取Canary指标
 func (ss *StrategyScheduler) getCanaryMetrics(ctx context.Context, deploymentID string) (*PerformanceMetrics, error) {
-	// 这里应该从监控系统获取实际指标
-	// 暂时返回模拟数据
+	// 从数据库获取实际的Canary部署指标
+	query := `
+		SELECT
+			sharpe_ratio, max_drawdown, total_return, win_rate,
+			profit_factor, volatility, updated_at
+		FROM canary_metrics
+		WHERE deployment_id = $1
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`
+
+	var metrics PerformanceMetrics
+	var updatedAt time.Time
+
+	err := ss.db.QueryRowContext(ctx, query, deploymentID).Scan(
+		&metrics.SharpeRatio,
+		&metrics.MaxDrawdown,
+		&metrics.TotalReturn,
+		&metrics.WinRate,
+		&metrics.ProfitFactor,
+		&metrics.Volatility,
+		&updatedAt,
+	)
+
+	if err != nil {
+		// 如果没有找到Canary指标，从策略历史表现计算
+		log.Printf("No canary metrics found for deployment %s, calculating from strategy performance: %v", deploymentID, err)
+		return ss.calculateCanaryMetricsFromStrategy(ctx, deploymentID)
+	}
+
+	// 检查数据是否过期（超过1小时）
+	if time.Since(updatedAt) > time.Hour {
+		log.Printf("Canary metrics for deployment %s are stale, recalculating", deploymentID)
+		return ss.calculateCanaryMetricsFromStrategy(ctx, deploymentID)
+	}
+
+	return &metrics, nil
+}
+
+// calculateCanaryMetricsFromStrategy 从策略表现计算Canary指标
+func (ss *StrategyScheduler) calculateCanaryMetricsFromStrategy(ctx context.Context, deploymentID string) (*PerformanceMetrics, error) {
+	// 获取策略ID
+	var strategyID string
+	err := ss.db.QueryRowContext(ctx,
+		"SELECT strategy_id FROM canary_deployments WHERE deployment_id = $1",
+		deploymentID).Scan(&strategyID)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get strategy ID for deployment %s: %w", deploymentID, err)
+	}
+
+	// 获取策略历史收益数据
+	returns, err := ss.getStrategyReturns(ctx, strategyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get strategy returns: %w", err)
+	}
+
+	if len(returns) == 0 {
+		return &PerformanceMetrics{}, nil // 返回空指标
+	}
+
+	// 计算性能指标
+	metrics := ss.calculateMetricsFromReturns(returns)
+
+	// 保存到数据库以供下次使用
+	ss.saveCanaryMetrics(ctx, deploymentID, metrics)
+
+	return metrics, nil
+}
+
+// saveCanaryMetrics 保存Canary指标到数据库
+func (ss *StrategyScheduler) saveCanaryMetrics(ctx context.Context, deploymentID string, metrics *PerformanceMetrics) {
+	query := `
+		INSERT INTO canary_metrics (deployment_id, sharpe_ratio, max_drawdown, total_return,
+			win_rate, profit_factor, volatility, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (deployment_id) DO UPDATE SET
+			sharpe_ratio = EXCLUDED.sharpe_ratio,
+			max_drawdown = EXCLUDED.max_drawdown,
+			total_return = EXCLUDED.total_return,
+			win_rate = EXCLUDED.win_rate,
+			profit_factor = EXCLUDED.profit_factor,
+			volatility = EXCLUDED.volatility,
+			updated_at = EXCLUDED.updated_at
+	`
+
+	_, err := ss.db.ExecContext(ctx, query, deploymentID,
+		metrics.SharpeRatio, metrics.MaxDrawdown, metrics.TotalReturn,
+		metrics.WinRate, metrics.ProfitFactor, metrics.Volatility, time.Now())
+
+	if err != nil {
+		log.Printf("Failed to save canary metrics for deployment %s: %v", deploymentID, err)
+	}
+}
+
+// calculateMetricsFromReturns 从收益序列计算性能指标
+func (ss *StrategyScheduler) calculateMetricsFromReturns(returns []float64) *PerformanceMetrics {
+	if len(returns) == 0 {
+		return &PerformanceMetrics{}
+	}
+
+	// 计算总收益
+	totalReturn := 1.0
+	for _, ret := range returns {
+		totalReturn *= (1.0 + ret)
+	}
+	totalReturn -= 1.0
+
+	// 计算平均收益和标准差
+	var sum float64
+	for _, ret := range returns {
+		sum += ret
+	}
+	meanReturn := sum / float64(len(returns))
+
+	var variance float64
+	for _, ret := range returns {
+		variance += math.Pow(ret-meanReturn, 2)
+	}
+	variance /= float64(len(returns) - 1)
+	volatility := math.Sqrt(variance)
+
+	// 计算夏普比率（假设无风险利率为0）
+	sharpeRatio := 0.0
+	if volatility > 0 {
+		sharpeRatio = meanReturn / volatility * math.Sqrt(252) // 年化
+	}
+
+	// 计算最大回撤
+	maxDrawdown := 0.0
+	peak := 1.0
+	for _, ret := range returns {
+		peak *= (1.0 + ret)
+		drawdown := (peak - peak) / peak
+		if drawdown > maxDrawdown {
+			maxDrawdown = drawdown
+		}
+	}
+
+	// 计算胜率
+	winCount := 0
+	for _, ret := range returns {
+		if ret > 0 {
+			winCount++
+		}
+	}
+	winRate := float64(winCount) / float64(len(returns))
+
+	// 计算盈利因子
+	totalProfit := 0.0
+	totalLoss := 0.0
+	for _, ret := range returns {
+		if ret > 0 {
+			totalProfit += ret
+		} else {
+			totalLoss += math.Abs(ret)
+		}
+	}
+
+	profitFactor := 0.0
+	if totalLoss > 0 {
+		profitFactor = totalProfit / totalLoss
+	}
+
 	return &PerformanceMetrics{
-		SharpeRatio:  1.25,
-		MaxDrawdown:  0.07,
-		TotalReturn:  0.12,
-		WinRate:      0.66,
-		ProfitFactor: 1.9,
-		Volatility:   0.11,
-	}, nil
+		SharpeRatio:  sharpeRatio,
+		MaxDrawdown:  maxDrawdown,
+		TotalReturn:  totalReturn,
+		WinRate:      winRate,
+		ProfitFactor: profitFactor,
+		Volatility:   volatility * math.Sqrt(252), // 年化波动率
+	}
 }
 
 // checkCanaryHealth 检查Canary健康状态
@@ -1529,9 +1702,9 @@ func (ss *StrategyScheduler) getStrategyReturns(ctx context.Context, strategyID 
 
 	rows, err := ss.db.QueryContext(ctx, query, strategyID)
 	if err != nil {
-		// 如果数据库查询失败，返回模拟数据
-		log.Printf("Database query failed for strategy %s, using mock data: %v", strategyID, err)
-		return ss.generateMockReturns(strategyID), nil
+		// 如果数据库查询失败，尝试从回测结果计算收益
+		log.Printf("Database query failed for strategy %s, trying to calculate from backtest results: %v", strategyID, err)
+		return ss.calculateReturnsFromBacktest(ctx, strategyID)
 	}
 	defer rows.Close()
 
@@ -1548,45 +1721,101 @@ func (ss *StrategyScheduler) getStrategyReturns(ctx context.Context, strategyID 
 		returns = append(returns, returnValue)
 	}
 
-	// 如果没有数据，生成模拟数据
+	// 如果没有数据，尝试从回测结果计算
 	if len(returns) == 0 {
-		log.Printf("No return data found for strategy %s, generating mock data", strategyID)
-		returns = ss.generateMockReturns(strategyID)
+		log.Printf("No return data found for strategy %s, calculating from backtest results", strategyID)
+		backtestReturns, err := ss.calculateReturnsFromBacktest(ctx, strategyID)
+		if err != nil {
+			log.Printf("Failed to calculate returns from backtest for strategy %s: %v", strategyID, err)
+			return []float64{}, nil // 返回空数组
+		}
+		returns = backtestReturns
 	}
 
 	return returns, nil
 }
 
-// generateMockReturns 生成模拟收益数据
-func (ss *StrategyScheduler) generateMockReturns(strategyID string) []float64 {
-	// 生成30天的模拟收益数据
-	returns := make([]float64, 30)
+// calculateReturnsFromBacktest 从回测结果计算收益数据
+func (ss *StrategyScheduler) calculateReturnsFromBacktest(ctx context.Context, strategyID string) ([]float64, error) {
+	// 从回测结果表获取策略的历史交易数据
+	query := `
+		SELECT
+			entry_price, exit_price, quantity, side, exit_time
+		FROM backtest_trades
+		WHERE strategy_id = $1
+		AND exit_time IS NOT NULL
+		ORDER BY exit_time ASC
+		LIMIT 100
+	`
 
-	// 使用策略ID作为种子，确保一致性
-	seed := int64(0)
-	for _, char := range strategyID {
-		seed += int64(char)
+	rows, err := ss.db.QueryContext(ctx, query, strategyID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query backtest trades: %w", err)
 	}
+	defer rows.Close()
 
-	rng := rand.New(rand.NewSource(seed))
+	var returns []float64
+	for rows.Next() {
+		var entryPrice, exitPrice, quantity float64
+		var side string
+		var exitTime time.Time
 
-	// 生成具有不同特征的收益序列
-	baseReturn := (rng.Float64() - 0.5) * 0.02 // -1% 到 1%
-	volatility := 0.01 + rng.Float64()*0.03    // 1% 到 4%
-
-	for i := range returns {
-		// 添加随机波动
-		noise := (rng.Float64() - 0.5) * volatility * 2
-		returns[i] = baseReturn + noise
-
-		// 添加一些趋势
-		if i > 0 {
-			momentum := returns[i-1] * 0.1 // 10%的动量效应
-			returns[i] += momentum
+		err := rows.Scan(&entryPrice, &exitPrice, &quantity, &side, &exitTime)
+		if err != nil {
+			continue
 		}
+
+		// 计算单笔交易收益率
+		var returnRate float64
+		if side == "long" {
+			returnRate = (exitPrice - entryPrice) / entryPrice
+		} else { // short
+			returnRate = (entryPrice - exitPrice) / entryPrice
+		}
+
+		returns = append(returns, returnRate)
 	}
 
-	return returns
+	// 如果没有回测数据，从策略配置获取预期收益
+	if len(returns) == 0 {
+		configReturns, err := ss.getExpectedReturnsFromConfig(ctx, strategyID)
+		if err != nil {
+			return []float64{0.0}, nil // 返回保守的默认值
+		}
+		return configReturns, nil
+	}
+
+	return returns, nil
+}
+
+// getExpectedReturnsFromConfig 从策略配置获取预期收益
+func (ss *StrategyScheduler) getExpectedReturnsFromConfig(ctx context.Context, strategyID string) ([]float64, error) {
+	// 从策略配置表获取预期收益参数
+	var expectedReturn, volatility float64
+	query := `
+		SELECT
+			COALESCE(expected_return, 0.0) as expected_return,
+			COALESCE(volatility, 0.02) as volatility
+		FROM strategy_configs
+		WHERE strategy_id = $1
+	`
+
+	err := ss.db.QueryRowContext(ctx, query, strategyID).Scan(&expectedReturn, &volatility)
+	if err != nil {
+		// 如果没有配置，返回保守的默认值
+		log.Printf("No strategy config found for %s, using conservative defaults", strategyID)
+		return []float64{0.0}, nil
+	}
+
+	// 生成基于配置的合理收益序列
+	returns := make([]float64, 30)
+	for i := range returns {
+		// 基于预期收益和波动率生成日收益
+		dailyReturn := expectedReturn/365 + (float64(i%7)-3.0)*volatility/100
+		returns[i] = dailyReturn
+	}
+
+	return returns, nil
 }
 
 // getActiveRunnableStrategies 获取所有可运行的活跃策略（排除被禁用和淘汰的）
@@ -1973,8 +2202,98 @@ func (ss *StrategyScheduler) analyzeStrategyCoverage(ctx context.Context, symbol
 
 // getSymbolStrategyCoverage 获取交易对的策略覆盖情况
 func (ss *StrategyScheduler) getSymbolStrategyCoverage(ctx context.Context, symbol string) (map[string]int, error) {
-	// 由于strategies表没有symbol字段，我们从strategy_params或其他相关表获取信息
-	// 或者基于策略类型返回模拟数据
+	// 首先尝试从strategy_positions表获取特定交易对的策略覆盖
+	query := `
+		SELECT
+			s.type as strategy_type,
+			COUNT(DISTINCT s.id) as count
+		FROM strategies s
+		INNER JOIN strategy_positions sp ON s.id = sp.strategy_id
+		WHERE s.status = 'active'
+		AND sp.symbol = $1
+		AND sp.status = 'ACTIVE'
+		AND sp.position_size != 0
+		GROUP BY s.type
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query, symbol)
+	if err != nil {
+		log.Printf("Failed to query strategy coverage for symbol %s: %v", symbol, err)
+		// 尝试备用查询方法
+		return ss.getSymbolStrategyCoverageFromParams(ctx, symbol)
+	}
+	defer rows.Close()
+
+	coverage := make(map[string]int)
+	for rows.Next() {
+		var strategyType string
+		var count int
+		if err := rows.Scan(&strategyType, &count); err != nil {
+			log.Printf("Warning: failed to scan strategy coverage row: %v", err)
+			continue
+		}
+		coverage[strategyType] = count
+	}
+
+	// 如果没有找到特定交易对的数据，尝试从策略参数中推断
+	if len(coverage) == 0 {
+		log.Printf("No direct position data found for %s, trying parameter-based lookup", symbol)
+		return ss.getSymbolStrategyCoverageFromParams(ctx, symbol)
+	}
+
+	log.Printf("Found strategy coverage for %s: %v", symbol, coverage)
+	return coverage, nil
+}
+
+// getSymbolStrategyCoverageFromParams 从策略参数中获取交易对覆盖情况
+func (ss *StrategyScheduler) getSymbolStrategyCoverageFromParams(ctx context.Context, symbol string) (map[string]int, error) {
+	// 从策略参数表中查找包含该交易对的策略
+	query := `
+		SELECT
+			s.type as strategy_type,
+			COUNT(DISTINCT s.id) as count
+		FROM strategies s
+		LEFT JOIN strategy_params sp ON s.id = sp.strategy_id
+		WHERE s.status = 'active'
+		AND (
+			sp.param_value LIKE '%' || $1 || '%'
+			OR sp.param_name = 'symbol' AND sp.param_value = $1
+			OR sp.param_name = 'symbols' AND sp.param_value LIKE '%' || $1 || '%'
+		)
+		GROUP BY s.type
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query, symbol)
+	if err != nil {
+		log.Printf("Failed to query strategy coverage from params for %s: %v", symbol, err)
+		// 最后的备用方案：返回全局策略类型分布
+		return ss.getGlobalStrategyCoverage(ctx)
+	}
+	defer rows.Close()
+
+	coverage := make(map[string]int)
+	for rows.Next() {
+		var strategyType string
+		var count int
+		if err := rows.Scan(&strategyType, &count); err != nil {
+			log.Printf("Warning: failed to scan strategy coverage from params: %v", err)
+			continue
+		}
+		coverage[strategyType] = count
+	}
+
+	// 如果仍然没有数据，返回空覆盖
+	if len(coverage) == 0 {
+		log.Printf("No parameter-based data found for %s, returning empty coverage", symbol)
+		return make(map[string]int), nil
+	}
+
+	log.Printf("Found parameter-based strategy coverage for %s: %v", symbol, coverage)
+	return coverage, nil
+}
+
+// getGlobalStrategyCoverage 获取全局策略类型分布
+func (ss *StrategyScheduler) getGlobalStrategyCoverage(ctx context.Context) (map[string]int, error) {
 	query := `
 		SELECT type as strategy_type, COUNT(*) as count
 		FROM strategies
@@ -1984,7 +2303,8 @@ func (ss *StrategyScheduler) getSymbolStrategyCoverage(ctx context.Context, symb
 
 	rows, err := ss.db.QueryContext(ctx, query)
 	if err != nil {
-		// 如果查询失败，返回空覆盖
+		log.Printf("Failed to query global strategy coverage: %v", err)
+		// 返回空覆盖
 		return make(map[string]int), nil
 	}
 	defer rows.Close()
@@ -1994,20 +2314,19 @@ func (ss *StrategyScheduler) getSymbolStrategyCoverage(ctx context.Context, symb
 		var strategyType string
 		var count int
 		if err := rows.Scan(&strategyType, &count); err != nil {
+			log.Printf("Warning: failed to scan global strategy coverage: %v", err)
 			continue
 		}
 		coverage[strategyType] = count
 	}
 
-	// 如果没有数据，返回默认覆盖
+	// 如果数据库中没有任何策略，返回空覆盖
 	if len(coverage) == 0 {
-		coverage = map[string]int{
-			"momentum":       1,
-			"mean_reversion": 1,
-			"arbitrage":      1,
-		}
+		log.Printf("No strategies found in database, returning empty coverage")
+		return make(map[string]int), nil
 	}
 
+	log.Printf("Global strategy coverage: %v", coverage)
 	return coverage, nil
 }
 
@@ -2583,35 +2902,69 @@ func (rdsl *RealDynamicStopLossService) GetServiceStatus() map[string]interface{
 
 // getActivePositions 获取活跃持仓
 func (ss *StrategyScheduler) getActivePositions(ctx context.Context) ([]*PositionState, error) {
-	// 从数据库获取活跃持仓，使用positions表
+	// 首先尝试从strategy_positions表获取持仓数据
+	positions, err := ss.getPositionsFromStrategyTable(ctx)
+	if err != nil {
+		log.Printf("Failed to get positions from strategy_positions table: %v", err)
+		// 尝试从positions表获取
+		positions, err = ss.getPositionsFromMainTable(ctx)
+		if err != nil {
+			log.Printf("Failed to get positions from positions table: %v", err)
+			// 返回空数据
+			log.Printf("No position data available, returning empty result")
+			return []*PositionState{}, nil
+		}
+	}
+
+	// 获取实时价格并更新持仓信息
+	if err := ss.updatePositionsWithMarketData(ctx, positions); err != nil {
+		log.Printf("Warning: failed to update positions with market data: %v", err)
+	}
+
+	// 计算技术指标
+	if err := ss.calculatePositionIndicators(ctx, positions); err != nil {
+		log.Printf("Warning: failed to calculate position indicators: %v", err)
+	}
+
+	log.Printf("Found %d active positions", len(positions))
+	return positions, nil
+}
+
+// getPositionsFromStrategyTable 从strategy_positions表获取持仓
+func (ss *StrategyScheduler) getPositionsFromStrategyTable(ctx context.Context) ([]*PositionState, error) {
 	query := `
 		SELECT
-			p.strategy_id,
-			p.symbol,
-			p.side,
-			p.entry_price,
-			p.entry_price as current_price,  -- Use entry_price as current_price approximation
-			p.size as quantity,
-			0 as stop_loss,  -- Default value
-			0 as take_profit,  -- Default value
-			p.created_at
-		FROM positions p
-		WHERE p.status IN ('open', 'active') AND p.size != 0
-		ORDER BY p.created_at DESC
+			sp.strategy_id,
+			sp.symbol,
+			sp.side,
+			sp.entry_price,
+			sp.current_price,
+			sp.position_size as quantity,
+			COALESCE(sp.margin_used, 0) as stop_loss,  -- 临时使用margin_used作为止损
+			0 as take_profit,  -- 默认值，后续可以从策略参数获取
+			sp.created_at,
+			sp.updated_at,
+			sp.unrealized_pnl,
+			sp.realized_pnl,
+			sp.leverage
+		FROM strategy_positions sp
+		WHERE sp.status = 'ACTIVE'
+		AND sp.position_size != 0
+		ORDER BY sp.updated_at DESC
 	`
 
 	rows, err := ss.db.QueryContext(ctx, query)
 	if err != nil {
-		// 如果数据库查询失败，返回模拟数据
-		log.Printf("Database query failed, using mock positions: %v", err)
-		return ss.generateMockPositions(), nil
+		return nil, fmt.Errorf("failed to query strategy positions: %w", err)
 	}
 	defer rows.Close()
 
 	var positions []*PositionState
 	for rows.Next() {
 		position := &PositionState{}
-		var createdAt time.Time
+		var createdAt, updatedAt time.Time
+		var unrealizedPnL, realizedPnL sql.NullFloat64
+		var leverage sql.NullInt64
 
 		err := rows.Scan(
 			&position.StrategyID,
@@ -2623,6 +2976,82 @@ func (ss *StrategyScheduler) getActivePositions(ctx context.Context) ([]*Positio
 			&position.StopLoss,
 			&position.TakeProfit,
 			&createdAt,
+			&updatedAt,
+			&unrealizedPnL,
+			&realizedPnL,
+			&leverage,
+		)
+		if err != nil {
+			log.Printf("Warning: failed to scan strategy position data: %v", err)
+			continue
+		}
+
+		position.CreatedAt = createdAt
+		position.LastUpdate = updatedAt
+
+		// 设置默认值
+		position.ATR = 0.02
+		position.RealizedVol = 0.15
+		position.MarketRegime = "ranging_stable"
+		position.TrendStrength = 0.2
+		position.AdjustmentCount = 0
+
+		positions = append(positions, position)
+	}
+
+	return positions, nil
+}
+
+// getPositionsFromMainTable 从positions表获取持仓
+func (ss *StrategyScheduler) getPositionsFromMainTable(ctx context.Context) ([]*PositionState, error) {
+	query := `
+		SELECT
+			COALESCE(p.strategy_id::text, 'unknown') as strategy_id,
+			p.symbol,
+			p.side,
+			p.entry_price,
+			p.entry_price as current_price,  -- 使用entry_price作为当前价格的近似值
+			p.size as quantity,
+			0 as stop_loss,  -- 默认值
+			0 as take_profit,  -- 默认值
+			p.created_at,
+			p.updated_at,
+			COALESCE(p.unrealized_pnl, 0) as unrealized_pnl,
+			COALESCE(p.realized_pnl, 0) as realized_pnl,
+			p.leverage
+		FROM positions p
+		WHERE p.status IN ('open', 'active')
+		AND p.size != 0
+		ORDER BY p.updated_at DESC
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query positions: %w", err)
+	}
+	defer rows.Close()
+
+	var positions []*PositionState
+	for rows.Next() {
+		position := &PositionState{}
+		var createdAt, updatedAt time.Time
+		var unrealizedPnL, realizedPnL float64
+		var leverage int
+
+		err := rows.Scan(
+			&position.StrategyID,
+			&position.Symbol,
+			&position.Side,
+			&position.EntryPrice,
+			&position.CurrentPrice,
+			&position.Quantity,
+			&position.StopLoss,
+			&position.TakeProfit,
+			&createdAt,
+			&updatedAt,
+			&unrealizedPnL,
+			&realizedPnL,
+			&leverage,
 		)
 		if err != nil {
 			log.Printf("Warning: failed to scan position data: %v", err)
@@ -2630,59 +3059,376 @@ func (ss *StrategyScheduler) getActivePositions(ctx context.Context) ([]*Positio
 		}
 
 		position.CreatedAt = createdAt
-		position.LastUpdate = time.Now()
-		position.ATR = 0.02         // 默认值
-		position.RealizedVol = 0.15 // 默认值
+		position.LastUpdate = updatedAt
+
+		// 设置默认值
+		position.ATR = 0.02
+		position.RealizedVol = 0.15
 		position.MarketRegime = "ranging_stable"
 		position.TrendStrength = 0.2
+		position.AdjustmentCount = 0
 
 		positions = append(positions, position)
 	}
 
-	// 如果没有数据，生成模拟数据
-	if len(positions) == 0 {
-		log.Printf("No active positions found, generating mock data")
-		positions = ss.generateMockPositions()
-	}
-
-	log.Printf("Found %d active positions", len(positions))
 	return positions, nil
 }
 
-// generateMockPositions 生成模拟持仓数据
-func (ss *StrategyScheduler) generateMockPositions() []*PositionState {
-	symbols := []string{"BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT"}
-	strategies := []string{"momentum_1", "mean_reversion_1", "grid_1", "trend_1"}
-
-	var positions []*PositionState
-
-	for i, symbol := range symbols {
-		if i >= len(strategies) {
-			break
-		}
-
-		position := &PositionState{
-			StrategyID:      strategies[i],
-			Symbol:          symbol,
-			Side:            "long",
-			EntryPrice:      50000.0 + float64(i)*1000, // 模拟价格
-			CurrentPrice:    51000.0 + float64(i)*1000, // 模拟当前价格
-			Quantity:        0.1 + float64(i)*0.05,
-			StopLoss:        0.02 + float64(i)*0.005,
-			TakeProfit:      0.04 + float64(i)*0.01,
-			ATR:             0.015 + float64(i)*0.005,
-			RealizedVol:     0.12 + float64(i)*0.02,
-			MarketRegime:    "ranging_stable",
-			TrendStrength:   0.2 + float64(i)*0.1,
-			LastUpdate:      time.Now().Add(-time.Hour * time.Duration(i)),
-			AdjustmentCount: i,
-			CreatedAt:       time.Now().Add(-time.Hour * 24 * time.Duration(i+1)),
-		}
-
-		positions = append(positions, position)
+// updatePositionsWithMarketData 使用市场数据更新持仓信息
+func (ss *StrategyScheduler) updatePositionsWithMarketData(ctx context.Context, positions []*PositionState) error {
+	// 收集所有需要更新价格的交易对
+	symbols := make(map[string]bool)
+	for _, pos := range positions {
+		symbols[pos.Symbol] = true
 	}
 
-	return positions
+	// 获取市场数据
+	marketData, err := ss.getMarketData(ctx)
+	if err != nil {
+		log.Printf("Failed to get market data: %v", err)
+		// 尝试从数据库获取最新价格
+		return ss.updatePositionsFromDatabase(ctx, positions)
+	}
+
+	// 更新每个持仓的当前价格
+	for _, position := range positions {
+		if data, exists := marketData[position.Symbol]; exists {
+			position.CurrentPrice = data.Price
+			position.LastUpdate = time.Now()
+
+			// 计算未实现盈亏
+			if position.Side == "long" || position.Side == "LONG" {
+				position.RealizedVol = (position.CurrentPrice - position.EntryPrice) / position.EntryPrice
+			} else {
+				position.RealizedVol = (position.EntryPrice - position.CurrentPrice) / position.EntryPrice
+			}
+		} else {
+			log.Printf("Warning: no market data found for symbol %s", position.Symbol)
+		}
+	}
+
+	return nil
+}
+
+// updatePositionsFromDatabase 从数据库更新持仓价格信息
+func (ss *StrategyScheduler) updatePositionsFromDatabase(ctx context.Context, positions []*PositionState) error {
+	for _, position := range positions {
+		// 从market_data表获取最新价格
+		query := `
+			SELECT close, updated_at
+			FROM market_data
+			WHERE symbol = $1
+			ORDER BY timestamp DESC
+			LIMIT 1
+		`
+
+		var price float64
+		var updatedAt time.Time
+		err := ss.db.QueryRowContext(ctx, query, position.Symbol).Scan(&price, &updatedAt)
+		if err != nil {
+			if err != sql.ErrNoRows {
+				log.Printf("Warning: failed to get price for %s: %v", position.Symbol, err)
+			}
+			continue
+		}
+
+		// 检查数据是否过期（超过1小时）
+		if time.Since(updatedAt) > time.Hour {
+			log.Printf("Warning: price data for %s is stale (updated %v ago)", position.Symbol, time.Since(updatedAt))
+			continue
+		}
+
+		position.CurrentPrice = price
+		position.LastUpdate = time.Now()
+
+		// 计算未实现盈亏
+		if position.Side == "long" || position.Side == "LONG" {
+			position.RealizedVol = (position.CurrentPrice - position.EntryPrice) / position.EntryPrice
+		} else {
+			position.RealizedVol = (position.EntryPrice - position.CurrentPrice) / position.EntryPrice
+		}
+	}
+
+	return nil
+}
+
+// calculatePositionIndicators 计算持仓技术指标
+func (ss *StrategyScheduler) calculatePositionIndicators(ctx context.Context, positions []*PositionState) error {
+	for _, position := range positions {
+		// 获取历史价格数据计算ATR
+		atr, err := ss.calculateATR(ctx, position.Symbol, 14)
+		if err != nil {
+			log.Printf("Warning: failed to calculate ATR for %s: %v", position.Symbol, err)
+			position.ATR = 0.02 // 默认值
+		} else {
+			position.ATR = atr
+		}
+
+		// 计算已实现波动率
+		volatility, err := ss.calculateRealizedVolatility(ctx, position.Symbol, 30)
+		if err != nil {
+			log.Printf("Warning: failed to calculate volatility for %s: %v", position.Symbol, err)
+			position.RealizedVol = 0.15 // 默认值
+		} else {
+			position.RealizedVol = volatility
+		}
+
+		// 判断市场状态
+		regime, strength := ss.determineMarketRegime(ctx, position.Symbol)
+		position.MarketRegime = regime
+		position.TrendStrength = strength
+
+		// 获取止损止盈设置
+		stopLoss, takeProfit := ss.getPositionRiskSettings(ctx, position.StrategyID, position.Symbol)
+		if stopLoss > 0 {
+			position.StopLoss = stopLoss
+		}
+		if takeProfit > 0 {
+			position.TakeProfit = takeProfit
+		}
+	}
+
+	return nil
+}
+
+// calculateATR 计算平均真实波幅
+func (ss *StrategyScheduler) calculateATR(ctx context.Context, symbol string, period int) (float64, error) {
+	// 从market_data表获取历史数据
+	query := `
+		SELECT high, low, close, timestamp
+		FROM market_data
+		WHERE symbol = $1
+		AND timestamp >= NOW() - INTERVAL '%d days'
+		ORDER BY timestamp DESC
+		LIMIT $2
+	`
+
+	rows, err := ss.db.QueryContext(ctx, fmt.Sprintf(query, period*2), symbol, period+1)
+	if err != nil {
+		return 0, fmt.Errorf("failed to query price data: %w", err)
+	}
+	defer rows.Close()
+
+	var prices []struct {
+		High, Low, Close float64
+		Timestamp        time.Time
+	}
+
+	for rows.Next() {
+		var p struct {
+			High, Low, Close float64
+			Timestamp        time.Time
+		}
+		if err := rows.Scan(&p.High, &p.Low, &p.Close, &p.Timestamp); err != nil {
+			continue
+		}
+		prices = append(prices, p)
+	}
+
+	if len(prices) < period {
+		return 0, fmt.Errorf("insufficient data points: got %d, need %d", len(prices), period)
+	}
+
+	// 计算真实波幅
+	var trueRanges []float64
+	for i := 1; i < len(prices); i++ {
+		current := prices[i]
+		previous := prices[i-1]
+
+		tr1 := current.High - current.Low
+		tr2 := math.Abs(current.High - previous.Close)
+		tr3 := math.Abs(current.Low - previous.Close)
+
+		trueRange := math.Max(tr1, math.Max(tr2, tr3))
+		trueRanges = append(trueRanges, trueRange)
+	}
+
+	// 计算ATR（简单移动平均）
+	if len(trueRanges) < period {
+		return 0, fmt.Errorf("insufficient true range data")
+	}
+
+	sum := 0.0
+	for i := 0; i < period && i < len(trueRanges); i++ {
+		sum += trueRanges[i]
+	}
+
+	return sum / float64(period), nil
+}
+
+// calculateRealizedVolatility 计算已实现波动率
+func (ss *StrategyScheduler) calculateRealizedVolatility(ctx context.Context, symbol string, days int) (float64, error) {
+	query := `
+		SELECT close, timestamp
+		FROM market_data
+		WHERE symbol = $1
+		AND timestamp >= NOW() - INTERVAL '%d days'
+		ORDER BY timestamp ASC
+	`
+
+	rows, err := ss.db.QueryContext(ctx, fmt.Sprintf(query, days), symbol)
+	if err != nil {
+		return 0, fmt.Errorf("failed to query price data: %w", err)
+	}
+	defer rows.Close()
+
+	var prices []float64
+	for rows.Next() {
+		var price float64
+		var timestamp time.Time
+		if err := rows.Scan(&price, &timestamp); err != nil {
+			continue
+		}
+		prices = append(prices, price)
+	}
+
+	if len(prices) < 2 {
+		return 0, fmt.Errorf("insufficient price data")
+	}
+
+	// 计算日收益率
+	var returns []float64
+	for i := 1; i < len(prices); i++ {
+		ret := math.Log(prices[i] / prices[i-1])
+		returns = append(returns, ret)
+	}
+
+	// 计算标准差
+	if len(returns) == 0 {
+		return 0, fmt.Errorf("no returns calculated")
+	}
+
+	mean := 0.0
+	for _, ret := range returns {
+		mean += ret
+	}
+	mean /= float64(len(returns))
+
+	variance := 0.0
+	for _, ret := range returns {
+		variance += math.Pow(ret-mean, 2)
+	}
+	variance /= float64(len(returns) - 1)
+
+	// 年化波动率
+	volatility := math.Sqrt(variance) * math.Sqrt(365)
+	return volatility, nil
+}
+
+// determineMarketRegime 判断市场状态
+func (ss *StrategyScheduler) determineMarketRegime(ctx context.Context, symbol string) (string, float64) {
+	// 获取最近的价格数据来判断趋势
+	query := `
+		SELECT close, timestamp
+		FROM market_data
+		WHERE symbol = $1
+		AND timestamp >= NOW() - INTERVAL '7 days'
+		ORDER BY timestamp ASC
+		LIMIT 50
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query, symbol)
+	if err != nil {
+		log.Printf("Failed to query price data for regime analysis: %v", err)
+		return "ranging_stable", 0.2
+	}
+	defer rows.Close()
+
+	var prices []float64
+	for rows.Next() {
+		var price float64
+		var timestamp time.Time
+		if err := rows.Scan(&price, &timestamp); err != nil {
+			continue
+		}
+		prices = append(prices, price)
+	}
+
+	if len(prices) < 10 {
+		return "ranging_stable", 0.2
+	}
+
+	// 简单的趋势强度计算
+	firstPrice := prices[0]
+	lastPrice := prices[len(prices)-1]
+	totalChange := (lastPrice - firstPrice) / firstPrice
+
+	// 计算价格变化的一致性
+	upMoves := 0
+	downMoves := 0
+	for i := 1; i < len(prices); i++ {
+		if prices[i] > prices[i-1] {
+			upMoves++
+		} else if prices[i] < prices[i-1] {
+			downMoves++
+		}
+	}
+
+	trendStrength := math.Abs(totalChange)
+	consistency := math.Abs(float64(upMoves-downMoves)) / float64(len(prices)-1)
+
+	// 判断市场状态
+	if trendStrength > 0.05 && consistency > 0.6 {
+		if totalChange > 0 {
+			return "trending_up", trendStrength
+		} else {
+			return "trending_down", trendStrength
+		}
+	} else if trendStrength < 0.02 {
+		return "ranging_stable", trendStrength
+	} else {
+		return "ranging_volatile", trendStrength
+	}
+}
+
+// getPositionRiskSettings 获取持仓风险设置
+func (ss *StrategyScheduler) getPositionRiskSettings(ctx context.Context, strategyID, symbol string) (float64, float64) {
+	// 从策略参数表获取止损止盈设置
+	query := `
+		SELECT param_name, param_value
+		FROM strategy_params
+		WHERE strategy_id = $1
+		AND param_name IN ('stop_loss', 'take_profit', 'stop_loss_pct', 'take_profit_pct')
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query, strategyID)
+	if err != nil {
+		log.Printf("Failed to query risk settings for strategy %s: %v", strategyID, err)
+		return 0.02, 0.04 // 默认值：2%止损，4%止盈
+	}
+	defer rows.Close()
+
+	stopLoss := 0.0
+	takeProfit := 0.0
+
+	for rows.Next() {
+		var paramName, paramValue string
+		if err := rows.Scan(&paramName, &paramValue); err != nil {
+			continue
+		}
+
+		value, err := strconv.ParseFloat(paramValue, 64)
+		if err != nil {
+			continue
+		}
+
+		switch paramName {
+		case "stop_loss", "stop_loss_pct":
+			stopLoss = value
+		case "take_profit", "take_profit_pct":
+			takeProfit = value
+		}
+	}
+
+	// 如果没有找到设置，使用默认值
+	if stopLoss == 0 {
+		stopLoss = 0.02
+	}
+	if takeProfit == 0 {
+		takeProfit = 0.04
+	}
+
+	return stopLoss, takeProfit
 }
 
 // addPositionToStopLossService 添加持仓到止损服务
@@ -2915,9 +3661,112 @@ func (ss *StrategyScheduler) getPortfolioAllocations(ctx context.Context) ([]*Al
 
 // getMarketData 获取市场数据
 func (ss *StrategyScheduler) getMarketData(ctx context.Context) (map[string]*MarketData, error) {
+	// 首先尝试从数据库获取最新的市场数据
+	marketData, err := ss.getMarketDataFromDatabase(ctx)
+	if err != nil {
+		log.Printf("Failed to get market data from database: %v", err)
+		// 尝试从tickers表获取数据
+		marketData, err = ss.getMarketDataFromTickers(ctx)
+		if err != nil {
+			log.Printf("Failed to get market data from tickers: %v", err)
+			// 最后的备用方案：从Binance API获取实时数据
+			return ss.getMarketDataFromAPI(ctx)
+		}
+	}
+
+	// 检查数据时效性，如果数据过期则尝试更新
+	if err := ss.validateMarketDataFreshness(marketData); err != nil {
+		log.Printf("Market data is stale: %v", err)
+		// 尝试从API获取最新数据
+		apiData, apiErr := ss.getMarketDataFromAPI(ctx)
+		if apiErr != nil {
+			log.Printf("Failed to get fresh data from API: %v", apiErr)
+			// 返回数据库中的数据，即使可能有些过期
+			return marketData, nil
+		}
+		return apiData, nil
+	}
+
+	return marketData, nil
+}
+
+// getMarketDataFromDatabase 从market_data表获取市场数据
+func (ss *StrategyScheduler) getMarketDataFromDatabase(ctx context.Context) (map[string]*MarketData, error) {
+	// 使用更精确的查询，从OHLCV数据计算市场指标
 	query := `
-		SELECT symbol, price, volume_24h, price_change_24h, volatility, updated_at
-		FROM market_data
+		SELECT
+			symbol,
+			close as price,
+			volume,
+			((close - LAG(close, 24) OVER (PARTITION BY symbol ORDER BY timestamp)) / LAG(close, 24) OVER (PARTITION BY symbol ORDER BY timestamp)) * 100 as price_change_24h,
+			timestamp as updated_at
+		FROM (
+			SELECT
+				symbol,
+				close,
+				volume,
+				timestamp,
+				ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY timestamp DESC) as rn
+			FROM market_data
+			WHERE timestamp > NOW() - INTERVAL '2 hours'
+			AND complete = true
+		) latest
+		WHERE rn = 1
+		ORDER BY volume DESC
+		LIMIT 50
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query market data from database: %w", err)
+	}
+	defer rows.Close()
+
+	marketData := make(map[string]*MarketData)
+	for rows.Next() {
+		data := &MarketData{}
+		var priceChange24h sql.NullFloat64
+
+		err := rows.Scan(
+			&data.Symbol,
+			&data.Price,
+			&data.Volume24h,
+			&priceChange24h,
+			&data.Timestamp,
+		)
+		if err != nil {
+			log.Printf("Failed to scan market data from database: %v", err)
+			continue
+		}
+
+		if priceChange24h.Valid {
+			data.PriceChange24h = priceChange24h.Float64
+		}
+
+		// 计算波动率（简化版本）
+		data.Volatility = ss.calculateSimpleVolatility(ctx, data.Symbol)
+
+		marketData[data.Symbol] = data
+	}
+
+	if len(marketData) == 0 {
+		return nil, fmt.Errorf("no market data found in database")
+	}
+
+	log.Printf("Retrieved %d symbols from market_data table", len(marketData))
+	return marketData, nil
+}
+
+// getMarketDataFromTickers 从tickers表获取市场数据
+func (ss *StrategyScheduler) getMarketDataFromTickers(ctx context.Context) (map[string]*MarketData, error) {
+	query := `
+		SELECT
+			symbol,
+			price,
+			volume_24h,
+			price_change_24h,
+			updated_at
+		FROM tickers
 		WHERE updated_at > NOW() - INTERVAL '1 hour'
 		ORDER BY volume_24h DESC
 		LIMIT 50
@@ -2925,7 +3774,7 @@ func (ss *StrategyScheduler) getMarketData(ctx context.Context) (map[string]*Mar
 
 	rows, err := ss.db.QueryContext(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query market data: %w", err)
+		return nil, fmt.Errorf("failed to query tickers: %w", err)
 	}
 	defer rows.Close()
 
@@ -2937,32 +3786,165 @@ func (ss *StrategyScheduler) getMarketData(ctx context.Context) (map[string]*Mar
 			&data.Price,
 			&data.Volume24h,
 			&data.PriceChange24h,
-			&data.Volatility,
 			&data.Timestamp,
 		)
 		if err != nil {
-			log.Printf("Failed to scan market data: %v", err)
+			log.Printf("Failed to scan ticker data: %v", err)
 			continue
 		}
+
+		// 从历史数据计算波动率
+		data.Volatility = ss.calculateSimpleVolatility(ctx, data.Symbol)
+
 		marketData[data.Symbol] = data
 	}
 
-	// 如果没有数据，生成模拟数据
 	if len(marketData) == 0 {
-		symbols := []string{"BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "SOLUSDT"}
-		for i, symbol := range symbols {
-			marketData[symbol] = &MarketData{
-				Symbol:         symbol,
-				Price:          50000.0 + float64(i*1000),
-				Volume24h:      1000000.0 + float64(i*100000),
-				PriceChange24h: -5.0 + float64(i*2),
-				Volatility:     0.02 + float64(i)*0.01,
-				Timestamp:      time.Now(),
-			}
+		return nil, fmt.Errorf("no ticker data found")
+	}
+
+	log.Printf("Retrieved %d symbols from tickers table", len(marketData))
+	return marketData, nil
+}
+
+// getMarketDataFromAPI 从Binance API获取实时市场数据
+func (ss *StrategyScheduler) getMarketDataFromAPI(ctx context.Context) (map[string]*MarketData, error) {
+	// TODO: 这里应该集成真实的Binance API客户端
+	// 当前没有可用的API客户端实例，返回空数据
+	log.Printf("API client not available, returning empty market data")
+
+	// 返回空的市场数据映射
+	return make(map[string]*MarketData), fmt.Errorf("API client not implemented")
+}
+
+// validateMarketDataFreshness 验证市场数据的时效性
+func (ss *StrategyScheduler) validateMarketDataFreshness(marketData map[string]*MarketData) error {
+	if len(marketData) == 0 {
+		return fmt.Errorf("no market data to validate")
+	}
+
+	staleThreshold := time.Minute * 30 // 30分钟阈值
+	staleCount := 0
+
+	for symbol, data := range marketData {
+		if time.Since(data.Timestamp) > staleThreshold {
+			staleCount++
+			log.Printf("Stale data detected for %s: %v old", symbol, time.Since(data.Timestamp))
 		}
 	}
 
-	return marketData, nil
+	// 如果超过50%的数据过期，认为需要刷新
+	if float64(staleCount)/float64(len(marketData)) > 0.5 {
+		return fmt.Errorf("too many stale data points: %d/%d", staleCount, len(marketData))
+	}
+
+	return nil
+}
+
+// calculateSimpleVolatility 计算简化的波动率
+func (ss *StrategyScheduler) calculateSimpleVolatility(ctx context.Context, symbol string) float64 {
+	// 从最近的价格数据计算波动率
+	query := `
+		SELECT close
+		FROM market_data
+		WHERE symbol = $1
+		AND timestamp >= NOW() - INTERVAL '7 days'
+		ORDER BY timestamp DESC
+		LIMIT 168  -- 7天的小时数据
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query, symbol)
+	if err != nil {
+		log.Printf("Failed to query price data for volatility calculation: %v", err)
+		return 0.15 // 默认波动率
+	}
+	defer rows.Close()
+
+	var prices []float64
+	for rows.Next() {
+		var price float64
+		if err := rows.Scan(&price); err != nil {
+			continue
+		}
+		prices = append(prices, price)
+	}
+
+	if len(prices) < 24 {
+		return 0.15 // 数据不足，返回默认值
+	}
+
+	// 计算收益率
+	var returns []float64
+	for i := 1; i < len(prices); i++ {
+		ret := math.Log(prices[i-1] / prices[i]) // 注意顺序，因为是DESC排序
+		returns = append(returns, ret)
+	}
+
+	if len(returns) == 0 {
+		return 0.15
+	}
+
+	// 计算标准差
+	mean := 0.0
+	for _, ret := range returns {
+		mean += ret
+	}
+	mean /= float64(len(returns))
+
+	variance := 0.0
+	for _, ret := range returns {
+		variance += math.Pow(ret-mean, 2)
+	}
+	variance /= float64(len(returns) - 1)
+
+	// 年化波动率
+	volatility := math.Sqrt(variance) * math.Sqrt(365*24) // 小时数据年化
+
+	// 限制在合理范围内
+	if volatility < 0.05 {
+		volatility = 0.05
+	} else if volatility > 2.0 {
+		volatility = 2.0
+	}
+
+	return volatility
+}
+
+// saveMarketDataToDatabase 将市场数据保存到数据库
+func (ss *StrategyScheduler) saveMarketDataToDatabase(ctx context.Context, marketData map[string]*MarketData) error {
+	if len(marketData) == 0 {
+		return nil
+	}
+
+	// 批量插入到tickers表
+	query := `
+		INSERT INTO tickers (symbol, price, volume_24h, price_change_24h, updated_at)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (symbol) DO UPDATE SET
+			price = EXCLUDED.price,
+			volume_24h = EXCLUDED.volume_24h,
+			price_change_24h = EXCLUDED.price_change_24h,
+			updated_at = EXCLUDED.updated_at
+	`
+
+	successCount := 0
+	for _, data := range marketData {
+		_, err := ss.db.ExecContext(ctx, query,
+			data.Symbol,
+			data.Price,
+			data.Volume24h,
+			data.PriceChange24h,
+			data.Timestamp,
+		)
+		if err != nil {
+			log.Printf("Failed to save market data for %s: %v", data.Symbol, err)
+			continue
+		}
+		successCount++
+	}
+
+	log.Printf("Successfully saved %d/%d market data records to database", successCount, len(marketData))
+	return nil
 }
 
 // getActiveStrategiesForOptimization 获取用于优化的活跃策略
@@ -3395,17 +4377,28 @@ func (ss *StrategyScheduler) recordOptimizationHistory(ctx context.Context, resu
 		"allocation":      make(map[string]interface{}),
 	}
 
-	if result.ExpectedReturn != 0 {
+	// 检查并设置有效的数值，过滤NaN和Inf
+	if result.ExpectedReturn != 0 && !math.IsNaN(result.ExpectedReturn) && !math.IsInf(result.ExpectedReturn, 0) {
 		performanceData["expected_return"] = result.ExpectedReturn
 	}
-	if result.ExpectedRisk != 0 {
+	if result.ExpectedRisk != 0 && !math.IsNaN(result.ExpectedRisk) && !math.IsInf(result.ExpectedRisk, 0) {
 		performanceData["expected_risk"] = result.ExpectedRisk
 	}
-	if result.SharpeRatio != 0 {
+	if result.SharpeRatio != 0 && !math.IsNaN(result.SharpeRatio) && !math.IsInf(result.SharpeRatio, 0) {
 		performanceData["sharpe_ratio"] = result.SharpeRatio
 	}
 	if result.OptimalAllocation != nil {
-		performanceData["allocation"] = result.OptimalAllocation
+		// 清理allocation中的NaN值
+		cleanAllocation := make(map[string]interface{})
+		for k, v := range result.OptimalAllocation {
+			if !math.IsNaN(v) && !math.IsInf(v, 0) {
+				cleanAllocation[k] = v
+			} else {
+				cleanAllocation[k] = 0.0 // 将NaN/Inf替换为0
+				log.Printf("Warning: replaced NaN/Inf value for allocation key %s", k)
+			}
+		}
+		performanceData["allocation"] = cleanAllocation
 	}
 
 	performanceJSON, err := json.Marshal(performanceData)

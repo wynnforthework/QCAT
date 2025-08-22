@@ -255,37 +255,6 @@ export default function HomePage() {
             </Card>
           </TabsContent>
         </Tabs>
-
-        {/* 快捷操作 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>快捷操作</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Link href="/strategies">
-                <Button variant="outline" className="w-full">
-                  策略管理
-                </Button>
-              </Link>
-              <Link href="/portfolio">
-                <Button variant="outline" className="w-full">
-                  投资组合
-                </Button>
-              </Link>
-              <Link href="/risk">
-                <Button variant="outline" className="w-full">
-                  风险控制
-                </Button>
-              </Link>
-              <Link href="/hotlist">
-                <Button variant="outline" className="w-full">
-                  热门币种
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
     </div>
   )
 }

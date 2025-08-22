@@ -231,7 +231,7 @@ export default function MarketAnalysisReport({ hotSymbols, whitelist }: MarketAn
               </div>
               <div className="text-2xl font-bold text-green-600">{marketMetrics.bullishCount}</div>
               <div className="text-sm text-muted-foreground">看涨币种</div>
-              <div className="text-xs text-muted-foreground">(涨幅 > 5%)</div>
+              <div className="text-xs text-muted-foreground">(涨幅 &gt;)</div>
             </div>
             <div className="text-center">
               <div className="flex items-center justify-center mb-2">
@@ -247,7 +247,7 @@ export default function MarketAnalysisReport({ hotSymbols, whitelist }: MarketAn
               </div>
               <div className="text-2xl font-bold text-red-600">{marketMetrics.bearishCount}</div>
               <div className="text-sm text-muted-foreground">看跌币种</div>
-              <div className="text-xs text-muted-foreground">(跌幅 > 5%)</div>
+              <div className="text-xs text-muted-foreground">(跌幅 &gt; 5%)</div>
             </div>
           </div>
         </CardContent>

@@ -679,20 +679,15 @@ func (ds *DataScheduler) collectMarketData(ctx context.Context, symbols []string
 		)
 
 		if err != nil {
-			// 如果数据库中没有数据，生成模拟数据用于测试
-			log.Printf("No market data found for %s, using mock data: %v", symbol, err)
-			data = MarketData{
-				Symbol:          symbol,
-				Price:           50000.0 + float64(len(symbol)*1000), // 模拟价格
-				Volume24h:       1000000.0 + float64(len(symbol)*100000),
-				VolumeChange24h: -10.0 + float64(len(symbol)%20),
-				PriceChange24h:  -5.0 + float64(len(symbol)%10),
-				Volatility:      0.02 + float64(len(symbol)%5)*0.01,
-				FundingRate:     0.0001 + float64(len(symbol)%3)*0.0001,
-				OpenInterest:    500000.0 + float64(len(symbol)*50000),
-				OIChange24h:     -5.0 + float64(len(symbol)%10),
-				Timestamp:       time.Now(),
+			// 如果数据库中没有数据，尝试从交易所API获取实时数据
+			log.Printf("No market data found for %s in database, fetching from exchange: %v", symbol, err)
+			apiData, apiErr := ds.fetchMarketDataFromAPI(ctx, symbol)
+			if apiErr != nil {
+				log.Printf("Failed to fetch market data from API for %s: %v", symbol, apiErr)
+				// 如果API也失败，返回错误
+				return nil, fmt.Errorf("no market data available for %s", symbol)
 			}
+			data = *apiData
 		}
 
 		marketData = append(marketData, &data)
@@ -1155,13 +1150,9 @@ func (rs *RiskScheduler) getExchangeFundDistribution(ctx context.Context) (map[s
 		distribution[exchangeName] = balance
 	}
 
-	// 如果没有数据，使用模拟数据
+	// 如果没有数据，返回错误
 	if len(distribution) == 0 {
-		distribution = map[string]float64{
-			"binance": 50000.0,
-			"okx":     30000.0,
-			"bybit":   20000.0,
-		}
+		return nil, fmt.Errorf("no exchange balance data available")
 	}
 
 	return distribution, nil
@@ -1192,12 +1183,9 @@ func (rs *RiskScheduler) getWalletFundDistribution(ctx context.Context) (map[str
 		distribution[walletType] = balance
 	}
 
-	// 如果没有数据，使用模拟数据
+	// 如果没有数据，返回错误
 	if len(distribution) == 0 {
-		distribution = map[string]float64{
-			"hot_wallet":  15000.0,
-			"cold_wallet": 35000.0,
-		}
+		return nil, fmt.Errorf("no wallet balance data available")
 	}
 
 	return distribution, nil
@@ -2279,14 +2267,41 @@ func (ps *PositionScheduler) getActiveStrategiesForHedging(ctx context.Context) 
 		strategies = append(strategies, strategyID)
 	}
 
-	// 如果没有数据，使用默认策略
+	// 如果没有数据，尝试从strategies表获取活跃策略的UUID
 	if len(strategies) == 0 {
-		strategies = []string{
-			"momentum_strategy",
-			"mean_reversion_strategy",
-			"arbitrage_strategy",
-			"trend_following_strategy",
+		log.Printf("No active strategy positions found, querying strategies table")
+
+		fallbackQuery := `
+			SELECT id::text
+			FROM strategies
+			WHERE status = 'active'
+			ORDER BY updated_at DESC
+			LIMIT 5
+		`
+
+		fallbackRows, err := ps.db.QueryContext(ctx, fallbackQuery)
+		if err != nil {
+			log.Printf("Failed to query fallback strategies: %v", err)
+			// 返回空数组而不是无效的字符串
+			return []string{}, nil
 		}
+		defer fallbackRows.Close()
+
+		for fallbackRows.Next() {
+			var strategyID string
+			if err := fallbackRows.Scan(&strategyID); err != nil {
+				log.Printf("Failed to scan fallback strategy ID: %v", err)
+				continue
+			}
+			strategies = append(strategies, strategyID)
+		}
+
+		if len(strategies) == 0 {
+			log.Printf("No active strategies found in database, returning empty list")
+			return []string{}, nil
+		}
+
+		log.Printf("Using %d fallback strategies from strategies table", len(strategies))
 	}
 
 	return strategies, nil
@@ -2308,8 +2323,7 @@ func (ps *PositionScheduler) getStrategyReturns(ctx context.Context, strategies 
 		rows, err := ps.db.QueryContext(ctx, fmt.Sprintf(query, days), strategy)
 		if err != nil {
 			log.Printf("Failed to query returns for strategy %s: %v", strategy, err)
-			// 生成模拟数据
-			strategyReturns[strategy] = ps.generateMockReturns(days)
+			// 跳过无法获取数据的策略
 			continue
 		}
 
@@ -2325,8 +2339,9 @@ func (ps *PositionScheduler) getStrategyReturns(ctx context.Context, strategies 
 		rows.Close()
 
 		if len(returns) == 0 {
-			// 生成模拟数据
-			returns = ps.generateMockReturns(days)
+			// 跳过没有收益数据的策略
+			log.Printf("No return data found for strategy %s", strategy)
+			continue
 		}
 
 		strategyReturns[strategy] = returns
@@ -2335,14 +2350,48 @@ func (ps *PositionScheduler) getStrategyReturns(ctx context.Context, strategies 
 	return strategyReturns, nil
 }
 
-// generateMockReturns 生成模拟收益数据
-func (ps *PositionScheduler) generateMockReturns(days int) []float64 {
-	returns := make([]float64, days)
-	for i := 0; i < days; i++ {
-		// 生成正态分布的随机收益
-		returns[i] = (float64(i%10) - 5.0) / 100.0 // -5% 到 +4% 的收益
+// calculateReturnsFromTrades 从交易记录计算收益数据
+func (ps *PositionScheduler) calculateReturnsFromTrades(ctx context.Context, strategy string, days int) ([]float64, error) {
+	// 从交易记录计算实际收益
+	query := `
+		SELECT
+			DATE(created_at) as trade_date,
+			SUM(realized_pnl) as daily_pnl,
+			SUM(ABS(quantity * entry_price)) as daily_volume
+		FROM trades
+		WHERE strategy_id = $1
+		AND created_at >= NOW() - INTERVAL '%d days'
+		GROUP BY DATE(created_at)
+		ORDER BY trade_date ASC
+	`
+
+	rows, err := ps.db.QueryContext(ctx, fmt.Sprintf(query, days), strategy)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query trades for strategy %s: %w", strategy, err)
 	}
-	return returns
+	defer rows.Close()
+
+	var returns []float64
+	var totalCapital float64 = 100000.0 // 假设初始资本
+
+	for rows.Next() {
+		var tradeDate time.Time
+		var dailyPnl, dailyVolume float64
+
+		err := rows.Scan(&tradeDate, &dailyPnl, &dailyVolume)
+		if err != nil {
+			continue
+		}
+
+		// 计算日收益率
+		if totalCapital > 0 {
+			dailyReturn := dailyPnl / totalCapital
+			returns = append(returns, dailyReturn)
+			totalCapital += dailyPnl // 更新资本
+		}
+	}
+
+	return returns, nil
 }
 
 // calculateCorrelation 计算两个序列的相关系数
@@ -2486,8 +2535,8 @@ func (ps *PositionScheduler) getStrategyPositions(ctx context.Context, strategie
 		err := ps.db.QueryRowContext(ctx, query, strategy).Scan(&totalPosition)
 		if err != nil {
 			log.Printf("Failed to get position for strategy %s: %v", strategy, err)
-			// 使用模拟数据
-			totalPosition = 10000.0 + float64(len(strategy)*1000)
+			// 跳过无法获取持仓数据的策略
+			continue
 		}
 
 		positions[strategy] = totalPosition
@@ -2799,12 +2848,101 @@ func (ps *PositionScheduler) calculateCorrelationStability(ctx context.Context, 
 	// 简化实现：基于历史相关性的稳定性
 	historicalCorrelation := operation.Metadata["correlation"].(float64)
 
-	// 模拟当前相关性（实际应该从实时数据计算）
-	currentCorrelation := historicalCorrelation + (float64(time.Now().Unix()%10)-5.0)/100.0
+	// 从实时数据计算当前相关性
+	currentCorrelation, err := ps.calculateCurrentCorrelation(ctx, operation)
+	if err != nil {
+		log.Printf("Failed to calculate current correlation, using historical: %v", err)
+		currentCorrelation = historicalCorrelation
+	}
 
 	// 计算稳定性（相关性变化越小，稳定性越高）
 	stability := 1.0 - math.Abs(historicalCorrelation-currentCorrelation)
 	return math.Max(0.0, stability)
+}
+
+// fetchMarketDataFromAPI 从交易所API获取市场数据
+func (ds *DataScheduler) fetchMarketDataFromAPI(ctx context.Context, symbol string) (*MarketData, error) {
+	// 这里应该调用实际的交易所API
+	// 暂时返回错误，表示API不可用
+	return nil, fmt.Errorf("exchange API not configured for symbol %s", symbol)
+}
+
+// calculateCurrentCorrelation 计算当前相关性
+func (ps *PositionScheduler) calculateCurrentCorrelation(ctx context.Context, operation *HedgeOperation) (float64, error) {
+	// 从数据库获取最近的价格数据来计算相关性
+	primarySymbol := operation.BaseStrategy
+	hedgeSymbol := operation.HedgeStrategy
+
+	// 获取最近30个数据点
+	query := `
+		SELECT p1.price, p2.price
+		FROM market_data p1
+		JOIN market_data p2 ON p1.timestamp = p2.timestamp
+		WHERE p1.symbol = $1 AND p2.symbol = $2
+		AND p1.timestamp >= NOW() - INTERVAL '30 minutes'
+		ORDER BY p1.timestamp DESC
+		LIMIT 30
+	`
+
+	rows, err := ps.db.QueryContext(ctx, query, primarySymbol, hedgeSymbol)
+	if err != nil {
+		return 0.0, fmt.Errorf("failed to query price data: %w", err)
+	}
+	defer rows.Close()
+
+	var prices1, prices2 []float64
+	for rows.Next() {
+		var price1, price2 float64
+		if err := rows.Scan(&price1, &price2); err != nil {
+			continue
+		}
+		prices1 = append(prices1, price1)
+		prices2 = append(prices2, price2)
+	}
+
+	if len(prices1) < 10 {
+		return 0.0, fmt.Errorf("insufficient data points for correlation calculation")
+	}
+
+	// 计算皮尔逊相关系数
+	correlation := ps.calculatePearsonCorrelation(prices1, prices2)
+	return correlation, nil
+}
+
+// calculatePearsonCorrelation 计算皮尔逊相关系数
+func (ps *PositionScheduler) calculatePearsonCorrelation(x, y []float64) float64 {
+	if len(x) != len(y) || len(x) == 0 {
+		return 0.0
+	}
+
+	n := float64(len(x))
+
+	// 计算均值
+	var sumX, sumY float64
+	for i := 0; i < len(x); i++ {
+		sumX += x[i]
+		sumY += y[i]
+	}
+	meanX := sumX / n
+	meanY := sumY / n
+
+	// 计算协方差和方差
+	var covariance, varianceX, varianceY float64
+	for i := 0; i < len(x); i++ {
+		dx := x[i] - meanX
+		dy := y[i] - meanY
+		covariance += dx * dy
+		varianceX += dx * dx
+		varianceY += dy * dy
+	}
+
+	// 计算相关系数
+	denominator := math.Sqrt(varianceX * varianceY)
+	if denominator == 0 {
+		return 0.0
+	}
+
+	return covariance / denominator
 }
 
 // calculateActualRiskReduction 计算实际风险降低

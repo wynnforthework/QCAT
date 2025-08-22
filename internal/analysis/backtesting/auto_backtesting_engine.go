@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"qcat/internal/config"
+	"qcat/internal/market/kline"
 )
 
 // AutoBacktestingEngine 自动回测验证引擎
@@ -187,8 +188,9 @@ type BacktestDataManager struct {
 	lastUpdate time.Time
 
 	// 数据源接口
-	db        DatabaseInterface
-	apiClient APIClientInterface
+	db           DatabaseInterface
+	apiClient    APIClientInterface
+	klineManager KlineManagerInterface // 新增：K线管理器接口
 
 	mu sync.RWMutex
 }
@@ -201,6 +203,24 @@ type DatabaseInterface interface {
 // APIClientInterface API客户端接口
 type APIClientInterface interface {
 	GetHistoricalKlines(ctx context.Context, symbol, interval string, startTime, endTime time.Time, limit int) ([]Candle, error)
+}
+
+// KlineManagerInterface K线管理器接口
+type KlineManagerInterface interface {
+	GetHistoryWithBackfill(ctx context.Context, symbol string, interval string, start, end time.Time) ([]KlineData, error)
+	EnsureDataAvailable(ctx context.Context, symbol string, interval string, start, end time.Time) error
+}
+
+// KlineData K线数据结构（用于回测）
+type KlineData struct {
+	Symbol    string
+	OpenTime  time.Time
+	CloseTime time.Time
+	Open      float64
+	High      float64
+	Low       float64
+	Close     float64
+	Volume    float64
 }
 
 // Candle K线数据
@@ -668,15 +688,71 @@ func NewAutoBacktestingEngine(cfg *config.Config) (*AutoBacktestingEngine, error
 	return abe, nil
 }
 
+// NewAutoBacktestingEngineWithKline 创建带K线管理器的自动回测引擎
+func NewAutoBacktestingEngineWithKline(cfg *config.Config, klineManager *kline.Manager) (*AutoBacktestingEngine, error) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// 创建带K线管理器的数据管理器
+	var dataManager *BacktestDataManager
+	if klineManager != nil {
+		adapter := NewKlineManagerAdapter(klineManager)
+		dataManager = NewBacktestDataManagerWithKline(adapter)
+	} else {
+		dataManager = NewBacktestDataManager()
+	}
+
+	abe := &AutoBacktestingEngine{
+		config:               cfg,
+		dataManager:          dataManager,
+		strategyManager:      NewBacktestStrategyManager(),
+		performanceAnalyzer:  NewPerformanceAnalyzer(),
+		reportGenerator:      NewReportGenerator(),
+		walkForwardEngine:    NewWalkForwardEngine(),
+		ctx:                  ctx,
+		cancel:               cancel,
+		activeBacktests:      make(map[string]*BacktestJob),
+		completedBacktests:   make([]BacktestResult, 0),
+		strategyPerformance:  make(map[string]*StrategyPerformance),
+		backtestingMetrics:   &BacktestingMetrics{},
+		validationHistory:    make([]ValidationResult, 0),
+		frequency:            24 * time.Hour,       // 每日回测
+		lookbackPeriod:       365 * 24 * time.Hour, // 1年回看期
+		walkForwardWindow:    90 * 24 * time.Hour,  // 3个月前进窗口
+		performanceThreshold: 0.02,                 // 2%性能阈值
+		enabled:              true,
+		maxConcurrentJobs:    4,
+		dataRetentionDays:    365,
+	}
+
+	// 从配置文件读取参数
+	if cfg != nil {
+		// TODO: 从配置文件读取回测参数
+	}
+
+	return abe, nil
+}
+
 // NewBacktestDataManager 创建回测数据管理器
 func NewBacktestDataManager() *BacktestDataManager {
 	return &BacktestDataManager{
-		dataSource: "binance",
-		symbols:    []string{"BTCUSDT", "ETHUSDT", "BNBUSDT"},
-		timeframes: []string{"1m", "5m", "15m", "1h", "4h", "1d"},
-		dataCache:  make(map[string][]Candle),
-		db:         nil, // 需要外部设置
-		apiClient:  nil, // 需要外部设置
+		dataSource:   "binance",
+		symbols:      []string{"BTCUSDT", "ETHUSDT", "BNBUSDT"},
+		timeframes:   []string{"1m", "5m", "15m", "1h", "4h", "1d"},
+		dataCache:    make(map[string][]Candle),
+		db:           nil, // 需要外部设置
+		apiClient:    nil, // 需要外部设置
+		klineManager: nil, // 需要外部设置
+	}
+}
+
+// NewBacktestDataManagerWithKline 创建带K线管理器的回测数据管理器
+func NewBacktestDataManagerWithKline(klineManager KlineManagerInterface) *BacktestDataManager {
+	return &BacktestDataManager{
+		dataSource:   "binance",
+		symbols:      []string{"BTCUSDT", "ETHUSDT", "BNBUSDT"},
+		timeframes:   []string{"1m", "5m", "15m", "1h", "4h", "1d"},
+		dataCache:    make(map[string][]Candle),
+		klineManager: klineManager,
 	}
 }
 
@@ -1614,6 +1690,17 @@ func (bdm *BacktestDataManager) GetHistoricalData(symbols []string, startDate, e
 
 // getHistoricalDataForSymbol 获取单个交易对的历史数据
 func (bdm *BacktestDataManager) getHistoricalDataForSymbol(symbol string, startDate, endDate time.Time) ([]Candle, error) {
+	// 优先使用K线管理器的自动回填功能
+	if bdm.klineManager != nil {
+		data, err := bdm.getDataFromKlineManager(symbol, startDate, endDate)
+		if err == nil && len(data) > 0 {
+			log.Printf("Retrieved %d candles from kline manager (with auto-backfill) for %s", len(data), symbol)
+			return data, nil
+		}
+		log.Printf("Kline manager query failed for %s: %v", symbol, err)
+	}
+
+	// 回退到原有的数据库+API方式
 	// 首先尝试从数据库获取
 	data, err := bdm.getDataFromDatabase(symbol, startDate, endDate)
 	if err == nil && len(data) > 0 {
@@ -1631,6 +1718,38 @@ func (bdm *BacktestDataManager) getHistoricalDataForSymbol(symbol string, startD
 
 	log.Printf("Retrieved %d candles from API for %s", len(data), symbol)
 	return data, nil
+}
+
+// getDataFromKlineManager 从K线管理器获取历史数据（带自动回填）
+func (bdm *BacktestDataManager) getDataFromKlineManager(symbol string, startDate, endDate time.Time) ([]Candle, error) {
+	if bdm.klineManager == nil {
+		return nil, fmt.Errorf("kline manager not available")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second) // 增加超时时间，因为可能需要回填
+	defer cancel()
+
+	// 使用1小时间隔获取数据（带自动回填）
+	klineData, err := bdm.klineManager.GetHistoryWithBackfill(ctx, symbol, "1h", startDate, endDate)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get data from kline manager: %w", err)
+	}
+
+	// 转换为Candle格式
+	var candles []Candle
+	for _, kline := range klineData {
+		candle := Candle{
+			Time:   kline.OpenTime,
+			Open:   kline.Open,
+			High:   kline.High,
+			Low:    kline.Low,
+			Close:  kline.Close,
+			Volume: kline.Volume,
+		}
+		candles = append(candles, candle)
+	}
+
+	return candles, nil
 }
 
 // getDataFromDatabase 从数据库获取历史数据

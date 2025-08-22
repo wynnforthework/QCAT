@@ -5,6 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 
 	"qcat/internal/market"
@@ -204,9 +209,20 @@ func calculateConfidence(result *OverfitResult) float64 {
 
 // fetchRealMarketData fetches real market data for optimization
 func (o *Orchestrator) fetchRealMarketData(ctx context.Context, strategyID string) (*DataSet, error) {
+	// 创建独立的上下文用于数据获取，避免被父上下文取消影响
+	dataCtx, dataCancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer dataCancel()
+
 	// 首先获取策略配置以确定需要的交易对和时间范围
-	strategyConfig, err := o.getStrategyConfig(ctx, strategyID)
+	strategyConfig, err := o.getStrategyConfig(dataCtx, strategyID)
 	if err != nil {
+		// 检查是否是上下文取消错误
+		if err == context.Canceled {
+			return nil, fmt.Errorf("strategy config query was canceled - this may indicate system shutdown")
+		}
+		if err == context.DeadlineExceeded {
+			return nil, fmt.Errorf("strategy config query timed out - database may be slow or unavailable")
+		}
 		return nil, fmt.Errorf("failed to get strategy config: %w", err)
 	}
 
@@ -219,14 +235,60 @@ func (o *Orchestrator) fetchRealMarketData(ctx context.Context, strategyID strin
 	endTime := time.Now()
 	startTime := endTime.AddDate(0, -6, 0) // 6个月前
 
-	// 从数据库获取K线数据
-	klines, err := o.fetchKlineData(ctx, symbol, "1d", startTime, endTime)
+	// 从数据库获取K线数据，使用独立的上下文
+	klines, err := o.fetchKlineData(dataCtx, symbol, "1d", startTime, endTime)
 	if err != nil {
+		// 检查是否是上下文相关错误
+		if err == context.Canceled {
+			return nil, fmt.Errorf("kline data query was canceled - this may indicate system shutdown")
+		}
+		if err == context.DeadlineExceeded {
+			return nil, fmt.Errorf("kline data query timed out - database may be slow or unavailable")
+		}
 		return nil, fmt.Errorf("failed to fetch kline data: %w", err)
 	}
 
 	if len(klines) < 30 {
-		return nil, fmt.Errorf("insufficient data: only %d klines available, need at least 30", len(klines))
+		// 尝试获取更长时间范围的数据
+		log.Printf("Warning: insufficient data for %s (%d klines), trying longer time range", symbol, len(klines))
+
+		// 尝试获取1年的数据，使用独立的上下文
+		startTime = endTime.AddDate(-1, 0, 0)
+		klines, err = o.fetchKlineData(dataCtx, symbol, "1d", startTime, endTime)
+		if err != nil {
+			if err == context.Canceled {
+				return nil, fmt.Errorf("extended kline data query was canceled")
+			}
+			if err == context.DeadlineExceeded {
+				return nil, fmt.Errorf("extended kline data query timed out")
+			}
+			return nil, fmt.Errorf("failed to fetch extended kline data: %w", err)
+		}
+
+		if len(klines) < 10 {
+			// 如果还是不够，尝试从外部API获取历史数据
+			log.Printf("Warning: still insufficient data (%d klines), attempting to fetch from external API", len(klines))
+
+			externalKlines, err := o.fetchFromExternalAPI(dataCtx, symbol, "1d", startTime, endTime)
+			if err != nil {
+				if err == context.Canceled {
+					return nil, fmt.Errorf("external API data fetch was canceled")
+				}
+				if err == context.DeadlineExceeded {
+					return nil, fmt.Errorf("external API data fetch timed out")
+				}
+				return nil, fmt.Errorf("failed to fetch data from external API: %w", err)
+			}
+
+			if len(externalKlines) < 10 {
+				return nil, fmt.Errorf("insufficient historical data available: only %d klines found, need at least 10 for optimization", len(externalKlines))
+			}
+
+			klines = externalKlines
+			log.Printf("Fetched %d klines from external API", len(klines))
+		}
+
+		log.Printf("Found %d klines with extended time range", len(klines))
 	}
 
 	// 转换为优化器需要的数据格式
@@ -246,11 +308,17 @@ func (o *Orchestrator) fetchRealMarketData(ctx context.Context, strategyID strin
 		}
 	}
 
-	// 获取交易数据用于更精确的分析
-	trades, err := o.fetchTradeData(ctx, symbol, startTime, endTime)
+	// 获取交易数据用于更精确的分析，使用独立的上下文
+	trades, err := o.fetchTradeData(dataCtx, symbol, startTime, endTime)
 	if err != nil {
 		// 交易数据不是必需的，记录警告但继续
-		fmt.Printf("Warning: failed to fetch trade data for %s: %v\n", symbol, err)
+		if err == context.Canceled {
+			log.Printf("Warning: trade data fetch was canceled for %s", symbol)
+		} else if err == context.DeadlineExceeded {
+			log.Printf("Warning: trade data fetch timed out for %s", symbol)
+		} else {
+			log.Printf("Warning: failed to fetch trade data for %s: %v", symbol, err)
+		}
 	}
 
 	// 创建数据集
@@ -419,6 +487,170 @@ func (o *Orchestrator) fetchTradeData(ctx context.Context, symbol string, startT
 	}
 
 	return trades, nil
+}
+
+// fetchFromExternalAPI fetches market data from external API (e.g., Binance)
+func (o *Orchestrator) fetchFromExternalAPI(ctx context.Context, symbol, interval string, startTime, endTime time.Time) ([]*market.Kline, error) {
+	log.Printf("Fetching historical data from external API for %s from %v to %v", symbol, startTime, endTime)
+
+	// 创建Binance API客户端
+	client := &BinanceAPIClient{
+		BaseURL: "https://api.binance.com",
+		Timeout: 30 * time.Second,
+	}
+
+	// 调用Binance API获取K线数据
+	klines, err := client.GetKlines(ctx, symbol, interval, startTime, endTime)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch data from Binance API: %w", err)
+	}
+
+	// 将获取的数据保存到数据库以供将来使用
+	if len(klines) > 0 {
+		if err := o.saveKlinesToDatabase(ctx, klines); err != nil {
+			log.Printf("Warning: failed to save fetched klines to database: %v", err)
+		} else {
+			log.Printf("Successfully saved %d klines to database", len(klines))
+		}
+	}
+
+	return klines, nil
+}
+
+// saveKlinesToDatabase saves kline data to the database
+func (o *Orchestrator) saveKlinesToDatabase(ctx context.Context, klines []*market.Kline) error {
+	if len(klines) == 0 {
+		return nil
+	}
+
+	// 批量插入K线数据
+	query := `
+		INSERT INTO klines (symbol, interval, open_time, close_time, open_price, high_price, low_price, close_price, volume, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+		ON CONFLICT (symbol, interval, open_time) DO UPDATE SET
+			close_time = EXCLUDED.close_time,
+			open_price = EXCLUDED.open_price,
+			high_price = EXCLUDED.high_price,
+			low_price = EXCLUDED.low_price,
+			close_price = EXCLUDED.close_price,
+			volume = EXCLUDED.volume,
+			updated_at = NOW()
+	`
+
+	// 准备批量插入
+	stmt, err := o.db.PrepareContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("failed to prepare insert statement: %w", err)
+	}
+	defer stmt.Close()
+
+	// 插入每个K线数据
+	for _, kline := range klines {
+		_, err := stmt.ExecContext(ctx,
+			kline.Symbol,
+			kline.Interval,
+			kline.OpenTime,
+			kline.CloseTime,
+			kline.Open,
+			kline.High,
+			kline.Low,
+			kline.Close,
+			kline.Volume,
+		)
+		if err != nil {
+			log.Printf("Warning: failed to insert kline for %s at %v: %v", kline.Symbol, kline.OpenTime, err)
+		}
+	}
+
+	return nil
+}
+
+// BinanceAPIClient represents a client for Binance API
+type BinanceAPIClient struct {
+	BaseURL string
+	Timeout time.Duration
+	client  *http.Client
+}
+
+// BinanceKlineResponse represents Binance API kline response
+type BinanceKlineResponse [][]interface{}
+
+// GetKlines fetches kline data from Binance API
+func (c *BinanceAPIClient) GetKlines(ctx context.Context, symbol, interval string, startTime, endTime time.Time) ([]*market.Kline, error) {
+	if c.client == nil {
+		c.client = &http.Client{Timeout: c.Timeout}
+	}
+
+	// 构建API URL
+	baseURL := c.BaseURL + "/api/v3/klines"
+	params := url.Values{}
+	params.Set("symbol", symbol)
+	params.Set("interval", interval)
+	params.Set("startTime", strconv.FormatInt(startTime.UnixMilli(), 10))
+	params.Set("endTime", strconv.FormatInt(endTime.UnixMilli(), 10))
+	params.Set("limit", "1000")
+
+	fullURL := baseURL + "?" + params.Encode()
+
+	// 创建HTTP请求
+	req, err := http.NewRequestWithContext(ctx, "GET", fullURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// 发送请求
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// 解析响应
+	var binanceData BinanceKlineResponse
+	if err := json.NewDecoder(resp.Body).Decode(&binanceData); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// 转换为内部格式
+	klines := make([]*market.Kline, 0, len(binanceData))
+	for _, item := range binanceData {
+		if len(item) < 11 {
+			continue
+		}
+
+		kline := &market.Kline{
+			Symbol:    symbol,
+			Interval:  interval,
+			OpenTime:  time.UnixMilli(int64(item[0].(float64))),
+			CloseTime: time.UnixMilli(int64(item[6].(float64))),
+		}
+
+		// 解析价格数据
+		if open, err := strconv.ParseFloat(item[1].(string), 64); err == nil {
+			kline.Open = open
+		}
+		if high, err := strconv.ParseFloat(item[2].(string), 64); err == nil {
+			kline.High = high
+		}
+		if low, err := strconv.ParseFloat(item[3].(string), 64); err == nil {
+			kline.Low = low
+		}
+		if close, err := strconv.ParseFloat(item[4].(string), 64); err == nil {
+			kline.Close = close
+		}
+		if volume, err := strconv.ParseFloat(item[5].(string), 64); err == nil {
+			kline.Volume = volume
+		}
+
+		klines = append(klines, kline)
+	}
+
+	return klines, nil
 }
 
 // StrategyConfig represents strategy configuration

@@ -8,6 +8,10 @@ import (
 	"sort"
 	"time"
 
+	"qcat/internal/database"
+	"qcat/internal/exchange"
+	"qcat/internal/exchange/binance"
+	"qcat/internal/market/kline"
 	"qcat/internal/strategy"
 	"qcat/internal/strategy/templates"
 )
@@ -19,11 +23,18 @@ type Generator struct {
 }
 
 // NewGenerator 创建新的策略生成器
-func NewGenerator() *Generator {
+func NewGenerator(analyzer *MarketAnalyzer) *Generator {
 	return &Generator{
 		templates: make(map[string]*templates.Template),
-		analyzer:  NewMarketAnalyzer(),
+		analyzer:  analyzer,
 	}
+}
+
+// NewGeneratorWithDependencies 创建带真实数据源的策略生成器
+func NewGeneratorWithDependencies(db *database.DB, binanceClient *binance.Client, klineManager *kline.Manager) *Generator {
+	// 创建带真实数据源的MarketAnalyzer
+	analyzer := NewMarketAnalyzer(db, binanceClient, klineManager)
+	return NewGenerator(analyzer)
 }
 
 // GenerateStrategy 基于市场数据和历史表现自动生成策略
@@ -242,9 +253,10 @@ type Service struct {
 	generator *Generator
 }
 
-// NewService 创建策略生成服务
-func NewService() *Service {
-	generator := NewGenerator()
+
+// NewServiceWithDependencies 创建带真实数据源的策略生成服务
+func NewServiceWithDependencies(db *database.DB, binanceClient *binance.Client, klineManager *kline.Manager) *Service {
+	generator := NewGeneratorWithDependencies(db, binanceClient, klineManager)
 	generator.LoadDefaultTemplates()
 
 	return &Service{
@@ -376,11 +388,12 @@ type ParameterRange struct {
 	Default float64
 }
 
-// NewAutoGenerationService 创建自动生成服务
-func NewAutoGenerationService() *AutoGenerationService {
+// NewAutoGenerationServiceWithDependencies 创建带真实数据源的自动生成服务
+func NewAutoGenerationServiceWithDependencies(db *database.DB, binanceClient *binance.Client, klineManager *kline.Manager) *AutoGenerationService {
+	analyzer := NewMarketAnalyzer(db, binanceClient, klineManager)
 	service := &AutoGenerationService{
-		generator:       NewGenerator(),
-		marketAnalyzer:  NewMarketAnalyzer(),
+		generator:       NewGenerator(analyzer),
+		marketAnalyzer:  analyzer,
 		performanceDB:   make(map[string]*StrategyPerformance),
 		generationRules: make([]*GenerationRule, 0),
 	}
@@ -389,6 +402,49 @@ func NewAutoGenerationService() *AutoGenerationService {
 	service.loadDefaultGenerationRules()
 
 	return service
+}
+
+// CreateProductionService 创建生产环境的策略生成服务
+// 这个函数会尝试创建所有必要的依赖项
+func CreateProductionService(dbConfig *database.Config, exchangeConfig *exchange.ExchangeConfig) (*Service, error) {
+	// 创建数据库连接
+	db, err := database.NewConnection(dbConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create database connection: %w", err)
+	}
+
+	// 创建Binance客户端
+	binanceClient := binance.NewClient(exchangeConfig, nil)
+
+	// 创建K线管理器
+	klineManager := kline.NewManagerWithBinance(db.DB, binanceClient)
+
+	// 创建服务
+	service := NewServiceWithDependencies(db, binanceClient, klineManager)
+
+	log.Printf("Production strategy generation service created successfully with real data sources")
+	return service, nil
+}
+
+// CreateProductionAutoService 创建生产环境的自动策略生成服务
+func CreateProductionAutoService(dbConfig *database.Config, exchangeConfig *exchange.ExchangeConfig) (*AutoGenerationService, error) {
+	// 创建数据库连接
+	db, err := database.NewConnection(dbConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create database connection: %w", err)
+	}
+
+	// 创建Binance客户端
+	binanceClient := binance.NewClient(exchangeConfig, nil)
+
+	// 创建K线管理器
+	klineManager := kline.NewManagerWithBinance(db.DB, binanceClient)
+
+	// 创建服务
+	service := NewAutoGenerationServiceWithDependencies(db, binanceClient, klineManager)
+
+	log.Printf("Production auto strategy generation service created successfully with real data sources")
+	return service, nil
 }
 
 // loadDefaultGenerationRules 加载默认生成规则

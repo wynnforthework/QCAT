@@ -467,7 +467,7 @@ func (fp *FundProtector) updateFundStatus() {
 	fundData, err := fp.getFundDataFromExchange()
 	if err != nil {
 		log.Printf("Failed to get fund data from exchange: %v", err)
-		// 保持当前状态，不更新为模拟数据
+		// 保持当前状态
 		return
 	}
 

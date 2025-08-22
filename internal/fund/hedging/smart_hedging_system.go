@@ -2,18 +2,22 @@ package hedging
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
 	"qcat/internal/config"
+	"qcat/internal/database"
 )
 
 // SmartHedgingSystem 智能对冲系统
 type SmartHedgingSystem struct {
 	config               *config.Config
+	db                   *sql.DB
 	correlationAnalyzer  *CorrelationAnalyzer
 	hedgeRatioCalculator *HedgeRatioCalculator
 	hedgeExecutor        *HedgeExecutor
@@ -278,8 +282,36 @@ type HedgePerformance struct {
 func NewSmartHedgingSystem(cfg *config.Config) (*SmartHedgingSystem, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// 初始化数据库连接
+	var db *sql.DB
+	if cfg != nil {
+		dbConfig := &database.Config{
+			Host:            cfg.Database.Host,
+			Port:            cfg.Database.Port,
+			User:            cfg.Database.User,
+			Password:        cfg.Database.Password,
+			DBName:          cfg.Database.DBName,
+			SSLMode:         cfg.Database.SSLMode,
+			MaxOpen:         cfg.Database.MaxOpen,
+			MaxIdle:         cfg.Database.MaxIdle,
+			Timeout:         cfg.Database.Timeout,
+			ConnMaxLifetime: cfg.Database.ConnMaxLifetime,
+			ConnMaxIdleTime: cfg.Database.ConnMaxIdleTime,
+		}
+
+		dbConn, err := database.NewConnection(dbConfig)
+		if err != nil {
+			log.Printf("Warning: Failed to connect to database for hedging system: %v", err)
+			// 继续运行，但没有数据库功能
+		} else {
+			db = dbConn.DB
+			log.Println("Database connection established for hedging system")
+		}
+	}
+
 	shs := &SmartHedgingSystem{
 		config:               cfg,
+		db:                   db,
 		correlationAnalyzer:  NewCorrelationAnalyzer(),
 		hedgeRatioCalculator: NewHedgeRatioCalculator(),
 		hedgeExecutor:        NewHedgeExecutor(),
@@ -638,9 +670,25 @@ func (shs *SmartHedgingSystem) CreateHedge(baseAsset, hedgeAsset string, baseQua
 func (shs *SmartHedgingSystem) updateCorrelations() {
 	log.Println("Updating correlations...")
 
-	// TODO: 从数据源获取价格数据
-	// 这里使用模拟数据
-	assets := []string{"BTC", "ETH", "BNB", "ADA"}
+	// 如果没有数据库连接，跳过更新
+	if shs.db == nil {
+		log.Println("No database connection available, skipping correlation update")
+		return
+	}
+
+	// 从数据库获取活跃的交易对
+	assets, err := shs.getActiveAssets()
+	if err != nil {
+		log.Printf("Failed to get active assets: %v", err)
+		return
+	}
+
+	if len(assets) == 0 {
+		log.Println("No active assets found for correlation calculation")
+		return
+	}
+
+	log.Printf("Calculating correlations for %d assets: %v", len(assets), assets)
 
 	// 计算相关性矩阵
 	for i, asset1 := range assets {
@@ -652,6 +700,7 @@ func (shs *SmartHedgingSystem) updateCorrelations() {
 			if i != j {
 				correlation := shs.calculateCorrelation(asset1, asset2)
 				shs.correlationMatrix[asset1][asset2] = correlation
+				log.Printf("Correlation %s-%s: %.4f", asset1, asset2, correlation)
 			} else {
 				shs.correlationMatrix[asset1][asset2] = 1.0
 			}
@@ -659,7 +708,8 @@ func (shs *SmartHedgingSystem) updateCorrelations() {
 	}
 
 	shs.lastCorrelationUpdate = time.Now()
-	log.Printf("Correlations updated at %s", shs.lastCorrelationUpdate.Format("15:04:05"))
+	log.Printf("Correlations updated at %s for %d asset pairs",
+		shs.lastCorrelationUpdate.Format("15:04:05"), len(assets))
 }
 
 // monitorHedges 监控对冲仓位
@@ -767,8 +817,11 @@ func (shs *SmartHedgingSystem) getCorrelation(asset1, asset2 string) float64 {
 }
 
 func (shs *SmartHedgingSystem) calculateCorrelation(asset1, asset2 string) float64 {
-	// TODO: 实现基于历史价格数据的真实相关性计算
-	// 需要获取两个资产的历史价格数据，计算皮尔逊相关系数
+	// 如果没有数据库连接，返回0
+	if shs.db == nil {
+		log.Printf("No database connection, cannot calculate correlation for %s-%s", asset1, asset2)
+		return 0.0
+	}
 
 	// 获取历史价格数据
 	prices1, err := shs.getHistoricalPrices(asset1, 30) // 30天数据
@@ -783,8 +836,22 @@ func (shs *SmartHedgingSystem) calculateCorrelation(asset1, asset2 string) float
 		return 0.0
 	}
 
+	if len(prices1) == 0 || len(prices2) == 0 {
+		log.Printf("No price data available for correlation calculation: %s(%d) - %s(%d)",
+			asset1, len(prices1), asset2, len(prices2))
+		return 0.0
+	}
+
 	// 计算皮尔逊相关系数
-	return shs.calculatePearsonCorrelation(prices1, prices2)
+	correlation := shs.calculatePearsonCorrelation(prices1, prices2)
+
+	// 验证相关系数的有效性
+	if math.IsNaN(correlation) || math.IsInf(correlation, 0) {
+		log.Printf("Invalid correlation calculated for %s-%s: %f", asset1, asset2, correlation)
+		return 0.0
+	}
+
+	return correlation
 }
 
 func (shs *SmartHedgingSystem) calculateOptimalHedgeRatio(baseAsset, hedgeAsset string) (float64, error) {
@@ -1240,8 +1307,29 @@ func (shs *SmartHedgingSystem) GetHedgingMetrics() *HedgingMetrics {
 	shs.hedgingMetrics.mu.RLock()
 	defer shs.hedgingMetrics.mu.RUnlock()
 
-	metrics := *shs.hedgingMetrics
-	return &metrics
+	// 创建一个新的HedgingMetrics实例，避免复制锁
+	metrics := &HedgingMetrics{
+		OverallHedgeEffectiveness: shs.hedgingMetrics.OverallHedgeEffectiveness,
+		AverageHedgeRatio:         shs.hedgingMetrics.AverageHedgeRatio,
+		TotalHedgingCost:          shs.hedgingMetrics.TotalHedgingCost,
+		PortfolioVaRReduction:     shs.hedgingMetrics.PortfolioVaRReduction,
+		AverageCorrelation:        shs.hedgingMetrics.AverageCorrelation,
+		CorrelationStability:      shs.hedgingMetrics.CorrelationStability,
+		StrongCorrelationPairs:    shs.hedgingMetrics.StrongCorrelationPairs,
+		TotalExecutions:           shs.hedgingMetrics.TotalExecutions,
+		SuccessfulExecutions:      shs.hedgingMetrics.SuccessfulExecutions,
+		AverageSlippage:           shs.hedgingMetrics.AverageSlippage,
+		AverageExecutionTime:      shs.hedgingMetrics.AverageExecutionTime,
+		TotalAdjustments:          shs.hedgingMetrics.TotalAdjustments,
+		AdjustmentFrequency:       shs.hedgingMetrics.AdjustmentFrequency,
+		AverageAdjustmentCost:     shs.hedgingMetrics.AverageAdjustmentCost,
+		HedgedVsUnhedgedReturn:    shs.hedgingMetrics.HedgedVsUnhedgedReturn,
+		RiskAdjustedPerformance:   shs.hedgingMetrics.RiskAdjustedPerformance,
+		InformationRatio:          shs.hedgingMetrics.InformationRatio,
+		LastUpdated:               shs.hedgingMetrics.LastUpdated,
+	}
+
+	return metrics
 }
 
 // GetActiveHedges 获取活跃对冲仓位
@@ -1258,13 +1346,66 @@ func (shs *SmartHedgingSystem) GetActiveHedges() map[string]*HedgePosition {
 
 // getHistoricalPrices 获取资产的历史价格数据
 func (shs *SmartHedgingSystem) getHistoricalPrices(asset string, days int) ([]float64, error) {
-	// TODO: 实现从数据源获取历史价格数据
-	// 这里应该调用市场数据API或从数据库查询
+	if shs.db == nil {
+		return nil, fmt.Errorf("no database connection available")
+	}
 
-	log.Printf("Attempting to get %d days of historical prices for %s", days, asset)
+	// 构建交易对符号（如果需要的话）
+	symbol := asset
+	if !strings.HasSuffix(asset, "USDT") {
+		symbol = asset + "USDT"
+	}
 
-	// 目前返回错误表示数据不可用
-	return nil, fmt.Errorf("historical price data not available for asset: %s", asset)
+	log.Printf("Getting %d days of historical prices for %s (symbol: %s)", days, asset, symbol)
+
+	// 从market_data表获取历史价格数据
+	query := `
+		SELECT close, timestamp
+		FROM market_data
+		WHERE symbol = $1
+		AND timestamp >= NOW() - INTERVAL '%d days'
+		AND complete = true
+		ORDER BY timestamp ASC
+	`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	rows, err := shs.db.QueryContext(ctx, fmt.Sprintf(query, days), symbol)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query historical prices for %s: %w", symbol, err)
+	}
+	defer rows.Close()
+
+	var prices []float64
+	var timestamps []time.Time
+
+	for rows.Next() {
+		var price float64
+		var timestamp time.Time
+
+		if err := rows.Scan(&price, &timestamp); err != nil {
+			log.Printf("Warning: failed to scan price data for %s: %v", symbol, err)
+			continue
+		}
+
+		prices = append(prices, price)
+		timestamps = append(timestamps, timestamp)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating price data for %s: %w", symbol, err)
+	}
+
+	log.Printf("Retrieved %d price points for %s (requested %d days)", len(prices), symbol, days)
+
+	// 如果数据点太少，记录警告
+	if len(prices) < days/2 {
+		log.Printf("Warning: insufficient price data for %s: got %d points, expected ~%d",
+			symbol, len(prices), days)
+	}
+
+	return prices, nil
 }
 
 // calculatePearsonCorrelation 计算两个价格序列的皮尔逊相关系数
@@ -1308,22 +1449,192 @@ func (shs *SmartHedgingSystem) calculatePearsonCorrelation(prices1, prices2 []fl
 
 // getMarketVolatility 获取市场波动率
 func (shs *SmartHedgingSystem) getMarketVolatility() (float64, error) {
-	// TODO: 实现真实的市场波动率计算
-	// 可以基于主要资产的价格波动计算VIX类似的指标
+	if shs.db == nil {
+		return 0.0, fmt.Errorf("no database connection available")
+	}
 
-	log.Printf("Attempting to calculate market volatility")
+	log.Printf("Calculating market volatility from database")
 
-	// 目前返回错误表示数据不可用
-	return 0.0, fmt.Errorf("market volatility calculation not implemented")
+	// 获取主要资产的价格数据来计算市场整体波动率
+	majorAssets := []string{"BTCUSDT", "ETHUSDT", "BNBUSDT"}
+	var totalVolatility float64
+	validAssets := 0
+
+	for _, asset := range majorAssets {
+		// 获取最近7天的价格数据
+		prices, err := shs.getHistoricalPrices(strings.TrimSuffix(asset, "USDT"), 7)
+		if err != nil || len(prices) < 5 {
+			log.Printf("Warning: insufficient data for volatility calculation for %s: %v", asset, err)
+			continue
+		}
+
+		// 计算该资产的波动率
+		volatility := shs.calculateAssetVolatility(prices)
+		if !math.IsNaN(volatility) && !math.IsInf(volatility, 0) {
+			totalVolatility += volatility
+			validAssets++
+			log.Printf("Volatility for %s: %.4f", asset, volatility)
+		}
+	}
+
+	if validAssets == 0 {
+		return 0.0, fmt.Errorf("no valid volatility data available")
+	}
+
+	// 计算平均市场波动率
+	marketVolatility := totalVolatility / float64(validAssets)
+
+	log.Printf("Calculated market volatility: %.4f (based on %d assets)", marketVolatility, validAssets)
+	return marketVolatility, nil
 }
 
 // getMarketPrice 获取实时市场价格
 func (shs *SmartHedgingSystem) getMarketPrice(symbol string) (float64, error) {
-	// TODO: 实现从交易所API获取实时价格
-	// 可以集成Binance、OKX等交易所的价格API
+	if shs.db == nil {
+		return 0.0, fmt.Errorf("no database connection available")
+	}
 
-	log.Printf("Attempting to get market price for %s", symbol)
+	log.Printf("Getting market price for %s from database", symbol)
 
-	// 目前返回错误表示价格不可用
-	return 0.0, fmt.Errorf("market price not available for symbol: %s", symbol)
+	// 首先尝试从tickers表获取最新价格
+	query := `
+		SELECT price, updated_at
+		FROM tickers
+		WHERE symbol = $1
+		ORDER BY updated_at DESC
+		LIMIT 1
+	`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var price float64
+	var updatedAt time.Time
+
+	err := shs.db.QueryRowContext(ctx, query, symbol).Scan(&price, &updatedAt)
+	if err == nil {
+		// 检查数据是否过期（超过5分钟）
+		if time.Since(updatedAt) <= 5*time.Minute {
+			log.Printf("Got current price for %s: %.4f (updated %v ago)",
+				symbol, price, time.Since(updatedAt))
+			return price, nil
+		}
+		log.Printf("Price data for %s is stale (updated %v ago), trying market_data",
+			symbol, time.Since(updatedAt))
+	}
+
+	// 如果tickers表没有数据或数据过期，尝试从market_data表获取
+	query = `
+		SELECT close, timestamp
+		FROM market_data
+		WHERE symbol = $1
+		AND complete = true
+		ORDER BY timestamp DESC
+		LIMIT 1
+	`
+
+	err = shs.db.QueryRowContext(ctx, query, symbol).Scan(&price, &updatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0.0, fmt.Errorf("no price data found for symbol: %s", symbol)
+		}
+		return 0.0, fmt.Errorf("failed to query market price for %s: %w", symbol, err)
+	}
+
+	// 检查market_data的数据时效性
+	if time.Since(updatedAt) > 1*time.Hour {
+		log.Printf("Warning: market price for %s is stale (updated %v ago)",
+			symbol, time.Since(updatedAt))
+	}
+
+	log.Printf("Got market price for %s: %.4f (from market_data, updated %v ago)",
+		symbol, price, time.Since(updatedAt))
+	return price, nil
+}
+
+// getActiveAssets 获取活跃的交易对资产
+func (shs *SmartHedgingSystem) getActiveAssets() ([]string, error) {
+	if shs.db == nil {
+		return nil, fmt.Errorf("no database connection available")
+	}
+
+	// 从数据库获取有数据的活跃交易对
+	query := `
+		SELECT DISTINCT REPLACE(symbol, 'USDT', '') as base_asset
+		FROM market_data
+		WHERE timestamp >= NOW() - INTERVAL '24 hours'
+		AND complete = true
+		AND symbol LIKE '%USDT'
+		ORDER BY base_asset
+		LIMIT 20
+	`
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	rows, err := shs.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query active assets: %w", err)
+	}
+	defer rows.Close()
+
+	var assets []string
+	for rows.Next() {
+		var asset string
+		if err := rows.Scan(&asset); err != nil {
+			log.Printf("Warning: failed to scan asset: %v", err)
+			continue
+		}
+		assets = append(assets, asset)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating active assets: %w", err)
+	}
+
+	// 如果数据库中没有数据，使用默认的主要资产
+	if len(assets) == 0 {
+		log.Println("No assets found in database, using default major assets")
+		assets = []string{"BTC", "ETH", "BNB", "ADA", "SOL"}
+	}
+
+	return assets, nil
+}
+
+// calculateAssetVolatility 计算单个资产的波动率
+func (shs *SmartHedgingSystem) calculateAssetVolatility(prices []float64) float64 {
+	if len(prices) < 2 {
+		return 0.0
+	}
+
+	// 计算收益率
+	var returns []float64
+	for i := 1; i < len(prices); i++ {
+		if prices[i-1] > 0 {
+			ret := math.Log(prices[i] / prices[i-1])
+			returns = append(returns, ret)
+		}
+	}
+
+	if len(returns) == 0 {
+		return 0.0
+	}
+
+	// 计算收益率的标准差
+	mean := 0.0
+	for _, ret := range returns {
+		mean += ret
+	}
+	mean /= float64(len(returns))
+
+	variance := 0.0
+	for _, ret := range returns {
+		variance += math.Pow(ret-mean, 2)
+	}
+	variance /= float64(len(returns) - 1)
+
+	// 年化波动率（假设每日数据）
+	volatility := math.Sqrt(variance) * math.Sqrt(365)
+
+	return volatility
 }
