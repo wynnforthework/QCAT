@@ -9,6 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { RefreshCw, TrendingUp, TrendingDown, DollarSign, BarChart3 } from 'lucide-react'
 import apiClient, { PositionItem, TradeHistoryItem, Strategy } from '@/lib/api'
+import TradingChart from '@/components/trading/TradingChart'
+import ProfitAnalysis from '@/components/trading/ProfitAnalysis'
 
 export default function TradingPage() {
   const [positions, setPositions] = useState<PositionItem[]>([])
@@ -202,6 +204,8 @@ export default function TradingPage() {
         <TabsList>
           <TabsTrigger value="positions">持仓管理</TabsTrigger>
           <TabsTrigger value="history">交易历史</TabsTrigger>
+          <TabsTrigger value="charts">图表分析</TabsTrigger>
+          <TabsTrigger value="analysis">收益分析</TabsTrigger>
         </TabsList>
 
         <TabsContent value="positions" className="space-y-4">
@@ -262,6 +266,24 @@ export default function TradingPage() {
         </TabsContent>
 
         <TabsContent value="history" className="space-y-4">
+          {/* K线图 */}
+          {tradeHistory.length > 0 && (
+            <TradingChart
+              symbol={tradeHistory[0]?.symbol}
+              strategyId={selectedStrategy}
+              trades={tradeHistory.map(trade => ({
+                id: trade.id,
+                symbol: trade.symbol,
+                side: trade.side,
+                price: trade.executedPrice,
+                quantity: trade.quantity,
+                timestamp: trade.openTime,
+                pnl: trade.pnl,
+                pnlPercent: trade.pnlPercent
+              }))}
+            />
+          )}
+
           <Card>
             <CardHeader>
               <CardTitle>交易历史</CardTitle>
@@ -318,6 +340,60 @@ export default function TradingPage() {
               </Table>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="charts" className="space-y-4">
+          <div className="grid gap-4">
+            {/* 为每个交易对显示独立的K线图 */}
+            {Array.from(new Set(tradeHistory.map(t => t.symbol))).map(symbol => {
+              const symbolTrades = tradeHistory.filter(t => t.symbol === symbol)
+              return (
+                <TradingChart
+                  key={symbol}
+                  symbol={symbol}
+                  strategyId={selectedStrategy}
+                  trades={symbolTrades.map(trade => ({
+                    id: trade.id,
+                    symbol: trade.symbol,
+                    side: trade.side,
+                    price: trade.executedPrice,
+                    quantity: trade.quantity,
+                    timestamp: trade.openTime,
+                    pnl: trade.pnl,
+                    pnlPercent: trade.pnlPercent
+                  }))}
+                />
+              )
+            })}
+
+            {tradeHistory.length === 0 && (
+              <Card>
+                <CardContent className="flex items-center justify-center h-64">
+                  <div className="text-center text-muted-foreground">
+                    <BarChart3 className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <p>暂无交易数据</p>
+                    <p className="text-sm">完成交易后将显示K线图分析</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="analysis" className="space-y-4">
+          <ProfitAnalysis
+            trades={tradeHistory.map(trade => ({
+              id: trade.id,
+              symbol: trade.symbol,
+              side: trade.side,
+              pnl: trade.pnl,
+              pnlPercent: trade.pnlPercent,
+              timestamp: trade.openTime,
+              quantity: trade.quantity,
+              price: trade.executedPrice
+            }))}
+            positions={positions}
+          />
         </TabsContent>
       </Tabs>
     </div>
