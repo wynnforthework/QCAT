@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"qcat/internal/exchange"
@@ -368,8 +369,18 @@ func (c *Client) GetSymbolPrice(ctx context.Context, symbol string) (float64, er
 		}
 	}
 
-	// Simple HTTP request to get symbol price (no authentication needed)
-	resp, err := c.httpClient.Get(c.baseURL + "/fapi/v1/ticker/price?symbol=" + symbol)
+	// Use correct endpoint based on base URL
+	var endpoint string
+	if strings.Contains(c.baseURL, "fapi") {
+		// Futures API
+		endpoint = "/fapi/v1/ticker/price"
+	} else {
+		// Spot API
+		endpoint = "/api/v3/ticker/price"
+	}
+
+	fullURL := c.baseURL + endpoint + "?symbol=" + symbol
+	resp, err := c.httpClient.Get(fullURL)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get symbol price: %w", err)
 	}
@@ -413,8 +424,17 @@ func (c *Client) GetKlines(ctx context.Context, symbol, interval string, startTi
 		params.Set("limit", strconv.Itoa(limit))
 	}
 
-	// Use public endpoint for klines (no authentication needed)
-	fullURL := c.baseURL + "/fapi/v1/klines?" + params.Encode()
+	// Use correct endpoint based on base URL
+	var endpoint string
+	if strings.Contains(c.baseURL, "fapi") {
+		// Futures API
+		endpoint = "/fapi/v1/klines"
+	} else {
+		// Spot API
+		endpoint = "/api/v3/klines"
+	}
+
+	fullURL := c.baseURL + endpoint + "?" + params.Encode()
 	resp, err := c.httpClient.Get(fullURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get klines: %w", err)
@@ -476,8 +496,17 @@ func (c *Client) GetTrades(ctx context.Context, symbol string, limit int) ([]*ty
 		params.Set("limit", strconv.Itoa(limit))
 	}
 
-	// Use public endpoint for recent trades (no authentication needed)
-	fullURL := c.baseURL + "/fapi/v1/aggTrades?" + params.Encode()
+	// Use correct endpoint based on base URL
+	var endpoint string
+	if strings.Contains(c.baseURL, "fapi") {
+		// Futures API
+		endpoint = "/fapi/v1/aggTrades"
+	} else {
+		// Spot API
+		endpoint = "/api/v3/aggTrades"
+	}
+
+	fullURL := c.baseURL + endpoint + "?" + params.Encode()
 	resp, err := c.httpClient.Get(fullURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get trades: %w", err)
@@ -540,8 +569,17 @@ func (c *Client) GetOrderBook(ctx context.Context, symbol string, limit int) (*t
 		params.Set("limit", strconv.Itoa(limit))
 	}
 
-	// Use public endpoint for order book (no authentication needed)
-	fullURL := c.baseURL + "/fapi/v1/depth?" + params.Encode()
+	// Use correct endpoint based on base URL
+	var endpoint string
+	if strings.Contains(c.baseURL, "fapi") {
+		// Futures API
+		endpoint = "/fapi/v1/depth"
+	} else {
+		// Spot API
+		endpoint = "/api/v3/depth"
+	}
+
+	fullURL := c.baseURL + endpoint + "?" + params.Encode()
 	resp, err := c.httpClient.Get(fullURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get order book: %w", err)
