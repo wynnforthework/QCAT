@@ -16,6 +16,16 @@ type BanexgAdapter struct {
 }
 
 // NewBanexgAdapter creates a new banexg adapter
+//
+// Note: You may see warnings like "cache private api result is not recommend" from banexg library.
+// These warnings are triggered when the library caches results from private API endpoints (like
+// /fapi/v1/leverageBracket) that require authentication. The library warns about this because:
+// 1. Private API responses contain sensitive account information
+// 2. Cached data can become stale quickly due to trading activity
+// 3. Security best practices discourage persisting sensitive data to disk
+//
+// These are informational warnings and can be safely ignored as they don't affect functionality.
+// The caching is controlled internally by the library's CacheSecs field in API endpoint definitions.
 func NewBanexgAdapter(config *ExchangeConfig) (*BanexgAdapter, error) {
 	// Prepare banexg options
 	options := map[string]interface{}{
@@ -26,12 +36,29 @@ func NewBanexgAdapter(config *ExchangeConfig) (*BanexgAdapter, error) {
 	// Set market type to linear futures (USDT-M)
 	options[banexg.OptMarketType] = banexg.MarketLinear
 
+	// Attempt to disable private API caching to avoid security warnings
+	// The banexg library warns when caching private API results because they contain
+	// sensitive account information that shouldn't be persisted to disk.
+	// Note: The library's caching is controlled by CacheSecs field in API endpoint
+	// definitions, so these options may not completely eliminate the warnings.
+	if config.SuppressCacheWarnings {
+		options["enableCache"] = false
+		options["cachePrivateApi"] = false
+		options["disableCache"] = true
+	}
+
 	// Set testnet if configured
 	if config.TestNet {
 		// Set environment to testnet
 		options[banexg.OptEnv] = "test"
-		// Enable debug for better error messages
+		// Disable debug to reduce log noise including cache warnings
 		options[banexg.OptDebugApi] = false
+
+		// Try to disable verbose logging that might include cache warnings
+		if config.SuppressCacheWarnings {
+			options["verbose"] = false
+			options["debug"] = false
+		}
 	}
 
 	// Create banexg exchange instance

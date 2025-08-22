@@ -580,11 +580,11 @@ export default function ShareResultPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {loadingStrategies ? (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="loading" disabled>
                           加载中...
                         </SelectItem>
                       ) : strategies.length === 0 ? (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="no-strategies" disabled>
                           暂无已启用的策略，请先登录或启用策略
                         </SelectItem>
                       ) : (

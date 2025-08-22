@@ -61,21 +61,22 @@ type Server struct {
 
 // Handlers contains all API handlers
 type Handlers struct {
-	Optimizer  *OptimizerHandler
-	Strategy   *StrategyHandler
-	Portfolio  *PortfolioHandler
-	Risk       *RiskHandler
-	Hotlist    *HotlistHandler
-	Metrics    *MetricsHandler
-	Audit      *AuditHandler
-	WebSocket  *WebSocketHandler
-	Auth       *AuthHandler
-	Cache      *CacheHandler
-	Security   *SecurityHandler
-	Dashboard  *DashboardHandler
-	Market     *MarketHandler
-	Trading    *TradingHandler
-	Automation *AutomationHandler
+	Optimizer          *OptimizerHandler
+	Strategy           *StrategyHandler
+	Portfolio          *PortfolioHandler
+	Risk               *RiskHandler
+	Hotlist            *HotlistHandler
+	Metrics            *MetricsHandler
+	Audit              *AuditHandler
+	WebSocket          *WebSocketHandler
+	Auth               *AuthHandler
+	Cache              *CacheHandler
+	Security           *SecurityHandler
+	Dashboard          *DashboardHandler
+	Market             *MarketHandler
+	Trading            *TradingHandler
+	Automation         *AutomationHandler
+	StrategyValidation *StrategyValidationHandler
 }
 
 // RateLimiter 速率限制器结构
@@ -472,21 +473,22 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 	// Initialize handlers with dependencies
 	server.handlers = &Handlers{
-		Optimizer:  NewOptimizerHandler(db, redis, metricsCollector),
-		Strategy:   NewStrategyHandler(db, redis, metricsCollector),
-		Portfolio:  NewPortfolioHandler(db, redis, metricsCollector),
-		Risk:       NewRiskHandler(db, redis, metricsCollector),
-		Hotlist:    NewHotlistHandler(db, redis, metricsCollector),
-		Metrics:    NewMetricsHandler(db, metricsCollector),
-		Audit:      NewAuditHandler(db, metricsCollector),
-		WebSocket:  NewWebSocketHandler(server.upgrader, metrics),
-		Auth:       NewAuthHandler(jwtManager, db),
-		Cache:      NewCacheHandler(cacheManagerRef),
-		Security:   NewSecurityHandler(keyManager, auditLogger),
-		Dashboard:  NewDashboardHandler(db, metricsCollector, accountManager),
-		Market:     NewMarketHandler(db, metricsCollector),
-		Trading:    NewTradingHandler(db, metricsCollector),
-		Automation: NewAutomationHandler(db, metricsCollector, automationSystem),
+		Optimizer:          NewOptimizerHandler(db, redis, metricsCollector),
+		Strategy:           NewStrategyHandler(db, redis, metricsCollector),
+		Portfolio:          NewPortfolioHandler(db, redis, metricsCollector),
+		Risk:               NewRiskHandler(db, redis, metricsCollector),
+		Hotlist:            NewHotlistHandler(db, redis, metricsCollector),
+		Metrics:            NewMetricsHandler(db, metricsCollector),
+		Audit:              NewAuditHandler(db, metricsCollector),
+		WebSocket:          NewWebSocketHandler(server.upgrader, metrics),
+		Auth:               NewAuthHandler(jwtManager, db),
+		Cache:              NewCacheHandler(cacheManagerRef),
+		Security:           NewSecurityHandler(keyManager, auditLogger),
+		Dashboard:          NewDashboardHandler(db, metricsCollector, accountManager),
+		Market:             NewMarketHandler(db, metricsCollector),
+		Trading:            NewTradingHandler(db, metricsCollector),
+		Automation:         NewAutomationHandler(db, metricsCollector, automationSystem),
+		StrategyValidation: NewStrategyValidationHandler(),
 	}
 
 	// Store security components for middleware
@@ -625,6 +627,14 @@ func (s *Server) setupRoutes() {
 			{
 				metrics.GET("/strategy/:id", s.handlers.Metrics.GetStrategyMetrics)
 				metrics.GET("/performance", s.handlers.Metrics.GetPerformanceMetrics)
+			}
+
+			// Strategy validation routes
+			validation := protected.Group("/validation")
+			{
+				validation.GET("/strategies", s.handlers.StrategyValidation.GetStrategyValidationStatus)
+				validation.GET("/problems", s.handlers.StrategyValidation.GetStrategyProblems)
+				validation.GET("/automation", s.handlers.StrategyValidation.GetAutomationStatus)
 			}
 
 			// Memory management routes

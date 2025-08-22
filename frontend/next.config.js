@@ -2,14 +2,15 @@
 const nextConfig = {
   // 启用严格模式以帮助发现潜在问题
   reactStrictMode: true,
-  
-  // 优化生产构建
-  swcMinify: true,
-  
-  // 配置实验性功能
+
+  // 配置实验性功能 (如果需要的话)
   experimental: {
-    // 启用 App Router
-    appDir: true,
+    // 可以在这里添加实验性功能
+  },
+
+  // Turbopack 配置 (用于开发模式)
+  turbo: {
+    // 可以在这里添加 Turbopack 特定的配置
   },
   
   // 配置环境变量
@@ -67,9 +68,10 @@ const nextConfig = {
     formats: ['image/webp', 'image/avif'],
   },
   
-  // 配置 webpack
+  // 配置 webpack (仅在非 Turbopack 模式下使用)
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     // 自定义 webpack 配置
+    // 注意：当使用 Turbopack 时，这个配置不会被使用
     return config
   },
 }

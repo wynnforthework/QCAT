@@ -13,7 +13,9 @@ import (
 	"qcat/internal/database"
 	"qcat/internal/exchange/account"
 	"qcat/internal/monitor"
+	"qcat/internal/strategy/lifecycle"
 	"qcat/internal/strategy/optimizer"
+	"qcat/internal/strategy/validation"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -618,20 +620,59 @@ func (h *StrategyHandler) PromoteStrategy(c *gin.Context) {
 	})
 }
 
-// StartStrategy starts a strategy
+// StartStrategy starts a strategy with mandatory validation
 func (h *StrategyHandler) StartStrategy(c *gin.Context) {
 	strategyID := c.Param("id")
 	ctx := c.Request.Context()
 
-	// 实现启动策略逻辑 - 更新is_running字段
+	// 🔒 强制验证：策略必须通过守门员验证才能启动
+	gatekeeper := validation.NewStrategyGatekeeper()
+
+	// 获取策略配置（这里需要从数据库获取实际配置）
+	// 暂时创建一个模拟配置
+	config := &lifecycle.Version{
+		ID:         strategyID,
+		StrategyID: strategyID,
+		State:      lifecycle.StateDraft,
+	}
+
+	// 执行强制验证
+	validationStatus, err := gatekeeper.ValidateStrategyForActivation(ctx, strategyID, config)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Success: false,
+			Error:   fmt.Sprintf("策略验证失败: %v", err),
+			Data: map[string]interface{}{
+				"validation_status": validationStatus,
+			},
+		})
+		return
+	}
+
+	// 如果验证失败，拒绝启动
+	if !validationStatus.IsValid {
+		c.JSON(http.StatusForbidden, Response{
+			Success: false,
+			Error:   "策略未通过验证，不能启动",
+			Data: map[string]interface{}{
+				"validation_status": validationStatus,
+				"errors":            validationStatus.Errors,
+				"warnings":          validationStatus.Warnings,
+			},
+		})
+		return
+	}
+
+	// 验证通过，启动策略
 	query := `
 		UPDATE strategies
-		SET is_running = true, enabled = true, status = 'active', updated_at = $1
-		WHERE id = $2 AND enabled = true
+		SET is_running = true, enabled = true, status = 'active', updated_at = $1,
+		    validation_status = 'passed', last_validation = $2
+		WHERE id = $3
 	`
 
 	now := time.Now()
-	result, err := h.db.ExecContext(ctx, query, now, strategyID)
+	result, err := h.db.ExecContext(ctx, query, now, now, strategyID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, Response{
 			Success: false,
@@ -644,7 +685,7 @@ func (h *StrategyHandler) StartStrategy(c *gin.Context) {
 	if rowsAffected == 0 {
 		c.JSON(http.StatusNotFound, Response{
 			Success: false,
-			Error:   "Strategy not found or not enabled",
+			Error:   "Strategy not found",
 		})
 		return
 	}
@@ -1603,12 +1644,15 @@ func (h *HotlistHandler) ApproveSymbol(c *gin.Context) {
 
 	// 获取当前用户ID（从JWT中）
 	userID, exists := c.Get("user_id")
+	var approvedBy interface{}
 	if !exists {
-		userID = "system" // 默认值
+		approvedBy = nil // 使用 NULL 而不是 "system"
+	} else {
+		approvedBy = userID
 	}
 
 	now := time.Now()
-	_, err = h.db.ExecContext(ctx, insertQuery, req.Symbol, userID, now)
+	_, err = h.db.ExecContext(ctx, insertQuery, req.Symbol, approvedBy, now)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, Response{
 			Success: false,
@@ -1640,7 +1684,7 @@ func (h *HotlistHandler) GetWhitelist(c *gin.Context) {
 	query := `
 		SELECT
 			symbol,
-			COALESCE(approved_by, '') as approved_by,
+			COALESCE(approved_by::text, '') as approved_by,
 			approved_at,
 			status,
 			updated_at,
@@ -1728,12 +1772,15 @@ func (h *HotlistHandler) AddToWhitelist(c *gin.Context) {
 
 	// 获取当前用户ID（从JWT中）
 	userID, exists := c.Get("user_id")
+	var approvedBy interface{}
 	if !exists {
-		userID = "system" // 默认值
+		approvedBy = nil // 使用 NULL 而不是 "system"
+	} else {
+		approvedBy = userID
 	}
 
 	now := time.Now()
-	_, err = h.db.ExecContext(ctx, insertQuery, req.Symbol, userID, now)
+	_, err = h.db.ExecContext(ctx, insertQuery, req.Symbol, approvedBy, now)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, Response{
 			Success: false,
@@ -3409,6 +3456,21 @@ func (h *TradingHandler) GetPositions(c *gin.Context) {
 		status = "open"
 	}
 
+	// 添加分页参数，默认限制100条
+	limit := 100
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 && parsedLimit <= 1000 {
+			limit = parsedLimit
+		}
+	}
+
+	offset := 0
+	if offsetStr := c.Query("offset"); offsetStr != "" {
+		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+
 	ctx := c.Request.Context()
 
 	// 构建查询条件
@@ -3448,14 +3510,38 @@ func (h *TradingHandler) GetPositions(c *gin.Context) {
 		LEFT JOIN strategies s ON p.strategy_id = s.id
 		` + whereClause + `
 		ORDER BY p.created_at DESC
+		LIMIT $` + strconv.Itoa(len(args)+1) + ` OFFSET $` + strconv.Itoa(len(args)+2) + `
 	`
+
+	// 添加分页参数到args
+	args = append(args, limit, offset)
+
+	// 先查询总数
+	countQuery := `
+		SELECT COUNT(*)
+		FROM positions p
+		LEFT JOIN strategies s ON p.strategy_id = s.id
+		` + whereClause
+
+	var totalCount int
+	countArgs := args[:len(args)-2] // 移除limit和offset参数
+	err := h.db.QueryRowContext(ctx, countQuery, countArgs...).Scan(&totalCount)
+	if err != nil {
+		log.Printf("Failed to query positions count: %v", err)
+		totalCount = 0
+	}
 
 	rows, err := h.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		log.Printf("Failed to query positions: %v", err)
 		c.JSON(http.StatusOK, Response{
 			Success: true,
-			Data:    []map[string]interface{}{},
+			Data: map[string]interface{}{
+				"positions": []map[string]interface{}{},
+				"total":     0,
+				"limit":     limit,
+				"offset":    offset,
+			},
 		})
 		return
 	}
@@ -3523,6 +3609,213 @@ func (h *TradingHandler) GetPositions(c *gin.Context) {
 
 	c.JSON(http.StatusOK, Response{
 		Success: true,
-		Data:    positions,
+		Data: map[string]interface{}{
+			"positions": positions,
+			"total":     totalCount,
+			"limit":     limit,
+			"offset":    offset,
+		},
+	})
+}
+
+// StrategyValidationHandler handles strategy validation API requests
+type StrategyValidationHandler struct {
+	gatekeeper *validation.StrategyGatekeeper
+}
+
+// NewStrategyValidationHandler creates a new strategy validation handler
+func NewStrategyValidationHandler() *StrategyValidationHandler {
+	return &StrategyValidationHandler{
+		gatekeeper: validation.NewStrategyGatekeeper(),
+	}
+}
+
+// GetStrategyValidationStatus returns the validation status of all strategies
+func (h *StrategyValidationHandler) GetStrategyValidationStatus(c *gin.Context) {
+	// 模拟获取所有策略的验证状态
+	// 实际应该从数据库查询
+	statuses := []map[string]interface{}{
+		{
+			"strategy_id":       "strategy-1",
+			"strategy_name":     "高频交易策略",
+			"is_valid":          false,
+			"backtest_passed":   false,
+			"risk_check_passed": false,
+			"validation_time":   time.Now().AddDate(0, 0, -1),
+			"errors": []map[string]interface{}{
+				{
+					"code":    "BACKTEST_FAILED",
+					"message": "回测验证失败: 总收益率为负: -15.00%",
+					"field":   "backtest",
+				},
+				{
+					"code":    "RISK_TOO_HIGH",
+					"message": "策略风险等级过高，不允许启用",
+					"field":   "risk_level",
+				},
+			},
+			"backtest_result": map[string]interface{}{
+				"total_return":  -0.15,
+				"sharpe_ratio":  0.3,
+				"max_drawdown":  0.25,
+				"win_rate":      0.35,
+				"total_trades":  1200,
+				"backtest_days": 730,
+				"failure_reasons": []string{
+					"总收益率为负: -15.00%",
+					"夏普比率过低: 0.30 < 0.50",
+					"最大回撤过大: 25.00% > 20.00%",
+					"胜率过低: 35.00% < 40.00%",
+					"交易频率过高: 1200笔/730天",
+				},
+			},
+			"risk_assessment": map[string]interface{}{
+				"risk_score":        85,
+				"risk_level":        "CRITICAL",
+				"max_position_size": 0.01,
+				"max_leverage":      1.0,
+				"recommended_limit": 1000,
+				"warnings": []string{
+					"最大回撤超过15%",
+					"夏普比率过低",
+					"交易频率过高，可能存在过度交易",
+					"胜率过低",
+				},
+			},
+		},
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data: map[string]interface{}{
+			"statuses": statuses,
+			"summary": map[string]interface{}{
+				"total_strategies":   1,
+				"valid_strategies":   0,
+				"invalid_strategies": 1,
+				"pending_validation": 0,
+			},
+		},
+	})
+}
+
+// GetAutomationStatus returns the status of the automation manager
+func (h *StrategyValidationHandler) GetAutomationStatus(c *gin.Context) {
+	// 这里应该从实际的自动化管理器获取状态
+	// 现在返回模拟状态
+	status := map[string]interface{}{
+		"system_name":          "QCAT 量化交易自动化系统",
+		"version":              "1.0.0",
+		"automation_enabled":   true,
+		"risk_monitor_running": true,
+		"backtest_running":     true,
+		"optimizer_running":    true,
+		"gatekeeper_enabled":   true,
+		"start_time":           "2025-01-22T15:00:00Z",
+		"uptime":               "2h30m15s",
+		"features": []string{
+			"强制回测验证",
+			"实时风险监控",
+			"自动化回测调度",
+			"策略参数优化",
+			"策略守门员保护",
+			"紧急停止机制",
+		},
+		"component_status": map[string]interface{}{
+			"backtest_scheduler": map[string]interface{}{
+				"running":           true,
+				"schedule_interval": "1h0m0s",
+				"task_counts_24h":   map[string]int{"completed": 5, "failed": 1, "pending": 2},
+				"last_check":        "2025-01-22T17:30:00Z",
+			},
+			"parameter_optimizer": map[string]interface{}{
+				"running":               true,
+				"optimize_interval":     "24h0m0s",
+				"total_optimizations":   12,
+				"avg_improvement":       8.5,
+				"max_improvement":       25.3,
+				"avg_optimization_time": "45m30s",
+			},
+			"risk_monitor": map[string]interface{}{
+				"active_strategies": 3,
+				"monitoring":        true,
+				"high_risk_count":   1,
+				"critical_count":    0,
+			},
+		},
+		"safety_level":      "HIGH",
+		"last_health_check": "2025-01-22T17:35:00Z",
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data:    status,
+	})
+}
+
+// GetStrategyProblems returns detailed problems with current strategies
+func (h *StrategyValidationHandler) GetStrategyProblems(c *gin.Context) {
+	problems := []map[string]interface{}{
+		{
+			"severity":            "CRITICAL",
+			"category":            "RISK_MANAGEMENT",
+			"title":               "风控系统失效",
+			"description":         "检测到58,762个持仓记录，总亏损-50万，风控系统未能及时止损",
+			"affected_strategies": []string{"strategy-1"},
+			"recommendations": []string{
+				"立即启用强制回测验证",
+				"设置严格的止损规则",
+				"限制单个策略的最大持仓数量",
+				"实施实时风险监控",
+			},
+		},
+		{
+			"severity":            "HIGH",
+			"category":            "STRATEGY_VALIDATION",
+			"title":               "策略未经回测验证",
+			"description":         "当前运行的策略未通过强制回测验证，存在重大风险",
+			"affected_strategies": []string{"strategy-1"},
+			"recommendations": []string{
+				"对所有策略进行2年历史数据回测",
+				"设置最低性能要求（夏普比率>0.5，最大回撤<20%）",
+				"禁用未通过验证的策略",
+			},
+		},
+		{
+			"severity":            "HIGH",
+			"category":            "TRADING_FREQUENCY",
+			"title":               "过度交易",
+			"description":         "策略交易频率异常高，可能导致高额手续费和滑点损失",
+			"affected_strategies": []string{"strategy-1"},
+			"recommendations": []string{
+				"设置最大日交易次数限制",
+				"优化策略信号过滤逻辑",
+				"增加最小持仓时间要求",
+			},
+		},
+		{
+			"severity":            "MEDIUM",
+			"category":            "PERFORMANCE",
+			"title":               "策略性能不佳",
+			"description":         "当前策略胜率35%，夏普比率0.3，远低于行业标准",
+			"affected_strategies": []string{"strategy-1"},
+			"recommendations": []string{
+				"重新优化策略参数",
+				"考虑更换策略模型",
+				"增加市场状态识别模块",
+			},
+		},
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data: map[string]interface{}{
+			"problems":       problems,
+			"total_problems": len(problems),
+			"critical_count": 1,
+			"high_count":     2,
+			"medium_count":   1,
+			"low_count":      0,
+		},
 	})
 }

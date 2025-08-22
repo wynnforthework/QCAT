@@ -44,11 +44,12 @@ func main() {
 
 	// Create exchange config
 	exchangeConfig := &exchange.ExchangeConfig{
-		Name:      cfg.Exchange.Name,
-		APIKey:    cfg.Exchange.APIKey,
-		APISecret: cfg.Exchange.APISecret,
-		TestNet:   cfg.Exchange.TestNet,
-		BaseURL:   cfg.Exchange.BaseURL,
+		Name:                  cfg.Exchange.Name,
+		APIKey:                cfg.Exchange.APIKey,
+		APISecret:             cfg.Exchange.APISecret,
+		TestNet:               cfg.Exchange.TestNet,
+		SuppressCacheWarnings: true, // Attempt to suppress banexg cache warnings
+		BaseURL:               cfg.Exchange.BaseURL,
 	}
 
 	// Create rate limiter (simple implementation)

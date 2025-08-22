@@ -116,7 +116,16 @@ class ApiClient {
     };
 
     try {
-      const response = await fetch(url, config);
+      // 添加超时控制，防止请求卡死
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30秒超时
+
+      const response = await fetch(url, {
+        ...config,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         let errorMessage = `HTTP error! status: ${response.status}`;
@@ -151,6 +160,17 @@ class ApiClient {
       return result.data as T;
     } catch (error) {
       console.error('API request failed:', error);
+
+      // 处理超时错误
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new ApiError('请求超时，请检查网络连接', 408);
+      }
+
+      // 处理网络错误
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        throw new ApiError('网络连接失败，请检查网络设置', 0);
+      }
+
       throw error;
     }
   }
@@ -664,18 +684,20 @@ class ApiClient {
   }
 
   // Positions API
-  async getPositions(strategyId?: string, status?: 'open' | 'closed' | 'all'): Promise<PositionItem[]> {
+  async getPositions(strategyId?: string, status?: 'open' | 'closed' | 'all', limit: number = 100, offset: number = 0): Promise<{positions: PositionItem[], total: number, limit: number, offset: number}> {
     try {
       const params = new URLSearchParams();
       if (strategyId) params.append('strategyId', strategyId);
       if (status) params.append('status', status);
+      params.append('limit', limit.toString());
+      params.append('offset', offset.toString());
       const queryString = params.toString();
-      const endpoint = queryString ? `/api/v1/trading/positions?${queryString}` : '/api/v1/trading/positions';
-      return this.request<PositionItem[]>(endpoint);
+      const endpoint = `/api/v1/trading/positions?${queryString}`;
+      return this.request<{positions: PositionItem[], total: number, limit: number, offset: number}>(endpoint);
     } catch (error) {
       console.error('Failed to fetch positions:', error);
-      // Return empty array when API fails
-      return [];
+      // Return empty result when API fails
+      return {positions: [], total: 0, limit, offset};
     }
   }
 
@@ -684,6 +706,15 @@ class ApiClient {
   // Automation System API
   async getAutomationStatus(): Promise<AutomationStatus[]> {
     return this.request<AutomationStatus[]>('/api/v1/automation/status');
+  }
+
+  // Strategy Validation API
+  async getStrategyValidationStatus(): Promise<any> {
+    return this.request<any>('/api/v1/validation/strategies');
+  }
+
+  async getStrategyProblems(): Promise<any> {
+    return this.request<any>('/api/v1/validation/problems');
   }
 
   async getAutomationHealthMetrics(): Promise<HealthMetrics> {

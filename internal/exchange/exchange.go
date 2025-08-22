@@ -75,12 +75,16 @@ type BaseExchange struct {
 
 // ExchangeConfig represents exchange configuration
 type ExchangeConfig struct {
-	Name      string
-	APIKey    string
-	APISecret string
-	TestNet   bool
-	BaseURL   string
+	Name           string
+	APIKey         string
+	APISecret      string
+	TestNet        bool
+	BaseURL        string
 	FuturesBaseURL string
+	// SuppressCacheWarnings indicates whether to attempt suppressing cache warnings
+	// from the underlying exchange library (like banexg). Note that this may not
+	// completely eliminate all warnings due to library-internal caching mechanisms.
+	SuppressCacheWarnings bool
 }
 
 // NewBaseExchange creates a new base exchange

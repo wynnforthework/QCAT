@@ -18,6 +18,7 @@ import (
 	"qcat/internal/orchestrator"
 	"qcat/internal/strategy/optimizer"
 	"qcat/internal/strategy/paper"
+	"qcat/internal/system"
 )
 
 func main() {
@@ -53,6 +54,32 @@ func main() {
 	// Start automation system (includes executor and scheduler)
 	if err := automationSystem.Start(); err != nil {
 		log.Fatalf("Failed to start automation system: %v", err)
+	}
+
+	// 🔥 Initialize and start the new comprehensive automation manager
+	log.Println("🚀 Initializing Advanced Automation Manager...")
+	db := server.GetDB()
+	if db != nil {
+		automationManager := system.NewAutomationManager(db.DB) // 使用嵌入的 *sql.DB
+
+		// Start the automation manager (includes risk monitoring, backtest scheduling, parameter optimization)
+		if err := automationManager.Start(); err != nil {
+			log.Printf("⚠️  Failed to start automation manager: %v", err)
+			log.Println("Continuing without advanced automation features...")
+		} else {
+			log.Println("✅ Advanced Automation Manager started successfully!")
+
+			// Register automation manager for graceful shutdown
+			shutdownManager := server.GetShutdownManager()
+			if shutdownManager != nil {
+				shutdownManager.RegisterComponent("automation_manager", "Advanced Automation Manager", 0, func(ctx context.Context) error {
+					automationManager.Stop()
+					return nil
+				}, 15*time.Second)
+			}
+		}
+	} else {
+		log.Println("⚠️  Database not available, skipping automation manager initialization")
 	}
 
 	// Add orchestrator handler to server
