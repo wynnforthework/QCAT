@@ -169,6 +169,7 @@ export default function ShareResultPage() {
   const [newDataSource, setNewDataSource] = useState('')
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<'idle' | 'success' | 'error'>('idle')
+  const [authError, setAuthError] = useState(false)
 
   // 加载策略列表
   useEffect(() => {
@@ -178,13 +179,32 @@ export default function ShareResultPage() {
   const loadStrategies = async () => {
     setLoadingStrategies(true)
     try {
+      // 检查是否有认证token
+      const token = localStorage.getItem('accessToken')
+      if (!token) {
+        console.warn('No authentication token found')
+        setAuthError(true)
+        setStrategies([])
+        return
+      }
+      setAuthError(false)
+
       // 使用正确的API客户端获取策略数据
       const strategies = await apiClient.getStrategies()
+      console.log('Loaded strategies:', strategies)
+
       // 只显示已启用的策略
       const enabledStrategies = strategies.filter(s => s.enabled !== false && s.runtime_status !== 'disabled')
+      console.log('Enabled strategies:', enabledStrategies)
       setStrategies(enabledStrategies)
     } catch (error) {
       console.error('Failed to load strategies:', error)
+      // 如果是认证错误，提示用户登录
+      if (error instanceof Error && error.message.includes('UNAUTHORIZED')) {
+        console.warn('Authentication required, redirecting to login')
+        setAuthError(true)
+        // 可以在这里添加重定向到登录页面的逻辑
+      }
       setStrategies([])
     } finally {
       setLoadingStrategies(false)
@@ -517,6 +537,18 @@ export default function ShareResultPage() {
         </Alert>
       )}
 
+      {authError && (
+        <Alert className="border-yellow-200 bg-yellow-50">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            请先登录系统才能获取策略列表。
+            <Button variant="link" className="p-0 h-auto ml-2" onClick={() => window.location.href = '/login'}>
+              前往登录
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="basic">基本信息</TabsTrigger>
@@ -547,9 +579,13 @@ export default function ShareResultPage() {
                       <SelectValue placeholder={loadingStrategies ? "加载中..." : "请选择一个已启用的策略"} />
                     </SelectTrigger>
                     <SelectContent>
-                      {strategies.length === 0 && !loadingStrategies ? (
+                      {loadingStrategies ? (
                         <SelectItem value="" disabled>
-                          暂无已启用的策略
+                          加载中...
+                        </SelectItem>
+                      ) : strategies.length === 0 ? (
+                        <SelectItem value="" disabled>
+                          暂无已启用的策略，请先登录或启用策略
                         </SelectItem>
                       ) : (
                         strategies.map((strategy) => (
