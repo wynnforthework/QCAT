@@ -186,47 +186,48 @@ func (h *AutomationHandler) GetSystemStatus(c *gin.Context) {
 func (h *AutomationHandler) generateAutomationFeatures(systemStatus *automation.SystemStatus) []AutomationStatus {
 	features := []struct {
 		id          string
+		realTaskID  string // 真实的任务ID，用于调度器查询
 		name        string
 		category    string
 		description string
 	}{
 		// Strategy Management (6 features)
-		{"1", "策略自动优化", "strategy", "自动优化策略参数以提升收益"},
-		{"2", "策略自动切换", "strategy", "根据市场条件自动切换策略"},
-		{"3", "策略性能监控", "strategy", "实时监控策略表现并预警"},
-		{"4", "策略参数调整", "strategy", "动态调整策略参数"},
-		{"5", "策略回测验证", "strategy", "自动回测验证策略有效性"},
-		{"6", "策略组合优化", "strategy", "优化多策略组合配置"},
+		{"1", "strategy_optimization", "策略自动优化", "strategy", "自动优化策略参数以提升收益"},
+		{"2", "strategy_switching", "策略自动切换", "strategy", "根据市场条件自动切换策略"},
+		{"3", "strategy_monitoring", "策略性能监控", "strategy", "实时监控策略表现并预警"},
+		{"4", "strategy_adjustment", "策略参数调整", "strategy", "动态调整策略参数"},
+		{"5", "strategy_backtesting", "策略回测验证", "strategy", "自动回测验证策略有效性"},
+		{"6", "strategy_portfolio", "策略组合优化", "strategy", "优化多策略组合配置"},
 
 		// Risk Management (5 features)
-		{"7", "风险实时监控", "risk", "实时监控账户风险指标"},
-		{"8", "自动止损止盈", "risk", "根据风险阈值自动止损止盈"},
-		{"9", "仓位自动调整", "risk", "根据风险水平自动调整仓位"},
-		{"10", "风险预警系统", "risk", "提前预警潜在风险"},
-		{"11", "熔断机制", "risk", "极端情况下自动熔断交易"},
+		{"7", "risk_monitoring", "风险实时监控", "risk", "实时监控账户风险指标"},
+		{"8", "stop_loss", "自动止损止盈", "risk", "根据风险阈值自动止损止盈"},
+		{"9", "position_adjustment", "仓位自动调整", "risk", "根据风险水平自动调整仓位"},
+		{"10", "risk_warning", "风险预警系统", "risk", "提前预警潜在风险"},
+		{"11", "circuit_breaker", "熔断机制", "risk", "极端情况下自动熔断交易"},
 
 		// Position Management (4 features)
-		{"12", "仓位自动再平衡", "position", "定期自动再平衡投资组合"},
-		{"13", "动态仓位分配", "position", "根据市场条件动态分配仓位"},
-		{"14", "仓位风险控制", "position", "控制单个仓位风险敞口"},
-		{"15", "仓位成本优化", "position", "优化仓位建立和平仓成本"},
+		{"12", "position_rebalance", "仓位自动再平衡", "position", "定期自动再平衡投资组合"},
+		{"13", "position_optimization", "动态仓位分配", "position", "根据市场条件动态分配仓位"},
+		{"14", "position_risk_control", "仓位风险控制", "position", "控制单个仓位风险敞口"},
+		{"15", "position_cost_optimization", "仓位成本优化", "position", "优化仓位建立和平仓成本"},
 
 		// Market Data (3 features)
-		{"16", "市场数据采集", "data", "自动采集和处理市场数据"},
-		{"17", "异常数据检测", "data", "检测和处理异常市场数据"},
-		{"18", "数据质量监控", "data", "监控数据质量和完整性"},
+		{"16", "data_cleaning", "市场数据采集", "data", "自动采集和处理市场数据"},
+		{"17", "data_anomaly_detection", "异常数据检测", "data", "检测和处理异常市场数据"},
+		{"18", "data_quality_monitoring", "数据质量监控", "data", "监控数据质量和完整性"},
 
 		// System Operations (4 features)
-		{"19", "系统健康检查", "system", "定期检查系统健康状态"},
-		{"20", "自动故障恢复", "system", "自动检测和恢复系统故障"},
-		{"21", "性能优化调整", "system", "自动优化系统性能参数"},
-		{"22", "资源使用监控", "system", "监控和优化资源使用"},
+		{"19", "system_health", "系统健康检查", "system", "定期检查系统健康状态"},
+		{"20", "system_recovery", "自动故障恢复", "system", "自动检测和恢复系统故障"},
+		{"21", "performance_optimization", "性能优化调整", "system", "自动优化系统性能参数"},
+		{"22", "resource_monitoring", "资源使用监控", "system", "监控和优化资源使用"},
 
 		// Learning & Intelligence (4 features)
-		{"23", "机器学习训练", "learning", "自动训练和更新ML模型"},
-		{"24", "市场模式识别", "learning", "识别和学习市场模式"},
-		{"25", "智能决策支持", "learning", "提供智能化决策建议"},
-		{"26", "自适应参数调整", "learning", "基于学习结果自适应调整"},
+		{"23", "automl_learning", "机器学习训练", "learning", "自动训练和更新ML模型"},
+		{"24", "market_pattern_recognition", "市场模式识别", "learning", "识别和学习市场模式"},
+		{"25", "intelligent_decision", "智能决策支持", "learning", "提供智能化决策建议"},
+		{"26", "adaptive_adjustment", "自适应参数调整", "learning", "基于学习结果自适应调整"},
 	}
 
 	automations := make([]AutomationStatus, len(features))
@@ -244,7 +245,7 @@ func (h *AutomationHandler) generateAutomationFeatures(systemStatus *automation.
 
 		// 尝试从调度器获取真实状态
 		if h.automationSystem != nil && h.automationSystem.GetScheduler() != nil {
-			if task := h.automationSystem.GetScheduler().GetTask(feature.id); task != nil {
+			if task := h.automationSystem.GetScheduler().GetTask(feature.realTaskID); task != nil {
 				enabled = task.Enabled
 				lastExecution = task.LastRun
 				nextExecution = task.NextRun
