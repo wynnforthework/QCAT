@@ -3400,3 +3400,129 @@ func (h *StrategyHandler) GetOnboardingStatus(c *gin.Context) {
 		Data:    status,
 	})
 }
+
+// GetPositions returns current positions
+func (h *TradingHandler) GetPositions(c *gin.Context) {
+	strategyId := c.Query("strategyId")
+	status := c.Query("status") // open, closed, all
+	if status == "" {
+		status = "open"
+	}
+
+	ctx := c.Request.Context()
+
+	// 构建查询条件
+	whereClause := "WHERE 1=1"
+	args := []interface{}{}
+	argIndex := 1
+
+	if strategyId != "" {
+		whereClause += " AND p.strategy_id = $" + strconv.Itoa(argIndex)
+		args = append(args, strategyId)
+		argIndex++
+	}
+
+	if status != "all" {
+		whereClause += " AND p.status = $" + strconv.Itoa(argIndex)
+		args = append(args, status)
+		argIndex++
+	}
+
+	// 从数据库获取持仓数据
+	query := `
+		SELECT
+			p.id,
+			p.strategy_id,
+			p.symbol,
+			p.side,
+			p.size,
+			p.entry_price,
+			p.leverage,
+			COALESCE(p.unrealized_pnl, 0) as unrealized_pnl,
+			COALESCE(p.realized_pnl, 0) as realized_pnl,
+			p.status,
+			p.created_at,
+			p.updated_at,
+			s.name as strategy_name
+		FROM positions p
+		LEFT JOIN strategies s ON p.strategy_id = s.id
+		` + whereClause + `
+		ORDER BY p.created_at DESC
+	`
+
+	rows, err := h.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		log.Printf("Failed to query positions: %v", err)
+		c.JSON(http.StatusOK, Response{
+			Success: true,
+			Data:    []map[string]interface{}{},
+		})
+		return
+	}
+	defer rows.Close()
+
+	var positions []map[string]interface{}
+	for rows.Next() {
+		var position struct {
+			ID            string    `db:"id"`
+			StrategyID    string    `db:"strategy_id"`
+			Symbol        string    `db:"symbol"`
+			Side          string    `db:"side"`
+			Size          float64   `db:"size"`
+			EntryPrice    float64   `db:"entry_price"`
+			Leverage      int       `db:"leverage"`
+			UnrealizedPnL float64   `db:"unrealized_pnl"`
+			RealizedPnL   float64   `db:"realized_pnl"`
+			Status        string    `db:"status"`
+			CreatedAt     time.Time `db:"created_at"`
+			UpdatedAt     time.Time `db:"updated_at"`
+			StrategyName  *string   `db:"strategy_name"`
+		}
+
+		if err := rows.Scan(
+			&position.ID, &position.StrategyID, &position.Symbol, &position.Side,
+			&position.Size, &position.EntryPrice, &position.Leverage,
+			&position.UnrealizedPnL, &position.RealizedPnL, &position.Status,
+			&position.CreatedAt, &position.UpdatedAt, &position.StrategyName,
+		); err != nil {
+			continue
+		}
+
+		strategyName := "未知策略"
+		if position.StrategyName != nil {
+			strategyName = *position.StrategyName
+		}
+
+		// 计算持仓价值和收益率
+		positionValue := position.Size * position.EntryPrice
+		totalPnL := position.UnrealizedPnL + position.RealizedPnL
+		pnlPercent := 0.0
+		if positionValue > 0 {
+			pnlPercent = (totalPnL / positionValue) * 100
+		}
+
+		positions = append(positions, map[string]interface{}{
+			"id":             position.ID,
+			"strategy_id":    position.StrategyID,
+			"strategy_name":  strategyName,
+			"symbol":         position.Symbol,
+			"side":           position.Side,
+			"size":           position.Size,
+			"entry_price":    position.EntryPrice,
+			"leverage":       position.Leverage,
+			"unrealized_pnl": position.UnrealizedPnL,
+			"realized_pnl":   position.RealizedPnL,
+			"total_pnl":      totalPnL,
+			"pnl_percent":    pnlPercent,
+			"position_value": positionValue,
+			"status":         position.Status,
+			"created_at":     position.CreatedAt,
+			"updated_at":     position.UpdatedAt,
+		})
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data:    positions,
+	})
+}

@@ -663,6 +663,22 @@ class ApiClient {
     }
   }
 
+  // Positions API
+  async getPositions(strategyId?: string, status?: 'open' | 'closed' | 'all'): Promise<PositionItem[]> {
+    try {
+      const params = new URLSearchParams();
+      if (strategyId) params.append('strategyId', strategyId);
+      if (status) params.append('status', status);
+      const queryString = params.toString();
+      const endpoint = queryString ? `/api/v1/trading/positions?${queryString}` : '/api/v1/trading/positions';
+      return this.request<PositionItem[]>(endpoint);
+    } catch (error) {
+      console.error('Failed to fetch positions:', error);
+      // Return empty array when API fails
+      return [];
+    }
+  }
+
 
 
   // Automation System API
@@ -1063,6 +1079,25 @@ export interface TradeHistoryFilters {
   startTime?: string;
   endTime?: string;
   limit?: number;
+}
+
+export interface PositionItem {
+  id: string;
+  strategy_id: string;
+  strategy_name: string;
+  symbol: string;
+  side: "LONG" | "SHORT";
+  size: number;
+  entry_price: number;
+  leverage: number;
+  unrealized_pnl: number;
+  realized_pnl: number;
+  total_pnl: number;
+  pnl_percent: number;
+  position_value: number;
+  status: "open" | "closed";
+  created_at: string;
+  updated_at: string;
 }
 
 // Automation System Types

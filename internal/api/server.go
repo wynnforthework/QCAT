@@ -562,6 +562,7 @@ func (s *Server) setupRoutes() {
 			// Trading activity routes (now protected)
 			protected.GET("/trading/activity", s.handlers.Trading.GetTradingActivity)
 			protected.GET("/trading/history", s.handlers.Trading.GetTradeHistory)
+			protected.GET("/trading/positions", s.handlers.Trading.GetPositions)
 
 			// System metrics (now protected)
 			protected.GET("/metrics/system", s.handlers.Metrics.GetSystemMetrics)

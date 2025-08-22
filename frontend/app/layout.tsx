@@ -55,6 +55,12 @@ const navigation = [
     description: "资金分配和再平衡"
   },
   {
+    name: "交易管理",
+    href: "/trading",
+    icon: Activity,
+    description: "持仓管理和交易历史"
+  },
+  {
     name: "风险控制",
     href: "/risk",
     icon: Shield,
