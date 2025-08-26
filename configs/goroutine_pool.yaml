@@ -1,0 +1,93 @@
+# Goroutine池配置文件
+# Goroutine Pool Configuration
+
+# 默认池配置
+default_pool:
+  max_workers: 10          # 最大工作者数量
+  queue_size: 100          # 队列大小
+  enabled: true            # 是否启用
+
+# 高优先级池配置
+high_priority_pool:
+  max_workers: 5           # 最大工作者数量
+  queue_size: 50           # 队列大小
+  enabled: true            # 是否启用
+
+# 低优先级池配置
+low_priority_pool:
+  max_workers: 3           # 最大工作者数量
+  queue_size: 200          # 队列大小
+  enabled: true            # 是否启用
+
+# 策略执行池配置
+strategy_pool:
+  max_workers: 8           # 最大工作者数量
+  queue_size: 80           # 队列大小
+  enabled: true            # 是否启用
+
+# 数据处理池配置
+data_processing_pool:
+  max_workers: 6           # 最大工作者数量
+  queue_size: 120          # 队列大小
+  enabled: true            # 是否启用
+
+# 负载均衡配置
+load_balancer:
+  strategy: "least_connections"  # 负载均衡策略: round_robin, least_connections, weighted_round_robin
+  enabled: true                  # 是否启用负载均衡
+
+# 监控配置
+monitor:
+  enabled: true                  # 是否启用监控
+  interval: 30                   # 监控间隔（秒）
+  alert_thresholds:
+    max_cpu_usage: 80.0         # CPU使用率告警阈值（%）
+    max_memory_usage: 85.0      # 内存使用率告警阈值（%）
+    max_goroutine_count: 1000   # Goroutine数量告警阈值
+    max_queue_length: 500       # 队列长度告警阈值
+    min_health_score: 60.0      # 最低健康分数
+
+# 任务队列配置
+task_queue:
+  max_size: 500               # 最大队列大小
+  enabled: true               # 是否启用
+
+# 自动扩缩容配置
+auto_scaling:
+  enabled: true               # 是否启用自动扩缩容
+  scale_up_threshold: 80      # 扩容阈值（队列使用率%）
+  scale_down_threshold: 20    # 缩容阈值（队列使用率%）
+  min_workers: 1              # 最小工作者数量
+  max_workers: 50             # 最大工作者数量
+  scale_interval: 60          # 扩缩容检查间隔（秒）
+
+# 性能调优配置
+performance:
+  worker_idle_timeout: 300    # 工作者空闲超时（秒）
+  task_timeout: 600           # 任务执行超时（秒）
+  batch_size: 10              # 批处理大小
+  prefetch_count: 5           # 预取任务数量
+
+# 日志配置
+logging:
+  enabled: true               # 是否启用日志
+  level: "info"              # 日志级别: debug, info, warn, error
+  include_task_details: true  # 是否包含任务详情
+  include_performance_metrics: true  # 是否包含性能指标
+
+# 故障恢复配置
+fault_tolerance:
+  enabled: true               # 是否启用故障恢复
+  max_retries: 3              # 最大重试次数
+  retry_delay: 5              # 重试延迟（秒）
+  circuit_breaker:
+    enabled: true             # 是否启用熔断器
+    failure_threshold: 5      # 失败阈值
+    recovery_timeout: 30      # 恢复超时（秒）
+
+# 资源限制配置
+resource_limits:
+  max_memory_per_worker: "100MB"  # 每个工作者最大内存
+  max_cpu_per_worker: 0.5         # 每个工作者最大CPU（核心数）
+  max_total_memory: "1GB"         # 总最大内存
+  max_total_cpu: 4.0              # 总最大CPU（核心数）
