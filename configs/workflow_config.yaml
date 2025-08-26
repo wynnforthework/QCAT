@@ -1,0 +1,332 @@
+# 26项自动化功能工作流配置
+
+# 工作流引擎配置
+workflow_engine:
+  enabled: true
+  max_concurrency: 10
+  execution_timeout: 3600  # 秒
+  retry_attempts: 3
+  retry_delay: 30  # 秒
+  
+  # 事件驱动配置
+  event_driven:
+    enabled: true
+    event_buffer_size: 1000
+    event_timeout: 10  # 秒
+    
+  # 负载均衡配置
+  load_balancing:
+    enabled: true
+    strategy: "weighted_round_robin"  # round_robin, weighted_round_robin, least_connections
+    
+    # 资源池配置
+    resource_pools:
+      cpu_intensive:
+        max_workers: 2
+        queue_size: 10
+        timeout: 1800  # 30分钟
+        
+      io_intensive:
+        max_workers: 4
+        queue_size: 20
+        timeout: 600   # 10分钟
+        
+      network_io:
+        max_workers: 6
+        queue_size: 30
+        timeout: 300   # 5分钟
+        
+      realtime:
+        max_workers: 8
+        queue_size: 50
+        timeout: 60    # 1分钟
+        
+      monitoring:
+        max_workers: 10
+        queue_size: 100
+        timeout: 30    # 30秒
+
+# 执行阶段配置
+execution_stages:
+  # 阶段1: 基础层
+  stage_1:
+    name: "基础数据与监控层"
+    functions: [18, 21, 23]
+    parallel_execution: true
+    stage_timeout: 300
+    failure_strategy: "abort"  # abort, continue, retry
+    
+  # 阶段2: 监控层  
+  stage_2:
+    name: "市场分析与风险监控层"
+    functions: [26, 12, 13]
+    parallel_execution: true
+    stage_timeout: 600
+    failure_strategy: "continue"
+    depends_on: ["stage_1"]
+    
+  # 阶段3: 策略管理层
+  stage_3:
+    name: "策略管理层"
+    functions: [8, 19, 20]
+    parallel_execution: true
+    stage_timeout: 1800
+    failure_strategy: "retry"
+    depends_on: ["stage_1", "stage_2"]
+    
+  # 阶段4: 策略优化层
+  stage_4:
+    name: "策略优化层"
+    functions: [1, 6, 24, 25]
+    parallel_execution: false  # 有冲突，需要串行或互斥执行
+    stage_timeout: 3600
+    failure_strategy: "continue"
+    depends_on: ["stage_3"]
+    
+  # 阶段5: 策略应用层
+  stage_5:
+    name: "策略应用层"
+    functions: [2, 7, 10]
+    parallel_execution: true
+    stage_timeout: 900
+    failure_strategy: "retry"
+    depends_on: ["stage_4"]
+    
+  # 阶段6: 仓位管理层
+  stage_6:
+    name: "仓位管理层"
+    functions: [15, 3, 16, 17]
+    parallel_execution: true
+    stage_timeout: 600
+    failure_strategy: "continue"
+    depends_on: ["stage_5"]
+    
+  # 阶段7: 交易执行层
+  stage_7:
+    name: "交易执行层"
+    functions: [4, 5, 9]
+    parallel_execution: true
+    stage_timeout: 300
+    failure_strategy: "abort"
+    depends_on: ["stage_6"]
+    
+  # 阶段8: 收益优化层
+  stage_8:
+    name: "收益优化层"
+    functions: [11]
+    parallel_execution: true
+    stage_timeout: 600
+    failure_strategy: "continue"
+    depends_on: ["stage_7"]
+    
+  # 阶段9: 安全保障层
+  stage_9:
+    name: "安全保障层"
+    functions: [14, 22]
+    parallel_execution: true
+    stage_timeout: 900
+    failure_strategy: "continue"
+    depends_on: ["stage_8"]
+
+# 互锁规则配置
+interlock_rules:
+  # 策略优化互斥
+  strategy_optimization_mutex:
+    name: "策略优化互斥"
+    functions: [1, 6]
+    max_concurrent: 1
+    priority: 10
+    timeout: 3600
+    
+  # 策略进化互斥
+  strategy_evolution_mutex:
+    name: "策略进化互斥"
+    functions: [24, 25]
+    max_concurrent: 1
+    priority: 9
+    timeout: 3600
+    
+  # 策略管理互斥
+  strategy_management_mutex:
+    name: "策略管理互斥"
+    functions: [7, 8]
+    max_concurrent: 1
+    priority: 8
+    timeout: 1800
+    
+  # 风险交易互斥
+  risk_trading_mutex:
+    name: "风险交易互斥"
+    functions: [4, 12]
+    max_concurrent: 1
+    priority: 10
+    timeout: 300
+    
+  # 收益风险互斥
+  profit_risk_mutex:
+    name: "收益风险互斥"
+    functions: [11, 12]
+    max_concurrent: 1
+    priority: 10
+    timeout: 600
+
+# 调度策略配置
+scheduling:
+  # 全局调度策略
+  global_strategy: "priority_based"  # priority_based, round_robin, fair_share
+  
+  # 优先级调度
+  priority_scheduling:
+    enabled: true
+    preemption: false  # 是否允许抢占
+    aging_factor: 0.1  # 老化因子，防止饥饿
+    
+  # 时间窗口调度
+  time_window_scheduling:
+    enabled: true
+    windows:
+      # 交易时间窗口
+      trading_hours:
+        start: "09:00"
+        end: "15:00"
+        timezone: "Asia/Shanghai"
+        functions: [4, 5, 9, 11]  # 交易相关功能
+        
+      # 优化时间窗口
+      optimization_hours:
+        start: "02:00"
+        end: "06:00"
+        timezone: "Asia/Shanghai"
+        functions: [1, 6, 24, 25]  # 优化相关功能
+        
+      # 维护时间窗口
+      maintenance_hours:
+        start: "01:00"
+        end: "02:00"
+        timezone: "Asia/Shanghai"
+        functions: [18, 19, 20]  # 数据处理功能
+
+# 故障恢复配置
+fault_tolerance:
+  # 重试策略
+  retry_policy:
+    max_attempts: 3
+    backoff_strategy: "exponential"  # fixed, linear, exponential
+    initial_delay: 30
+    max_delay: 300
+    multiplier: 2.0
+    
+  # 降级策略
+  degradation_policy:
+    enabled: true
+    fallback_functions:
+      1: [2]    # 策略参数优化失败时，使用最佳参数应用
+      6: [1]    # 周期性优化失败时，使用参数优化
+      24: [19]  # 自学习失败时，使用回测
+      25: [24]  # 遗传升级失败时，使用自学习
+      
+  # 熔断策略
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5      # 失败阈值
+    timeout: 300             # 熔断超时时间(秒)
+    half_open_max_calls: 3   # 半开状态最大调用次数
+
+# 监控和告警配置
+monitoring:
+  # 性能监控
+  performance_monitoring:
+    enabled: true
+    metrics_interval: 60  # 秒
+    history_retention: 7  # 天
+    
+  # 告警配置
+  alerting:
+    enabled: true
+    channels: ["email", "webhook", "log"]
+    
+    # 告警规则
+    rules:
+      high_failure_rate:
+        condition: "failure_rate > 0.1"
+        severity: "warning"
+        cooldown: 300
+        
+      execution_timeout:
+        condition: "execution_time > timeout * 1.5"
+        severity: "critical"
+        cooldown: 60
+        
+      interlock_blocks:
+        condition: "interlock_blocks > 10"
+        severity: "warning"
+        cooldown: 600
+
+# 日志配置
+logging:
+  workflow_logs:
+    enabled: true
+    level: "info"
+    file: "logs/workflow.log"
+    max_size: "100MB"
+    max_backups: 10
+    max_age: 30
+    
+  execution_logs:
+    enabled: true
+    level: "debug"
+    file: "logs/execution.log"
+    max_size: "50MB"
+    max_backups: 20
+    max_age: 7
+    
+  event_logs:
+    enabled: true
+    level: "info"
+    file: "logs/events.log"
+    max_size: "50MB"
+    max_backups: 15
+    max_age: 14
+
+# 功能特定配置
+function_configs:
+  # 基础层功能配置
+  function_18:  # 数据清洗与校正
+    resource_type: "io_intensive"
+    max_execution_time: 300
+    memory_limit: "1GB"
+    
+  function_21:  # 系统健康监控
+    resource_type: "monitoring"
+    max_execution_time: 30
+    memory_limit: "256MB"
+    
+  function_23:  # 日志与审计追踪
+    resource_type: "io_intensive"
+    max_execution_time: 60
+    memory_limit: "512MB"
+    
+  # CPU密集型功能配置
+  function_1:   # 策略参数自动优化
+    resource_type: "cpu_intensive"
+    max_execution_time: 1800
+    memory_limit: "4GB"
+    cpu_cores: 2
+    
+  function_6:   # 周期性策略优化
+    resource_type: "cpu_intensive"
+    max_execution_time: 3600
+    memory_limit: "8GB"
+    cpu_cores: 4
+    
+  function_24:  # 策略自学习
+    resource_type: "cpu_intensive"
+    max_execution_time: 7200
+    memory_limit: "16GB"
+    cpu_cores: 8
+    
+  function_25:  # 遗传淘汰制升级
+    resource_type: "cpu_intensive"
+    max_execution_time: 5400
+    memory_limit: "12GB"
+    cpu_cores: 6

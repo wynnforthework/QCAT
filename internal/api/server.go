@@ -77,6 +77,10 @@ type Handlers struct {
 	Trading            *TradingHandler
 	Automation         *AutomationHandler
 	StrategyValidation *StrategyValidationHandler
+	Blacklist          *BlacklistHandler
+	Emergency          *EmergencyHandler
+	Workflow           *WorkflowHandler
+	Concurrent         *ConcurrentHandler
 }
 
 // RateLimiter 速率限制器结构
@@ -489,6 +493,10 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		Trading:            NewTradingHandler(db, metricsCollector),
 		Automation:         NewAutomationHandler(db, metricsCollector, automationSystem),
 		StrategyValidation: NewStrategyValidationHandler(),
+		Blacklist:          NewBlacklistHandler(db.DB),
+		Emergency:          NewEmergencyHandler(db.DB),
+		Workflow:           NewWorkflowHandler(db.DB),
+		Concurrent:         NewConcurrentHandler(db.DB),
 	}
 
 	// Store security components for middleware
@@ -581,6 +589,54 @@ func (s *Server) setupRoutes() {
 				strategy.POST("/:id/start", s.handlers.Strategy.StartStrategy)
 				strategy.POST("/:id/stop", s.handlers.Strategy.StopStrategy)
 				strategy.POST("/:id/backtest", s.handlers.Strategy.RunBacktest)
+			}
+
+			// Blacklist routes (all protected)
+			blacklist := protected.Group("/blacklist")
+			{
+				blacklist.GET("/", s.handlers.Blacklist.ListBlacklist)
+				blacklist.POST("/", s.handlers.Blacklist.AddToBlacklist)
+				blacklist.DELETE("/:strategy_id", s.handlers.Blacklist.RemoveFromBlacklist)
+				blacklist.GET("/:strategy_id", s.handlers.Blacklist.CheckBlacklist)
+				blacklist.POST("/clear-expired", s.handlers.Blacklist.ClearExpiredEntries)
+			}
+
+			// Emergency routes (all protected)
+			emergency := protected.Group("/emergency")
+			{
+				emergency.POST("/stop-all", s.handlers.Emergency.EmergencyStopAll)
+				emergency.GET("/status", s.handlers.Emergency.GetEmergencyStatus)
+				emergency.POST("/reset", s.handlers.Emergency.ResetEmergencyStop)
+				emergency.GET("/history", s.handlers.Emergency.GetEmergencyHistory)
+			}
+
+			// Workflow routes (all protected)
+			workflow := protected.Group("/workflow")
+			{
+				workflow.GET("/dependency-graph", s.handlers.Workflow.GetDependencyGraph)
+				workflow.POST("/execute", s.handlers.Workflow.ExecuteWorkflow)
+				workflow.GET("/results", s.handlers.Workflow.GetExecutionResults)
+				workflow.GET("/status", s.handlers.Workflow.GetWorkflowStatus)
+				workflow.GET("/validate", s.handlers.Workflow.ValidateWorkflow)
+				workflow.GET("/enabled", s.handlers.Workflow.GetEnabledFunctions)
+				workflow.POST("/functions/:function_id/enable", s.handlers.Workflow.EnableFunction)
+				workflow.POST("/functions/:function_id/disable", s.handlers.Workflow.DisableFunction)
+				workflow.GET("/functions/:function_id", s.handlers.Workflow.GetFunctionInfo)
+			}
+
+			// Concurrent routes (all protected)
+			concurrent := protected.Group("/concurrent")
+			{
+				concurrent.GET("/pools", s.handlers.Concurrent.GetPoolStats)
+				concurrent.GET("/pools/:pool_name", s.handlers.Concurrent.GetPoolStats)
+				concurrent.POST("/pools", s.handlers.Concurrent.CreatePool)
+				concurrent.DELETE("/pools/:pool_name", s.handlers.Concurrent.DeletePool)
+				concurrent.PUT("/pools/:pool_name/scale", s.handlers.Concurrent.ScalePool)
+				concurrent.POST("/tasks", s.handlers.Concurrent.SubmitTask)
+				concurrent.GET("/monitor", s.handlers.Concurrent.GetMonitorStats)
+				concurrent.GET("/alerts", s.handlers.Concurrent.GetAlerts)
+				concurrent.GET("/load-balancer", s.handlers.Concurrent.GetLoadBalancerStats)
+				concurrent.GET("/task-queue", s.handlers.Concurrent.GetTaskQueueStats)
 			}
 
 			// Optimizer routes

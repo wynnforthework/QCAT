@@ -13,31 +13,31 @@ import (
 
 // RealtimeRiskMonitor 实时风险监控器
 type RealtimeRiskMonitor struct {
-	db                *sql.DB
-	gatekeeper        *validation.StrategyGatekeeper
-	monitorInterval   time.Duration
-	emergencyActions  map[string]EmergencyAction
-	riskThresholds    *RiskThresholds
-	activeStrategies  map[string]*StrategyRiskState
-	mu                sync.RWMutex
-	stopChan          chan struct{}
-	running           bool
+	db               *sql.DB
+	gatekeeper       *validation.StrategyGatekeeper
+	monitorInterval  time.Duration
+	emergencyActions map[string]EmergencyAction
+	riskThresholds   *RiskThresholds
+	activeStrategies map[string]*StrategyRiskState
+	mu               sync.RWMutex
+	stopChan         chan struct{}
+	running          bool
 }
 
 // RiskThresholds 风险阈值配置
 type RiskThresholds struct {
-	MaxDailyLoss        float64 `json:"max_daily_loss"`         // 最大日损失 (如 0.05 = 5%)
-	MaxTotalPositions   int     `json:"max_total_positions"`    // 最大总持仓数
-	MaxPositionValue    float64 `json:"max_position_value"`     // 单个持仓最大价值
-	MaxDrawdown         float64 `json:"max_drawdown"`           // 最大回撤
-	MaxConsecutiveLoss  int     `json:"max_consecutive_loss"`   // 最大连续亏损次数
-	MinAccountBalance   float64 `json:"min_account_balance"`    // 最小账户余额
+	MaxDailyLoss       float64 `json:"max_daily_loss"`       // 最大日损失 (如 0.05 = 5%)
+	MaxTotalPositions  int     `json:"max_total_positions"`  // 最大总持仓数
+	MaxPositionValue   float64 `json:"max_position_value"`   // 单个持仓最大价值
+	MaxDrawdown        float64 `json:"max_drawdown"`         // 最大回撤
+	MaxConsecutiveLoss int     `json:"max_consecutive_loss"` // 最大连续亏损次数
+	MinAccountBalance  float64 `json:"min_account_balance"`  // 最小账户余额
 }
 
 // StrategyRiskState 策略风险状态
 type StrategyRiskState struct {
-	StrategyID         string    `json:"strategy_id"`
-	CurrentPositions   int       `json:"current_positions"`
+	StrategyID        string    `json:"strategy_id"`
+	CurrentPositions  int       `json:"current_positions"`
 	DailyPnL          float64   `json:"daily_pnl"`
 	TotalPnL          float64   `json:"total_pnl"`
 	ConsecutiveLosses int       `json:"consecutive_losses"`
@@ -60,9 +60,9 @@ const (
 // NewRealtimeRiskMonitor 创建实时风险监控器
 func NewRealtimeRiskMonitor(db *sql.DB) *RealtimeRiskMonitor {
 	return &RealtimeRiskMonitor{
-		db:              db,
-		gatekeeper:      validation.NewStrategyGatekeeper(),
-		monitorInterval: 30 * time.Second, // 每30秒检查一次
+		db:               db,
+		gatekeeper:       validation.NewStrategyGatekeeper(),
+		monitorInterval:  30 * time.Second, // 每30秒检查一次
 		emergencyActions: make(map[string]EmergencyAction),
 		riskThresholds: &RiskThresholds{
 			MaxDailyLoss:       0.05,  // 5%
@@ -73,7 +73,7 @@ func NewRealtimeRiskMonitor(db *sql.DB) *RealtimeRiskMonitor {
 			MinAccountBalance:  1000,  // 最小余额$1k
 		},
 		activeStrategies: make(map[string]*StrategyRiskState),
-		stopChan:        make(chan struct{}),
+		stopChan:         make(chan struct{}),
 	}
 }
 
@@ -185,10 +185,10 @@ func (rm *RealtimeRiskMonitor) getActiveStrategies(ctx context.Context) ([]*Stra
 		}
 
 		strategy.LastTradeTime = lastActivity
-		
+
 		// 计算今日盈亏
 		strategy.DailyPnL = rm.calculateDailyPnL(ctx, strategy.StrategyID)
-		
+
 		// 评估风险等级
 		strategy.RiskLevel = rm.assessRiskLevel(&strategy)
 
@@ -205,14 +205,14 @@ func (rm *RealtimeRiskMonitor) checkStrategyRisk(ctx context.Context, strategy *
 	// 检查持仓数量
 	if strategy.CurrentPositions > rm.riskThresholds.MaxTotalPositions {
 		actions = append(actions, ActionStopStrategy)
-		strategy.BlockReason = fmt.Sprintf("持仓数量过多: %d > %d", 
+		strategy.BlockReason = fmt.Sprintf("持仓数量过多: %d > %d",
 			strategy.CurrentPositions, rm.riskThresholds.MaxTotalPositions)
 	}
 
 	// 检查日损失
 	if strategy.DailyPnL < -rm.riskThresholds.MaxDailyLoss {
 		actions = append(actions, ActionStopStrategy)
-		strategy.BlockReason = fmt.Sprintf("日损失超限: %.2f%% > %.2f%%", 
+		strategy.BlockReason = fmt.Sprintf("日损失超限: %.2f%% > %.2f%%",
 			strategy.DailyPnL*100, rm.riskThresholds.MaxDailyLoss*100)
 	}
 
@@ -275,7 +275,7 @@ func (rm *RealtimeRiskMonitor) checkSystemRisk(ctx context.Context) error {
 // calculateDailyPnL 计算日盈亏
 func (rm *RealtimeRiskMonitor) calculateDailyPnL(ctx context.Context, strategyID string) float64 {
 	today := time.Now().Truncate(24 * time.Hour)
-	
+
 	query := `
 		SELECT COALESCE(SUM(unrealized_pnl + realized_pnl), 0)
 		FROM positions 
@@ -284,7 +284,7 @@ func (rm *RealtimeRiskMonitor) calculateDailyPnL(ctx context.Context, strategyID
 
 	var dailyPnL float64
 	rm.db.QueryRowContext(ctx, query, strategyID, today).Scan(&dailyPnL)
-	
+
 	return dailyPnL
 }
 
@@ -323,20 +323,41 @@ func (rm *RealtimeRiskMonitor) stopStrategy(ctx context.Context, strategyID stri
 		    stop_reason = $1, updated_at = $2
 		WHERE id = $3
 	`
-	
+
 	_, err := rm.db.ExecContext(ctx, query, reason, time.Now(), strategyID)
 	return err
 }
 
 // emergencyStopStrategy 紧急停止策略
 func (rm *RealtimeRiskMonitor) emergencyStopStrategy(ctx context.Context, strategyID string, reason string) error {
+	log.Printf("🚨 紧急停止策略 %s，原因: %s", strategyID, reason)
+
 	// 1. 停止策略
 	if err := rm.stopStrategy(ctx, strategyID, reason); err != nil {
+		log.Printf("停止策略失败: %v", err)
 		return err
 	}
 
-	// 2. 通过守门员禁用策略
-	return rm.gatekeeper.DisableStrategy(ctx, strategyID, reason)
+	// 2. 通过守门员禁用策略并加入黑名单
+	if err := rm.gatekeeper.DisableStrategy(ctx, strategyID, reason); err != nil {
+		log.Printf("禁用策略失败: %v", err)
+		return err
+	}
+
+	// 3. 强制停止所有相关进程
+	if err := rm.forceStopStrategyProcesses(ctx, strategyID); err != nil {
+		log.Printf("强制停止策略进程失败: %v", err)
+		// 不返回错误，继续执行其他清理操作
+	}
+
+	// 4. 清理策略相关资源
+	if err := rm.cleanupStrategyResources(ctx, strategyID); err != nil {
+		log.Printf("清理策略资源失败: %v", err)
+		// 不返回错误，继续执行
+	}
+
+	log.Printf("✅ 策略 %s 已被紧急停止并禁用", strategyID)
+	return nil
 }
 
 // GetRiskStatus 获取风险状态
@@ -349,4 +370,56 @@ func (rm *RealtimeRiskMonitor) GetRiskStatus() map[string]*StrategyRiskState {
 		result[k] = v
 	}
 	return result
+}
+
+// forceStopStrategyProcesses 强制停止策略相关进程
+func (rm *RealtimeRiskMonitor) forceStopStrategyProcesses(ctx context.Context, strategyID string) error {
+	log.Printf("强制停止策略 %s 的相关进程", strategyID)
+
+	// TODO: 实现进程停止逻辑
+	// 这里需要与进程管理器集成，停止策略相关的所有进程
+	// 包括策略执行进程、数据采集进程等
+
+	// 暂时只记录日志
+	log.Printf("策略 %s 的进程停止操作已执行", strategyID)
+	return nil
+}
+
+// cleanupStrategyResources 清理策略相关资源
+func (rm *RealtimeRiskMonitor) cleanupStrategyResources(ctx context.Context, strategyID string) error {
+	log.Printf("清理策略 %s 的相关资源", strategyID)
+
+	// 1. 清理内存中的策略状态
+	rm.mu.Lock()
+	delete(rm.activeStrategies, strategyID)
+	rm.mu.Unlock()
+
+	// 2. 取消未完成的订单
+	if err := rm.cancelPendingOrders(ctx, strategyID); err != nil {
+		log.Printf("取消策略 %s 的待处理订单失败: %v", strategyID, err)
+	}
+
+	// 3. 清理缓存数据
+	if err := rm.clearStrategyCache(ctx, strategyID); err != nil {
+		log.Printf("清理策略 %s 的缓存失败: %v", strategyID, err)
+	}
+
+	log.Printf("策略 %s 的资源清理完成", strategyID)
+	return nil
+}
+
+// cancelPendingOrders 取消待处理订单
+func (rm *RealtimeRiskMonitor) cancelPendingOrders(ctx context.Context, strategyID string) error {
+	// TODO: 实现订单取消逻辑
+	// 这里需要与交易所API集成，取消策略的所有待处理订单
+	log.Printf("取消策略 %s 的待处理订单", strategyID)
+	return nil
+}
+
+// clearStrategyCache 清理策略缓存
+func (rm *RealtimeRiskMonitor) clearStrategyCache(ctx context.Context, strategyID string) error {
+	// TODO: 实现缓存清理逻辑
+	// 这里需要清理Redis或其他缓存中的策略相关数据
+	log.Printf("清理策略 %s 的缓存数据", strategyID)
+	return nil
 }

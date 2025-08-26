@@ -8,10 +8,7 @@ const nextConfig = {
     // 可以在这里添加实验性功能
   },
 
-  // Turbopack 配置 (用于开发模式)
-  turbo: {
-    // 可以在这里添加 Turbopack 特定的配置
-  },
+  // Turbopack 配置已移除 - 使用默认配置
   
   // 配置环境变量
   env: {

@@ -44,15 +44,16 @@ type Process struct {
 
 // ProcessConfig holds configuration for a process
 type ProcessConfig struct {
-	Name        string            `json:"name"`
-	Type        ProcessType       `json:"type"`
-	Executable  string            `json:"executable"`
-	Args        []string          `json:"args"`
-	Env         map[string]string `json:"env"`
-	WorkingDir  string            `json:"working_dir"`
-	AutoRestart bool              `json:"auto_restart"`
-	MaxRetries  int               `json:"max_retries"`
-	HealthCheck HealthCheckConfig `json:"health_check"`
+	Name           string            `json:"name"`
+	Type           ProcessType       `json:"type"`
+	Executable     string            `json:"executable"`
+	Args           []string          `json:"args"`
+	Env            map[string]string `json:"env"`
+	WorkingDir     string            `json:"working_dir"`
+	AutoRestart    bool              `json:"auto_restart"`
+	RestartBlocked bool              `json:"restart_blocked"` // 是否禁止重启
+	MaxRetries     int               `json:"max_retries"`
+	HealthCheck    HealthCheckConfig `json:"health_check"`
 }
 
 // HealthCheckConfig defines health check parameters
@@ -255,9 +256,14 @@ func (pm *ProcessManager) monitorProcess(process *Process) {
 	}
 	process.mu.Unlock()
 
-	// Handle auto-restart
+	// Handle auto-restart (但需要检查是否被风控禁用)
 	if process.Config.AutoRestart && process.Status == ProcessStatusFailed {
-		go pm.handleAutoRestart(process)
+		// 检查是否应该重启
+		if pm.shouldAllowRestart(process) {
+			go pm.handleAutoRestart(process)
+		} else {
+			fmt.Printf("Process %s restart blocked by risk control\n", process.ID)
+		}
 	}
 
 	// Notify about process exit
@@ -286,6 +292,54 @@ func (pm *ProcessManager) handleAutoRestart(process *Process) {
 	}
 
 	fmt.Printf("Giving up on restarting process %s after %d attempts\n", process.ID, maxRetries)
+}
+
+// shouldAllowRestart 检查是否允许重启进程
+func (pm *ProcessManager) shouldAllowRestart(process *Process) bool {
+	// 检查进程是否被标记为禁止重启
+	if process.Config.RestartBlocked {
+		return false
+	}
+
+	// 检查是否是策略进程，如果是，需要检查策略黑名单
+	if process.Type == "strategy" {
+		// TODO: 这里需要与策略守门员集成，检查策略是否在黑名单中
+		// 暂时返回true，实际实现需要调用策略守门员的检查方法
+		return true
+	}
+
+	// 其他类型的进程默认允许重启
+	return true
+}
+
+// BlockProcessRestart 阻止进程重启
+func (pm *ProcessManager) BlockProcessRestart(processID string, reason string) error {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	process, exists := pm.processes[processID]
+	if !exists {
+		return fmt.Errorf("process %s not found", processID)
+	}
+
+	process.Config.RestartBlocked = true
+	fmt.Printf("Process %s restart blocked: %s\n", processID, reason)
+	return nil
+}
+
+// UnblockProcessRestart 解除进程重启阻止
+func (pm *ProcessManager) UnblockProcessRestart(processID string) error {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	process, exists := pm.processes[processID]
+	if !exists {
+		return fmt.Errorf("process %s not found", processID)
+	}
+
+	process.Config.RestartBlocked = false
+	fmt.Printf("Process %s restart unblocked\n", processID)
+	return nil
 }
 
 // notifyProcessExit notifies about process exit

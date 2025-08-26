@@ -2,8 +2,10 @@ package validation
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"qcat/internal/strategy/lifecycle"
@@ -14,6 +16,19 @@ type StrategyGatekeeper struct {
 	backtestValidator *MandatoryBacktestValidator
 	riskValidator     *RiskValidator
 	enabled           bool
+	blacklist         map[string]*BlacklistEntry
+	mu                sync.RWMutex
+	db                *sql.DB
+}
+
+// BlacklistEntry 黑名单条目
+type BlacklistEntry struct {
+	StrategyID string     `json:"strategy_id"`
+	Reason     string     `json:"reason"`
+	BlockedAt  time.Time  `json:"blocked_at"`
+	BlockedBy  string     `json:"blocked_by"`
+	Permanent  bool       `json:"permanent"`
+	ExpiresAt  *time.Time `json:"expires_at,omitempty"`
 }
 
 // RiskValidator 风险验证器
@@ -26,26 +41,26 @@ type RiskValidator struct {
 
 // ValidationStatus 验证状态
 type ValidationStatus struct {
-	StrategyID       string                 `json:"strategy_id"`
-	IsValid          bool                   `json:"is_valid"`
-	BacktestPassed   bool                   `json:"backtest_passed"`
-	RiskCheckPassed  bool                   `json:"risk_check_passed"`
-	ValidationTime   time.Time              `json:"validation_time"`
-	BacktestResult   *BacktestResult        `json:"backtest_result,omitempty"`
-	RiskAssessment   *RiskAssessment        `json:"risk_assessment,omitempty"`
-	Errors           []ValidationError      `json:"errors,omitempty"`
-	Warnings         []ValidationError      `json:"warnings,omitempty"`
-	NextRevalidation time.Time              `json:"next_revalidation"`
+	StrategyID       string            `json:"strategy_id"`
+	IsValid          bool              `json:"is_valid"`
+	BacktestPassed   bool              `json:"backtest_passed"`
+	RiskCheckPassed  bool              `json:"risk_check_passed"`
+	ValidationTime   time.Time         `json:"validation_time"`
+	BacktestResult   *BacktestResult   `json:"backtest_result,omitempty"`
+	RiskAssessment   *RiskAssessment   `json:"risk_assessment,omitempty"`
+	Errors           []ValidationError `json:"errors,omitempty"`
+	Warnings         []ValidationError `json:"warnings,omitempty"`
+	NextRevalidation time.Time         `json:"next_revalidation"`
 }
 
 // RiskAssessment 风险评估
 type RiskAssessment struct {
-	RiskScore        float64   `json:"risk_score"`        // 0-100风险评分
-	RiskLevel        string    `json:"risk_level"`        // LOW/MEDIUM/HIGH/CRITICAL
-	MaxPositionSize  float64   `json:"max_position_size"` // 建议最大持仓
-	MaxLeverage      float64   `json:"max_leverage"`      // 建议最大杠杆
-	RecommendedLimit float64   `json:"recommended_limit"` // 建议资金限制
-	Warnings         []string  `json:"warnings"`
+	RiskScore        float64  `json:"risk_score"`        // 0-100风险评分
+	RiskLevel        string   `json:"risk_level"`        // LOW/MEDIUM/HIGH/CRITICAL
+	MaxPositionSize  float64  `json:"max_position_size"` // 建议最大持仓
+	MaxLeverage      float64  `json:"max_leverage"`      // 建议最大杠杆
+	RecommendedLimit float64  `json:"recommended_limit"` // 建议资金限制
+	Warnings         []string `json:"warnings"`
 }
 
 // NewStrategyGatekeeper 创建策略守门员
@@ -58,8 +73,22 @@ func NewStrategyGatekeeper() *StrategyGatekeeper {
 			maxDailyLoss:       0.05, // 日损失不超过5%
 			maxConsecutiveLoss: 5,    // 最多连续5次亏损
 		},
-		enabled: true,
+		enabled:   true,
+		blacklist: make(map[string]*BlacklistEntry),
 	}
+}
+
+// NewStrategyGatekeeperWithDB 创建带数据库连接的策略守门员
+func NewStrategyGatekeeperWithDB(db *sql.DB) *StrategyGatekeeper {
+	sg := NewStrategyGatekeeper()
+	sg.db = db
+
+	// 从数据库加载黑名单
+	if err := sg.loadBlacklistFromDB(context.Background()); err != nil {
+		log.Printf("从数据库加载黑名单失败: %v", err)
+	}
+
+	return sg
 }
 
 // ValidateStrategyForActivation 验证策略是否可以激活
@@ -74,6 +103,21 @@ func (sg *StrategyGatekeeper) ValidateStrategyForActivation(ctx context.Context,
 	}
 
 	log.Printf("开始验证策略 %s 是否可以激活", strategyID)
+
+	// 首先检查黑名单
+	if sg.isBlacklisted(strategyID) {
+		log.Printf("策略 %s 在黑名单中，拒绝激活", strategyID)
+		return &ValidationStatus{
+			StrategyID:     strategyID,
+			IsValid:        false,
+			ValidationTime: time.Now(),
+			Errors: []ValidationError{{
+				Code:    "STRATEGY_BLACKLISTED",
+				Message: "策略已被加入黑名单，禁止启动",
+				Field:   "strategy_id",
+			}},
+		}, nil
+	}
 
 	status := &ValidationStatus{
 		StrategyID:     strategyID,
@@ -209,7 +253,7 @@ func (sg *StrategyGatekeeper) assessRisk(ctx context.Context, strategyID string,
 	// 设置建议参数
 	switch assessment.RiskLevel {
 	case "LOW":
-		assessment.MaxPositionSize = 0.1  // 10%
+		assessment.MaxPositionSize = 0.1 // 10%
 		assessment.MaxLeverage = 5.0
 		assessment.RecommendedLimit = 100000 // $100k
 	case "MEDIUM":
@@ -232,10 +276,20 @@ func (sg *StrategyGatekeeper) assessRisk(ctx context.Context, strategyID string,
 // DisableStrategy 禁用策略（紧急情况）
 func (sg *StrategyGatekeeper) DisableStrategy(ctx context.Context, strategyID string, reason string) error {
 	log.Printf("紧急禁用策略 %s，原因: %s", strategyID, reason)
-	
-	// 这里应该调用策略管理器来禁用策略
-	// 并通知所有相关系统
-	
+
+	// 添加到黑名单
+	if err := sg.addToBlacklist(ctx, strategyID, reason); err != nil {
+		log.Printf("添加策略 %s 到黑名单失败: %v", strategyID, err)
+		return err
+	}
+
+	// 强制停止策略
+	if err := sg.forceStopStrategy(ctx, strategyID, reason); err != nil {
+		log.Printf("强制停止策略 %s 失败: %v", strategyID, err)
+		return err
+	}
+
+	log.Printf("策略 %s 已被紧急禁用并加入黑名单", strategyID)
 	return nil
 }
 
@@ -255,4 +309,139 @@ func (sg *StrategyGatekeeper) Enable() {
 func (sg *StrategyGatekeeper) Disable() {
 	sg.enabled = false
 	log.Printf("警告: 策略守门员已禁用！所有策略将跳过验证")
+}
+
+// addToBlacklist 添加策略到黑名单
+func (sg *StrategyGatekeeper) addToBlacklist(ctx context.Context, strategyID string, reason string) error {
+	sg.mu.Lock()
+	defer sg.mu.Unlock()
+
+	entry := &BlacklistEntry{
+		StrategyID: strategyID,
+		Reason:     reason,
+		BlockedAt:  time.Now(),
+		BlockedBy:  "risk_control",
+		Permanent:  true, // 风控停止的策略永久禁用
+	}
+
+	if sg.blacklist == nil {
+		sg.blacklist = make(map[string]*BlacklistEntry)
+	}
+	sg.blacklist[strategyID] = entry
+
+	// 如果有数据库连接，保存到数据库
+	if sg.db != nil {
+		if err := sg.saveBlacklistEntry(ctx, entry); err != nil {
+			log.Printf("保存黑名单条目到数据库失败: %v", err)
+			// 不返回错误，允许内存操作继续
+		}
+	}
+
+	log.Printf("策略 %s 已添加到黑名单，原因: %s", strategyID, reason)
+	return nil
+}
+
+// forceStopStrategy 强制停止策略
+func (sg *StrategyGatekeeper) forceStopStrategy(ctx context.Context, strategyID string, reason string) error {
+	// 这里应该调用策略管理器来强制停止策略
+	// 暂时只记录日志，实际实现需要依赖策略管理器
+	log.Printf("强制停止策略 %s，原因: %s", strategyID, reason)
+
+	// TODO: 实现实际的策略停止逻辑
+	// 可能需要调用策略管理器或直接操作数据库
+
+	return nil
+}
+
+// isBlacklisted 检查策略是否在黑名单中
+func (sg *StrategyGatekeeper) isBlacklisted(strategyID string) bool {
+	sg.mu.RLock()
+	defer sg.mu.RUnlock()
+
+	entry, exists := sg.blacklist[strategyID]
+	if !exists {
+		return false
+	}
+
+	// 检查是否过期
+	if !entry.Permanent && entry.ExpiresAt != nil && time.Now().After(*entry.ExpiresAt) {
+		// 已过期，从黑名单移除
+		delete(sg.blacklist, strategyID)
+		return false
+	}
+
+	return true
+}
+
+// saveBlacklistEntry 保存黑名单条目到数据库
+func (sg *StrategyGatekeeper) saveBlacklistEntry(ctx context.Context, entry *BlacklistEntry) error {
+	if sg.db == nil {
+		return fmt.Errorf("database connection not available")
+	}
+
+	query := `
+		INSERT INTO strategy_blacklist (strategy_id, reason, blocked_at, blocked_by, permanent, expires_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (strategy_id) DO UPDATE SET
+			reason = EXCLUDED.reason,
+			blocked_at = EXCLUDED.blocked_at,
+			blocked_by = EXCLUDED.blocked_by,
+			permanent = EXCLUDED.permanent,
+			expires_at = EXCLUDED.expires_at
+	`
+
+	_, err := sg.db.ExecContext(ctx, query,
+		entry.StrategyID, entry.Reason, entry.BlockedAt,
+		entry.BlockedBy, entry.Permanent, entry.ExpiresAt)
+
+	return err
+}
+
+// loadBlacklistFromDB 从数据库加载黑名单
+func (sg *StrategyGatekeeper) loadBlacklistFromDB(ctx context.Context) error {
+	if sg.db == nil {
+		return fmt.Errorf("database connection not available")
+	}
+
+	query := `
+		SELECT strategy_id, reason, blocked_at, blocked_by, permanent, expires_at
+		FROM strategy_blacklist
+		WHERE permanent = true OR (expires_at IS NOT NULL AND expires_at > NOW())
+	`
+
+	rows, err := sg.db.QueryContext(ctx, query)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	sg.mu.Lock()
+	defer sg.mu.Unlock()
+
+	if sg.blacklist == nil {
+		sg.blacklist = make(map[string]*BlacklistEntry)
+	}
+
+	for rows.Next() {
+		entry := &BlacklistEntry{}
+		var expiresAt sql.NullTime
+
+		err := rows.Scan(
+			&entry.StrategyID, &entry.Reason, &entry.BlockedAt,
+			&entry.BlockedBy, &entry.Permanent, &expiresAt,
+		)
+		if err != nil {
+			log.Printf("扫描黑名单条目失败: %v", err)
+			continue
+		}
+
+		if expiresAt.Valid {
+			entry.ExpiresAt = &expiresAt.Time
+		}
+
+		sg.blacklist[entry.StrategyID] = entry
+	}
+
+	log.Printf("从数据库加载了 %d 个黑名单条目", len(sg.blacklist))
+	return rows.Err()
 }
