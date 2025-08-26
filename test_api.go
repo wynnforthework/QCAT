@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -52,19 +51,19 @@ func main() {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		
+
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
 		}
-		
+
 		c.Next()
 	})
 
 	// Test endpoint to get strategy statistics
 	r.GET("/api/v1/test/strategy-stats", func(c *gin.Context) {
 		ctx := context.Background()
-		
+
 		// First check total count
 		totalQuery := `SELECT COUNT(*) FROM strategies`
 		var totalCount int

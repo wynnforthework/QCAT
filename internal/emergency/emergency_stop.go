@@ -8,23 +8,45 @@ import (
 	"sync"
 	"time"
 
+	"qcat/internal/exchange"
+	"qcat/internal/exchange/order"
+	"qcat/internal/orchestrator"
+	"qcat/internal/stability"
 	"qcat/internal/strategy/validation"
 )
 
 // EmergencyStopManager 紧急停止管理器
 type EmergencyStopManager struct {
-	db         *sql.DB
-	gatekeeper *validation.StrategyGatekeeper
-	mu         sync.RWMutex
-	stopped    bool
-	stopTime   time.Time
+	db             *sql.DB
+	gatekeeper     *validation.StrategyGatekeeper
+	processManager *stability.ProcessManager
+	orchestrator   *orchestrator.Orchestrator
+	orderManager   *order.Manager
+	exchange       exchange.Exchange
+	mu             sync.RWMutex
+	stopped        bool
+	stopTime       time.Time
 }
 
 // NewEmergencyStopManager 创建紧急停止管理器
 func NewEmergencyStopManager(db *sql.DB) *EmergencyStopManager {
 	return &EmergencyStopManager{
-		db:         db,
-		gatekeeper: validation.NewStrategyGatekeeperWithDB(db),
+		db:             db,
+		gatekeeper:     validation.NewStrategyGatekeeperWithDB(db),
+		processManager: stability.NewProcessManager(),
+	}
+}
+
+// NewEmergencyStopManagerWithDeps 创建带依赖的紧急停止管理器
+func NewEmergencyStopManagerWithDeps(db *sql.DB, processManager *stability.ProcessManager,
+	orchestrator *orchestrator.Orchestrator, orderManager *order.Manager, exchange exchange.Exchange) *EmergencyStopManager {
+	return &EmergencyStopManager{
+		db:             db,
+		gatekeeper:     validation.NewStrategyGatekeeperWithDB(db),
+		processManager: processManager,
+		orchestrator:   orchestrator,
+		orderManager:   orderManager,
+		exchange:       exchange,
 	}
 }
 
@@ -159,17 +181,61 @@ func (esm *EmergencyStopManager) updateStrategyStatus(ctx context.Context, strat
 
 // forceStopStrategyProcesses 强制停止策略进程
 func (esm *EmergencyStopManager) forceStopStrategyProcesses(ctx context.Context, strategyID string) error {
-	// TODO: 实现进程停止逻辑
-	// 这里需要与进程管理器集成
 	log.Printf("强制停止策略 %s 的进程", strategyID)
+
+	// 1. 通过进程管理器停止策略进程
+	if esm.processManager != nil {
+		// 停止策略相关的进程
+		if err := esm.processManager.StopProcess(stability.ProcessTypeStrategy); err != nil {
+			log.Printf("停止策略进程失败: %v", err)
+			// 不返回错误，继续执行其他停止操作
+		}
+	}
+
+	// 2. 通过编排器停止策略服务
+	if esm.orchestrator != nil {
+		serviceName := fmt.Sprintf("strategy-%s", strategyID)
+		if err := esm.orchestrator.StopService(serviceName); err != nil {
+			log.Printf("停止策略服务 %s 失败: %v", serviceName, err)
+			// 不返回错误，继续执行其他停止操作
+		}
+	}
+
+	// 3. 查询并停止策略相关的系统进程
+	if err := esm.stopStrategySystemProcesses(ctx, strategyID); err != nil {
+		log.Printf("停止策略系统进程失败: %v", err)
+		// 不返回错误，继续执行其他停止操作
+	}
+
+	log.Printf("策略 %s 的进程停止操作完成", strategyID)
 	return nil
 }
 
 // cancelPendingOrders 取消待处理订单
 func (esm *EmergencyStopManager) cancelPendingOrders(ctx context.Context, strategyID string) error {
-	// TODO: 实现订单取消逻辑
-	// 这里需要与交易所API集成
 	log.Printf("取消策略 %s 的待处理订单", strategyID)
+
+	// 1. 通过订单管理器取消订单
+	if esm.orderManager != nil {
+		// 获取策略的所有待处理订单
+		if err := esm.cancelOrdersByStrategy(ctx, strategyID); err != nil {
+			log.Printf("通过订单管理器取消订单失败: %v", err)
+		}
+	}
+
+	// 2. 直接通过交易所API取消订单
+	if esm.exchange != nil {
+		if err := esm.cancelOrdersViaExchange(ctx, strategyID); err != nil {
+			log.Printf("通过交易所API取消订单失败: %v", err)
+		}
+	}
+
+	// 3. 从数据库查询并取消订单
+	if err := esm.cancelOrdersFromDatabase(ctx, strategyID); err != nil {
+		log.Printf("从数据库取消订单失败: %v", err)
+	}
+
+	log.Printf("策略 %s 的订单取消操作完成", strategyID)
 	return nil
 }
 
@@ -228,6 +294,158 @@ func (esm *EmergencyStopManager) ResetEmergencyStop(ctx context.Context, reason 
 	esm.stopTime = time.Time{}
 
 	log.Printf("✅ 紧急停止状态已重置")
+	return nil
+}
+
+// stopStrategySystemProcesses 停止策略相关的系统进程
+func (esm *EmergencyStopManager) stopStrategySystemProcesses(ctx context.Context, strategyID string) error {
+	// 查询策略相关的进程信息
+	query := `
+		SELECT process_id, process_name
+		FROM strategy_processes
+		WHERE strategy_id = $1 AND status = 'running'
+	`
+
+	rows, err := esm.db.QueryContext(ctx, query, strategyID)
+	if err != nil {
+		return fmt.Errorf("查询策略进程失败: %w", err)
+	}
+	defer rows.Close()
+
+	var processIDs []string
+	var processNames []string
+
+	for rows.Next() {
+		var processID, processName string
+		if err := rows.Scan(&processID, &processName); err != nil {
+			log.Printf("扫描进程信息失败: %v", err)
+			continue
+		}
+		processIDs = append(processIDs, processID)
+		processNames = append(processNames, processName)
+	}
+
+	// 停止找到的进程
+	for i, processID := range processIDs {
+		log.Printf("停止进程: %s (%s)", processNames[i], processID)
+
+		// 更新进程状态为停止
+		updateQuery := `
+			UPDATE strategy_processes
+			SET status = 'stopped', stopped_at = NOW()
+			WHERE process_id = $1
+		`
+		if _, err := esm.db.ExecContext(ctx, updateQuery, processID); err != nil {
+			log.Printf("更新进程状态失败: %v", err)
+		}
+	}
+
+	return nil
+}
+
+// cancelOrdersByStrategy 通过订单管理器取消策略订单
+func (esm *EmergencyStopManager) cancelOrdersByStrategy(ctx context.Context, strategyID string) error {
+	// 查询策略的所有待处理订单
+	query := `
+		SELECT order_id, symbol
+		FROM orders
+		WHERE strategy_id = $1 AND status IN ('NEW', 'PARTIALLY_FILLED')
+	`
+
+	rows, err := esm.db.QueryContext(ctx, query, strategyID)
+	if err != nil {
+		return fmt.Errorf("查询策略订单失败: %w", err)
+	}
+	defer rows.Close()
+
+	var orders []struct {
+		OrderID string
+		Symbol  string
+	}
+
+	for rows.Next() {
+		var order struct {
+			OrderID string
+			Symbol  string
+		}
+		if err := rows.Scan(&order.OrderID, &order.Symbol); err != nil {
+			log.Printf("扫描订单信息失败: %v", err)
+			continue
+		}
+		orders = append(orders, order)
+	}
+
+	// 取消找到的订单
+	for _, order := range orders {
+		req := &exchange.OrderCancelRequest{
+			Symbol:  order.Symbol,
+			OrderID: order.OrderID,
+		}
+
+		if _, err := esm.orderManager.CancelOrder(ctx, req); err != nil {
+			log.Printf("取消订单 %s 失败: %v", order.OrderID, err)
+		} else {
+			log.Printf("已取消订单: %s", order.OrderID)
+		}
+	}
+
+	return nil
+}
+
+// cancelOrdersViaExchange 直接通过交易所API取消订单
+func (esm *EmergencyStopManager) cancelOrdersViaExchange(ctx context.Context, strategyID string) error {
+	// 查询策略使用的交易对
+	query := `
+		SELECT DISTINCT symbol
+		FROM orders
+		WHERE strategy_id = $1 AND status IN ('NEW', 'PARTIALLY_FILLED')
+	`
+
+	rows, err := esm.db.QueryContext(ctx, query, strategyID)
+	if err != nil {
+		return fmt.Errorf("查询策略交易对失败: %w", err)
+	}
+	defer rows.Close()
+
+	var symbols []string
+	for rows.Next() {
+		var symbol string
+		if err := rows.Scan(&symbol); err != nil {
+			log.Printf("扫描交易对失败: %v", err)
+			continue
+		}
+		symbols = append(symbols, symbol)
+	}
+
+	// 为每个交易对取消所有订单
+	for _, symbol := range symbols {
+		if err := esm.exchange.CancelAllOrders(ctx, symbol); err != nil {
+			log.Printf("取消交易对 %s 的所有订单失败: %v", symbol, err)
+		} else {
+			log.Printf("已取消交易对 %s 的所有订单", symbol)
+		}
+	}
+
+	return nil
+}
+
+// cancelOrdersFromDatabase 从数据库取消订单
+func (esm *EmergencyStopManager) cancelOrdersFromDatabase(ctx context.Context, strategyID string) error {
+	// 更新数据库中的订单状态
+	query := `
+		UPDATE orders
+		SET status = 'CANCELLED', updated_at = NOW()
+		WHERE strategy_id = $1 AND status IN ('NEW', 'PARTIALLY_FILLED')
+	`
+
+	result, err := esm.db.ExecContext(ctx, query, strategyID)
+	if err != nil {
+		return fmt.Errorf("更新订单状态失败: %w", err)
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	log.Printf("已从数据库取消 %d 个订单", rowsAffected)
+
 	return nil
 }
 
