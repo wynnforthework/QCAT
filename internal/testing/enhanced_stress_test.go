@@ -482,12 +482,12 @@ func (estf *EnhancedStressTestFramework) runPhase(phaseName string, duration tim
 		case <-ticker.C:
 			// 调整并发数
 			if currentConcurrency < maxConcurrency {
-				currentConcurrency = min(currentConcurrency+estf.config.ConcurrencyStep, maxConcurrency)
+				currentConcurrency = minInt(currentConcurrency+estf.config.ConcurrencyStep, maxConcurrency)
 			}
 
 			// 调整RPS
 			if currentRPS < maxRPS {
-				currentRPS = min(currentRPS+estf.config.RPSStep, maxRPS)
+				currentRPS = minInt(currentRPS+estf.config.RPSStep, maxRPS)
 			}
 
 			log.Printf("[%s] 当前负载: 并发=%d, RPS=%d", phaseName, currentConcurrency, currentRPS)
@@ -872,8 +872,8 @@ func (estf *EnhancedStressTestFramework) GetConfig() *EnhancedStressTestConfig {
 	return &config
 }
 
-// min 辅助函数
-func min(a, b int) int {
+// minInt 辅助函数
+func minInt(a, b int) int {
 	if a < b {
 		return a
 	}
