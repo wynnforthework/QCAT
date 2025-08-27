@@ -32,6 +32,11 @@ func NewManager(db *sql.DB, cache cache.Cacher, exchange exch.Exchange) *Manager
 		subscribers: make(map[string][]chan *exch.Position),
 	}
 
+	// Ensure database constraints exist to prevent duplicate positions
+	if err := m.ensureConstraints(); err != nil {
+		log.Printf("Warning: failed to ensure database constraints: %v", err)
+	}
+
 	// Start position monitor only if exchange is available
 	if exchange != nil {
 		go m.monitorPositions()
@@ -229,6 +234,16 @@ func (m *Manager) storePositionWithStrategy(position *exch.Position, strategyID 
 		) VALUES (
 			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10
 		)
+		ON CONFLICT (strategy_id, symbol)
+		DO UPDATE SET
+			side = EXCLUDED.side,
+			size = EXCLUDED.size,
+			entry_price = EXCLUDED.entry_price,
+			leverage = EXCLUDED.leverage,
+			unrealized_pnl = EXCLUDED.unrealized_pnl,
+			realized_pnl = EXCLUDED.realized_pnl,
+			status = EXCLUDED.status,
+			updated_at = EXCLUDED.updated_at
 	`
 
 	// Use Size field instead of Quantity, and set a default status
@@ -290,7 +305,7 @@ func (m *Manager) storePositionWithNullStrategy(position *exch.Position) error {
 	// First, check if we can modify the schema to allow NULL strategy_id temporarily
 	// This is a fallback method when we can't create a default strategy
 
-	// Try to insert with a placeholder strategy_id
+	// Try to insert with a placeholder strategy_id using UPSERT
 	query := `
 		INSERT INTO positions (
 			strategy_id, symbol, side, size, entry_price, leverage,
@@ -298,6 +313,16 @@ func (m *Manager) storePositionWithNullStrategy(position *exch.Position) error {
 		) VALUES (
 			(SELECT id FROM strategies LIMIT 1), $1, $2, $3, $4, $5, $6, $7, $8, $9
 		)
+		ON CONFLICT (strategy_id, symbol)
+		DO UPDATE SET
+			side = EXCLUDED.side,
+			size = EXCLUDED.size,
+			entry_price = EXCLUDED.entry_price,
+			leverage = EXCLUDED.leverage,
+			unrealized_pnl = EXCLUDED.unrealized_pnl,
+			realized_pnl = EXCLUDED.realized_pnl,
+			status = EXCLUDED.status,
+			updated_at = EXCLUDED.updated_at
 	`
 
 	status := "open"

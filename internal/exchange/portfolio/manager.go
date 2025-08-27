@@ -129,8 +129,27 @@ func (m *Manager) CalculateTargetPositions(ctx context.Context, totalEquity floa
 			}
 		}
 
-		// Calculate position size
-		positions[symbol] = totalEquity * weight
+		// Calculate target position size based on total equity
+		targetPositionSize := totalEquity * weight
+
+		// Get current position size for this symbol
+		currentPositionSize := 0.0
+		if m.exchange != nil {
+			if position, err := m.exchange.GetPosition(context.Background(), symbol); err == nil && position != nil {
+				// Calculate current position value (size * mark price or entry price)
+				if position.MarkPrice > 0 {
+					currentPositionSize = math.Abs(position.Size) * position.MarkPrice
+				} else if position.EntryPrice > 0 {
+					currentPositionSize = math.Abs(position.Size) * position.EntryPrice
+				}
+			}
+		}
+
+		// Only set target if it's different from current (with tolerance)
+		tolerance := totalEquity * 0.01 // 1% tolerance to avoid frequent small adjustments
+		if math.Abs(targetPositionSize-currentPositionSize) > tolerance {
+			positions[symbol] = targetPositionSize
+		}
 	}
 
 	return positions, nil
@@ -184,7 +203,7 @@ func (m *Manager) Rebalance(ctx context.Context, threshold float64) error {
 			quantity := math.Abs(targetSize - currentSize)
 			req := &exchange.OrderRequest{
 				Symbol:   symbol,
-				Side:     string(side), // 显式转换为 string
+				Side:     string(side),                     // 显式转换为 string
 				Type:     string(exchange.OrderTypeMarket), // 显式转换为 string
 				Quantity: quantity,
 			}
