@@ -1,0 +1,223 @@
+# 多策略工作流系统配置
+
+# 多策略管理器配置
+multi_strategy_manager:
+  # 并发配置
+  max_concurrent_strategies: 10
+  max_concurrent_jobs: 50
+  
+  # 全局资源配置
+  global_cpu_quota: 20.0
+  global_memory_quota: 42949672960  # 40GB
+  
+  # 策略池配置
+  min_enabled_strategies: 3
+  max_enabled_strategies: 15
+  
+  # 性能阈值
+  performance_threshold: 0.1
+  disable_threshold: -0.2
+  enable_threshold: 0.15
+  
+  # 调度配置
+  scheduling_interval: "30s"
+  evaluation_interval: "5m"
+  cleanup_interval: "30m"
+
+# 策略工作流引擎配置
+strategy_workflow:
+  # 并发配置
+  max_concurrent_jobs: 5
+  
+  # 超时配置
+  onboarding_timeout: "30m"
+  backtest_timeout: "60m"
+  optimization_timeout: "120m"
+  learning_timeout: "240m"
+  application_timeout: "30m"
+  
+  # 重试配置
+  max_retries: 3
+  retry_delay: "30s"
+  retry_backoff: 2.0
+  
+  # 资源配置
+  cpu_quota: 2.0
+  memory_quota: 4294967296  # 4GB
+  
+  # 性能阈值
+  performance_threshold: 0.1
+  min_backtest_period: 30
+
+# 策略资源池配置
+strategy_resource_pool:
+  # 资源配额
+  cpu_quota: 2.0
+  memory_quota: 4294967296  # 4GB
+  
+  # 工作线程配置
+  backtest_workers: 3
+  optimize_workers: 2
+  learning_workers: 1
+
+# 生命周期管理器配置
+lifecycle_manager:
+  # 阶段超时配置
+  stage_timeouts:
+    onboarding: "30m"
+    backtesting: "60m"
+    optimizing: "120m"
+    learning: "240m"
+    applying: "30m"
+  
+  # 性能阈值
+  min_sharpe_ratio: 0.5
+  max_drawdown_limit: 0.3
+  min_optimization_score: 0.7
+  min_model_accuracy: 0.8
+  
+  # 重试配置
+  max_retries: 3
+  retry_delay: "30s"
+  
+  # 自动推进配置
+  auto_advance: true
+  advance_delay: "5s"
+
+# 进化管理器配置
+evolution_manager:
+  # 评估配置
+  evaluation_interval: "30m"
+  min_evaluation_period: "24h"
+  performance_window: "168h"  # 7 days
+  
+  # 进化参数
+  mutation_rate: 0.1
+  crossover_rate: 0.7
+  elitism_rate: 0.2
+  population_size: 20
+  
+  # 淘汰参数
+  elimination_threshold: -0.1
+  min_survival_rate: 0.3
+  max_generations: 100
+  
+  # 性能阈值
+  min_sharpe_ratio: 0.5
+  max_drawdown_limit: 0.3
+  min_win_rate: 0.4
+  min_profit_factor: 1.1
+
+# 交易工作流引擎配置
+trading_workflow:
+  # 执行配置
+  execution_interval: "1m"
+  max_concurrency: 10
+  function_timeout: "30s"
+  
+  # 重试配置
+  max_retries: 3
+  retry_delay: "10s"
+  
+  # 策略检查配置
+  strategy_check_interval: "30s"
+  
+  # 启用的功能层
+  enabled_layers:
+    - "基础数据层"
+    - "监控分析层"
+    - "仓位管理层"
+    - "交易执行层"
+    - "收益优化层"
+    - "安全保障层"
+
+# 策略池配置
+strategy_pool:
+  # 更新配置
+  update_interval: "30s"
+  
+  # 缓存配置
+  cache_ttl: "5m"
+  max_cache_size: 1000
+
+# 事件系统配置
+event_system:
+  # 事件总线配置
+  buffer_size: 2000
+  max_retries: 3
+  retry_delay: "1s"
+  
+  # 事件处理配置
+  max_handlers: 10
+  handler_timeout: "30s"
+
+# 监控配置
+monitoring:
+  # 指标收集间隔
+  metrics_interval: "30s"
+  
+  # 健康检查配置
+  health_check_interval: "1m"
+  health_check_timeout: "10s"
+  
+  # 日志配置
+  log_level: "info"
+  log_format: "json"
+  log_file: "logs/multi_strategy_workflow.log"
+  
+  # 性能监控
+  enable_profiling: false
+  profiling_port: 6060
+
+# 数据库配置
+database:
+  # 策略数据存储
+  strategy_db:
+    type: "sqlite"
+    connection: "data/strategies.db"
+    max_connections: 10
+    connection_timeout: "30s"
+  
+  # 性能数据存储
+  performance_db:
+    type: "sqlite"
+    connection: "data/performance.db"
+    max_connections: 5
+    connection_timeout: "30s"
+  
+  # 事件数据存储
+  event_db:
+    type: "sqlite"
+    connection: "data/events.db"
+    max_connections: 5
+    connection_timeout: "30s"
+
+# 安全配置
+security:
+  # API访问控制
+  enable_auth: false
+  api_key: ""
+  
+  # 资源限制
+  max_memory_per_strategy: 2147483648  # 2GB
+  max_cpu_per_strategy: 1.0
+  
+  # 执行限制
+  max_execution_time: "4h"
+  max_concurrent_executions: 20
+
+# 开发配置
+development:
+  # 调试模式
+  debug_mode: true
+  
+  # 模拟模式
+  simulation_mode: true
+  
+  # 测试配置
+  enable_test_strategies: true
+  test_data_path: "testdata/"
+  
+  # 性能测试
+  enable_benchmarks: false
+  benchmark_iterations: 100
