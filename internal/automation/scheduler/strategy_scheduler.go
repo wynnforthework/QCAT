@@ -2133,10 +2133,13 @@ func (ss *StrategyScheduler) getOrCreateOnboardingService() OnboardingServiceInt
 // getActiveSymbols 获取活跃交易对
 func (ss *StrategyScheduler) getActiveSymbols(ctx context.Context) ([]string, error) {
 	// 从数据库或配置获取活跃交易对
+	// 修复NULL值扫描问题：过滤掉NULL值并使用COALESCE
 	query := `
-		SELECT DISTINCT symbol
+		SELECT DISTINCT COALESCE(symbol, '') as symbol
 		FROM strategy_performance
 		WHERE last_updated >= NOW() - INTERVAL '7 days'
+		AND symbol IS NOT NULL
+		AND symbol != ''
 		ORDER BY symbol
 	`
 
@@ -2150,12 +2153,15 @@ func (ss *StrategyScheduler) getActiveSymbols(ctx context.Context) ([]string, er
 
 	var symbols []string
 	for rows.Next() {
-		var symbol string
+		var symbol sql.NullString
 		if err := rows.Scan(&symbol); err != nil {
 			log.Printf("Warning: failed to scan symbol: %v", err)
 			continue
 		}
-		symbols = append(symbols, symbol)
+		// 只添加有效的非空符号
+		if symbol.Valid && symbol.String != "" {
+			symbols = append(symbols, symbol.String)
+		}
 	}
 
 	// 如果没有找到活跃交易对，返回默认列表
@@ -2250,6 +2256,7 @@ func (ss *StrategyScheduler) getSymbolStrategyCoverage(ctx context.Context, symb
 // getSymbolStrategyCoverageFromParams 从策略参数中获取交易对覆盖情况
 func (ss *StrategyScheduler) getSymbolStrategyCoverageFromParams(ctx context.Context, symbol string) (map[string]int, error) {
 	// 从策略参数表中查找包含该交易对的策略
+	// 修复JSONB操作符问题：使用正确的JSONB操作符和类型转换
 	query := `
 		SELECT
 			s.type as strategy_type,
@@ -2258,9 +2265,9 @@ func (ss *StrategyScheduler) getSymbolStrategyCoverageFromParams(ctx context.Con
 		LEFT JOIN strategy_params sp ON s.id::TEXT = sp.strategy_id::TEXT
 		WHERE s.is_running = true
 		AND (
-			sp.param_value LIKE '%' || $1 || '%'
-			OR sp.param_name = 'symbol' AND sp.param_value = $1
-			OR sp.param_name = 'symbols' AND sp.param_value LIKE '%' || $1 || '%'
+			sp.param_value::TEXT ILIKE '%' || $1 || '%'
+			OR (sp.param_name = 'symbol' AND sp.param_value::TEXT = $1)
+			OR (sp.param_name = 'symbols' AND sp.param_value::TEXT ILIKE '%' || $1 || '%')
 		)
 		GROUP BY s.type
 	`
@@ -3820,11 +3827,11 @@ func (ss *StrategyScheduler) getMarketDataFromAPI(ctx context.Context) (map[stri
 func (ss *StrategyScheduler) getMockMarketData() map[string]*MarketData {
 	mockData := make(map[string]*MarketData)
 	symbols := []string{"BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "SOLUSDT"}
-	
+
 	for _, symbol := range symbols {
 		mockData[symbol] = ss.createMockMarketData(symbol)
 	}
-	
+
 	return mockData
 }
 
@@ -3856,8 +3863,8 @@ func (ss *StrategyScheduler) createMockMarketData(symbol string) *MarketData {
 		Symbol:         symbol,
 		Price:          currentPrice,
 		Volume24h:      basePrice * 1000 * (0.5 + rand.Float64()), // 模拟交易量
-		PriceChange24h: priceChange * 100, // 转换为百分比
-		Volatility:     0.15 + rand.Float64()*0.1, // 15-25% 波动率
+		PriceChange24h: priceChange * 100,                         // 转换为百分比
+		Volatility:     0.15 + rand.Float64()*0.1,                 // 15-25% 波动率
 		Timestamp:      time.Now(),
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand"
 	"sort"
 	"sync"
 	"time"
@@ -14,461 +15,461 @@ import (
 
 // SmartExchangeRouter 智能交易所路由系统
 type SmartExchangeRouter struct {
-	config               *config.Config
-	exchangeManager      *ExchangeManager
-	healthMonitor        *HealthMonitor
-	loadBalancer         *LoadBalancer
-	failoverController   *FailoverController
-	routingOptimizer     *RoutingOptimizer
-	
+	config             *config.Config
+	exchangeManager    *ExchangeManager
+	healthMonitor      *HealthMonitor
+	loadBalancer       *LoadBalancer
+	failoverController *FailoverController
+	routingOptimizer   *RoutingOptimizer
+
 	// 运行状态
-	ctx        context.Context
-	cancel     context.CancelFunc
-	wg         sync.WaitGroup
-	isRunning  bool
-	mu         sync.RWMutex
-	
+	ctx       context.Context
+	cancel    context.CancelFunc
+	wg        sync.WaitGroup
+	isRunning bool
+	mu        sync.RWMutex
+
 	// 路由配置
-	primaryExchange      string
-	backupExchanges      []string
-	failoverThreshold    float64
-	latencyThreshold     time.Duration
-	healthCheckInterval  time.Duration
-	
+	primaryExchange     string
+	backupExchanges     []string
+	failoverThreshold   float64
+	latencyThreshold    time.Duration
+	healthCheckInterval time.Duration
+
 	// 路由状态
-	exchangeStatus       map[string]*ExchangeStatus
-	routingRules         []RoutingRule
-	routingHistory       []RoutingDecision
-	
+	exchangeStatus map[string]*ExchangeStatus
+	routingRules   []RoutingRule
+	routingHistory []RoutingDecision
+
 	// 监控指标
-	routingMetrics       *RoutingMetrics
-	performanceHistory   []PerformanceSnapshot
-	
+	routingMetrics     *RoutingMetrics
+	performanceHistory []PerformanceSnapshot
+
 	// 配置参数
-	enabled              bool
-	autoFailover         bool
-	smartRouting         bool
-	loadBalancing        bool
+	enabled       bool
+	autoFailover  bool
+	smartRouting  bool
+	loadBalancing bool
 }
 
 // ExchangeStatus 交易所状态
 type ExchangeStatus struct {
-	Exchange            string            `json:"exchange"`
-	IsOnline            bool              `json:"is_online"`
-	Latency             time.Duration     `json:"latency"`
-	Availability        float64           `json:"availability"`
-	ThroughputLimit     float64           `json:"throughput_limit"`
-	CurrentLoad         float64           `json:"current_load"`
-	ErrorRate           float64           `json:"error_rate"`
-	
+	Exchange        string        `json:"exchange"`
+	IsOnline        bool          `json:"is_online"`
+	Latency         time.Duration `json:"latency"`
+	Availability    float64       `json:"availability"`
+	ThroughputLimit float64       `json:"throughput_limit"`
+	CurrentLoad     float64       `json:"current_load"`
+	ErrorRate       float64       `json:"error_rate"`
+
 	// 连接状态
-	ConnectionStatus    string            `json:"connection_status"`  // CONNECTED, DISCONNECTED, CONNECTING, ERROR
-	LastPing            time.Time         `json:"last_ping"`
-	PingSuccess         bool              `json:"ping_success"`
-	ConsecutiveFailures int               `json:"consecutive_failures"`
-	
+	ConnectionStatus    string    `json:"connection_status"` // CONNECTED, DISCONNECTED, CONNECTING, ERROR
+	LastPing            time.Time `json:"last_ping"`
+	PingSuccess         bool      `json:"ping_success"`
+	ConsecutiveFailures int       `json:"consecutive_failures"`
+
 	// 交易相关
-	OrderBookDepth      float64           `json:"order_book_depth"`
-	SpreadTightness     float64           `json:"spread_tightness"`
-	TradingFees         map[string]float64 `json:"trading_fees"`
-	SupportedPairs      []string          `json:"supported_pairs"`
-	
+	OrderBookDepth  float64            `json:"order_book_depth"`
+	SpreadTightness float64            `json:"spread_tightness"`
+	TradingFees     map[string]float64 `json:"trading_fees"`
+	SupportedPairs  []string           `json:"supported_pairs"`
+
 	// 历史统计
-	UptimePercentage    float64           `json:"uptime_percentage"`
-	AvgLatency          time.Duration     `json:"avg_latency"`
-	AvgErrorRate        float64           `json:"avg_error_rate"`
-	
+	UptimePercentage float64       `json:"uptime_percentage"`
+	AvgLatency       time.Duration `json:"avg_latency"`
+	AvgErrorRate     float64       `json:"avg_error_rate"`
+
 	// 限制和约束
-	RateLimits          map[string]int    `json:"rate_limits"`
-	MaintenanceWindows  []MaintenanceWindow `json:"maintenance_windows"`
-	
-	LastUpdated         time.Time         `json:"last_updated"`
-	LastFailover        time.Time         `json:"last_failover"`
-	HealthScore         float64           `json:"health_score"`
+	RateLimits         map[string]int      `json:"rate_limits"`
+	MaintenanceWindows []MaintenanceWindow `json:"maintenance_windows"`
+
+	LastUpdated  time.Time `json:"last_updated"`
+	LastFailover time.Time `json:"last_failover"`
+	HealthScore  float64   `json:"health_score"`
 }
 
 // MaintenanceWindow 维护窗口
 type MaintenanceWindow struct {
 	Start       time.Time `json:"start"`
 	End         time.Time `json:"end"`
-	Type        string    `json:"type"`        // SCHEDULED, EMERGENCY
+	Type        string    `json:"type"` // SCHEDULED, EMERGENCY
 	Description string    `json:"description"`
 	Recurring   bool      `json:"recurring"`
-	Impact      string    `json:"impact"`      // HIGH, MEDIUM, LOW
+	Impact      string    `json:"impact"` // HIGH, MEDIUM, LOW
 }
 
 // ExchangeManager 交易所管理器
 type ExchangeManager struct {
-	exchanges           map[string]*Exchange
-	connectionPool      map[string]*ConnectionPool
-	credentialManager   *CredentialManager
-	
-	mu                  sync.RWMutex
+	exchanges         map[string]*Exchange
+	connectionPool    map[string]*ConnectionPool
+	credentialManager *CredentialManager
+
+	mu sync.RWMutex
 }
 
 // Exchange 交易所配置
 type Exchange struct {
-	Name                string            `json:"name"`
-	DisplayName         string            `json:"display_name"`
-	Region              string            `json:"region"`
-	Type                string            `json:"type"`            // SPOT, FUTURES, OPTIONS
-	Priority            int               `json:"priority"`
-	Capacity            float64           `json:"capacity"`
-	
+	Name        string  `json:"name"`
+	DisplayName string  `json:"display_name"`
+	Region      string  `json:"region"`
+	Type        string  `json:"type"` // SPOT, FUTURES, OPTIONS
+	Priority    int     `json:"priority"`
+	Capacity    float64 `json:"capacity"`
+
 	// 连接配置
-	RestAPI             APIConfig         `json:"rest_api"`
-	WebSocketAPI        APIConfig         `json:"websocket_api"`
-	FIXProtocol         *FIXConfig        `json:"fix_protocol"`
-	
+	RestAPI      APIConfig  `json:"rest_api"`
+	WebSocketAPI APIConfig  `json:"websocket_api"`
+	FIXProtocol  *FIXConfig `json:"fix_protocol"`
+
 	// 交易配置
-	MinOrderSize        map[string]float64 `json:"min_order_size"`
-	MaxOrderSize        map[string]float64 `json:"max_order_size"`
-	TickSizes           map[string]float64 `json:"tick_sizes"`
-	TradingFees         FeeStructure      `json:"trading_fees"`
-	
+	MinOrderSize map[string]float64 `json:"min_order_size"`
+	MaxOrderSize map[string]float64 `json:"max_order_size"`
+	TickSizes    map[string]float64 `json:"tick_sizes"`
+	TradingFees  FeeStructure       `json:"trading_fees"`
+
 	// 功能支持
-	SupportedOrderTypes []string          `json:"supported_order_types"`
-	SupportedTimeframes []string          `json:"supported_timeframes"`
-	MarginTrading       bool              `json:"margin_trading"`
-	OptionsTrading      bool              `json:"options_trading"`
-	
+	SupportedOrderTypes []string `json:"supported_order_types"`
+	SupportedTimeframes []string `json:"supported_timeframes"`
+	MarginTrading       bool     `json:"margin_trading"`
+	OptionsTrading      bool     `json:"options_trading"`
+
 	// 状态
-	IsEnabled           bool              `json:"is_enabled"`
-	LastUpdated         time.Time         `json:"last_updated"`
+	IsEnabled   bool      `json:"is_enabled"`
+	LastUpdated time.Time `json:"last_updated"`
 }
 
 // APIConfig API配置
 type APIConfig struct {
-	BaseURL             string            `json:"base_url"`
-	Version             string            `json:"version"`
-	Endpoints           map[string]string `json:"endpoints"`
-	RateLimits          map[string]int    `json:"rate_limits"`
-	Timeout             time.Duration     `json:"timeout"`
-	RetryAttempts       int               `json:"retry_attempts"`
-	Authentication      AuthConfig        `json:"authentication"`
+	BaseURL        string            `json:"base_url"`
+	Version        string            `json:"version"`
+	Endpoints      map[string]string `json:"endpoints"`
+	RateLimits     map[string]int    `json:"rate_limits"`
+	Timeout        time.Duration     `json:"timeout"`
+	RetryAttempts  int               `json:"retry_attempts"`
+	Authentication AuthConfig        `json:"authentication"`
 }
 
 // FIXConfig FIX协议配置
 type FIXConfig struct {
-	Host                string            `json:"host"`
-	Port                int               `json:"port"`
-	SenderCompID        string            `json:"sender_comp_id"`
-	TargetCompID        string            `json:"target_comp_id"`
-	HeartbeatInterval   time.Duration     `json:"heartbeat_interval"`
-	LogonTimeout        time.Duration     `json:"logon_timeout"`
+	Host              string        `json:"host"`
+	Port              int           `json:"port"`
+	SenderCompID      string        `json:"sender_comp_id"`
+	TargetCompID      string        `json:"target_comp_id"`
+	HeartbeatInterval time.Duration `json:"heartbeat_interval"`
+	LogonTimeout      time.Duration `json:"logon_timeout"`
 }
 
 // AuthConfig 认证配置
 type AuthConfig struct {
-	Type                string            `json:"type"`            // API_KEY, OAUTH, SIGNATURE
-	APIKey              string            `json:"api_key"`
-	SecretKey           string            `json:"secret_key"`
-	Passphrase          string            `json:"passphrase"`
-	SignatureMethod     string            `json:"signature_method"`
+	Type            string `json:"type"` // API_KEY, OAUTH, SIGNATURE
+	APIKey          string `json:"api_key"`
+	SecretKey       string `json:"secret_key"`
+	Passphrase      string `json:"passphrase"`
+	SignatureMethod string `json:"signature_method"`
 }
 
 // FeeStructure 费用结构
 type FeeStructure struct {
-	MakerFee            float64           `json:"maker_fee"`
-	TakerFee            float64           `json:"taker_fee"`
-	WithdrawalFees      map[string]float64 `json:"withdrawal_fees"`
-	VIPLevels           map[string]VIPFee `json:"vip_levels"`
+	MakerFee       float64            `json:"maker_fee"`
+	TakerFee       float64            `json:"taker_fee"`
+	WithdrawalFees map[string]float64 `json:"withdrawal_fees"`
+	VIPLevels      map[string]VIPFee  `json:"vip_levels"`
 }
 
 // VIPFee VIP费率
 type VIPFee struct {
-	MakerFee            float64           `json:"maker_fee"`
-	TakerFee            float64           `json:"taker_fee"`
-	Requirements        map[string]float64 `json:"requirements"`
+	MakerFee     float64            `json:"maker_fee"`
+	TakerFee     float64            `json:"taker_fee"`
+	Requirements map[string]float64 `json:"requirements"`
 }
 
 // ConnectionPool 连接池
 type ConnectionPool struct {
-	MaxConnections      int               `json:"max_connections"`
-	ActiveConnections   int               `json:"active_connections"`
-	IdleConnections     int               `json:"idle_connections"`
-	ConnectionTimeout   time.Duration     `json:"connection_timeout"`
-	IdleTimeout         time.Duration     `json:"idle_timeout"`
-	MaxLifetime         time.Duration     `json:"max_lifetime"`
-	
-	mu                  sync.RWMutex
+	MaxConnections    int           `json:"max_connections"`
+	ActiveConnections int           `json:"active_connections"`
+	IdleConnections   int           `json:"idle_connections"`
+	ConnectionTimeout time.Duration `json:"connection_timeout"`
+	IdleTimeout       time.Duration `json:"idle_timeout"`
+	MaxLifetime       time.Duration `json:"max_lifetime"`
+
+	mu sync.RWMutex
 }
 
 // CredentialManager 凭证管理器
 type CredentialManager struct {
-	credentials         map[string]*ExchangeCredential
-	encryptionKey       []byte
-	
-	mu                  sync.RWMutex
+	credentials   map[string]*ExchangeCredential
+	encryptionKey []byte
+
+	mu sync.RWMutex
 }
 
 // ExchangeCredential 交易所凭证
 type ExchangeCredential struct {
-	Exchange            string            `json:"exchange"`
-	APIKey              string            `json:"api_key"`
-	SecretKey           string            `json:"secret_key"`
-	Passphrase          string            `json:"passphrase"`
-	IsActive            bool              `json:"is_active"`
-	ExpiresAt           time.Time         `json:"expires_at"`
-	Permissions         []string          `json:"permissions"`
-	CreatedAt           time.Time         `json:"created_at"`
-	LastUsed            time.Time         `json:"last_used"`
+	Exchange    string    `json:"exchange"`
+	APIKey      string    `json:"api_key"`
+	SecretKey   string    `json:"secret_key"`
+	Passphrase  string    `json:"passphrase"`
+	IsActive    bool      `json:"is_active"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	Permissions []string  `json:"permissions"`
+	CreatedAt   time.Time `json:"created_at"`
+	LastUsed    time.Time `json:"last_used"`
 }
 
 // HealthMonitor 健康监控器
 type HealthMonitor struct {
-	checkInterval       time.Duration
-	timeoutDuration     time.Duration
-	healthThreshold     float64
-	
+	checkInterval   time.Duration
+	timeoutDuration time.Duration
+	healthThreshold float64
+
 	// 监控历史
-	healthHistory       map[string][]HealthCheck
-	lastChecks          map[string]HealthCheck
-	
-	mu                  sync.RWMutex
+	healthHistory map[string][]HealthCheck
+	lastChecks    map[string]HealthCheck
+
+	mu sync.RWMutex
 }
 
 // HealthCheck 健康检查
 type HealthCheck struct {
-	Exchange            string            `json:"exchange"`
-	Timestamp           time.Time         `json:"timestamp"`
-	IsHealthy           bool              `json:"is_healthy"`
-	Latency             time.Duration     `json:"latency"`
-	ErrorMessage        string            `json:"error_message"`
-	ResponseTime        time.Duration     `json:"response_time"`
-	
+	Exchange     string        `json:"exchange"`
+	Timestamp    time.Time     `json:"timestamp"`
+	IsHealthy    bool          `json:"is_healthy"`
+	Latency      time.Duration `json:"latency"`
+	ErrorMessage string        `json:"error_message"`
+	ResponseTime time.Duration `json:"response_time"`
+
 	// 检查详情
-	PingTest            TestResult        `json:"ping_test"`
-	APITest             TestResult        `json:"api_test"`
-	WebSocketTest       TestResult        `json:"websocket_test"`
-	OrderBookTest       TestResult        `json:"order_book_test"`
-	
+	PingTest      TestResult `json:"ping_test"`
+	APITest       TestResult `json:"api_test"`
+	WebSocketTest TestResult `json:"websocket_test"`
+	OrderBookTest TestResult `json:"order_book_test"`
+
 	// 综合评分
-	HealthScore         float64           `json:"health_score"`
-	Components          map[string]float64 `json:"components"`
+	HealthScore float64            `json:"health_score"`
+	Components  map[string]float64 `json:"components"`
 }
 
 // TestResult 测试结果
 type TestResult struct {
-	Passed              bool              `json:"passed"`
-	Duration            time.Duration     `json:"duration"`
-	Error               string            `json:"error"`
-	Details             map[string]interface{} `json:"details"`
+	Passed   bool                   `json:"passed"`
+	Duration time.Duration          `json:"duration"`
+	Error    string                 `json:"error"`
+	Details  map[string]interface{} `json:"details"`
 }
 
 // LoadBalancer 负载均衡器
 type LoadBalancer struct {
-	algorithm           string            // ROUND_ROBIN, WEIGHTED, LEAST_CONNECTIONS, HASH
-	weights             map[string]float64
-	connections         map[string]int
-	lastSelected        string
-	
-	mu                  sync.RWMutex
+	algorithm    string // ROUND_ROBIN, WEIGHTED, LEAST_CONNECTIONS, HASH
+	weights      map[string]float64
+	connections  map[string]int
+	lastSelected string
+
+	mu sync.RWMutex
 }
 
 // FailoverController 故障转移控制器
 type FailoverController struct {
-	failoverStrategy    string            // AUTO, MANUAL, HYBRID
-	failoverThreshold   float64
-	recoveryThreshold   float64
-	maxFailovers        int
-	failoverCooldown    time.Duration
-	
+	failoverStrategy  string // AUTO, MANUAL, HYBRID
+	failoverThreshold float64
+	recoveryThreshold float64
+	maxFailovers      int
+	failoverCooldown  time.Duration
+
 	// 故障转移历史
-	failoverHistory     []FailoverEvent
-	lastFailover        time.Time
-	failoverCount       int
-	
-	mu                  sync.RWMutex
+	failoverHistory []FailoverEvent
+	lastFailover    time.Time
+	failoverCount   int
+
+	mu sync.RWMutex
 }
 
 // FailoverEvent 故障转移事件
 type FailoverEvent struct {
-	ID                  string            `json:"id"`
-	Timestamp           time.Time         `json:"timestamp"`
-	FromExchange        string            `json:"from_exchange"`
-	ToExchange          string            `json:"to_exchange"`
-	Trigger             string            `json:"trigger"`
-	TriggerValue        float64           `json:"trigger_value"`
-	Reason              string            `json:"reason"`
-	Duration            time.Duration     `json:"duration"`
-	Success             bool              `json:"success"`
-	Impact              FailoverImpact    `json:"impact"`
-	AutoRecovery        bool              `json:"auto_recovery"`
-	RecoveryTime        time.Time         `json:"recovery_time"`
+	ID           string         `json:"id"`
+	Timestamp    time.Time      `json:"timestamp"`
+	FromExchange string         `json:"from_exchange"`
+	ToExchange   string         `json:"to_exchange"`
+	Trigger      string         `json:"trigger"`
+	TriggerValue float64        `json:"trigger_value"`
+	Reason       string         `json:"reason"`
+	Duration     time.Duration  `json:"duration"`
+	Success      bool           `json:"success"`
+	Impact       FailoverImpact `json:"impact"`
+	AutoRecovery bool           `json:"auto_recovery"`
+	RecoveryTime time.Time      `json:"recovery_time"`
 }
 
 // FailoverImpact 故障转移影响
 type FailoverImpact struct {
-	AffectedOrders      int               `json:"affected_orders"`
-	TradingInterruption time.Duration     `json:"trading_interruption"`
-	LostOpportunities   float64           `json:"lost_opportunities"`
-	AdditionalCosts     float64           `json:"additional_costs"`
-	CustomerImpact      string            `json:"customer_impact"`
+	AffectedOrders      int           `json:"affected_orders"`
+	TradingInterruption time.Duration `json:"trading_interruption"`
+	LostOpportunities   float64       `json:"lost_opportunities"`
+	AdditionalCosts     float64       `json:"additional_costs"`
+	CustomerImpact      string        `json:"customer_impact"`
 }
 
 // RoutingOptimizer 路由优化器
 type RoutingOptimizer struct {
-	optimizationModel   string            // LATENCY, COST, LIQUIDITY, HYBRID
-	reoptimizeInterval  time.Duration
-	
+	optimizationModel  string // LATENCY, COST, LIQUIDITY, HYBRID
+	reoptimizeInterval time.Duration
+
 	// 优化参数
-	latencyWeight       float64
-	costWeight          float64
-	liquidityWeight     float64
-	reliabilityWeight   float64
-	
+	latencyWeight     float64
+	costWeight        float64
+	liquidityWeight   float64
+	reliabilityWeight float64
+
 	// 优化历史
 	optimizationHistory []OptimizationResult
-	
-	mu                  sync.RWMutex
+
+	mu sync.RWMutex
 }
 
 // OptimizationResult 优化结果
 type OptimizationResult struct {
-	Timestamp           time.Time         `json:"timestamp"`
-	OptimizationModel   string            `json:"optimization_model"`
-	PreviousRouting     map[string]float64 `json:"previous_routing"`
-	OptimalRouting      map[string]float64 `json:"optimal_routing"`
-	ExpectedImprovement float64           `json:"expected_improvement"`
-	ActualImprovement   float64           `json:"actual_improvement"`
+	Timestamp           time.Time           `json:"timestamp"`
+	OptimizationModel   string              `json:"optimization_model"`
+	PreviousRouting     map[string]float64  `json:"previous_routing"`
+	OptimalRouting      map[string]float64  `json:"optimal_routing"`
+	ExpectedImprovement float64             `json:"expected_improvement"`
+	ActualImprovement   float64             `json:"actual_improvement"`
 	Metrics             OptimizationMetrics `json:"metrics"`
 }
 
 // OptimizationMetrics 优化指标
 type OptimizationMetrics struct {
-	AvgLatency          time.Duration     `json:"avg_latency"`
-	TotalCost           float64           `json:"total_cost"`
-	LiquidityScore      float64           `json:"liquidity_score"`
-	ReliabilityScore    float64           `json:"reliability_score"`
-	ThroughputScore     float64           `json:"throughput_score"`
+	AvgLatency       time.Duration `json:"avg_latency"`
+	TotalCost        float64       `json:"total_cost"`
+	LiquidityScore   float64       `json:"liquidity_score"`
+	ReliabilityScore float64       `json:"reliability_score"`
+	ThroughputScore  float64       `json:"throughput_score"`
 }
 
 // RoutingRule 路由规则
 type RoutingRule struct {
-	ID                  string            `json:"id"`
-	Name                string            `json:"name"`
-	Priority            int               `json:"priority"`
-	Condition           RoutingCondition  `json:"condition"`
-	Action              RoutingAction     `json:"action"`
-	IsActive            bool              `json:"is_active"`
-	CreatedAt           time.Time         `json:"created_at"`
-	UpdatedAt           time.Time         `json:"updated_at"`
-	HitCount            int64             `json:"hit_count"`
-	SuccessCount        int64             `json:"success_count"`
+	ID           string           `json:"id"`
+	Name         string           `json:"name"`
+	Priority     int              `json:"priority"`
+	Condition    RoutingCondition `json:"condition"`
+	Action       RoutingAction    `json:"action"`
+	IsActive     bool             `json:"is_active"`
+	CreatedAt    time.Time        `json:"created_at"`
+	UpdatedAt    time.Time        `json:"updated_at"`
+	HitCount     int64            `json:"hit_count"`
+	SuccessCount int64            `json:"success_count"`
 }
 
 // RoutingCondition 路由条件
 type RoutingCondition struct {
-	Type                string            `json:"type"`            // EXCHANGE_DOWN, HIGH_LATENCY, HIGH_COST, SYMBOL, TIME
-	Operator            string            `json:"operator"`        // EQUALS, GREATER_THAN, LESS_THAN, CONTAINS
-	Value               interface{}       `json:"value"`
-	LogicalOperator     string            `json:"logical_operator"` // AND, OR, NOT
-	SubConditions       []RoutingCondition `json:"sub_conditions"`
+	Type            string             `json:"type"`     // EXCHANGE_DOWN, HIGH_LATENCY, HIGH_COST, SYMBOL, TIME
+	Operator        string             `json:"operator"` // EQUALS, GREATER_THAN, LESS_THAN, CONTAINS
+	Value           interface{}        `json:"value"`
+	LogicalOperator string             `json:"logical_operator"` // AND, OR, NOT
+	SubConditions   []RoutingCondition `json:"sub_conditions"`
 }
 
 // RoutingAction 路由动作
 type RoutingAction struct {
-	Type                string            `json:"type"`            // ROUTE_TO, AVOID, LOAD_BALANCE, FAILOVER
-	TargetExchange      string            `json:"target_exchange"`
-	Parameters          map[string]interface{} `json:"parameters"`
-	Fallback            *RoutingAction    `json:"fallback"`
+	Type           string                 `json:"type"` // ROUTE_TO, AVOID, LOAD_BALANCE, FAILOVER
+	TargetExchange string                 `json:"target_exchange"`
+	Parameters     map[string]interface{} `json:"parameters"`
+	Fallback       *RoutingAction         `json:"fallback"`
 }
 
 // RoutingDecision 路由决策
 type RoutingDecision struct {
-	ID                  string            `json:"id"`
-	Timestamp           time.Time         `json:"timestamp"`
-	OrderID             string            `json:"order_id"`
-	Symbol              string            `json:"symbol"`
-	OrderType           string            `json:"order_type"`
-	
+	ID        string    `json:"id"`
+	Timestamp time.Time `json:"timestamp"`
+	OrderID   string    `json:"order_id"`
+	Symbol    string    `json:"symbol"`
+	OrderType string    `json:"order_type"`
+
 	// 决策过程
-	SelectedExchange    string            `json:"selected_exchange"`
-	AlternativeExchanges []string         `json:"alternative_exchanges"`
-	DecisionReason      string            `json:"decision_reason"`
-	RuleMatches         []string          `json:"rule_matches"`
-	
+	SelectedExchange     string   `json:"selected_exchange"`
+	AlternativeExchanges []string `json:"alternative_exchanges"`
+	DecisionReason       string   `json:"decision_reason"`
+	RuleMatches          []string `json:"rule_matches"`
+
 	// 决策指标
-	LatencyScore        float64           `json:"latency_score"`
-	CostScore           float64           `json:"cost_score"`
-	LiquidityScore      float64           `json:"liquidity_score"`
-	ReliabilityScore    float64           `json:"reliability_score"`
-	OverallScore        float64           `json:"overall_score"`
-	
+	LatencyScore     float64 `json:"latency_score"`
+	CostScore        float64 `json:"cost_score"`
+	LiquidityScore   float64 `json:"liquidity_score"`
+	ReliabilityScore float64 `json:"reliability_score"`
+	OverallScore     float64 `json:"overall_score"`
+
 	// 执行结果
-	ExecutionTime       time.Duration     `json:"execution_time"`
-	Success             bool              `json:"success"`
-	ErrorMessage        string            `json:"error_message"`
-	
+	ExecutionTime time.Duration `json:"execution_time"`
+	Success       bool          `json:"success"`
+	ErrorMessage  string        `json:"error_message"`
+
 	// 性能比较
-	ExpectedLatency     time.Duration     `json:"expected_latency"`
-	ActualLatency       time.Duration     `json:"actual_latency"`
-	ExpectedCost        float64           `json:"expected_cost"`
-	ActualCost          float64           `json:"actual_cost"`
+	ExpectedLatency time.Duration `json:"expected_latency"`
+	ActualLatency   time.Duration `json:"actual_latency"`
+	ExpectedCost    float64       `json:"expected_cost"`
+	ActualCost      float64       `json:"actual_cost"`
 }
 
 // RoutingMetrics 路由指标
 type RoutingMetrics struct {
 	mu sync.RWMutex
-	
+
 	// 路由统计
-	TotalRequests       int64             `json:"total_requests"`
-	SuccessfulRoutes    int64             `json:"successful_routes"`
-	FailedRoutes        int64             `json:"failed_routes"`
-	SuccessRate         float64           `json:"success_rate"`
-	
+	TotalRequests    int64   `json:"total_requests"`
+	SuccessfulRoutes int64   `json:"successful_routes"`
+	FailedRoutes     int64   `json:"failed_routes"`
+	SuccessRate      float64 `json:"success_rate"`
+
 	// 性能指标
-	AvgRoutingLatency   time.Duration     `json:"avg_routing_latency"`
-	AvgExecutionLatency time.Duration     `json:"avg_execution_latency"`
-	P95Latency          time.Duration     `json:"p95_latency"`
-	P99Latency          time.Duration     `json:"p99_latency"`
-	
+	AvgRoutingLatency   time.Duration `json:"avg_routing_latency"`
+	AvgExecutionLatency time.Duration `json:"avg_execution_latency"`
+	P95Latency          time.Duration `json:"p95_latency"`
+	P99Latency          time.Duration `json:"p99_latency"`
+
 	// 交易所分布
-	ExchangeDistribution map[string]int64 `json:"exchange_distribution"`
-	ExchangeSuccessRates map[string]float64 `json:"exchange_success_rates"`
-	ExchangeLatencies   map[string]time.Duration `json:"exchange_latencies"`
-	
+	ExchangeDistribution map[string]int64         `json:"exchange_distribution"`
+	ExchangeSuccessRates map[string]float64       `json:"exchange_success_rates"`
+	ExchangeLatencies    map[string]time.Duration `json:"exchange_latencies"`
+
 	// 故障转移统计
-	FailoverCount       int64             `json:"failover_count"`
-	AvgFailoverTime     time.Duration     `json:"avg_failover_time"`
-	AutoRecoveryRate    float64           `json:"auto_recovery_rate"`
-	
+	FailoverCount    int64         `json:"failover_count"`
+	AvgFailoverTime  time.Duration `json:"avg_failover_time"`
+	AutoRecoveryRate float64       `json:"auto_recovery_rate"`
+
 	// 成本统计
-	TotalTradingCosts   float64           `json:"total_trading_costs"`
-	AvgTradingCost      float64           `json:"avg_trading_cost"`
-	CostSavings         float64           `json:"cost_savings"`
-	
+	TotalTradingCosts float64 `json:"total_trading_costs"`
+	AvgTradingCost    float64 `json:"avg_trading_cost"`
+	CostSavings       float64 `json:"cost_savings"`
+
 	// 优化效果
-	OptimizationEfficiency float64        `json:"optimization_efficiency"`
-	RouteQuality        float64           `json:"route_quality"`
-	
-	LastUpdated         time.Time         `json:"last_updated"`
+	OptimizationEfficiency float64 `json:"optimization_efficiency"`
+	RouteQuality           float64 `json:"route_quality"`
+
+	LastUpdated time.Time `json:"last_updated"`
 }
 
 // PerformanceSnapshot 性能快照
 type PerformanceSnapshot struct {
-	Timestamp           time.Time         `json:"timestamp"`
+	Timestamp           time.Time                      `json:"timestamp"`
 	ExchangePerformance map[string]ExchangePerformance `json:"exchange_performance"`
-	RoutingQuality      float64           `json:"routing_quality"`
-	SystemLoad          float64           `json:"system_load"`
-	FailoverEvents      int               `json:"failover_events"`
+	RoutingQuality      float64                        `json:"routing_quality"`
+	SystemLoad          float64                        `json:"system_load"`
+	FailoverEvents      int                            `json:"failover_events"`
 }
 
 // ExchangePerformance 交易所性能
 type ExchangePerformance struct {
-	Latency             time.Duration     `json:"latency"`
-	Availability        float64           `json:"availability"`
-	ThroughputUtilization float64         `json:"throughput_utilization"`
-	ErrorRate           float64           `json:"error_rate"`
-	HealthScore         float64           `json:"health_score"`
-	OrderSuccessRate    float64           `json:"order_success_rate"`
+	Latency               time.Duration `json:"latency"`
+	Availability          float64       `json:"availability"`
+	ThroughputUtilization float64       `json:"throughput_utilization"`
+	ErrorRate             float64       `json:"error_rate"`
+	HealthScore           float64       `json:"health_score"`
+	OrderSuccessRate      float64       `json:"order_success_rate"`
 }
 
 // NewSmartExchangeRouter 创建智能交易所路由系统
 func NewSmartExchangeRouter(cfg *config.Config) (*SmartExchangeRouter, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	ser := &SmartExchangeRouter{
 		config:             cfg,
 		exchangeManager:    NewExchangeManager(),
@@ -481,38 +482,38 @@ func NewSmartExchangeRouter(cfg *config.Config) (*SmartExchangeRouter, error) {
 		exchangeStatus:     make(map[string]*ExchangeStatus),
 		routingRules:       make([]RoutingRule, 0),
 		routingHistory:     make([]RoutingDecision, 0),
-		routingMetrics:     &RoutingMetrics{
+		routingMetrics: &RoutingMetrics{
 			ExchangeDistribution: make(map[string]int64),
 			ExchangeSuccessRates: make(map[string]float64),
 			ExchangeLatencies:    make(map[string]time.Duration),
 		},
-		performanceHistory: make([]PerformanceSnapshot, 0),
-		primaryExchange:    "binance",
-		backupExchanges:    []string{"okx", "bybit", "huobi"},
-		failoverThreshold:  0.95,
-		latencyThreshold:   100 * time.Millisecond,
+		performanceHistory:  make([]PerformanceSnapshot, 0),
+		primaryExchange:     "binance",
+		backupExchanges:     []string{"okx", "bybit", "huobi"},
+		failoverThreshold:   0.95,
+		latencyThreshold:    100 * time.Millisecond,
 		healthCheckInterval: 30 * time.Second,
-		enabled:            true,
-		autoFailover:       true,
-		smartRouting:       true,
-		loadBalancing:      true,
+		enabled:             true,
+		autoFailover:        true,
+		smartRouting:        true,
+		loadBalancing:       true,
 	}
-	
+
 	// 从配置文件读取参数
 	if cfg != nil {
 		// TODO: 从配置文件读取路由参数
 	}
-	
+
 	// 初始化交易所
 	err := ser.initializeExchanges()
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to initialize exchanges: %w", err)
 	}
-	
+
 	// 初始化路由规则
 	ser.initializeRoutingRules()
-	
+
 	return ser, nil
 }
 
@@ -582,41 +583,41 @@ func NewRoutingOptimizer() *RoutingOptimizer {
 func (ser *SmartExchangeRouter) Start() error {
 	ser.mu.Lock()
 	defer ser.mu.Unlock()
-	
+
 	if ser.isRunning {
 		return fmt.Errorf("smart exchange router is already running")
 	}
-	
+
 	if !ser.enabled {
 		return fmt.Errorf("smart exchange router is disabled")
 	}
-	
+
 	log.Println("Starting Smart Exchange Router...")
-	
+
 	// 启动健康监控
 	ser.wg.Add(1)
 	go ser.runHealthMonitoring()
-	
+
 	// 启动负载均衡
 	ser.wg.Add(1)
 	go ser.runLoadBalancing()
-	
+
 	// 启动故障转移监控
 	ser.wg.Add(1)
 	go ser.runFailoverMonitoring()
-	
+
 	// 启动路由优化
 	ser.wg.Add(1)
 	go ser.runRoutingOptimization()
-	
+
 	// 启动性能监控
 	ser.wg.Add(1)
 	go ser.runPerformanceMonitoring()
-	
+
 	// 启动指标收集
 	ser.wg.Add(1)
 	go ser.runMetricsCollection()
-	
+
 	ser.isRunning = true
 	log.Println("Smart Exchange Router started successfully")
 	return nil
@@ -626,16 +627,16 @@ func (ser *SmartExchangeRouter) Start() error {
 func (ser *SmartExchangeRouter) Stop() error {
 	ser.mu.Lock()
 	defer ser.mu.Unlock()
-	
+
 	if !ser.isRunning {
 		return fmt.Errorf("smart exchange router is not running")
 	}
-	
+
 	log.Println("Stopping Smart Exchange Router...")
-	
+
 	ser.cancel()
 	ser.wg.Wait()
-	
+
 	ser.isRunning = false
 	log.Println("Smart Exchange Router stopped successfully")
 	return nil
@@ -652,9 +653,9 @@ func (ser *SmartExchangeRouter) initializeExchanges() error {
 			Priority:    1,
 			Capacity:    10000.0,
 			RestAPI: APIConfig{
-				BaseURL: "https://api.binance.com",
-				Version: "v3",
-				Timeout: 5 * time.Second,
+				BaseURL:       "https://api.binance.com",
+				Version:       "v3",
+				Timeout:       5 * time.Second,
 				RetryAttempts: 3,
 			},
 			IsEnabled: true,
@@ -667,9 +668,9 @@ func (ser *SmartExchangeRouter) initializeExchanges() error {
 			Priority:    2,
 			Capacity:    8000.0,
 			RestAPI: APIConfig{
-				BaseURL: "https://www.okx.com",
-				Version: "v5",
-				Timeout: 5 * time.Second,
+				BaseURL:       "https://www.okx.com",
+				Version:       "v5",
+				Timeout:       5 * time.Second,
 				RetryAttempts: 3,
 			},
 			IsEnabled: true,
@@ -682,18 +683,18 @@ func (ser *SmartExchangeRouter) initializeExchanges() error {
 			Priority:    3,
 			Capacity:    6000.0,
 			RestAPI: APIConfig{
-				BaseURL: "https://api.bybit.com",
-				Version: "v5",
-				Timeout: 5 * time.Second,
+				BaseURL:       "https://api.bybit.com",
+				Version:       "v5",
+				Timeout:       5 * time.Second,
 				RetryAttempts: 3,
 			},
 			IsEnabled: true,
 		},
 	}
-	
+
 	for _, exchange := range exchanges {
 		ser.exchangeManager.exchanges[exchange.Name] = &exchange
-		
+
 		// 初始化连接池
 		ser.exchangeManager.connectionPool[exchange.Name] = &ConnectionPool{
 			MaxConnections:    10,
@@ -703,7 +704,7 @@ func (ser *SmartExchangeRouter) initializeExchanges() error {
 			IdleTimeout:       5 * time.Minute,
 			MaxLifetime:       1 * time.Hour,
 		}
-		
+
 		// 初始化交易所状态
 		ser.exchangeStatus[exchange.Name] = &ExchangeStatus{
 			Exchange:         exchange.Name,
@@ -720,11 +721,11 @@ func (ser *SmartExchangeRouter) initializeExchanges() error {
 			HealthScore:      1.0,
 			LastUpdated:      time.Now(),
 		}
-		
+
 		// 设置负载均衡权重
 		ser.loadBalancer.weights[exchange.Name] = 1.0 / float64(exchange.Priority)
 	}
-	
+
 	log.Printf("Initialized %d exchanges", len(exchanges))
 	return nil
 }
@@ -782,7 +783,7 @@ func (ser *SmartExchangeRouter) initializeRoutingRules() {
 			CreatedAt: time.Now(),
 		},
 	}
-	
+
 	ser.routingRules = rules
 	log.Printf("Initialized %d routing rules", len(rules))
 }
@@ -790,12 +791,12 @@ func (ser *SmartExchangeRouter) initializeRoutingRules() {
 // runHealthMonitoring 运行健康监控
 func (ser *SmartExchangeRouter) runHealthMonitoring() {
 	defer ser.wg.Done()
-	
+
 	ticker := time.NewTicker(ser.healthCheckInterval)
 	defer ticker.Stop()
-	
+
 	log.Println("Health monitoring started")
-	
+
 	for {
 		select {
 		case <-ser.ctx.Done():
@@ -810,12 +811,12 @@ func (ser *SmartExchangeRouter) runHealthMonitoring() {
 // runLoadBalancing 运行负载均衡
 func (ser *SmartExchangeRouter) runLoadBalancing() {
 	defer ser.wg.Done()
-	
+
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
-	
+
 	log.Println("Load balancing started")
-	
+
 	for {
 		select {
 		case <-ser.ctx.Done():
@@ -832,12 +833,12 @@ func (ser *SmartExchangeRouter) runLoadBalancing() {
 // runFailoverMonitoring 运行故障转移监控
 func (ser *SmartExchangeRouter) runFailoverMonitoring() {
 	defer ser.wg.Done()
-	
+
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	
+
 	log.Println("Failover monitoring started")
-	
+
 	for {
 		select {
 		case <-ser.ctx.Done():
@@ -854,12 +855,12 @@ func (ser *SmartExchangeRouter) runFailoverMonitoring() {
 // runRoutingOptimization 运行路由优化
 func (ser *SmartExchangeRouter) runRoutingOptimization() {
 	defer ser.wg.Done()
-	
+
 	ticker := time.NewTicker(ser.routingOptimizer.reoptimizeInterval)
 	defer ticker.Stop()
-	
+
 	log.Println("Routing optimization started")
-	
+
 	for {
 		select {
 		case <-ser.ctx.Done():
@@ -876,12 +877,12 @@ func (ser *SmartExchangeRouter) runRoutingOptimization() {
 // runPerformanceMonitoring 运行性能监控
 func (ser *SmartExchangeRouter) runPerformanceMonitoring() {
 	defer ser.wg.Done()
-	
+
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
-	
+
 	log.Println("Performance monitoring started")
-	
+
 	for {
 		select {
 		case <-ser.ctx.Done():
@@ -896,12 +897,12 @@ func (ser *SmartExchangeRouter) runPerformanceMonitoring() {
 // runMetricsCollection 运行指标收集
 func (ser *SmartExchangeRouter) runMetricsCollection() {
 	defer ser.wg.Done()
-	
+
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
-	
+
 	log.Println("Metrics collection started")
-	
+
 	for {
 		select {
 		case <-ser.ctx.Done():
@@ -916,17 +917,17 @@ func (ser *SmartExchangeRouter) runMetricsCollection() {
 // RouteOrder 路由订单
 func (ser *SmartExchangeRouter) RouteOrder(orderID, symbol, orderType string) (*RoutingDecision, error) {
 	startTime := time.Now()
-	
+
 	decision := &RoutingDecision{
-		ID:                  ser.generateDecisionID(),
-		Timestamp:           startTime,
-		OrderID:             orderID,
-		Symbol:              symbol,
-		OrderType:           orderType,
+		ID:                   ser.generateDecisionID(),
+		Timestamp:            startTime,
+		OrderID:              orderID,
+		Symbol:               symbol,
+		OrderType:            orderType,
 		AlternativeExchanges: make([]string, 0),
-		RuleMatches:         make([]string, 0),
+		RuleMatches:          make([]string, 0),
 	}
-	
+
 	// 获取可用交易所
 	availableExchanges := ser.getAvailableExchanges(symbol)
 	if len(availableExchanges) == 0 {
@@ -934,44 +935,44 @@ func (ser *SmartExchangeRouter) RouteOrder(orderID, symbol, orderType string) (*
 		decision.ErrorMessage = "No available exchanges for symbol"
 		return decision, fmt.Errorf("no available exchanges for symbol: %s", symbol)
 	}
-	
+
 	// 应用路由规则
 	selectedExchange, ruleMatches := ser.applyRoutingRules(symbol, orderType, availableExchanges)
 	decision.RuleMatches = ruleMatches
-	
+
 	// 如果规则没有明确指定，使用智能路由
 	if selectedExchange == "" && ser.smartRouting {
 		selectedExchange = ser.selectOptimalExchange(symbol, orderType, availableExchanges)
 		decision.DecisionReason = "Smart routing optimization"
 	}
-	
+
 	// 如果仍未选择，使用负载均衡
 	if selectedExchange == "" {
 		selectedExchange = ser.loadBalancer.selectExchange(availableExchanges)
 		decision.DecisionReason = "Load balancing"
 	}
-	
+
 	// 如果还是没有选择，使用主交易所
 	if selectedExchange == "" {
 		selectedExchange = ser.primaryExchange
 		decision.DecisionReason = "Default primary exchange"
 	}
-	
+
 	decision.SelectedExchange = selectedExchange
 	decision.AlternativeExchanges = ser.getAlternatives(selectedExchange, availableExchanges)
-	
+
 	// 计算决策指标
 	ser.calculateDecisionScores(decision, availableExchanges)
-	
+
 	// 执行路由
 	success, err := ser.executeRouting(decision)
 	decision.Success = success
 	decision.ExecutionTime = time.Since(startTime)
-	
+
 	if err != nil {
 		decision.ErrorMessage = err.Error()
 	}
-	
+
 	// 记录决策
 	ser.mu.Lock()
 	ser.routingHistory = append(ser.routingHistory, *decision)
@@ -979,48 +980,48 @@ func (ser *SmartExchangeRouter) RouteOrder(orderID, symbol, orderType string) (*
 		ser.routingHistory = ser.routingHistory[1000:]
 	}
 	ser.mu.Unlock()
-	
+
 	// 更新统计
 	ser.updateRoutingStats(decision)
-	
+
 	log.Printf("Order %s routed to %s (reason: %s)", orderID, selectedExchange, decision.DecisionReason)
-	
+
 	return decision, err
 }
 
 // performHealthChecks 执行健康检查
 func (ser *SmartExchangeRouter) performHealthChecks() {
 	log.Println("Performing health checks...")
-	
+
 	ser.exchangeManager.mu.RLock()
 	exchanges := make(map[string]*Exchange)
 	for k, v := range ser.exchangeManager.exchanges {
 		exchanges[k] = v
 	}
 	ser.exchangeManager.mu.RUnlock()
-	
+
 	for name, exchange := range exchanges {
 		if !exchange.IsEnabled {
 			continue
 		}
-		
+
 		healthCheck := ser.performSingleHealthCheck(name, exchange)
-		
+
 		// 更新交易所状态
 		ser.updateExchangeStatus(name, healthCheck)
-		
+
 		// 记录健康检查历史
 		ser.healthMonitor.mu.Lock()
 		if ser.healthMonitor.healthHistory[name] == nil {
 			ser.healthMonitor.healthHistory[name] = make([]HealthCheck, 0)
 		}
 		ser.healthMonitor.healthHistory[name] = append(ser.healthMonitor.healthHistory[name], healthCheck)
-		
+
 		// 保持历史记录在合理范围内
 		if len(ser.healthMonitor.healthHistory[name]) > 1000 {
 			ser.healthMonitor.healthHistory[name] = ser.healthMonitor.healthHistory[name][100:]
 		}
-		
+
 		ser.healthMonitor.lastChecks[name] = healthCheck
 		ser.healthMonitor.mu.Unlock()
 	}
@@ -1029,49 +1030,49 @@ func (ser *SmartExchangeRouter) performHealthChecks() {
 // performSingleHealthCheck 执行单个交易所健康检查
 func (ser *SmartExchangeRouter) performSingleHealthCheck(name string, exchange *Exchange) HealthCheck {
 	startTime := time.Now()
-	
+
 	healthCheck := HealthCheck{
 		Exchange:   name,
 		Timestamp:  startTime,
 		Components: make(map[string]float64),
 	}
-	
+
 	// Ping测试
 	pingResult := ser.performPingTest(exchange)
 	healthCheck.PingTest = pingResult
 	healthCheck.Components["ping"] = ser.getTestScore(pingResult)
-	
+
 	// API测试
 	apiResult := ser.performAPITest(exchange)
 	healthCheck.APITest = apiResult
 	healthCheck.Components["api"] = ser.getTestScore(apiResult)
-	
+
 	// WebSocket测试
 	wsResult := ser.performWebSocketTest(exchange)
 	healthCheck.WebSocketTest = wsResult
 	healthCheck.Components["websocket"] = ser.getTestScore(wsResult)
-	
+
 	// 订单簿测试
 	obResult := ser.performOrderBookTest(exchange)
 	healthCheck.OrderBookTest = obResult
 	healthCheck.Components["orderbook"] = ser.getTestScore(obResult)
-	
+
 	// 计算总体健康分数
 	totalScore := 0.0
 	for _, score := range healthCheck.Components {
 		totalScore += score
 	}
 	healthCheck.HealthScore = totalScore / float64(len(healthCheck.Components))
-	
+
 	// 确定是否健康
 	healthCheck.IsHealthy = healthCheck.HealthScore >= ser.healthMonitor.healthThreshold
 	healthCheck.Latency = time.Since(startTime)
-	
+
 	if !healthCheck.IsHealthy {
-		healthCheck.ErrorMessage = fmt.Sprintf("Health score %.2f below threshold %.2f", 
+		healthCheck.ErrorMessage = fmt.Sprintf("Health score %.2f below threshold %.2f",
 			healthCheck.HealthScore, ser.healthMonitor.healthThreshold)
 	}
-	
+
 	return healthCheck
 }
 
@@ -1131,19 +1132,19 @@ func (ser *SmartExchangeRouter) getTestScore(result TestResult) float64 {
 func (ser *SmartExchangeRouter) updateExchangeStatus(name string, healthCheck HealthCheck) {
 	ser.mu.Lock()
 	defer ser.mu.Unlock()
-	
+
 	status := ser.exchangeStatus[name]
 	if status == nil {
 		status = &ExchangeStatus{Exchange: name}
 		ser.exchangeStatus[name] = status
 	}
-	
+
 	status.IsOnline = healthCheck.IsHealthy
 	status.Latency = healthCheck.Latency
 	status.HealthScore = healthCheck.HealthScore
 	status.LastPing = healthCheck.Timestamp
 	status.PingSuccess = healthCheck.IsHealthy
-	
+
 	if !healthCheck.IsHealthy {
 		status.ConsecutiveFailures++
 		status.ConnectionStatus = "ERROR"
@@ -1151,23 +1152,23 @@ func (ser *SmartExchangeRouter) updateExchangeStatus(name string, healthCheck He
 		status.ConsecutiveFailures = 0
 		status.ConnectionStatus = "CONNECTED"
 	}
-	
+
 	// 更新可用性统计
 	ser.updateAvailabilityStats(status)
-	
+
 	status.LastUpdated = time.Now()
 }
 
 // rebalanceLoad 重新平衡负载
 func (ser *SmartExchangeRouter) rebalanceLoad() {
 	log.Println("Rebalancing load across exchanges...")
-	
+
 	// 获取当前负载情况
 	loads := ser.getCurrentLoads()
-	
+
 	// 计算理想负载分布
 	idealLoads := ser.calculateIdealLoads()
-	
+
 	// 调整权重
 	ser.loadBalancer.mu.Lock()
 	for exchange, idealLoad := range idealLoads {
@@ -1189,13 +1190,13 @@ func (ser *SmartExchangeRouter) checkFailoverConditions() {
 		statuses[k] = v
 	}
 	ser.mu.RUnlock()
-	
+
 	for exchange, status := range statuses {
 		// 检查是否需要故障转移
 		if ser.shouldFailover(exchange, status) {
 			ser.performFailover(exchange, status)
 		}
-		
+
 		// 检查是否可以恢复
 		if ser.shouldRecover(exchange, status) {
 			ser.performRecovery(exchange, status)
@@ -1209,22 +1210,22 @@ func (ser *SmartExchangeRouter) shouldFailover(exchange string, status *Exchange
 	if status.HealthScore < ser.failoverController.failoverThreshold {
 		return true
 	}
-	
+
 	// 检查连续失败次数
 	if status.ConsecutiveFailures >= 3 {
 		return true
 	}
-	
+
 	// 检查延迟
 	if status.Latency > ser.latencyThreshold*2 {
 		return true
 	}
-	
+
 	// 检查错误率
 	if status.ErrorRate > 0.1 { // 10%错误率
 		return true
 	}
-	
+
 	return false
 }
 
@@ -1232,27 +1233,27 @@ func (ser *SmartExchangeRouter) shouldFailover(exchange string, status *Exchange
 func (ser *SmartExchangeRouter) performFailover(fromExchange string, status *ExchangeStatus) {
 	ser.failoverController.mu.Lock()
 	defer ser.failoverController.mu.Unlock()
-	
+
 	// 检查冷却期
 	if time.Since(ser.failoverController.lastFailover) < ser.failoverController.failoverCooldown {
 		return
 	}
-	
+
 	// 检查最大故障转移次数
 	if ser.failoverController.failoverCount >= ser.failoverController.maxFailovers {
 		log.Printf("Maximum failover limit reached for %s", fromExchange)
 		return
 	}
-	
+
 	// 选择目标交易所
 	toExchange := ser.selectFailoverTarget(fromExchange)
 	if toExchange == "" {
 		log.Printf("No suitable failover target found for %s", fromExchange)
 		return
 	}
-	
+
 	log.Printf("Performing failover from %s to %s", fromExchange, toExchange)
-	
+
 	// 创建故障转移事件
 	failoverEvent := FailoverEvent{
 		ID:           ser.generateFailoverID(),
@@ -1264,7 +1265,7 @@ func (ser *SmartExchangeRouter) performFailover(fromExchange string, status *Exc
 		Reason:       fmt.Sprintf("Health score %.2f below threshold", status.HealthScore),
 		Success:      true,
 	}
-	
+
 	// 执行故障转移逻辑
 	err := ser.executeFailover(fromExchange, toExchange)
 	if err != nil {
@@ -1272,35 +1273,35 @@ func (ser *SmartExchangeRouter) performFailover(fromExchange string, status *Exc
 		log.Printf("Failover failed: %v", err)
 		return
 	}
-	
+
 	failoverEvent.Duration = time.Since(failoverEvent.Timestamp)
-	
+
 	// 记录故障转移事件
 	ser.failoverController.failoverHistory = append(ser.failoverController.failoverHistory, failoverEvent)
 	ser.failoverController.lastFailover = time.Now()
 	ser.failoverController.failoverCount++
-	
+
 	// 更新状态
 	status.LastFailover = time.Now()
-	
+
 	log.Printf("Failover completed successfully from %s to %s", fromExchange, toExchange)
 }
 
 // optimizeRouting 优化路由
 func (ser *SmartExchangeRouter) optimizeRouting() {
 	log.Println("Optimizing routing configuration...")
-	
+
 	startTime := time.Now()
-	
+
 	// 获取当前性能数据
 	currentMetrics := ser.getCurrentOptimizationMetrics()
-	
+
 	// 根据优化模型计算最优路由
 	optimalRouting := ser.calculateOptimalRouting(currentMetrics)
-	
+
 	// 应用优化结果
 	ser.applyOptimizationResult(optimalRouting)
-	
+
 	// 记录优化历史
 	result := OptimizationResult{
 		Timestamp:         startTime,
@@ -1308,11 +1309,11 @@ func (ser *SmartExchangeRouter) optimizeRouting() {
 		OptimalRouting:    optimalRouting,
 		Metrics:           currentMetrics,
 	}
-	
+
 	ser.routingOptimizer.mu.Lock()
 	ser.routingOptimizer.optimizationHistory = append(ser.routingOptimizer.optimizationHistory, result)
 	ser.routingOptimizer.mu.Unlock()
-	
+
 	log.Printf("Routing optimization completed in %v", time.Since(startTime))
 }
 
@@ -1323,7 +1324,7 @@ func (ser *SmartExchangeRouter) capturePerformanceSnapshot() {
 		ExchangePerformance: make(map[string]ExchangePerformance),
 		SystemLoad:          ser.calculateSystemLoad(),
 	}
-	
+
 	// 收集各交易所性能数据
 	ser.mu.RLock()
 	for exchange, status := range ser.exchangeStatus {
@@ -1338,13 +1339,13 @@ func (ser *SmartExchangeRouter) capturePerformanceSnapshot() {
 		snapshot.ExchangePerformance[exchange] = performance
 	}
 	ser.mu.RUnlock()
-	
+
 	// 计算路由质量
 	snapshot.RoutingQuality = ser.calculateRoutingQuality()
-	
+
 	// 统计故障转移事件
 	snapshot.FailoverEvents = ser.countRecentFailovers(1 * time.Hour)
-	
+
 	// 保存快照
 	ser.mu.Lock()
 	ser.performanceHistory = append(ser.performanceHistory, snapshot)
@@ -1358,63 +1359,63 @@ func (ser *SmartExchangeRouter) capturePerformanceSnapshot() {
 func (ser *SmartExchangeRouter) updateMetrics() {
 	ser.routingMetrics.mu.Lock()
 	defer ser.routingMetrics.mu.Unlock()
-	
+
 	// 更新路由统计
 	totalRequests := int64(len(ser.routingHistory))
 	successfulRoutes := int64(0)
-	
+
 	latencies := make([]time.Duration, 0)
-	
+
 	for _, decision := range ser.routingHistory {
 		if decision.Success {
 			successfulRoutes++
 		}
 		latencies = append(latencies, decision.ExecutionTime)
-		
+
 		// 更新交易所分布
 		ser.routingMetrics.ExchangeDistribution[decision.SelectedExchange]++
 	}
-	
+
 	ser.routingMetrics.TotalRequests = totalRequests
 	ser.routingMetrics.SuccessfulRoutes = successfulRoutes
 	ser.routingMetrics.FailedRoutes = totalRequests - successfulRoutes
-	
+
 	if totalRequests > 0 {
 		ser.routingMetrics.SuccessRate = float64(successfulRoutes) / float64(totalRequests)
 	}
-	
+
 	// 计算延迟统计
 	if len(latencies) > 0 {
 		sort.Slice(latencies, func(i, j int) bool {
 			return latencies[i] < latencies[j]
 		})
-		
+
 		ser.routingMetrics.AvgRoutingLatency = ser.calculateMeanDuration(latencies)
 		ser.routingMetrics.P95Latency = latencies[int(float64(len(latencies))*0.95)]
 		ser.routingMetrics.P99Latency = latencies[int(float64(len(latencies))*0.99)]
 	}
-	
+
 	// 更新故障转移统计
 	ser.routingMetrics.FailoverCount = int64(len(ser.failoverController.failoverHistory))
 	if ser.routingMetrics.FailoverCount > 0 {
 		totalFailoverTime := time.Duration(0)
 		autoRecoveries := int64(0)
-		
+
 		for _, event := range ser.failoverController.failoverHistory {
 			totalFailoverTime += event.Duration
 			if event.AutoRecovery {
 				autoRecoveries++
 			}
 		}
-		
+
 		ser.routingMetrics.AvgFailoverTime = totalFailoverTime / time.Duration(ser.routingMetrics.FailoverCount)
 		ser.routingMetrics.AutoRecoveryRate = float64(autoRecoveries) / float64(ser.routingMetrics.FailoverCount)
 	}
-	
+
 	// 更新路由质量
 	ser.routingMetrics.RouteQuality = ser.calculateRoutingQuality()
 	ser.routingMetrics.OptimizationEfficiency = ser.calculateOptimizationEfficiency()
-	
+
 	ser.routingMetrics.LastUpdated = time.Now()
 }
 
@@ -1422,10 +1423,10 @@ func (ser *SmartExchangeRouter) updateMetrics() {
 
 func (ser *SmartExchangeRouter) getAvailableExchanges(symbol string) []string {
 	available := make([]string, 0)
-	
+
 	ser.mu.RLock()
 	defer ser.mu.RUnlock()
-	
+
 	for exchange, status := range ser.exchangeStatus {
 		if status.IsOnline && status.ConnectionStatus == "CONNECTED" {
 			// 检查是否支持该交易对
@@ -1437,28 +1438,28 @@ func (ser *SmartExchangeRouter) getAvailableExchanges(symbol string) []string {
 			}
 		}
 	}
-	
+
 	return available
 }
 
 func (ser *SmartExchangeRouter) applyRoutingRules(symbol, orderType string, available []string) (string, []string) {
 	matches := make([]string, 0)
-	
+
 	// 按优先级排序规则
 	rules := make([]RoutingRule, len(ser.routingRules))
 	copy(rules, ser.routingRules)
 	sort.Slice(rules, func(i, j int) bool {
 		return rules[i].Priority < rules[j].Priority
 	})
-	
+
 	for _, rule := range rules {
 		if !rule.IsActive {
 			continue
 		}
-		
+
 		if ser.evaluateCondition(rule.Condition, symbol, orderType) {
 			matches = append(matches, rule.ID)
-			
+
 			// 应用动作
 			switch rule.Action.Type {
 			case "ROUTE_TO":
@@ -1474,7 +1475,7 @@ func (ser *SmartExchangeRouter) applyRoutingRules(symbol, orderType string, avai
 			}
 		}
 	}
-	
+
 	return "", matches
 }
 
@@ -1482,30 +1483,30 @@ func (ser *SmartExchangeRouter) selectOptimalExchange(symbol, orderType string, 
 	if len(available) == 0 {
 		return ""
 	}
-	
+
 	if len(available) == 1 {
 		return available[0]
 	}
-	
+
 	// 计算每个交易所的综合评分
 	scores := make(map[string]float64)
-	
+
 	for _, exchange := range available {
 		score := ser.calculateExchangeScore(exchange, symbol, orderType)
 		scores[exchange] = score
 	}
-	
+
 	// 选择评分最高的交易所
 	bestExchange := ""
 	bestScore := math.Inf(-1)
-	
+
 	for exchange, score := range scores {
 		if score > bestScore {
 			bestScore = score
 			bestExchange = exchange
 		}
 	}
-	
+
 	return bestExchange
 }
 
@@ -1514,26 +1515,26 @@ func (ser *SmartExchangeRouter) calculateExchangeScore(exchange, symbol, orderTy
 	if status == nil {
 		return 0.0
 	}
-	
+
 	// 延迟评分 (越低越好)
 	latencyScore := 1.0 - math.Min(float64(status.Latency.Milliseconds())/1000.0, 1.0)
-	
+
 	// 可用性评分
 	availabilityScore := status.Availability
-	
+
 	// 健康评分
 	healthScore := status.HealthScore
-	
+
 	// 负载评分 (越低越好)
 	loadScore := 1.0 - (status.CurrentLoad / status.ThroughputLimit)
-	
+
 	// 加权计算综合评分
 	weights := ser.routingOptimizer
 	totalScore := latencyScore*weights.latencyWeight +
 		availabilityScore*weights.reliabilityWeight +
 		healthScore*0.25 +
 		loadScore*0.25
-	
+
 	return totalScore
 }
 
@@ -1553,8 +1554,8 @@ func (ser *SmartExchangeRouter) calculateDecisionScores(decision *RoutingDecisio
 		decision.ReliabilityScore = status.HealthScore
 		decision.CostScore = 1.0 - (status.TradingFees["taker"] * 10) // 简化成本计算
 		decision.LiquidityScore = status.OrderBookDepth / 10000.0     // 简化流动性计算
-		
-		decision.OverallScore = (decision.LatencyScore + decision.ReliabilityScore + 
+
+		decision.OverallScore = (decision.LatencyScore + decision.ReliabilityScore +
 			decision.CostScore + decision.LiquidityScore) / 4.0
 	}
 }
@@ -1562,11 +1563,11 @@ func (ser *SmartExchangeRouter) calculateDecisionScores(decision *RoutingDecisio
 func (ser *SmartExchangeRouter) executeRouting(decision *RoutingDecision) (bool, error) {
 	// TODO: 实现实际的订单路由执行
 	log.Printf("Executing routing for order %s to %s", decision.OrderID, decision.SelectedExchange)
-	
+
 	// 模拟执行
 	decision.ActualLatency = time.Duration(50+rand.Intn(100)) * time.Millisecond
 	decision.ActualCost = 0.001 // 模拟交易成本
-	
+
 	return true, nil
 }
 
@@ -1575,7 +1576,7 @@ func (ser *SmartExchangeRouter) updateRoutingStats(decision *RoutingDecision) {
 	ser.loadBalancer.mu.Lock()
 	ser.loadBalancer.connections[decision.SelectedExchange]++
 	ser.loadBalancer.mu.Unlock()
-	
+
 	// 更新规则命中统计
 	for _, ruleID := range decision.RuleMatches {
 		for i := range ser.routingRules {
@@ -1621,12 +1622,12 @@ func (ser *SmartExchangeRouter) selectFailoverTarget(fromExchange string) string
 	// 选择可用性最高的备用交易所
 	bestTarget := ""
 	bestScore := 0.0
-	
+
 	for _, backup := range ser.backupExchanges {
 		if backup == fromExchange {
 			continue
 		}
-		
+
 		if status := ser.exchangeStatus[backup]; status != nil && status.IsOnline {
 			if status.HealthScore > bestScore {
 				bestScore = status.HealthScore
@@ -1634,7 +1635,7 @@ func (ser *SmartExchangeRouter) selectFailoverTarget(fromExchange string) string
 			}
 		}
 	}
-	
+
 	return bestTarget
 }
 
@@ -1676,13 +1677,13 @@ func (ser *SmartExchangeRouter) calculateRoutingQuality() float64 {
 func (ser *SmartExchangeRouter) countRecentFailovers(duration time.Duration) int {
 	count := 0
 	since := time.Now().Add(-duration)
-	
+
 	for _, event := range ser.failoverController.failoverHistory {
 		if event.Timestamp.After(since) {
 			count++
 		}
 	}
-	
+
 	return count
 }
 
@@ -1690,12 +1691,12 @@ func (ser *SmartExchangeRouter) calculateMeanDuration(durations []time.Duration)
 	if len(durations) == 0 {
 		return 0
 	}
-	
+
 	total := time.Duration(0)
 	for _, d := range durations {
 		total += d
 	}
-	
+
 	return total / time.Duration(len(durations))
 }
 
@@ -1740,7 +1741,7 @@ func (ser *SmartExchangeRouter) generateFailoverID() string {
 func (lb *LoadBalancer) selectExchange(available []string) string {
 	lb.mu.Lock()
 	defer lb.mu.Unlock()
-	
+
 	switch lb.algorithm {
 	case "ROUND_ROBIN":
 		return lb.selectRoundRobin(available)
@@ -1757,7 +1758,7 @@ func (lb *LoadBalancer) selectRoundRobin(available []string) string {
 	if len(available) == 0 {
 		return ""
 	}
-	
+
 	// 找到上次选择的位置
 	lastIndex := -1
 	for i, exchange := range available {
@@ -1766,12 +1767,12 @@ func (lb *LoadBalancer) selectRoundRobin(available []string) string {
 			break
 		}
 	}
-	
+
 	// 选择下一个
 	nextIndex := (lastIndex + 1) % len(available)
 	selected := available[nextIndex]
 	lb.lastSelected = selected
-	
+
 	return selected
 }
 
@@ -1779,7 +1780,7 @@ func (lb *LoadBalancer) selectWeighted(available []string) string {
 	if len(available) == 0 {
 		return ""
 	}
-	
+
 	// 计算总权重
 	totalWeight := 0.0
 	for _, exchange := range available {
@@ -1789,24 +1790,24 @@ func (lb *LoadBalancer) selectWeighted(available []string) string {
 		}
 		totalWeight += weight
 	}
-	
+
 	// 随机选择
 	random := rand.Float64() * totalWeight
 	currentWeight := 0.0
-	
+
 	for _, exchange := range available {
 		weight := lb.weights[exchange]
 		if weight <= 0 {
 			weight = 1.0
 		}
 		currentWeight += weight
-		
+
 		if random <= currentWeight {
 			lb.lastSelected = exchange
 			return exchange
 		}
 	}
-	
+
 	// 失败时返回第一个
 	return available[0]
 }
@@ -1815,10 +1816,10 @@ func (lb *LoadBalancer) selectLeastConnections(available []string) string {
 	if len(available) == 0 {
 		return ""
 	}
-	
+
 	minConnections := math.MaxInt32
 	selected := available[0]
-	
+
 	for _, exchange := range available {
 		connections := lb.connections[exchange]
 		if connections < minConnections {
@@ -1826,7 +1827,7 @@ func (lb *LoadBalancer) selectLeastConnections(available []string) string {
 			selected = exchange
 		}
 	}
-	
+
 	lb.lastSelected = selected
 	return selected
 }
@@ -1835,7 +1836,7 @@ func (lb *LoadBalancer) selectLeastConnections(available []string) string {
 func (ser *SmartExchangeRouter) GetStatus() map[string]interface{} {
 	ser.mu.RLock()
 	defer ser.mu.RUnlock()
-	
+
 	return map[string]interface{}{
 		"running":               ser.isRunning,
 		"enabled":               ser.enabled,
@@ -1859,7 +1860,7 @@ func (ser *SmartExchangeRouter) GetStatus() map[string]interface{} {
 func (ser *SmartExchangeRouter) GetRoutingMetrics() *RoutingMetrics {
 	ser.routingMetrics.mu.RLock()
 	defer ser.routingMetrics.mu.RUnlock()
-	
+
 	metrics := *ser.routingMetrics
 	return &metrics
 }
@@ -1868,11 +1869,11 @@ func (ser *SmartExchangeRouter) GetRoutingMetrics() *RoutingMetrics {
 func (ser *SmartExchangeRouter) GetExchangeStatus(exchange string) (*ExchangeStatus, error) {
 	ser.mu.RLock()
 	defer ser.mu.RUnlock()
-	
+
 	if status, exists := ser.exchangeStatus[exchange]; exists {
 		return status, nil
 	}
-	
+
 	return nil, fmt.Errorf("exchange status not found: %s", exchange)
 }
 
@@ -1880,16 +1881,16 @@ func (ser *SmartExchangeRouter) GetExchangeStatus(exchange string) (*ExchangeSta
 func (ser *SmartExchangeRouter) GetHealthHistory(exchange string, limit int) ([]HealthCheck, error) {
 	ser.healthMonitor.mu.RLock()
 	defer ser.healthMonitor.mu.RUnlock()
-	
+
 	history, exists := ser.healthMonitor.healthHistory[exchange]
 	if !exists {
 		return nil, fmt.Errorf("health history not found for exchange: %s", exchange)
 	}
-	
+
 	if limit <= 0 || limit > len(history) {
 		limit = len(history)
 	}
-	
+
 	// 返回最新的记录
 	start := len(history) - limit
 	return history[start:], nil

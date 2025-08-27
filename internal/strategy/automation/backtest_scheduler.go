@@ -7,27 +7,27 @@ import (
 	"log"
 	"time"
 
-	"qcat/internal/strategy/validation"
 	"qcat/internal/strategy/lifecycle"
+	"qcat/internal/strategy/validation"
 )
 
 // BacktestScheduler 自动化回测调度器
 type BacktestScheduler struct {
-	db                *sql.DB
-	validator         *validation.MandatoryBacktestValidator
-	gatekeeper        *validation.StrategyGatekeeper
-	scheduleInterval  time.Duration
-	running           bool
-	stopChan          chan struct{}
+	db               *sql.DB
+	validator        *validation.MandatoryBacktestValidator
+	gatekeeper       *validation.StrategyGatekeeper
+	scheduleInterval time.Duration
+	running          bool
+	stopChan         chan struct{}
 }
 
 // BacktestTask 回测任务
 type BacktestTask struct {
 	StrategyID    string    `json:"strategy_id"`
-	TaskType      string    `json:"task_type"`      // "mandatory", "periodic", "validation"
-	Priority      int       `json:"priority"`       // 1=highest, 5=lowest
+	TaskType      string    `json:"task_type"` // "mandatory", "periodic", "validation"
+	Priority      int       `json:"priority"`  // 1=highest, 5=lowest
 	ScheduledTime time.Time `json:"scheduled_time"`
-	Status        string    `json:"status"`         // "pending", "running", "completed", "failed"
+	Status        string    `json:"status"` // "pending", "running", "completed", "failed"
 	CreatedAt     time.Time `json:"created_at"`
 }
 
@@ -121,10 +121,11 @@ func (bs *BacktestScheduler) checkAndScheduleBacktests(ctx context.Context) erro
 
 // findStrategiesNeedingBacktest 查找需要回测的策略
 func (bs *BacktestScheduler) findStrategiesNeedingBacktest(ctx context.Context) ([]string, error) {
+	// 修复ORDER BY和SELECT DISTINCT问题：ORDER BY字段必须出现在SELECT DISTINCT列表中
 	query := `
-		SELECT DISTINCT s.id
+		SELECT DISTINCT s.id, s.updated_at
 		FROM strategies s
-		LEFT JOIN backtest_results br ON s.id = br.strategy_id 
+		LEFT JOIN backtest_results br ON s.id = br.strategy_id
 		WHERE (
 			-- 策略从未回测过
 			br.strategy_id IS NULL
@@ -148,7 +149,8 @@ func (bs *BacktestScheduler) findStrategiesNeedingBacktest(ctx context.Context) 
 	var strategies []string
 	for rows.Next() {
 		var strategyID string
-		if err := rows.Scan(&strategyID); err != nil {
+		var updatedAt time.Time
+		if err := rows.Scan(&strategyID, &updatedAt); err != nil {
 			continue
 		}
 		strategies = append(strategies, strategyID)
@@ -164,7 +166,7 @@ func (bs *BacktestScheduler) scheduleBacktestTask(ctx context.Context, strategyI
 		SELECT COUNT(*) FROM backtest_tasks 
 		WHERE strategy_id = $1 AND status IN ('pending', 'running')
 	`
-	
+
 	var count int
 	if err := bs.db.QueryRowContext(ctx, existingQuery, strategyID).Scan(&count); err != nil {
 		return err
@@ -265,7 +267,7 @@ func (bs *BacktestScheduler) executeBacktestTask(ctx context.Context, task *Back
 	} else {
 		log.Printf("❌ 策略 %s 回测未通过: %v", task.StrategyID, result.FailureReasons)
 		bs.updateTaskStatus(ctx, task.StrategyID, "failed")
-		
+
 		// 如果策略正在运行但回测失败，停止策略
 		if err := bs.stopFailedStrategy(ctx, task.StrategyID, result.FailureReasons); err != nil {
 			log.Printf("停止失败策略时出错: %v", err)
@@ -282,7 +284,7 @@ func (bs *BacktestScheduler) updateTaskStatus(ctx context.Context, strategyID, s
 		SET status = $1, updated_at = $2
 		WHERE strategy_id = $3 AND status != 'completed'
 	`
-	
+
 	_, err := bs.db.ExecContext(ctx, query, status, time.Now(), strategyID)
 	return err
 }

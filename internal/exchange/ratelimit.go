@@ -3,6 +3,7 @@ package exchange
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -84,8 +85,16 @@ func (r *RateLimiter) Wait(ctx context.Context, name string) error {
 	r.mu.Lock()
 	limit, exists := r.limits[name]
 	if !exists {
-		r.mu.Unlock()
-		return fmt.Errorf("rate limit not found: %s", name)
+		// 修复rate limit配置问题：如果限制不存在，自动创建默认限制
+		log.Printf("Rate limit not found for %s, creating default limit", name)
+		r.limits[name] = &Limit{
+			Name:      name,
+			Interval:  time.Minute,
+			MaxTokens: 60, // 默认每分钟60次请求
+			Tokens:    60,
+			LastReset: time.Now(),
+		}
+		limit = r.limits[name]
 	}
 
 	now := time.Now()

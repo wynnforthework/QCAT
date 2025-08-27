@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -46,11 +47,22 @@ func NewClient(config *exchange.ExchangeConfig, rateLimiter *exchange.RateLimite
 	adapter, err := exchange.NewBanexgAdapter(config)
 	if err != nil {
 		// Fallback to original implementation if banexg fails
+		// 修复网络连接问题：增加超时时间和重试机制
+		httpClient := &http.Client{
+			Timeout: 30 * time.Second, // 增加超时时间到30秒
+			Transport: &http.Transport{
+				MaxIdleConns:        100,
+				MaxIdleConnsPerHost: 10,
+				IdleConnTimeout:     90 * time.Second,
+				DisableKeepAlives:   false,
+			},
+		}
+
 		return &Client{
 			BaseExchange: exchange.NewBaseExchange(config),
 			config:       config,
 			baseURL:      baseURL,
-			httpClient:   &http.Client{Timeout: 10 * time.Second},
+			httpClient:   httpClient,
 			rateLimiter:  rateLimiter,
 			adapter:      nil,
 		}
@@ -74,45 +86,90 @@ func (c *Client) signRequest(params url.Values) string {
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-// makeRequest makes an authenticated request to Binance API
+// makeRequest makes an authenticated request to Binance API with retry logic
 func (c *Client) makeRequest(ctx context.Context, method, endpoint string, params url.Values) ([]byte, error) {
-	// Add timestamp
-	params.Set("timestamp", strconv.FormatInt(time.Now().UnixMilli(), 10))
+	maxRetries := 3
+	baseDelay := time.Second
 
-	// Sign the request
-	signature := c.signRequest(params)
-	params.Set("signature", signature)
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		// Add timestamp (refresh for each attempt)
+		params.Set("timestamp", strconv.FormatInt(time.Now().UnixMilli(), 10))
 
-	// Build URL
-	fullURL := c.baseURL + endpoint + "?" + params.Encode()
+		// Sign the request
+		signature := c.signRequest(params)
+		params.Set("signature", signature)
 
-	// Create request
-	req, err := http.NewRequestWithContext(ctx, method, fullURL, nil)
-	if err != nil {
-		return nil, err
+		// Build URL
+		fullURL := c.baseURL + endpoint + "?" + params.Encode()
+
+		// Create request
+		req, err := http.NewRequestWithContext(ctx, method, fullURL, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		// Add headers
+		req.Header.Set("X-MBX-APIKEY", c.config.APIKey)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		// Make request
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			// 检查是否是网络连接错误且还有重试机会
+			if attempt < maxRetries && isNetworkError(err) {
+				delay := time.Duration(attempt+1) * baseDelay
+				log.Printf("Network error on attempt %d/%d: %v, retrying in %v",
+					attempt+1, maxRetries+1, err, delay)
+				time.Sleep(delay)
+				continue
+			}
+			return nil, err
+		}
+
+		// 处理响应
+		defer resp.Body.Close()
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			if attempt < maxRetries {
+				delay := time.Duration(attempt+1) * baseDelay
+				log.Printf("Failed to read response on attempt %d/%d: %v, retrying in %v",
+					attempt+1, maxRetries+1, err, delay)
+				time.Sleep(delay)
+				continue
+			}
+			return nil, err
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			if attempt < maxRetries && (resp.StatusCode >= 500 || resp.StatusCode == 429) {
+				delay := time.Duration(attempt+1) * baseDelay
+				log.Printf("Server error %d on attempt %d/%d, retrying in %v",
+					resp.StatusCode, attempt+1, maxRetries+1, delay)
+				time.Sleep(delay)
+				continue
+			}
+			return nil, fmt.Errorf("server returned status: %d, body: %s", resp.StatusCode, string(body))
+		}
+
+		return body, nil
 	}
 
-	// Add headers
-	req.Header.Set("X-MBX-APIKEY", c.config.APIKey)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	return nil, fmt.Errorf("max retries exceeded")
+}
 
-	// Make request
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+// isNetworkError 检查是否是网络连接错误
+func isNetworkError(err error) bool {
+	if err == nil {
+		return false
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("API error: %d - %s", resp.StatusCode, string(body))
-	}
-
-	return body, nil
+	// 检查常见的网络错误
+	errStr := err.Error()
+	return strings.Contains(errStr, "timeout") ||
+		strings.Contains(errStr, "connection refused") ||
+		strings.Contains(errStr, "no such host") ||
+		strings.Contains(errStr, "network is unreachable") ||
+		strings.Contains(errStr, "connection reset")
 }
 
 // GetServerTime implements exchange.Exchange

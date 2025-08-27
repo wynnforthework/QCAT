@@ -1,0 +1,97 @@
+2025/08/27 13:46:30 从数据库加载黑名单失败: pq: 关系 "strategy_blacklist" 不存在
+2025/08/27 13:46:30 初始回测检查失败: 查找需要回测的策略失败: pq: 在查询列表中必须出现SELECT DISTINCT, ORDER BY表达式
+2025/08/27 13:46:41 Failed to get open orders during emergency stop: rate limit not found: get_open_orders
+2025/08/27 13:46:41 Failed to close position ETH/USDT:USDT: rate limit not found: place_order
+2025/08/27 13:47:30 Warning: failed to scan symbol: sql: Scan error on column index 0, name "symbol": converting NULL to string is unsupported
+2025/08/27 13:47:30 No return data found for strategy 2c3ed7a4-634b-4a4a-add4-1539232161f1
+2025/08/27 13:47:30 No direct position data found for BTCUSDT, trying parameter-based lookup
+2025/08/27 13:47:30 No return data found for strategy d5735892-9e73-495a-aec1-00d5b24fec43
+2025/08/27 13:47:30 Failed to query strategy coverage from params for BTCUSDT: pq: 操作符不存在: jsonb ~~ text
+2025/08/27 13:47:30 No direct position data found for ETHUSDT, trying parameter-based lookup
+2025/08/27 13:47:30 Failed to query strategy coverage from params for ETHUSDT: pq: 操作符不存在: jsonb ~~ text
+2025/08/27 13:47:30 Global strategy coverage: map[mean_reversion:1 momentum:3]
+2025/08/27 13:47:30 No direct position data found for BNBUSDT, trying parameter-based lookup
+2025/08/27 13:47:30 Failed to query strategy coverage from params for BNBUSDT: pq: 操作符不存在: jsonb ~~ text
+2025/08/27 13:47:30 Global strategy coverage: map[mean_reversion:1 momentum:3]
+2025/08/27 13:47:30 No direct position data found for ADAUSDT, trying parameter-based lookup
+2025/08/27 13:47:30 Failed to query strategy coverage from params for ADAUSDT: pq: 操作符不存在: jsonb ~~ text
+2025/08/27 13:47:30 Global strategy coverage: map[mean_reversion:1 momentum:3]
+2025/08/27 13:47:30 No direct position data found for SOLUSDT, trying parameter-based lookup
+2025/08/27 13:47:30 Failed to query strategy coverage from params for SOLUSDT: pq: 操作符不存在: jsonb ~~ text
+2025/08/27 13:47:30 Worker 0 task failed: 新策略引入, duration: 15.6086ms, error: failed to submit onboarding request: failed to save onboarding request: pq: 关系 "strategy_onboarding" 的 "symbols" 字段不存在
+2025/08/27 13:47:30 Task failed: 新策略引入, error: failed to submit onboarding request: failed to save onboarding request: pq: 关系 "strategy_onboarding" 的 "symbols" 字段不存在, retry: 1/2
+2025/08/27 13:47:30 Failed to get market data from database: no market data found in database
+2025/08/27 13:47:30 Failed to get market data from tickers: failed to query tickers: pq: 字段 "volume_24h" 不存在
+2025/08/27 13:47:30 Failed to calculate returns from backtest for strategy 2c3ed7a4-634b-4a4a-add4-1539232161f1: failedto query backtest trades: pq: 关系 "backtest_trades" 不存在
+2025/08/27 13:47:30 No return data found for strategy 013d2087-35c6-4275-bd88-57d09d43610b, calculating from backtest results
+
+2025/08/27 13:47:30 Protected elimination: can eliminate at most 1 strategies (current: 4, minimum: 3)
+2025/08/27 13:47:30 Strategy BTC动量策略 too new for elimination (created: 2025-08-26 01:45:49.604625 +0800 CST)
+2025/08/27 13:47:30 No strategies eligible for elimination (all strategies too new)
+2025/08/27 13:47:31 Failed to get market data from database: no market data found in database
+2025/08/27 13:47:31 Failed to get market data from tickers: failed to query tickers: pq: 字段 "volume_24h" 不存在
+2025/08/27 13:47:31 Exchange client not fully implemented, using mock data
+2025/08/27 13:47:31 Optimization completed: Objective=NaN, Expected Return=0.0000, Expected Risk=0.0000
+2025/08/27 13:47:31 Applying profit optimization result with objective value: NaN
+2025/08/27 13:47:31 Profit optimization result applied successfully
+2025/08/27 13:47:31 Profit maximization completed successfully. Objective value: NaN
+2025/08/27 13:47:31 Failed to update monitoring rule for bybit: pq: 关系 "fund_monitoring_rules" 的 "location" 字段不存在
+2025/08/27 13:47:31 Failed to update monitoring rule for hot_wallet: pq: 关系 "fund_monitoring_rules" 的 "location" 字段不存在
+2025/08/27 13:47:31 Failed to update monitoring rule for treasury: pq: 关系 "fund_monitoring_rules" 的 "location" 字段不存在
+2025/08/27 13:47:31 Failed to update monitoring rule for cold_wallet: pq: 关系 "fund_monitoring_rules" 的 "location" 字段不存在
+2025/08/27 13:47:31 Failed to update monitoring rule for binance: pq: 关系 "fund_monitoring_rules" 的 "location" 字段不存在
+2025/08/27 13:47:31 Failed to update monitoring rule for okx: pq: 关系 "fund_monitoring_rules" 的 "location" 字段不存在
+2025/08/27 13:47:31 Failed to record protocol update: pq: 关系 "fund_protection_history" 的 "target_distribution" 字段不存在
+
+2025/08/27 13:47:31 Warning: insufficient data for BTCUSDT (0 klines), trying longer time range
+2025/08/27 13:47:31 Warning: still insufficient data (0 klines), attempting to fetch from external API
+2025/08/27 13:47:31 Fetching historical data from external API for BTCUSDT from 2024-08-27 13:47:31.4943365 +0800 CST to 2025-08-27 13:47:31.4943365 +0800 CST m=+63.274618301
+2025/08/27 13:47:31 Warning: insufficient data for BTCUSDT (0 klines), trying longer time range
+2025/08/27 13:47:31 Warning: still insufficient data (0 klines), attempting to fetch from external API
+
+2025/08/27 13:47:33 Failed to calculate returns from backtest for strategy 2c3ed7a4-634b-4a4a-add4-1539232161f1: failedto query backtest trades: pq: 关系 "backtest_trades" 不存在
+2025/08/27 13:47:33 No return data found for strategy 013d2087-35c6-4275-bd88-57d09d43610b, calculating from backtest results
+
+2025/08/27 13:47:33 Failed to update monitoring rule for binance: pq: 关系 "fund_monitoring_rules" 的 "location" 字段不存在
+2025/08/27 13:47:33 Failed to update monitoring rule for okx: pq: 关系 "fund_monitoring_rules" 的 "location" 字段不存在
+2025/08/27 13:47:33 Failed to update monitoring rule for bybit: pq: 关系 "fund_monitoring_rules" 的 "location" 字段不存在
+2025/08/27 13:47:33 Failed to update monitoring rule for hot_wallet: pq: 关系 "fund_monitoring_rules" 的 "location" 字段不存在
+2025/08/27 13:47:33 Failed to update monitoring rule for cold_wallet: pq: 关系 "fund_monitoring_rules" 的 "location" 字段不存在
+2025/08/27 13:47:33 Failed to update monitoring rule for treasury: pq: 关系 "fund_monitoring_rules" 的 "location" 字段不存在
+2025/08/27 13:47:33 Failed to record protocol update: pq: 关系 "fund_protection_history" 的 "target_distribution" 字段不存在
+
+2025/08/27 13:47:33 Warning: failed to scan symbol: sql: Scan error on column index 0, name "symbol": converting NULL to string is unsupported
+2025/08/27 13:47:33 No direct position data found for BTCUSDT, trying parameter-based lookup
+2025/08/27 13:47:33 Failed to query strategy coverage from params for BTCUSDT: pq: 操作符不存在: jsonb ~~ text
+2025/08/27 13:47:33 Global strategy coverage: map[mean_reversion:1 momentum:3]
+2025/08/27 13:47:33 No direct position data found for ETHUSDT, trying parameter-based lookup
+
+
+2025/08/27 13:47:33 Worker 4 task failed: 新策略引入, duration: 3.0878583s, error: failed to submit onboarding request:failed to save onboarding request: pq: 关系 "strategy_onboarding" 的 "symbols" 字段不存在
+2025/08/27 13:47:33 Task failed: 新策略引入, error: failed to submit onboarding request: failed to save onboarding request: pq: 关系 "strategy_onboarding" 的 "symbols" 字段不存在, retry: 1/2
+
+2025/08/27 13:47:51 Failed to optimize strategy d5735892-9e73-495a-aec1-00d5b24fec43: failed to run optimization task: failed to fetch market data: failed to fetch data from external API: failed to fetch data from Binance API: failed to send request: Get "https://api.binance.com/api/v3/klines?endTime=1756273650742&interval=1d&limit=1000&startTime=1724737650742&symbol=BTCUSDT": dial tcp 198.18.0.77:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond.
+2025/08/27 13:47:51 Warning: insufficient data for BTCUSDT (0 klines), trying longer time range
+2025/08/27 13:47:51 Warning: insufficient data for BTCUSDT (0 klines), trying longer time range
+2025/08/27 13:47:51 Warning: still insufficient data (0 klines), attempting to fetch from external API
+2025/08/27 13:47:51 Warning: still insufficient data (0 klines), attempting to fetch from external API
+2025/08/27 13:47:51 Fetching historical data from external API for BTCUSDT from 2024-08-27 13:47:51.7632862 +0800 CST to 2025-08-27 13:47:51.7632862 +0800 CST m=+83.543568001
+2025/08/27 13:47:51 Fetching historical data from external API for BTCUSDT from 2024-08-27 13:47:51.7632862 +0800 CST to 2025-08-27 13:47:51.7632862 +0800 CST m=+83.543568001
+
+2025/08/27 13:49:30 Warning: failed to scan symbol: sql: Scan error on column index 0, name "symbol": converting NULL to string is unsupported
+
+2025/08/27 13:49:30 Failed to query strategy coverage from params for BTCUSDT: pq: 操作符不存在: jsonb ~~ text
+2025/08/27 13:49:30 Task failed: 新策略引入, error: failed to submit onboarding request: failed to save onboarding request: pq: 关系 "strategy_onboarding" 的 "symbols" 字段不存在, retry: 2/2
+
+2025/08/27 13:49:30 Warning: failed to scan symbol: sql: Scan error on column index 0, name "symbol": converting NULL to string is unsupported
+
+2025/08/27 13:49:30 Failed to query strategy coverage from params for BTCUSDT: pq: 操作符不存在: jsonb ~~ text
+2025/08/27 13:49:30 Global strategy coverage: map[mean_reversion:1 momentum:3]
+2025/08/27 13:49:30 No direct position data found for ETHUSDT, trying parameter-based lookup
+
+2025/08/27 13:49:30 Worker 1 task failed: 新策略引入, duration: 7.8949ms, error: failed to submit onboarding request: failed to save onboarding request: pq: 关系 "strategy_onboarding" 的 "symbols" 字段不存在
+2025/08/27 13:49:30 Task failed: 新策略引入, error: failed to submit onboarding request: failed to save onboarding request: pq: 关系 "strategy_onboarding" 的 "symbols" 字段不存在, retry: 2/2
+
+2025/08/27 13:49:51 Worker 2 task failed: 策略参数自动优化, duration: 21.0446772s, error: optimization errors: [failed to optimize strategy d5735892-9e73-495a-aec1-00d5b24fec43: failed to run optimization task: failed to fetch market data:failed to fetch data from external API: failed to fetch data from Binance API: failed to send request: Get "https://api.binance.com/api/v3/klines?endTime=1756273770744&interval=1d&limit=1000&startTime=1724737770744&symbol=BTCUSDT": dial tcp 198.18.0.77:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond. failed to optimize strategy 013d2087-35c6-4275-bd88-57d09d43610b: failed to run optimization task: failed to fetch market data: failed to fetch data from external API: failed to fetch data from Binance API: failed to send request: Get "https://api.binance.com/api/v3/klines?endTime=1756273770745&interval=1d&limit=1000&startTime=1724737770745&symbol=BTCUSDT": dial tcp 198.18.0.77:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond. failed to optimize strategy 0cbf452a-6ad3-408d-bf59-123cbe1e2f14: failed to run optimization task: failed to fetch market data: failed to fetch data from external API: failed to fetch data from Binance API: failed to send request: Get "https://api.binance.com/api/v3/klines?endTime=1756273770744&interval=1d&limit=1000&startTime=1724737770744&symbol=BTCUSDT": dial tcp 198.18.0.77:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond. failed to optimize strategy 2c3ed7a4-634b-4a4a-add4-1539232161f1: failed to run optimization task: failed to fetch market data: failed to fetch data from external API: failed to fetch data from Binance API: failed to send request: Get "https://api.binance.com/api/v3/klines?endTime=1756273770744&interval=1d&limit=1000&startTime=1724737770744&symbol=BTCUSDT": dial tcp 198.18.0.77:443: connectex: A connection attempt failedbecause the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond.]
+2025/08/27 13:49:51 Task failed: 策略参数自动优化, error: optimization errors: [failed to optimize strategy d5735892-9e73-495a-aec1-00d5b24fec43: failed to run optimization task: failed to fetch market data: failed to fetch data from external API: failed to fetch data from Binance API: failed to send request: Get "https://api.binance.com/api/v3/klines?endTime=1756273770744&interval=1d&limit=1000&startTime=1724737770744&symbol=BTCUSDT": dial tcp 198.18.0.77:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond. failed to optimize strategy 013d2087-35c6-4275-bd88-57d09d43610b: failed to run optimization task: failed to fetch market data: failed to fetch data from external API: failed to fetch data from Binance API: failed to send request: Get "https://api.binance.com/api/v3/klines?endTime=1756273770745&interval=1d&limit=1000&startTime=1724737770745&symbol=BTCUSDT": dial tcp 198.18.0.77:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond. failed to optimize strategy 0cbf452a-6ad3-408d-bf59-123cbe1e2f14: failed to run optimization task: failed to fetch market data: failed to fetch data from external API: failed to fetch data from Binance API: failed to send request: Get "https://api.binance.com/api/v3/klines?endTime=1756273770744&interval=1d&limit=1000&startTime=1724737770744&symbol=BTCUSDT": dial tcp 198.18.0.77:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected hosthas failed to respond. failed to optimize strategy 2c3ed7a4-634b-4a4a-add4-1539232161f1: failed to run optimization task: failed to fetch market data: failed to fetch data from external API: failed to fetch data from Binance API: failed tosend request: Get "https://api.binance.com/api/v3/klines?endTime=1756273770744&interval=1d&limit=1000&startTime=1724737770744&symbol=BTCUSDT": dial tcp 198.18.0.77:443: connectex: A connection attempt failed because the connected party didnot properly respond after a period of time, or established connection failed because connected host has failed to respond.], retry: 2/3
+Optimization task opt_1756273770744423100 failed: failed to fetch market data: failed to fetch data from external API: failed to fetch data from Binance API: failed to send request: Get "https://api.binance.com/api/v3/klines?endTime=1756273770967&interval=1d&limit=1000&startTime=1724737770967&symbol=BTCUSDT": dial tcp 198.18.0.77:443: connectex: A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond.
