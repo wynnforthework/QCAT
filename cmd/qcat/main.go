@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -10,15 +9,8 @@ import (
 	"time"
 
 	"qcat/internal/api"
-	"qcat/internal/automation"
 	"qcat/internal/config"
-	"qcat/internal/exchange"
-	"qcat/internal/exchange/account"
-	"qcat/internal/exchange/binance"
 	"qcat/internal/orchestrator"
-	"qcat/internal/strategy/optimizer"
-	"qcat/internal/strategy/paper"
-	"qcat/internal/system"
 )
 
 func main() {
@@ -44,11 +36,11 @@ func main() {
 		log.Fatalf("Failed to create server: %v", err)
 	}
 
-	// Initialize and start automation system
-	log.Println("🚀 Initializing QCAT Automation System...")
-	automationSystem, err := initializeAutomationSystem(cfg, server)
-	if err != nil {
-		log.Fatalf("Failed to initialize automation system: %v", err)
+	// Get automation system from server (already initialized)
+	log.Println("🚀 Starting QCAT Automation System...")
+	automationSystem := server.GetAutomationSystem()
+	if automationSystem == nil {
+		log.Fatalf("Automation system not available from server")
 	}
 
 	// Start automation system (includes executor and scheduler)
@@ -56,31 +48,9 @@ func main() {
 		log.Fatalf("Failed to start automation system: %v", err)
 	}
 
-	// 🔥 Initialize and start the new comprehensive automation manager
-	log.Println("🚀 Initializing Advanced Automation Manager...")
-	db := server.GetDB()
-	if db != nil {
-		automationManager := system.NewAutomationManager(db.DB) // 使用嵌入的 *sql.DB
-
-		// Start the automation manager (includes risk monitoring, backtest scheduling, parameter optimization)
-		if err := automationManager.Start(); err != nil {
-			log.Printf("⚠️  Failed to start automation manager: %v", err)
-			log.Println("Continuing without advanced automation features...")
-		} else {
-			log.Println("✅ Advanced Automation Manager started successfully!")
-
-			// Register automation manager for graceful shutdown
-			shutdownManager := server.GetShutdownManager()
-			if shutdownManager != nil {
-				shutdownManager.RegisterComponent("automation_manager", "Advanced Automation Manager", 0, func(ctx context.Context) error {
-					automationManager.Stop()
-					return nil
-				}, 15*time.Second)
-			}
-		}
-	} else {
-		log.Println("⚠️  Database not available, skipping automation manager initialization")
-	}
+	// Note: Removed duplicate automation manager initialization to prevent double registration
+	// The main automation system already includes all necessary automation features
+	log.Println("✅ Using unified automation system (avoiding duplicate initialization)")
 
 	// Add orchestrator handler to server
 	orchHandler := api.NewOrchestratorHandler(orch)
@@ -178,71 +148,4 @@ func main() {
 	}
 
 	log.Println("Server stopped gracefully")
-}
-
-// initializeAutomationSystem 初始化自动化系统
-func initializeAutomationSystem(cfg *config.Config, server *api.Server) (*automation.AutomationSystem, error) {
-	// 获取必要的组件
-	db := server.GetDB()
-	if db == nil {
-		return nil, fmt.Errorf("database not available")
-	}
-
-	// 获取metrics组件
-	metricsCollector := server.GetMetricsCollector()
-	if metricsCollector == nil {
-		return nil, fmt.Errorf("metrics collector not available")
-	}
-
-	// 获取Redis缓存
-	redis := server.GetRedis()
-	if redis == nil {
-		return nil, fmt.Errorf("redis cache not available")
-	}
-
-	// 创建优化器工厂
-	optimizerFactory := optimizer.NewFactory()
-
-	// 创建exchange客户端
-	var exchangeClient exchange.Exchange
-	if cfg.Exchange.APIKey != "" && cfg.Exchange.APISecret != "" {
-		// 创建真实的exchange客户端
-		exchangeConfig := &exchange.ExchangeConfig{
-			Name:           cfg.Exchange.Name,
-			APIKey:         cfg.Exchange.APIKey,
-			APISecret:      cfg.Exchange.APISecret,
-			TestNet:        cfg.Exchange.TestNet,
-			BaseURL:        cfg.Exchange.BaseURL,
-			FuturesBaseURL: cfg.Exchange.FuturesBaseURL,
-		}
-
-		// 创建速率限制器
-		rateLimiter := exchange.NewRateLimiter(redis, time.Second)
-
-		// 创建Binance客户端
-		exchangeClient = binance.NewClient(exchangeConfig, rateLimiter)
-		log.Printf("Exchange client initialized: %s", cfg.Exchange.Name)
-	} else {
-		// 使用纸上交易exchange
-		log.Printf("Warning: Using paper trading exchange (no API credentials)")
-		exchangeClient = paper.NewExchange(nil, map[string]float64{
-			"USDT": 100000.0, // 初始资金
-		})
-	}
-
-	// 创建账户管理器
-	accountManager := account.NewManager(db.DB, redis, exchangeClient)
-
-	// 创建自动化系统
-	automationSystem := automation.NewAutomationSystem(
-		cfg,
-		db,
-		exchangeClient,
-		accountManager,
-		metricsCollector,
-		optimizerFactory,
-	)
-
-	log.Println("✅ Automation system initialized with all components")
-	return automationSystem, nil
 }

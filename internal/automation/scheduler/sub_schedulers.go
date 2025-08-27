@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -1165,10 +1166,10 @@ func (rs *RiskScheduler) getExchangeFundDistribution(ctx context.Context) (map[s
 // getMockExchangeFundDistribution 获取模拟的交易所资金分布
 func (rs *RiskScheduler) getMockExchangeFundDistribution() map[string]float64 {
 	return map[string]float64{
-		"binance":  50000.0,  // 50,000 USDT
-		"okx":      30000.0,  // 30,000 USDT
-		"bybit":    20000.0,  // 20,000 USDT
-		"hot_wallet": 15000.0, // 15,000 USDT
+		"binance":     50000.0, // 50,000 USDT
+		"okx":         30000.0, // 30,000 USDT
+		"bybit":       20000.0, // 20,000 USDT
+		"hot_wallet":  15000.0, // 15,000 USDT
 		"cold_wallet": 85000.0, // 85,000 USDT
 	}
 }
@@ -2088,26 +2089,62 @@ func (rs *RiskScheduler) updateMonitoringRules(ctx context.Context, distribution
 
 // createOrUpdateMonitoringRule 创建或更新监控规则
 func (rs *RiskScheduler) createOrUpdateMonitoringRule(ctx context.Context, rule map[string]interface{}) error {
-	query := `
-		INSERT INTO fund_monitoring_rules (
-			location, target_ratio, warning_threshold, critical_threshold,
-			check_interval, created_at, updated_at
-		) VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-		ON CONFLICT (location) DO UPDATE SET
-			target_ratio = EXCLUDED.target_ratio,
-			warning_threshold = EXCLUDED.warning_threshold,
-			critical_threshold = EXCLUDED.critical_threshold,
-			check_interval = EXCLUDED.check_interval,
-			updated_at = NOW()
+	// 修复ON CONFLICT约束问题：使用正确的唯一约束字段
+	location := rule["location"].(string)
+
+	// 首先检查是否存在相同的规则
+	var existingID string
+	checkQuery := `
+		SELECT id FROM fund_monitoring_rules
+		WHERE exchange = $1 AND rule_type = $2 AND rule_name = $3
+		LIMIT 1
 	`
 
-	_, err := rs.db.ExecContext(ctx, query,
-		rule["location"],
-		rule["target_ratio"],
-		rule["warning_threshold"],
-		rule["critical_threshold"],
-		rule["check_interval"],
-	)
+	err := rs.db.QueryRowContext(ctx, checkQuery, location, "balance_monitoring", "fund_distribution").Scan(&existingID)
+
+	if err == sql.ErrNoRows {
+		// 不存在，插入新记录
+		insertQuery := `
+			INSERT INTO fund_monitoring_rules (
+				exchange, rule_type, rule_name, location, target_ratio,
+				warning_threshold, critical_threshold, threshold_value,
+				threshold_currency, created_at, updated_at
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+		`
+
+		_, err = rs.db.ExecContext(ctx, insertQuery,
+			location,                   // exchange
+			"balance_monitoring",       // rule_type
+			"fund_distribution",        // rule_name
+			rule["location"],           // location
+			rule["target_ratio"],       // target_ratio
+			rule["warning_threshold"],  // warning_threshold
+			rule["critical_threshold"], // critical_threshold
+			rule["target_ratio"],       // threshold_value
+			"USDT",                     // threshold_currency
+		)
+	} else if err == nil {
+		// 存在，更新记录
+		updateQuery := `
+			UPDATE fund_monitoring_rules SET
+				location = $1,
+				target_ratio = $2,
+				warning_threshold = $3,
+				critical_threshold = $4,
+				threshold_value = $5,
+				updated_at = NOW()
+			WHERE id = $6
+		`
+
+		_, err = rs.db.ExecContext(ctx, updateQuery,
+			rule["location"],
+			rule["target_ratio"],
+			rule["warning_threshold"],
+			rule["critical_threshold"],
+			rule["target_ratio"],
+			existingID,
+		)
+	}
 
 	return err
 }

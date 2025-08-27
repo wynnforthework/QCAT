@@ -4031,7 +4031,16 @@ func (ss *StrategyScheduler) executeGlobalOptimization(ctx context.Context,
 	// 5. 计算预期收益和风险
 	expectedReturn := ss.calculateExpectedReturn(optimalAllocation, marketData, strategies)
 	expectedRisk := ss.calculateExpectedRisk(optimalAllocation, marketData)
-	expectedSharpe := expectedReturn / expectedRisk
+
+	// 修复NaN值问题：防止除零和无效值
+	var expectedSharpe float64
+	if expectedRisk > 0 && !math.IsNaN(expectedReturn) && !math.IsInf(expectedReturn, 0) &&
+		!math.IsNaN(expectedRisk) && !math.IsInf(expectedRisk, 0) {
+		expectedSharpe = expectedReturn / expectedRisk
+	} else {
+		log.Printf("Warning: Invalid risk/return values, using default Sharpe ratio 0.0")
+		expectedSharpe = 0.0
+	}
 
 	// 6. 生成再平衡动作
 	rebalanceActions := ss.generateRebalanceActions(portfolio, optimalAllocation)
@@ -4041,6 +4050,12 @@ func (ss *StrategyScheduler) executeGlobalOptimization(ctx context.Context,
 
 	// 8. 计算目标函数值 (最大化夏普比率)
 	objectiveValue := expectedSharpe
+
+	// 最终验证目标函数值
+	if math.IsNaN(objectiveValue) || math.IsInf(objectiveValue, 0) {
+		log.Printf("Warning: Objective value is NaN/Inf, using default value 0.0")
+		objectiveValue = 0.0
+	}
 
 	result := &ProfitOptimizationResult{
 		ObjectiveValue:      objectiveValue,

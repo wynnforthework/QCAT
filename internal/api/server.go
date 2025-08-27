@@ -454,11 +454,11 @@ func NewServer(cfg *config.Config) (*Server, error) {
 			exchangeClient = binance.NewClient(exchangeConfig, rateLimiter)
 		}
 
-		// Create automation system
+		// Create automation system (but don't start it here - will be started in main.go)
 		automationSystem = automation.NewAutomationSystem(
 			cfg, db, exchangeClient, accountManager, metricsCollector, nil,
 		)
-		log.Printf("Automation system initialized successfully")
+		log.Printf("Automation system initialized successfully (will be started by main)")
 	} else {
 		log.Printf("Warning: Automation system not initialized due to missing dependencies")
 	}
@@ -466,14 +466,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	// Store automation system in server
 	server.automationSystem = automationSystem
 
-	// Start automation system if initialized
-	if automationSystem != nil {
-		if err := automationSystem.Start(); err != nil {
-			log.Printf("Warning: Failed to start automation system: %v", err)
-		} else {
-			log.Printf("Automation system started successfully")
-		}
-	}
+	// Note: Automation system startup moved to main.go to prevent duplicate initialization
 
 	// Initialize handlers with dependencies
 	server.handlers = &Handlers{
@@ -1182,6 +1175,11 @@ func (s *Server) GetHealthChecker() *stability.HealthChecker {
 // GetMetricsCollector returns the metrics collector
 func (s *Server) GetMetricsCollector() *monitor.MetricsCollector {
 	return s.metricsCollector
+}
+
+// GetAutomationSystem returns the automation system
+func (s *Server) GetAutomationSystem() *automation.AutomationSystem {
+	return s.automationSystem
 }
 
 // RegisterOrchestratorHandler registers the orchestrator handler routes

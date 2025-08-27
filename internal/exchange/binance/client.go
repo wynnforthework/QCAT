@@ -43,21 +43,25 @@ func NewClient(config *exchange.ExchangeConfig, rateLimiter *exchange.RateLimite
 		baseURL = BaseTestnetURL
 	}
 
+	// 创建统一的HTTP客户端配置，修复网络连接超时问题
+	httpClient := &http.Client{
+		Timeout: 60 * time.Second, // 增加超时时间到60秒
+		Transport: &http.Transport{
+			MaxIdleConns:        100,
+			MaxIdleConnsPerHost: 10,
+			IdleConnTimeout:     90 * time.Second,
+			DisableKeepAlives:   false,
+			// 增加连接超时配置
+			TLSHandshakeTimeout:   30 * time.Second,
+			ResponseHeaderTimeout: 30 * time.Second,
+		},
+	}
+
 	// Create banexg adapter
 	adapter, err := exchange.NewBanexgAdapter(config)
 	if err != nil {
 		// Fallback to original implementation if banexg fails
-		// 修复网络连接问题：增加超时时间和重试机制
-		httpClient := &http.Client{
-			Timeout: 30 * time.Second, // 增加超时时间到30秒
-			Transport: &http.Transport{
-				MaxIdleConns:        100,
-				MaxIdleConnsPerHost: 10,
-				IdleConnTimeout:     90 * time.Second,
-				DisableKeepAlives:   false,
-			},
-		}
-
+		log.Printf("Warning: banexg adapter failed, using fallback implementation: %v", err)
 		return &Client{
 			BaseExchange: exchange.NewBaseExchange(config),
 			config:       config,
@@ -72,7 +76,7 @@ func NewClient(config *exchange.ExchangeConfig, rateLimiter *exchange.RateLimite
 		BaseExchange: exchange.NewBaseExchange(config),
 		config:       config,
 		baseURL:      baseURL,
-		httpClient:   &http.Client{Timeout: 10 * time.Second},
+		httpClient:   httpClient, // 使用相同的HTTP客户端配置
 		rateLimiter:  rateLimiter,
 		adapter:      adapter,
 	}
