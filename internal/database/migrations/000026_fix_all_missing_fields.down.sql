@@ -2,6 +2,10 @@
 
 BEGIN;
 
+-- 6. Drop strategy_blacklist table
+DROP TRIGGER IF EXISTS update_strategy_blacklist_updated_at ON strategy_blacklist;
+DROP TABLE IF EXISTS strategy_blacklist;
+
 -- 5. Remove target_distribution field from fund_protection_history table
 DO $$ 
 BEGIN
