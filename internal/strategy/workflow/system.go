@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"qcat/internal/events"
-	"qcat/internal/workflow"
+	"qcat/internal/workflow/interfaces"
 )
 
 // MultiStrategyWorkflowSystem 多策略工作流系统
@@ -16,7 +16,7 @@ type MultiStrategyWorkflowSystem struct {
 	// 核心组件
 	multiStrategyManager  *MultiStrategyManager
 	evolutionManager      *EvolutionManager
-	tradingWorkflowEngine *workflow.TradingWorkflowEngine
+	tradingWorkflowEngine interfaces.WorkflowEngineInterface
 	strategyPool          *TradingStrategyPool
 	factorSyncService     *FactorSyncService
 
@@ -40,12 +40,12 @@ type MultiStrategyWorkflowSystem struct {
 
 // SystemConfig 系统配置
 type SystemConfig struct {
-	MultiStrategyManager *MultiStrategyManagerConfig     `yaml:"multi_strategy_manager"`
-	StrategyWorkflow     *StrategyWorkflowConfig         `yaml:"strategy_workflow"`
-	EvolutionManager     *EvolutionConfig                `yaml:"evolution_manager"`
-	TradingWorkflow      *workflow.TradingWorkflowConfig `yaml:"trading_workflow"`
-	EventSystem          *events.EventBusConfig          `yaml:"event_system"`
-	Monitoring           *MonitoringConfig               `yaml:"monitoring"`
+	MultiStrategyManager *MultiStrategyManagerConfig       `yaml:"multi_strategy_manager"`
+	StrategyWorkflow     *StrategyWorkflowConfig           `yaml:"strategy_workflow"`
+	EvolutionManager     *EvolutionConfig                  `yaml:"evolution_manager"`
+	TradingWorkflow      *interfaces.TradingWorkflowConfig `yaml:"trading_workflow"`
+	EventSystem          *events.EventBusConfig            `yaml:"event_system"`
+	Monitoring           *MonitoringConfig                 `yaml:"monitoring"`
 }
 
 // MonitoringConfig 监控配置
@@ -112,8 +112,10 @@ func NewMultiStrategyWorkflowSystem(config *SystemConfig) (*MultiStrategyWorkflo
 	// 创建因子同步服务
 	factorSyncService := NewFactorSyncService(eventBus, nil)
 
-	// 创建交易工作流引擎
-	tradingWorkflowEngine := workflow.NewTradingWorkflowEngine(strategyPool, config.TradingWorkflow)
+	// 创建交易工作流引擎 - 通过依赖注入避免循环依赖
+	// 在实际使用中，这个引擎应该通过外部注入
+	var tradingWorkflowEngine interfaces.WorkflowEngineInterface = nil
+	// 注意：这里暂时设为nil，需要在系统启动时通过SetTradingWorkflowEngine注入
 
 	system := &MultiStrategyWorkflowSystem{
 		multiStrategyManager:  multiStrategyManager,
@@ -133,6 +135,11 @@ func NewMultiStrategyWorkflowSystem(config *SystemConfig) (*MultiStrategyWorkflo
 	}
 
 	return system, nil
+}
+
+// SetTradingWorkflowEngine 设置交易工作流引擎（依赖注入）
+func (msws *MultiStrategyWorkflowSystem) SetTradingWorkflowEngine(engine interfaces.WorkflowEngineInterface) {
+	msws.tradingWorkflowEngine = engine
 }
 
 // Start 启动系统
@@ -168,10 +175,12 @@ func (msws *MultiStrategyWorkflowSystem) Start() error {
 	msws.stats.ComponentsRunning++
 
 	// 启动交易工作流引擎
-	if err := msws.tradingWorkflowEngine.Start(); err != nil {
-		return fmt.Errorf("failed to start trading workflow engine: %w", err)
+	if msws.tradingWorkflowEngine != nil {
+		if err := msws.tradingWorkflowEngine.Start(msws.ctx); err != nil {
+			return fmt.Errorf("failed to start trading workflow engine: %w", err)
+		}
+		msws.stats.ComponentsRunning++
 	}
-	msws.stats.ComponentsRunning++
 
 	// 启动监控循环
 	msws.wg.Add(2)
@@ -324,9 +333,15 @@ func (msws *MultiStrategyWorkflowSystem) updateSystemStats() {
 	// 获取交易工作流统计
 	if msws.tradingWorkflowEngine != nil {
 		tradingStats := msws.tradingWorkflowEngine.GetStats()
-		msws.stats.TotalExecutions = tradingStats.TotalExecutions
-		msws.stats.SuccessfulExecutions = tradingStats.SuccessfulExecutions
-		msws.stats.FailedExecutions = tradingStats.FailedExecutions
+		if totalExec, ok := tradingStats["total_executions"].(int64); ok {
+			msws.stats.TotalExecutions = totalExec
+		}
+		if successExec, ok := tradingStats["successful_executions"].(int64); ok {
+			msws.stats.SuccessfulExecutions = successExec
+		}
+		if failedExec, ok := tradingStats["failed_executions"].(int64); ok {
+			msws.stats.FailedExecutions = failedExec
+		}
 	}
 
 	msws.stats.LastUpdateTime = time.Now()
@@ -404,7 +419,7 @@ func GetDefaultSystemConfig() *SystemConfig {
 		MultiStrategyManager: GetDefaultMultiStrategyConfig(),
 		StrategyWorkflow:     GetDefaultWorkflowConfig(),
 		EvolutionManager:     GetDefaultEvolutionConfig(),
-		TradingWorkflow:      workflow.GetDefaultTradingWorkflowConfig(),
+		TradingWorkflow:      interfaces.GetDefaultTradingWorkflowConfig(),
 		EventSystem: &events.EventBusConfig{
 			BufferSize: 2000,
 			MaxRetries: 3,

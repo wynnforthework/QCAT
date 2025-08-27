@@ -349,6 +349,35 @@ func (m *Manager) storePositionWithNullStrategy(position *exch.Position) error {
 	return nil
 }
 
+// ensureConstraints ensures that the necessary database constraints exist
+func (m *Manager) ensureConstraints() error {
+	// Create unique constraint on (strategy_id, symbol) if it doesn't exist
+	constraintQuery := `
+		DO $$
+		BEGIN
+			-- Check if constraint already exists
+			IF NOT EXISTS (
+				SELECT 1 FROM information_schema.table_constraints
+				WHERE constraint_name = 'positions_strategy_symbol_unique'
+				AND table_name = 'positions'
+			) THEN
+				-- Add unique constraint
+				ALTER TABLE positions
+				ADD CONSTRAINT positions_strategy_symbol_unique
+				UNIQUE (strategy_id, symbol);
+			END IF;
+		END $$;
+	`
+
+	_, err := m.db.Exec(constraintQuery)
+	if err != nil {
+		return fmt.Errorf("failed to ensure unique constraint: %w", err)
+	}
+
+	log.Printf("Database constraints ensured for positions table")
+	return nil
+}
+
 // updatePosition updates the local position cache and notifies subscribers
 func (m *Manager) updatePosition(position *exch.Position) {
 	m.mu.Lock()
