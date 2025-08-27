@@ -369,7 +369,7 @@ func (im *InterlockManager) isTimeInWindow(t time.Time, window TimeWindow) bool 
 	// 简化实现
 	hour := t.Hour()
 	minute := t.Minute()
-	currentTime := hour*60 + minute
+	_ = hour*60 + minute // 当前时间（分钟）
 
 	// 解析开始和结束时间
 	// 这里简化处理，实际应该更严格地解析时间格式

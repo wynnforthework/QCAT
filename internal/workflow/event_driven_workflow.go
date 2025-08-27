@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/your-org/qcat/internal/events"
+	"qcat/internal/events"
 )
 
 // EventDrivenWorkflowEngine 事件驱动的工作流引擎
