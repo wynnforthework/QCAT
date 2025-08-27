@@ -94,18 +94,24 @@ type RedisConfig struct {
 
 // ExchangeConfig 交易所配置
 type ExchangeConfig struct {
-	Name                string            `yaml:"name"`
-	APIKey              string            `yaml:"api_key"`
-	APISecret           string            `yaml:"api_secret"`
-	TestNet             bool              `yaml:"test_net"`
-	BaseURL             string            `yaml:"base_url"`
-	WebsocketURL        string            `yaml:"websocket_url"`
-	FuturesBaseURL      string            `yaml:"futures_base_url"`
-	FuturesWebsocketURL string            `yaml:"futures_websocket_url"`
-	RateLimit           ExchangeRateLimit `yaml:"rate_limit"`
-	Timeout             time.Duration     `yaml:"timeout"`
-	RetryAttempts       int               `yaml:"retry_attempts"`
-	RetryDelay          time.Duration     `yaml:"retry_delay"`
+	Name                string `yaml:"name"`
+	APIKey              string `yaml:"api_key"`
+	APISecret           string `yaml:"api_secret"`
+	TestNet             bool   `yaml:"test_net"`
+	BaseURL             string `yaml:"base_url"`
+	WebsocketURL        string `yaml:"websocket_url"`
+	FuturesBaseURL      string `yaml:"futures_base_url"`
+	FuturesWebsocketURL string `yaml:"futures_websocket_url"`
+
+	// Network fallback configuration
+	FallbackMode      bool `yaml:"fallback_mode"`
+	SkipKlinesOnError bool `yaml:"skip_klines_on_error"`
+	UseCachedData     bool `yaml:"use_cached_data"`
+
+	RateLimit     ExchangeRateLimit `yaml:"rate_limit"`
+	Timeout       time.Duration     `yaml:"timeout"`
+	RetryAttempts int               `yaml:"retry_attempts"`
+	RetryDelay    time.Duration     `yaml:"retry_delay"`
 }
 
 // ExchangeRateLimit 交易所限流配置

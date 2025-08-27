@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -39,32 +40,51 @@ type Client struct {
 
 // NewClient creates a new Binance client
 func NewClient(config *exchange.ExchangeConfig, rateLimiter *exchange.RateLimiter) *Client {
-	// 优先使用配置文件中的URL，如果没有则使用默认值
-	baseURL := config.FuturesBaseURL
-	if baseURL == "" {
-		baseURL = BaseFuturesURL
-		if config.TestNet {
+	// 确定正确的baseURL
+	var baseURL string
+	if config.TestNet {
+		// 测试网环境：优先使用配置中的futures_base_url，如果没有则使用默认测试网URL
+		if config.FuturesBaseURL != "" {
+			baseURL = config.FuturesBaseURL
+		} else {
 			baseURL = BaseTestnetURL
 		}
-	}
-
-	// 如果是测试网但URL仍然是生产环境，强制使用测试网URL
-	if config.TestNet && (baseURL == BaseFuturesURL || baseURL == BaseSpotURL) {
-		baseURL = BaseTestnetURL
-		log.Printf("Warning: TestNet enabled but production URL detected, switching to %s", baseURL)
+		log.Printf("Using TestNet environment with URL: %s", baseURL)
+	} else {
+		// 生产环境：优先使用配置中的futures_base_url，如果没有则使用默认生产URL
+		if config.FuturesBaseURL != "" {
+			baseURL = config.FuturesBaseURL
+		} else {
+			baseURL = BaseFuturesURL
+		}
+		log.Printf("Using Production environment with URL: %s", baseURL)
 	}
 
 	// 创建统一的HTTP客户端配置，修复网络连接超时问题
 	httpClient := &http.Client{
 		Timeout: 60 * time.Second, // 增加超时时间到60秒
 		Transport: &http.Transport{
+			// 使用系统代理设置 - 这可能是浏览器能访问而Go程序不能的原因
+			Proxy: http.ProxyFromEnvironment,
+
+			// 连接池配置
 			MaxIdleConns:        100,
 			MaxIdleConnsPerHost: 10,
 			IdleConnTimeout:     90 * time.Second,
 			DisableKeepAlives:   false,
-			// 增加连接超时配置
+
+			// 连接超时配置
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second, // 连接超时
+				KeepAlive: 30 * time.Second, // 保持连接
+			}).DialContext,
+
+			// TLS和响应超时配置
 			TLSHandshakeTimeout:   30 * time.Second,
 			ResponseHeaderTimeout: 30 * time.Second,
+
+			// 强制使用HTTP/1.1，避免HTTP/2可能的问题
+			ForceAttemptHTTP2: false,
 		},
 	}
 
@@ -529,6 +549,15 @@ func (c *Client) GetKlines(ctx context.Context, symbol, interval string, startTi
 		}
 	}
 
+	log.Printf("Fetching klines for %s %s from %s to %s (limit: %d)",
+		symbol, interval, startTime.Format("2006-01-02 15:04:05"),
+		endTime.Format("2006-01-02 15:04:05"), limit)
+
+	// 检查是否启用了fallback模式
+	if c.config.FallbackMode && c.config.SkipKlinesOnError {
+		log.Printf("Fallback mode enabled - attempting API call with error handling")
+	}
+
 	params := url.Values{}
 	params.Set("symbol", symbol)
 	params.Set("interval", interval)
@@ -538,20 +567,28 @@ func (c *Client) GetKlines(ctx context.Context, symbol, interval string, startTi
 		params.Set("limit", strconv.Itoa(limit))
 	}
 
-	// Use correct endpoint based on base URL
-	var endpoint string
-	if strings.Contains(c.baseURL, "fapi") {
-		// Futures API
-		endpoint = "/fapi/v1/klines"
-	} else {
-		// Spot API
-		endpoint = "/api/v3/klines"
-	}
-
+	// 使用期货API端点（因为我们主要处理期货交易）
+	endpoint := "/fapi/v1/klines"
 	fullURL := c.baseURL + endpoint + "?" + params.Encode()
+
+	log.Printf("Making klines request to: %s", fullURL)
+
 	resp, err := c.httpClient.Get(fullURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get klines: %w", err)
+		log.Printf("Klines request failed: %v", err)
+		log.Printf("Base URL: %s, TestNet: %v", c.baseURL, c.config.TestNet)
+
+		// 如果启用了fallback模式且允许跳过klines错误，返回空数据而不是错误
+		if c.config.FallbackMode && c.config.SkipKlinesOnError {
+			log.Printf("⚠️  Fallback mode: Skipping klines fetch due to network error")
+			log.Printf("📊 Returning empty klines data to allow optimization to continue")
+
+			// 返回一个空的klines数组，这样优化任务可以继续进行
+			// 虽然没有历史数据，但至少不会因为网络问题而完全失败
+			return []*types.Kline{}, nil
+		}
+
+		return nil, fmt.Errorf("failed to get klines from %s: %w", fullURL, err)
 	}
 	defer resp.Body.Close()
 
