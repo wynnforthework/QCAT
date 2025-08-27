@@ -21,9 +21,10 @@ import (
 
 // Binance API endpoints
 const (
-	BaseSpotURL    = "https://api.binance.com"
-	BaseFuturesURL = "https://fapi.binance.com"
-	BaseTestnetURL = "https://testnet.binancefuture.com"
+	BaseSpotURL        = "https://api.binance.com"
+	BaseFuturesURL     = "https://fapi.binance.com"
+	BaseTestnetURL     = "https://testnet.binancefuture.com"
+	BaseTestnetSpotURL = "https://testnet.binance.vision"
 )
 
 // Client represents a Binance API client
@@ -38,9 +39,19 @@ type Client struct {
 
 // NewClient creates a new Binance client
 func NewClient(config *exchange.ExchangeConfig, rateLimiter *exchange.RateLimiter) *Client {
-	baseURL := BaseFuturesURL
-	if config.TestNet {
+	// 优先使用配置文件中的URL，如果没有则使用默认值
+	baseURL := config.FuturesBaseURL
+	if baseURL == "" {
+		baseURL = BaseFuturesURL
+		if config.TestNet {
+			baseURL = BaseTestnetURL
+		}
+	}
+
+	// 如果是测试网但URL仍然是生产环境，强制使用测试网URL
+	if config.TestNet && (baseURL == BaseFuturesURL || baseURL == BaseSpotURL) {
 		baseURL = BaseTestnetURL
+		log.Printf("Warning: TestNet enabled but production URL detected, switching to %s", baseURL)
 	}
 
 	// 创建统一的HTTP客户端配置，修复网络连接超时问题
@@ -72,7 +83,7 @@ func NewClient(config *exchange.ExchangeConfig, rateLimiter *exchange.RateLimite
 		}
 	}
 
-	return &Client{
+	client := &Client{
 		BaseExchange: exchange.NewBaseExchange(config),
 		config:       config,
 		baseURL:      baseURL,
@@ -80,6 +91,41 @@ func NewClient(config *exchange.ExchangeConfig, rateLimiter *exchange.RateLimite
 		rateLimiter:  rateLimiter,
 		adapter:      adapter,
 	}
+
+	// 测试网络连接
+	log.Printf("Initializing Binance client with base URL: %s (TestNet: %v)", baseURL, config.TestNet)
+	if err := client.testConnection(); err != nil {
+		log.Printf("Warning: Initial connection test failed: %v", err)
+		log.Printf("This may indicate network connectivity issues, but the client will still attempt requests")
+	}
+
+	return client
+}
+
+// testConnection tests the network connection to Binance API
+func (c *Client) testConnection() error {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// 测试服务器时间接口（不需要签名）
+	testURL := c.baseURL + "/fapi/v1/time"
+	req, err := http.NewRequestWithContext(ctx, "GET", testURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create test request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("connection test failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
+
+	log.Printf("✅ Connection test successful to %s", c.baseURL)
+	return nil
 }
 
 // signRequest signs the request with HMAC SHA256
@@ -122,12 +168,19 @@ func (c *Client) makeRequest(ctx context.Context, method, endpoint string, param
 			// 检查是否是网络连接错误且还有重试机会
 			if attempt < maxRetries && isNetworkError(err) {
 				delay := time.Duration(attempt+1) * baseDelay
-				log.Printf("Network error on attempt %d/%d: %v, retrying in %v",
-					attempt+1, maxRetries+1, err, delay)
+				log.Printf("Network error on attempt %d/%d for %s: %v, retrying in %v",
+					attempt+1, maxRetries+1, fullURL, err, delay)
+
+				// 如果是DNS或连接错误，提供更详细的诊断信息
+				if strings.Contains(err.Error(), "connectex") || strings.Contains(err.Error(), "dial tcp") {
+					log.Printf("Connection failed to %s - this may indicate network restrictions or DNS issues", c.baseURL)
+					log.Printf("Current base URL: %s, TestNet: %v", c.baseURL, c.config.TestNet)
+				}
+
 				time.Sleep(delay)
 				continue
 			}
-			return nil, err
+			return nil, fmt.Errorf("failed to connect to %s after %d attempts: %w", c.baseURL, maxRetries+1, err)
 		}
 
 		// 处理响应
@@ -1093,6 +1146,12 @@ func (c *Client) GetOrder(ctx context.Context, symbol, orderID string) (*exchang
 
 // GetOpenOrders gets all open orders for a symbol
 func (c *Client) GetOpenOrders(ctx context.Context, symbol string) ([]*exchange.Order, error) {
+	// Use banexg adapter if available
+	if c.adapter != nil {
+		return c.adapter.GetOpenOrders(ctx, symbol)
+	}
+
+	// Fallback to original implementation
 	if c.rateLimiter != nil {
 		if err := c.rateLimiter.Wait(ctx, "get_open_orders"); err != nil {
 			return nil, err
