@@ -273,7 +273,7 @@ func (s *Storage) GetLatestKlines(ctx context.Context, symbol, interval string, 
 // GetLatestTrades retrieves the latest trades for a symbol
 func (s *Storage) GetLatestTrades(ctx context.Context, symbol string, limit int) ([]*types.Trade, error) {
 	query := `
-		SELECT id, symbol, price, size, side, fee, fee_currency, created_at
+		SELECT id, symbol, price, COALESCE(quantity, size, 0) as quantity, side, fee, fee_currency, created_at
 		FROM trades
 		WHERE symbol = $1
 		ORDER BY created_at DESC
@@ -412,8 +412,8 @@ func (s *Storage) CleanupOldData(ctx context.Context, retentionDays int) error {
 	}
 
 	// Clean up old klines (keep only daily and above for long-term storage)
-	_, err = s.db.ExecContext(ctx, 
-		"DELETE FROM market_data WHERE created_at < $1 AND interval NOT IN ('1d', '1w', '1M')", 
+	_, err = s.db.ExecContext(ctx,
+		"DELETE FROM market_data WHERE created_at < $1 AND interval NOT IN ('1d', '1w', '1M')",
 		cutoffTime)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup old klines: %w", err)

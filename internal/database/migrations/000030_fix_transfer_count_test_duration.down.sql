@@ -1,4 +1,4 @@
--- Migration 000028 Down: Remove transfer_count and test_duration fields
+-- Migration 000030 Down: Remove transfer_count and test_duration fields
 -- This migration removes the fields added in the up migration
 
 BEGIN;

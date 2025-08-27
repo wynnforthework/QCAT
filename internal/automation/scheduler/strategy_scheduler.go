@@ -3771,13 +3771,13 @@ func (ss *StrategyScheduler) getMarketDataFromTickers(ctx context.Context) (map[
 	query := `
 		SELECT
 			symbol,
-			price,
-			volume_24h,
-			price_change_24h,
+			COALESCE(price, last_price, 0) as price,
+			COALESCE(volume_24h, volume, 0) as volume_24h,
+			COALESCE(price_change_24h, change_24h, 0) as price_change_24h,
 			updated_at
 		FROM tickers
 		WHERE updated_at > NOW() - INTERVAL '1 hour'
-		ORDER BY volume_24h DESC
+		ORDER BY COALESCE(volume_24h, volume, 0) DESC
 		LIMIT 50
 	`
 

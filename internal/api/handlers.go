@@ -2595,15 +2595,15 @@ func (h *TradingHandler) GetTradeHistory(c *gin.Context) {
 			t.id,
 			t.symbol,
 			t.side,
-			t.size as quantity,
+			COALESCE(t.quantity, t.size, 0) as quantity,
 			t.price as executed_price,
 			COALESCE(t.fee, 0) as fee,
 			t.created_at as open_time,
 			'FILLED' as status,
 			'MARKET' as type,
 			CASE
-				WHEN t.side = 'BUY' THEN (t.price - COALESCE(prev_price.price, t.price)) * t.size
-				ELSE (COALESCE(prev_price.price, t.price) - t.price) * t.size
+				WHEN t.side = 'BUY' THEN (t.price - COALESCE(prev_price.price, t.price)) * COALESCE(t.quantity, t.size, 0)
+				ELSE (COALESCE(prev_price.price, t.price) - t.price) * COALESCE(t.quantity, t.size, 0)
 			END as pnl,
 			CASE
 				WHEN t.side = 'BUY' THEN ((t.price - COALESCE(prev_price.price, t.price)) / COALESCE(prev_price.price, t.price)) * 100

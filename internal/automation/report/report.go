@@ -617,7 +617,7 @@ type PerformanceMetric struct {
 // getTradeHistory retrieves trade history from database
 func (r *Reporter) getTradeHistory(ctx context.Context, strategy, symbol string) ([]*exchange.Trade, error) {
 	query := `
-		SELECT id, symbol, side, size, price, fee, fee_currency, created_at
+		SELECT id, symbol, side, COALESCE(quantity, size, 0) as quantity, price, fee, fee_currency, created_at
 		FROM trades
 		WHERE strategy_id = (SELECT id FROM strategies WHERE name = $1)
 		AND symbol = $2

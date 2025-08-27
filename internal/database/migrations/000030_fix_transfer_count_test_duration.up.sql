@@ -1,4 +1,4 @@
--- Migration 000028: Fix missing transfer_count and test_duration fields
+-- Migration 000030: Fix missing transfer_count and test_duration fields
 -- This migration adds the missing fields that are causing database errors
 
 BEGIN;

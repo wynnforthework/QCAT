@@ -98,7 +98,7 @@ func (m *Manager) GetStats(symbol string) *TradeStats {
 // GetTradeHistory returns historical trades for a symbol
 func (m *Manager) GetTradeHistory(ctx context.Context, symbol string, limit int) ([]*Trade, error) {
 	query := `
-		SELECT id, symbol, price, size, side, fee, fee_currency, created_at
+		SELECT id, symbol, price, COALESCE(quantity, size, 0) as quantity, side, fee, fee_currency, created_at
 		FROM trades
 		WHERE symbol = $1
 		ORDER BY created_at DESC
@@ -146,8 +146,8 @@ func (m *Manager) GetAggregatedTrades(ctx context.Context, symbol string, interv
 				max(price) as high,
 				min(price) as low,
 				last(price, created_at) as close,
-				sum(size) as volume,
-				sum(price * size) / sum(size) as vwap,
+				sum(COALESCE(quantity, size, 0)) as volume,
+				sum(price * COALESCE(quantity, size, 0)) / sum(COALESCE(quantity, size, 0)) as vwap,
 				count(*) as num_trades
 			FROM trades
 			WHERE symbol = $2 AND created_at BETWEEN $3 AND $4

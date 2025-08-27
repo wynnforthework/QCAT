@@ -103,11 +103,6 @@ type ExchangeConfig struct {
 	FuturesBaseURL      string `yaml:"futures_base_url"`
 	FuturesWebsocketURL string `yaml:"futures_websocket_url"`
 
-	// Network fallback configuration
-	FallbackMode      bool `yaml:"fallback_mode"`
-	SkipKlinesOnError bool `yaml:"skip_klines_on_error"`
-	UseCachedData     bool `yaml:"use_cached_data"`
-
 	RateLimit     ExchangeRateLimit `yaml:"rate_limit"`
 	Timeout       time.Duration     `yaml:"timeout"`
 	RetryAttempts int               `yaml:"retry_attempts"`

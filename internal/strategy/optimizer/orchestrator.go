@@ -550,45 +550,67 @@ func (o *Orchestrator) saveKlinesToDatabase(ctx context.Context, klines []*marke
 		return nil
 	}
 
-	// 批量插入K线数据
+	// Check if database connection is available
+	if o.db == nil {
+		log.Printf("No database connection available, skipping kline storage")
+		return nil
+	}
+
+	// Use the correct table name: market_data (not klines)
 	query := `
-		INSERT INTO klines (symbol, interval, open_time, close_time, open_price, high_price, low_price, close_price, volume, created_at)
+		INSERT INTO market_data (symbol, interval, timestamp, open, high, low, close, volume, complete, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
-		ON CONFLICT (symbol, interval, open_time) DO UPDATE SET
-			close_time = EXCLUDED.close_time,
-			open_price = EXCLUDED.open_price,
-			high_price = EXCLUDED.high_price,
-			low_price = EXCLUDED.low_price,
-			close_price = EXCLUDED.close_price,
+		ON CONFLICT (symbol, interval, timestamp) DO UPDATE SET
+			open = EXCLUDED.open,
+			high = EXCLUDED.high,
+			low = EXCLUDED.low,
+			close = EXCLUDED.close,
 			volume = EXCLUDED.volume,
+			complete = EXCLUDED.complete,
 			updated_at = NOW()
 	`
 
+	// Use transaction for better performance and consistency
+	tx, err := o.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
 	// 准备批量插入
-	stmt, err := o.db.PrepareContext(ctx, query)
+	stmt, err := tx.PrepareContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to prepare insert statement: %w", err)
 	}
 	defer stmt.Close()
 
 	// 插入每个K线数据
+	successCount := 0
 	for _, kline := range klines {
 		_, err := stmt.ExecContext(ctx,
 			kline.Symbol,
 			kline.Interval,
 			kline.OpenTime,
-			kline.CloseTime,
 			kline.Open,
 			kline.High,
 			kline.Low,
 			kline.Close,
 			kline.Volume,
+			kline.Complete,
 		)
 		if err != nil {
 			log.Printf("Warning: failed to insert kline for %s at %v: %v", kline.Symbol, kline.OpenTime, err)
+		} else {
+			successCount++
 		}
 	}
 
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	log.Printf("Successfully saved %d/%d klines to database", successCount, len(klines))
 	return nil
 }
 
@@ -803,11 +825,11 @@ func (o *Orchestrator) generateFallbackData(ctx context.Context, symbol, interva
 	for _, b := range symbol {
 		seed += int64(b)
 	}
-	rand.Seed(seed)
+	rng := rand.New(rand.NewSource(seed))
 
 	for i := 0; i < numKlines; i++ {
 		// Generate realistic price movement (random walk with mean reversion)
-		change := (rand.Float64() - 0.5) * 0.02 // ±1% change
+		change := (rng.Float64() - 0.5) * 0.02 // ±1% change
 
 		// Add some mean reversion
 		if currentPrice > basePrice*1.1 {
@@ -821,11 +843,11 @@ func (o *Orchestrator) generateFallbackData(ctx context.Context, symbol, interva
 
 		// Generate high and low
 		volatility := 0.01 // 1% intraday volatility
-		high := math.Max(open, close) * (1 + rand.Float64()*volatility)
-		low := math.Min(open, close) * (1 - rand.Float64()*volatility)
+		high := math.Max(open, close) * (1 + rng.Float64()*volatility)
+		low := math.Min(open, close) * (1 - rng.Float64()*volatility)
 
 		// Generate volume (random but realistic)
-		volume := (500000 + rand.Float64()*1000000) * (basePrice / 100) // Scale volume by price
+		volume := (500000 + rng.Float64()*1000000) * (basePrice / 100) // Scale volume by price
 
 		kline := &market.Kline{
 			Symbol:    symbol,

@@ -553,11 +553,6 @@ func (c *Client) GetKlines(ctx context.Context, symbol, interval string, startTi
 		symbol, interval, startTime.Format("2006-01-02 15:04:05"),
 		endTime.Format("2006-01-02 15:04:05"), limit)
 
-	// 检查是否启用了fallback模式
-	if c.config.FallbackMode && c.config.SkipKlinesOnError {
-		log.Printf("Fallback mode enabled - attempting API call with error handling")
-	}
-
 	params := url.Values{}
 	params.Set("symbol", symbol)
 	params.Set("interval", interval)
@@ -577,16 +572,6 @@ func (c *Client) GetKlines(ctx context.Context, symbol, interval string, startTi
 	if err != nil {
 		log.Printf("Klines request failed: %v", err)
 		log.Printf("Base URL: %s, TestNet: %v", c.baseURL, c.config.TestNet)
-
-		// 如果启用了fallback模式且允许跳过klines错误，返回空数据而不是错误
-		if c.config.FallbackMode && c.config.SkipKlinesOnError {
-			log.Printf("⚠️  Fallback mode: Skipping klines fetch due to network error")
-			log.Printf("📊 Returning empty klines data to allow optimization to continue")
-
-			// 返回一个空的klines数组，这样优化任务可以继续进行
-			// 虽然没有历史数据，但至少不会因为网络问题而完全失败
-			return []*types.Kline{}, nil
-		}
 
 		return nil, fmt.Errorf("failed to get klines from %s: %w", fullURL, err)
 	}

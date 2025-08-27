@@ -82,11 +82,6 @@ type ExchangeConfig struct {
 	BaseURL        string
 	FuturesBaseURL string
 
-	// Network fallback configuration
-	FallbackMode      bool
-	SkipKlinesOnError bool
-	UseCachedData     bool
-
 	// SuppressCacheWarnings indicates whether to attempt suppressing cache warnings
 	// from the underlying exchange library (like banexg). Note that this may not
 	// completely eliminate all warnings due to library-internal caching mechanisms.
