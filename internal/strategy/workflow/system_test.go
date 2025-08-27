@@ -202,7 +202,7 @@ func TestTradingStrategyPool_Integration(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	// 检查策略池
-	enabledStrategies := pool.GetEnabledStrategies()
+	enabledStrategies := pool.GetEnabledStrategyObjects()
 	assert.Greater(t, len(enabledStrategies), 0)
 
 	// 检查策略是否启用

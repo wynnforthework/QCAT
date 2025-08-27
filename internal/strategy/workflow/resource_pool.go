@@ -1,7 +1,6 @@
 package workflow
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"sync"
@@ -34,9 +33,9 @@ type StrategyResourcePool struct {
 	memoryMu    sync.RWMutex
 
 	// 工作线程池
-	backtestPool *concurrent.Pool
-	optimizePool *concurrent.Pool
-	learningPool *concurrent.Pool
+	backtestPool *concurrent.GoroutinePool
+	optimizePool *concurrent.GoroutinePool
+	learningPool *concurrent.GoroutinePool
 
 	// 数据连接池
 	dataConnections map[string]*DataConnection

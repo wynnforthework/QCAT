@@ -65,8 +65,14 @@ type GoroutinePool struct {
 
 // PoolConfig 池配置
 type PoolConfig struct {
-	MaxWorkers int
-	QueueSize  int
+	MinWorkers      int
+	MaxWorkers      int
+	QueueSize       int
+	IdleTimeout     time.Duration
+	TaskTimeout     time.Duration
+	WorkerTimeout   time.Duration
+	EnableMetrics   bool
+	EnableProfiling bool
 }
 
 // NewGoroutinePool 创建Goroutine池
@@ -386,3 +392,10 @@ func (at *AutomationTask) SetParam(key string, value interface{}) {
 func (at *AutomationTask) GetParam(key string) interface{} {
 	return at.params[key]
 }
+// NewPool 创建池的别名函数，为了兼容性
+func NewPool(name string, config *PoolConfig) *GoroutinePool {
+	return NewGoroutinePool(config)
+}
+
+// Pool 类型别名，为了兼容性
+type Pool = GoroutinePool

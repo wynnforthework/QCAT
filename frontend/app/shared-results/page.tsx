@@ -24,6 +24,7 @@ import {
   AlertCircle,
   FileText
 } from 'lucide-react'
+import apiClient from '@/lib/api'
 
 interface SharedResult {
   id: string
@@ -161,8 +162,7 @@ export default function SharedResultsPage() {
 
   const fetchResults = async () => {
     try {
-      const response = await fetch('/api/shared-results')
-      const data = await response.json()
+      const data = await apiClient.getSharedResults()
       setResults(data.results || [])
     } catch (error) {
       console.error('Failed to fetch results:', error)
@@ -219,21 +219,10 @@ export default function SharedResultsPage() {
 
     setImportStatus('importing')
     try {
-      const formData = new FormData()
-      formData.append('file', importFile)
-
-      const response = await fetch('/api/import-result', {
-        method: 'POST',
-        body: formData
-      })
-
-      if (response.ok) {
-        setImportStatus('success')
-        setImportFile(null)
-        fetchResults() // 刷新结果列表
-      } else {
-        setImportStatus('error')
-      }
+      await apiClient.importResult(importFile)
+      setImportStatus('success')
+      setImportFile(null)
+      fetchResults() // 刷新结果列表
     } catch (error) {
       console.error('Import failed:', error)
       setImportStatus('error')
@@ -242,9 +231,8 @@ export default function SharedResultsPage() {
 
   const handleExport = async (result: SharedResult) => {
     try {
-      const response = await fetch(`/api/export-result/${result.id}`)
-      const blob = await response.blob()
-      
+      const blob = await apiClient.exportResult(result.id)
+
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { SafeTimeDisplay } from "@/components/ui/client-only";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { DryRunIndicator } from "@/components/ui/dry-run-indicator";
 import {
   Activity,
   BarChart3,
@@ -68,34 +69,16 @@ const navigation = [
     description: "风险监控和限额管理"
   },
   {
-    name: "双闭环监控",
+    name: "系统监控",
     href: "/dual-loop-overview",
     icon: Bot,
-    description: "双闭环系统协同运行状态"
+    description: "双闭环系统实时监控和协同状态"
   },
   {
-    name: "多策略工作流",
-    href: "/strategy-workflow",
-    icon: TrendingUp,
-    description: "策略优化过程和进化监控"
-  },
-  {
-    name: "交易执行监控",
-    href: "/trading-execution",
-    icon: Activity,
-    description: "交易执行系统专用监控"
-  },
-  {
-    name: "策略池管理",
-    href: "/strategy-pool",
-    icon: Users,
-    description: "策略池状态和同步管理"
-  },
-  {
-    name: "自动化系统",
+    name: "自动化管理",
     href: "/automation",
     icon: Settings,
-    description: "26项自动化功能监控和管理"
+    description: "26项自动化功能配置和管理"
   },
   {
     name: "热门币种",
@@ -328,6 +311,10 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                 {children}
               </div>
             </main>
+          </div>
+
+          {/* Dry-Run 模式指示器 */}
+          <DryRunIndicator />
           </div>
         </div>
       </ProtectedRoute>

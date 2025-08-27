@@ -737,13 +737,41 @@ func (as *AutomationScheduler) RegisterTask(task *ScheduledTask) {
 	}
 
 	task.Status = TaskStatusPending
-	task.Enabled = false // 默认禁用，需要手动启用
+	// 默认启用关键任务，其他任务需要手动启用
+	task.Enabled = as.shouldEnableByDefault(task.ID)
 	task.CreatedAt = time.Now()
 	task.UpdatedAt = time.Now()
 	task.NextRun = time.Now().Add(time.Minute) // 1分钟后开始
 
 	as.tasks[task.ID] = task
-	log.Printf("Registered task: %s (%s)", task.Name, task.ID)
+	log.Printf("Registered task: %s (%s) - Enabled: %v", task.Name, task.ID, task.Enabled)
+}
+
+// shouldEnableByDefault 判断任务是否应该默认启用
+func (as *AutomationScheduler) shouldEnableByDefault(taskID string) bool {
+	// 默认启用的关键任务列表
+	defaultEnabledTasks := []string{
+		"risk_monitoring",                    // 风险监控
+		"system_health",                      // 系统健康检查
+		"minimum_strategy_check",             // 最小策略数量检查
+		"abnormal_market_response",           // 异常行情应对
+		"account_security_monitoring",        // 账户安全监控
+		"multi_exchange_redundancy",          // 多交易所冗余
+		"audit_logging",                      // 日志与审计追踪
+		"market_pattern_recognition",         // 市场模式识别
+		"data_cleaning",                      // 数据清洗
+		"position_optimization",              // 仓位动态优化
+		"stop_loss_adjustment",               // 止盈止损线自动调整
+		"dynamic_fund_allocation",            // 资金动态分配
+		"layered_position_management",        // 仓位分层机制
+	}
+
+	for _, enabledTask := range defaultEnabledTasks {
+		if taskID == enabledTask {
+			return true
+		}
+	}
+	return false
 }
 
 // startSubSchedulers 启动子调度器

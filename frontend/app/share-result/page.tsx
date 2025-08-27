@@ -382,17 +382,9 @@ export default function ShareResultPage() {
     setStatus('idle')
 
     try {
-      const response = await fetch('/api/share-result', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData)
-      })
-      
-      if (response.ok) {
-        setStatus('success')
-        // 重置表单
+      await apiClient.shareResult(formData)
+      setStatus('success')
+      // 重置表单
         setFormData({
           task_id: '',
           strategy_name: '',
@@ -503,9 +495,6 @@ export default function ShareResultPage() {
             rating: 0
           }
         })
-      } else {
-        setStatus('error')
-      }
     } catch (error) {
       console.error('Share failed:', error)
       setStatus('error')

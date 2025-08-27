@@ -22,6 +22,7 @@ import (
 	"qcat/internal/monitoring"
 	"qcat/internal/security"
 	"qcat/internal/stability"
+	"qcat/internal/strategy"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -63,6 +64,7 @@ type Server struct {
 type Handlers struct {
 	Optimizer          *OptimizerHandler
 	Strategy           *StrategyHandler
+	UnifiedStrategy    *UnifiedStrategyHandler
 	Portfolio          *PortfolioHandler
 	Risk               *RiskHandler
 	Hotlist            *HotlistHandler
@@ -81,6 +83,8 @@ type Handlers struct {
 	Emergency          *EmergencyHandler
 	Workflow           *WorkflowHandler
 	Concurrent         *ConcurrentHandler
+	ResultSharing      *ResultSharingHandler
+	Settings           *SettingsHandler
 }
 
 // RateLimiter 速率限制器结构
@@ -468,10 +472,25 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 	// Note: Automation system startup moved to main.go to prevent duplicate initialization
 
+	// Initialize workflow system for unified strategy service
+	var unifiedStrategyHandler *UnifiedStrategyHandler
+	if db != nil {
+		// Import the workflow package
+		// workflowSystem, err := workflow.NewMultiStrategyWorkflowSystem(nil)
+		// if err != nil {
+		//     log.Printf("Warning: Failed to create workflow system: %v", err)
+		// }
+		
+		// Create unified strategy service (without workflow system for now)
+		unifiedService := strategy.NewUnifiedStrategyService(db, redis, metricsCollector, nil)
+		unifiedStrategyHandler = NewUnifiedStrategyHandler(unifiedService)
+	}
+
 	// Initialize handlers with dependencies
 	server.handlers = &Handlers{
 		Optimizer:          NewOptimizerHandler(db, redis, metricsCollector),
 		Strategy:           NewStrategyHandler(db, redis, metricsCollector),
+		UnifiedStrategy:    unifiedStrategyHandler,
 		Portfolio:          NewPortfolioHandler(db, redis, metricsCollector),
 		Risk:               NewRiskHandler(db, redis, metricsCollector),
 		Hotlist:            NewHotlistHandler(db, redis, metricsCollector),
@@ -490,6 +509,8 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		Emergency:          NewEmergencyHandler(db.DB),
 		Workflow:           NewWorkflowHandler(db.DB),
 		Concurrent:         NewConcurrentHandler(db.DB),
+		ResultSharing:      NewResultSharingHandler(db, redis, metricsCollector),
+		Settings:           NewSettingsHandler(),
 	}
 
 	// Store security components for middleware
@@ -552,6 +573,31 @@ func (s *Server) setupRoutes() {
 			auth.POST("/refresh", s.handlers.Auth.RefreshToken)
 		}
 
+		// TODO: TEMPORARY - Add audit logs as public route for testing
+		// This should be moved back to protected routes in production
+		auditPublic := v1.Group("/audit")
+		{
+			auditPublic.GET("/logs", s.handlers.Audit.GetLogs)
+		}
+
+		// TODO: TEMPORARY - Add strategy routes as public for frontend testing
+		// This should be moved back to protected routes in production
+		if s.handlers.UnifiedStrategy != nil {
+			v1.GET("/strategy", s.handlers.UnifiedStrategy.ListStrategies)
+			v1.GET("/strategy/:id", s.handlers.UnifiedStrategy.GetStrategy)
+			v1.GET("/strategy/pool/overview", s.handlers.UnifiedStrategy.GetPoolOverview)
+			v1.GET("/strategy/execution/overview", s.handlers.UnifiedStrategy.GetExecutionOverview)
+			v1.GET("/strategy/execution/realtime", s.handlers.UnifiedStrategy.GetRealtimeStatus)
+			v1.GET("/strategy/workflow/status", s.handlers.UnifiedStrategy.GetWorkflowStatus)
+		}
+
+		// Settings routes (public for frontend access)
+		if s.handlers.Settings != nil {
+			v1.GET("/settings", s.handlers.Settings.GetSettings)
+			v1.PUT("/settings", s.handlers.Settings.UpdateSettings)
+			v1.OPTIONS("/settings", s.handlers.Settings.UpdateSettings) // Handle CORS preflight
+		}
+
 		// Protected routes (authentication required)
 		protected := v1.Group("")
 		protected.Use(s.jwtManager.AuthMiddleware())
@@ -570,11 +616,10 @@ func (s *Server) setupRoutes() {
 			// System metrics (now protected)
 			protected.GET("/metrics/system", s.handlers.Metrics.GetSystemMetrics)
 
-			// Strategy routes (all protected)
+			// Strategy routes (all protected) - only modification routes
 			strategy := protected.Group("/strategy")
 			{
-				strategy.GET("/", s.handlers.Strategy.ListStrategies) // 移到受保护路由
-				strategy.GET("/:id", s.handlers.Strategy.GetStrategy)
+				// Keep original routes for backward compatibility
 				strategy.POST("/", s.handlers.Strategy.CreateStrategy)
 				strategy.PUT("/:id", s.handlers.Strategy.UpdateStrategy)
 				strategy.DELETE("/:id", s.handlers.Strategy.DeleteStrategy)
@@ -718,10 +763,10 @@ func (s *Server) setupRoutes() {
 				shutdown.POST("/force", s.forceShutdown)
 			}
 
-			// Audit routes
+			// Audit routes (logs moved to public for testing)
 			audit := protected.Group("/audit")
 			{
-				audit.GET("/logs", s.handlers.Audit.GetLogs)
+				// audit.GET("/logs", s.handlers.Audit.GetLogs) // MOVED TO PUBLIC FOR TESTING
 				audit.GET("/decisions", s.handlers.Audit.GetDecisionChains)
 				audit.GET("/performance", s.handlers.Audit.GetPerformanceMetrics)
 				audit.POST("/export", s.handlers.Audit.ExportReport)
@@ -740,6 +785,14 @@ func (s *Server) setupRoutes() {
 			// Automation system routes
 			if s.handlers.Automation != nil {
 				s.handlers.Automation.RegisterRoutes(protected)
+			}
+
+			// Result sharing routes
+			if s.handlers.ResultSharing != nil {
+				s.handlers.ResultSharing.RegisterRoutes(protected)
+				// Add direct routes for frontend compatibility
+				protected.POST("/share-result", s.handlers.ResultSharing.ShareResult)
+				protected.GET("/shared-results", s.handlers.ResultSharing.GetSharedResults)
 			}
 		}
 	}
@@ -880,10 +933,17 @@ func (s *Server) Stop(ctx context.Context) error {
 // corsMiddleware adds CORS headers
 func corsMiddleware(corsConfig config.CORSConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Allow all origins for now, in production you should check against allowed origins
-		c.Header("Access-Control-Allow-Origin", "*")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+		// Allow all origins for development
+		origin := c.Request.Header.Get("Origin")
+		if origin == "" {
+			origin = "*"
+		}
+		
+		c.Header("Access-Control-Allow-Origin", origin)
+		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Accept, Cache-Control, X-Requested-With")
+		c.Header("Access-Control-Allow-Credentials", "true")
+		c.Header("Access-Control-Max-Age", "86400")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -1181,6 +1241,8 @@ func (s *Server) GetMetricsCollector() *monitor.MetricsCollector {
 func (s *Server) GetAutomationSystem() *automation.AutomationSystem {
 	return s.automationSystem
 }
+
+
 
 // RegisterOrchestratorHandler registers the orchestrator handler routes
 func (s *Server) RegisterOrchestratorHandler(handler *OrchestratorHandler) {

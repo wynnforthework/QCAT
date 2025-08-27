@@ -170,20 +170,37 @@ func (fss *FactorSyncService) Stop() error {
 
 // subscribeToFactorEvents 订阅因子更新事件
 func (fss *FactorSyncService) subscribeToFactorEvents() error {
+	// 创建事件处理器适配器
+	libraryHandler := &FactorLibraryEventHandler{service: fss}
+	updateHandler := &FactorUpdateEventHandler{service: fss}
+	deleteHandler := &FactorDeleteEventHandler{service: fss}
+
 	// 订阅因子库更新事件
-	err := fss.eventBus.Subscribe("factor_library_updated", fss.handleFactorLibraryUpdate)
+	_, err := fss.eventBus.Subscribe(
+		[]events.EventType{"factor_library_updated"}, 
+		libraryHandler, 
+		nil,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to factor_library_updated: %w", err)
 	}
 
 	// 订阅单个因子更新事件
-	err = fss.eventBus.Subscribe("factor_updated", fss.handleFactorUpdate)
+	_, err = fss.eventBus.Subscribe(
+		[]events.EventType{"factor_updated"}, 
+		updateHandler, 
+		nil,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to factor_updated: %w", err)
 	}
 
 	// 订阅因子删除事件
-	err = fss.eventBus.Subscribe("factor_deleted", fss.handleFactorDeleted)
+	_, err = fss.eventBus.Subscribe(
+		[]events.EventType{"factor_deleted"}, 
+		deleteHandler, 
+		nil,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to factor_deleted: %w", err)
 	}
@@ -554,4 +571,67 @@ func GetDefaultFactorSyncConfig() *FactorSyncConfig {
 		FullSyncInterval: 1 * time.Hour,
 		EnableDeltaSync:  true,
 	}
+}
+
+// FactorLibraryEventHandler 因子库事件处理器适配器
+type FactorLibraryEventHandler struct {
+	service *FactorSyncService
+}
+
+func (h *FactorLibraryEventHandler) Handle(ctx context.Context, event *events.Event) error {
+	return h.service.handleFactorLibraryUpdate(event)
+}
+
+func (h *FactorLibraryEventHandler) GetName() string {
+	return "FactorLibraryEventHandler"
+}
+
+func (h *FactorLibraryEventHandler) GetEventTypes() []events.EventType {
+	return []events.EventType{"factor_library_updated"}
+}
+
+func (h *FactorLibraryEventHandler) GetPriority() int {
+	return 5
+}
+
+// FactorUpdateEventHandler 因子更新事件处理器适配器
+type FactorUpdateEventHandler struct {
+	service *FactorSyncService
+}
+
+func (h *FactorUpdateEventHandler) Handle(ctx context.Context, event *events.Event) error {
+	return h.service.handleFactorUpdate(event)
+}
+
+func (h *FactorUpdateEventHandler) GetName() string {
+	return "FactorUpdateEventHandler"
+}
+
+func (h *FactorUpdateEventHandler) GetEventTypes() []events.EventType {
+	return []events.EventType{"factor_updated"}
+}
+
+func (h *FactorUpdateEventHandler) GetPriority() int {
+	return 5
+}
+
+// FactorDeleteEventHandler 因子删除事件处理器适配器
+type FactorDeleteEventHandler struct {
+	service *FactorSyncService
+}
+
+func (h *FactorDeleteEventHandler) Handle(ctx context.Context, event *events.Event) error {
+	return h.service.handleFactorDeleted(event)
+}
+
+func (h *FactorDeleteEventHandler) GetName() string {
+	return "FactorDeleteEventHandler"
+}
+
+func (h *FactorDeleteEventHandler) GetEventTypes() []events.EventType {
+	return []events.EventType{"factor_deleted"}
+}
+
+func (h *FactorDeleteEventHandler) GetPriority() int {
+	return 5
 }

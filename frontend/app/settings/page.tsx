@@ -1,12 +1,13 @@
 "use client"
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { 
   Settings, 
   User, 
@@ -15,10 +16,59 @@ import {
   Monitor,
   Database,
   Globe,
-  Palette
+  Palette,
+  AlertCircle,
+  CheckCircle
 } from 'lucide-react'
+import { useSettings } from '@/hooks/useSettings'
 
 export default function SettingsPage() {
+  const { 
+    settings, 
+    loading, 
+    error, 
+    updateTradingSettings, 
+    updateSystemSettings, 
+    resetSettings 
+  } = useSettings()
+  
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle')
+
+  const handleDryRunToggle = async (enabled: boolean) => {
+    try {
+      setSaveStatus('saving')
+      await updateTradingSettings({ dryRunMode: enabled })
+      setSaveStatus('success')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch (err) {
+      setSaveStatus('error')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    }
+  }
+
+  const handleRiskControlToggle = async (enabled: boolean) => {
+    try {
+      setSaveStatus('saving')
+      await updateTradingSettings({ riskControl: enabled })
+      setSaveStatus('success')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch (err) {
+      setSaveStatus('error')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    }
+  }
+
+  const handleDebugModeToggle = async (enabled: boolean) => {
+    try {
+      setSaveStatus('saving')
+      await updateSystemSettings({ debugMode: enabled })
+      setSaveStatus('success')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch (err) {
+      setSaveStatus('error')
+      setTimeout(() => setSaveStatus('idle'), 3000)
+    }
+  }
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* 页面标题 */}
@@ -218,11 +268,85 @@ export default function SettingsPage() {
 
         {/* 高级设置 */}
         <TabsContent value="advanced" className="space-y-4">
+          {/* 交易设置 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Monitor className="w-5 h-5" />
+                交易设置
+              </CardTitle>
+              <CardDescription>交易执行相关配置</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Dry-Run 模式警告 */}
+              {settings.trading.dryRunMode && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    当前处于 Dry-Run 模式，所有交易都将在本地模拟执行，不会产生真实的交易订单。
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>Dry-Run 模式</Label>
+                  <p className="text-sm text-gray-500">启用后所有交易将在本地模拟执行，不会产生真实交易</p>
+                </div>
+                <Switch 
+                  checked={settings.trading.dryRunMode}
+                  onCheckedChange={handleDryRunToggle}
+                  disabled={loading}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>风险控制</Label>
+                  <p className="text-sm text-gray-500">启用自动风险控制和止损机制</p>
+                </div>
+                <Switch 
+                  checked={settings.trading.riskControl}
+                  onCheckedChange={handleRiskControlToggle}
+                  disabled={loading}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="max-position">最大持仓比例</Label>
+                  <Input 
+                    id="max-position" 
+                    value={`${settings.trading.maxPositionRatio}%`}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value.replace('%', ''))
+                      if (!isNaN(value)) {
+                        updateTradingSettings({ maxPositionRatio: value })
+                      }
+                    }}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="stop-loss">默认止损比例</Label>
+                  <Input 
+                    id="stop-loss" 
+                    value={`${settings.trading.defaultStopLoss}%`}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value.replace('%', ''))
+                      if (!isNaN(value)) {
+                        updateTradingSettings({ defaultStopLoss: value })
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 系统设置 */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Settings className="w-5 h-5" />
-                高级设置
+                系统设置
               </CardTitle>
               <CardDescription>系统高级配置选项</CardDescription>
             </CardHeader>
@@ -230,11 +354,19 @@ export default function SettingsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="log-level">日志级别</Label>
-                  <Input id="log-level" defaultValue="INFO" />
+                  <Input 
+                    id="log-level" 
+                    value={settings.system.logLevel}
+                    onChange={(e) => updateSystemSettings({ logLevel: e.target.value })}
+                  />
                 </div>
                 <div>
                   <Label htmlFor="cache-size">缓存大小</Label>
-                  <Input id="cache-size" defaultValue="1GB" />
+                  <Input 
+                    id="cache-size" 
+                    value={settings.system.cacheSize}
+                    onChange={(e) => updateSystemSettings({ cacheSize: e.target.value })}
+                  />
                 </div>
               </div>
               <div className="flex items-center justify-between">
@@ -242,22 +374,58 @@ export default function SettingsPage() {
                   <Label>调试模式</Label>
                   <p className="text-sm text-gray-500">启用调试模式获取详细日志</p>
                 </div>
-                <Switch />
+                <Switch 
+                  checked={settings.system.debugMode}
+                  onCheckedChange={handleDebugModeToggle}
+                  disabled={loading}
+                />
               </div>
               <div className="flex gap-2">
                 <Button variant="outline">导出配置</Button>
                 <Button variant="outline">导入配置</Button>
-                <Button variant="destructive">重置设置</Button>
+                <Button 
+                  variant="destructive" 
+                  onClick={resetSettings}
+                  disabled={loading}
+                >
+                  重置设置
+                </Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
 
-      {/* 保存按钮 */}
-      <div className="flex justify-end gap-4">
-        <Button variant="outline">取消</Button>
-        <Button>保存设置</Button>
+      {/* 状态提示和保存按钮 */}
+      <div className="space-y-4">
+        {/* 保存状态提示 */}
+        {saveStatus === 'success' && (
+          <Alert>
+            <CheckCircle className="h-4 w-4" />
+            <AlertDescription>设置已成功保存</AlertDescription>
+          </Alert>
+        )}
+        
+        {saveStatus === 'error' && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>保存设置失败，请重试</AlertDescription>
+          </Alert>
+        )}
+        
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex justify-end gap-4">
+          <Button variant="outline" disabled={loading}>取消</Button>
+          <Button disabled={loading || saveStatus === 'saving'}>
+            {saveStatus === 'saving' ? '保存中...' : '保存设置'}
+          </Button>
+        </div>
       </div>
     </div>
   )

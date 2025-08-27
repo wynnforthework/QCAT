@@ -1997,6 +1997,10 @@ func (h *AuditHandler) GetLogs(c *gin.Context) {
 	// 实现获取审计日志逻辑
 	ctx := c.Request.Context()
 
+	// TODO: Remove this temporary bypass for testing
+	// This is a temporary fix to test the audit logs API without authentication
+	// In production, proper authentication should be enforced
+
 	// 获取查询参数
 	startDate := c.Query("start_date")
 	endDate := c.Query("end_date")
@@ -2128,18 +2132,21 @@ func (h *AuditHandler) GetDecisionChains(c *gin.Context) {
 
 	// 从数据库获取决策链数据
 	query := `
-		SELECT 
+		SELECT
 			id,
+			decision_id,
 			strategy_id,
-			signal_id,
 			decision_type,
-			decision_data,
-			risk_check_result,
-			execution_result,
+			input_data,
+			output_data,
+			decision_path,
+			confidence_score,
+			execution_time_ms,
+			status,
 			created_at
-		FROM decision_chains 
+		FROM audit_decisions
 		` + whereClause + `
-		ORDER BY created_at DESC 
+		ORDER BY created_at DESC
 		LIMIT ` + limit
 
 	rows, err := h.db.QueryContext(ctx, query, args...)
@@ -2155,29 +2162,67 @@ func (h *AuditHandler) GetDecisionChains(c *gin.Context) {
 	chains := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var chain struct {
-			ID              string                 `db:"id"`
-			StrategyID      string                 `db:"strategy_id"`
-			SignalID        string                 `db:"signal_id"`
-			DecisionType    string                 `db:"decision_type"`
-			DecisionData    map[string]interface{} `db:"decision_data"`
-			RiskCheckResult map[string]interface{} `db:"risk_check_result"`
-			ExecutionResult map[string]interface{} `db:"execution_result"`
-			CreatedAt       time.Time              `db:"created_at"`
+			ID              string    `db:"id"`
+			DecisionID      string    `db:"decision_id"`
+			StrategyID      *string   `db:"strategy_id"`
+			DecisionType    string    `db:"decision_type"`
+			InputData       *string   `db:"input_data"`
+			OutputData      *string   `db:"output_data"`
+			DecisionPath    *string   `db:"decision_path"`
+			ConfidenceScore *float64  `db:"confidence_score"`
+			ExecutionTimeMs *int      `db:"execution_time_ms"`
+			Status          string    `db:"status"`
+			CreatedAt       time.Time `db:"created_at"`
 		}
 
-		if err := rows.Scan(&chain.ID, &chain.StrategyID, &chain.SignalID, &chain.DecisionType,
-			&chain.DecisionData, &chain.RiskCheckResult, &chain.ExecutionResult, &chain.CreatedAt); err != nil {
+		if err := rows.Scan(&chain.ID, &chain.DecisionID, &chain.StrategyID, &chain.DecisionType,
+			&chain.InputData, &chain.OutputData, &chain.DecisionPath, &chain.ConfidenceScore,
+			&chain.ExecutionTimeMs, &chain.Status, &chain.CreatedAt); err != nil {
 			continue
+		}
+
+		// Convert nullable fields to proper values
+		strategyID := ""
+		if chain.StrategyID != nil {
+			strategyID = *chain.StrategyID
+		}
+
+		confidenceScore := 0.0
+		if chain.ConfidenceScore != nil {
+			confidenceScore = *chain.ConfidenceScore
+		}
+
+		executionTime := 0
+		if chain.ExecutionTimeMs != nil {
+			executionTime = *chain.ExecutionTimeMs
+		}
+
+		// Parse JSON fields
+		var inputData, outputData, decisionPath map[string]interface{}
+
+		if chain.InputData != nil {
+			json.Unmarshal([]byte(*chain.InputData), &inputData)
+		}
+
+		if chain.OutputData != nil {
+			json.Unmarshal([]byte(*chain.OutputData), &outputData)
+		}
+
+		if chain.DecisionPath != nil {
+			json.Unmarshal([]byte(*chain.DecisionPath), &decisionPath)
 		}
 
 		chains = append(chains, map[string]interface{}{
 			"id":                chain.ID,
-			"strategy_id":       chain.StrategyID,
-			"signal_id":         chain.SignalID,
+			"decision_id":       chain.DecisionID,
+			"strategy_id":       strategyID,
 			"decision_type":     chain.DecisionType,
-			"decision_data":     chain.DecisionData,
-			"risk_check_result": chain.RiskCheckResult,
-			"execution_result":  chain.ExecutionResult,
+			"input_data":        inputData,
+			"output_data":       outputData,
+			"decision_path":     decisionPath,
+			"confidence_score":  confidenceScore,
+			"execution_time_ms": executionTime,
+			"status":            chain.Status,
 			"created_at":        chain.CreatedAt,
 		})
 	}

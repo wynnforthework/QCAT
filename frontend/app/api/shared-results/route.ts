@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 调用后端API获取结果
-    const response = await fetch(`http://localhost:8080/shared-results?${params.toString()}`, {
+    const response = await fetch(`http://localhost:8082/shared-results?${params.toString()}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

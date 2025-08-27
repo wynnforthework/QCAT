@@ -10,10 +10,10 @@ import (
 	"qcat/internal/events"
 )
 
-// StrategyPoolInterface 策略池接口
-type StrategyPoolInterface interface {
-	// 获取已启用策略
-	GetEnabledStrategies() []*EnabledStrategy
+// LocalStrategyPoolInterface 本地策略池接口
+type LocalStrategyPoolInterface interface {
+	// 获取已启用策略对象
+	GetEnabledStrategyObjects() []*EnabledStrategy
 	
 	// 策略状态变更通知
 	OnStrategyEnabled(strategyID string)
@@ -119,8 +119,8 @@ func (tsp *TradingStrategyPool) Stop() error {
 	return nil
 }
 
-// GetEnabledStrategies 获取已启用策略
-func (tsp *TradingStrategyPool) GetEnabledStrategies() []*EnabledStrategy {
+// GetEnabledStrategyObjects 获取已启用策略对象
+func (tsp *TradingStrategyPool) GetEnabledStrategyObjects() []*EnabledStrategy {
 	tsp.strategiesMu.RLock()
 	defer tsp.strategiesMu.RUnlock()
 	
@@ -202,6 +202,103 @@ func (tsp *TradingStrategyPool) GetStrategyInfo(strategyID string) (*EnabledStra
 	return &strategyCopy, nil
 }
 
+// 实现 workflow/interfaces.StrategyPoolInterface 接口
+
+// GetActiveStrategyCount 获取活跃策略数量
+func (tsp *TradingStrategyPool) GetActiveStrategyCount() int {
+	tsp.strategiesMu.RLock()
+	defer tsp.strategiesMu.RUnlock()
+	
+	count := 0
+	for _, strategy := range tsp.enabledStrategies {
+		if strategy.IsActive && strategy.TradingEnabled {
+			count++
+		}
+	}
+	return count
+}
+
+// GetStrategyStatus 获取策略状态
+func (tsp *TradingStrategyPool) GetStrategyStatus(strategyID string) (string, error) {
+	tsp.strategiesMu.RLock()
+	defer tsp.strategiesMu.RUnlock()
+	
+	strategy, exists := tsp.enabledStrategies[strategyID]
+	if !exists {
+		return "not_found", fmt.Errorf("strategy %s not found", strategyID)
+	}
+	
+	if !strategy.IsActive {
+		return "inactive", nil
+	}
+	
+	if !strategy.TradingEnabled {
+		return "disabled", nil
+	}
+	
+	return "active", nil
+}
+
+// GetActiveStrategyIDs 获取所有活跃策略ID
+func (tsp *TradingStrategyPool) GetActiveStrategyIDs() []string {
+	tsp.strategiesMu.RLock()
+	defer tsp.strategiesMu.RUnlock()
+	
+	ids := make([]string, 0, len(tsp.enabledStrategies))
+	for id, strategy := range tsp.enabledStrategies {
+		if strategy.IsActive && strategy.TradingEnabled {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+// GetEnabledStrategies 获取启用的策略ID列表（实现接口）
+func (tsp *TradingStrategyPool) GetEnabledStrategies() []string {
+	return tsp.GetActiveStrategyIDs()
+}
+
+// HasStrategy 检查策略是否存在
+func (tsp *TradingStrategyPool) HasStrategy(strategyID string) bool {
+	tsp.strategiesMu.RLock()
+	defer tsp.strategiesMu.RUnlock()
+	
+	_, exists := tsp.enabledStrategies[strategyID]
+	return exists
+}
+
+// GetStrategyStats 获取策略统计信息
+func (tsp *TradingStrategyPool) GetStrategyStats(strategyID string) (map[string]interface{}, error) {
+	tsp.strategiesMu.RLock()
+	defer tsp.strategiesMu.RUnlock()
+	
+	strategy, exists := tsp.enabledStrategies[strategyID]
+	if !exists {
+		return nil, fmt.Errorf("strategy %s not found", strategyID)
+	}
+	
+	stats := map[string]interface{}{
+		"strategy_id":     strategyID,
+		"is_active":       strategy.IsActive,
+		"trading_enabled": strategy.TradingEnabled,
+		"last_updated":    strategy.LastUpdated,
+		"enabled_at":      strategy.EnabledAt,
+	}
+	
+	if strategy.Performance != nil {
+		stats["performance"] = map[string]interface{}{
+			"sharpe_ratio":    strategy.Performance.SharpeRatio,
+			"total_return":    strategy.Performance.TotalReturn,
+			"max_drawdown":    strategy.Performance.MaxDrawdown,
+			"win_rate":        strategy.Performance.WinRate,
+			"profit_factor":   strategy.Performance.ProfitFactor,
+			// "volatility":      strategy.Performance.Volatility, // 字段不存在，暂时注释
+		}
+	}
+	
+	return stats, nil
+}
+
 // syncStrategies 同步策略
 func (tsp *TradingStrategyPool) syncStrategies() error {
 	if tsp.multiStrategyManager == nil {
@@ -253,21 +350,23 @@ func (tsp *TradingStrategyPool) subscribeToStrategyEvents() {
 		return
 	}
 	
+	// 创建事件处理器适配器
+	enabledHandler := &StrategyEnabledEventHandler{pool: tsp}
+	disabledHandler := &StrategyDisabledEventHandler{pool: tsp}
+	
 	// 订阅策略启用事件
-	tsp.eventBus.Subscribe("strategy_enabled", func(event *events.Event) error {
-		if strategyID, ok := event.Data["strategy_id"].(string); ok {
-			tsp.OnStrategyEnabled(strategyID)
-		}
-		return nil
-	})
+	tsp.eventBus.Subscribe(
+		[]events.EventType{"strategy_enabled"}, 
+		enabledHandler, 
+		nil,
+	)
 	
 	// 订阅策略禁用事件
-	tsp.eventBus.Subscribe("strategy_disabled", func(event *events.Event) error {
-		if strategyID, ok := event.Data["strategy_id"].(string); ok {
-			tsp.OnStrategyDisabled(strategyID)
-		}
-		return nil
-	})
+	tsp.eventBus.Subscribe(
+		[]events.EventType{"strategy_disabled"}, 
+		disabledHandler, 
+		nil,
+	)
 }
 
 // emitEvent 发送事件
@@ -313,4 +412,51 @@ func (tsp *TradingStrategyPool) GetStats() map[string]interface{} {
 		"last_update":                tsp.lastUpdate,
 		"update_interval":            tsp.updateInterval.String(),
 	}
+}
+// StrategyEnabledEventHandler 策略启用事件处理器适配器
+type StrategyEnabledEventHandler struct {
+	pool *TradingStrategyPool
+}
+
+func (h *StrategyEnabledEventHandler) Handle(ctx context.Context, event *events.Event) error {
+	if strategyID, ok := event.Data["strategy_id"].(string); ok {
+		h.pool.OnStrategyEnabled(strategyID)
+	}
+	return nil
+}
+
+func (h *StrategyEnabledEventHandler) GetName() string {
+	return "StrategyEnabledEventHandler"
+}
+
+func (h *StrategyEnabledEventHandler) GetEventTypes() []events.EventType {
+	return []events.EventType{"strategy_enabled"}
+}
+
+func (h *StrategyEnabledEventHandler) GetPriority() int {
+	return 5
+}
+
+// StrategyDisabledEventHandler 策略禁用事件处理器适配器
+type StrategyDisabledEventHandler struct {
+	pool *TradingStrategyPool
+}
+
+func (h *StrategyDisabledEventHandler) Handle(ctx context.Context, event *events.Event) error {
+	if strategyID, ok := event.Data["strategy_id"].(string); ok {
+		h.pool.OnStrategyDisabled(strategyID)
+	}
+	return nil
+}
+
+func (h *StrategyDisabledEventHandler) GetName() string {
+	return "StrategyDisabledEventHandler"
+}
+
+func (h *StrategyDisabledEventHandler) GetEventTypes() []events.EventType {
+	return []events.EventType{"strategy_disabled"}
+}
+
+func (h *StrategyDisabledEventHandler) GetPriority() int {
+	return 5
 }

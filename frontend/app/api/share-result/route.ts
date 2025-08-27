@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
 
     // 这里应该调用后端API来保存结果
     // 暂时模拟成功响应
-    const response = await fetch('http://localhost:8080/share-result', {
+    const response = await fetch('http://localhost:8082/share-result', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

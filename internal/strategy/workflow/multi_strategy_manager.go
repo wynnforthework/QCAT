@@ -395,9 +395,7 @@ func (msm *MultiStrategyManager) startGlobalScheduler() error {
 	}
 
 	// 启动工作池
-	if err := msm.globalScheduler.workerPool.Start(); err != nil {
-		return fmt.Errorf("failed to start worker pool: %w", err)
-	}
+	msm.globalScheduler.workerPool.Start()
 
 	// 启动任务处理循环
 	go msm.runTaskProcessingLoop()

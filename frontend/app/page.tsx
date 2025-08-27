@@ -23,22 +23,33 @@ export default function HomePage() {
     const fetchDashboardData = async () => {
       try {
         setLoading(true)
+        setError(null)
         const data = await apiClient.getDashboardData()
         setDashboardData(data)
-        setError(null)
+        console.log('Dashboard data loaded successfully')
       } catch (error) {
         console.error('Failed to fetch dashboard data:', error)
-        setError('无法获取仪表盘数据，请检查后端服务是否正常运行')
-        setDashboardData(null)
+        if (error instanceof Error) {
+          if (error.message.includes('超时')) {
+            setError('服务器响应超时，正在使用缓存数据显示')
+          } else if (error.message.includes('网络')) {
+            setError('网络连接失败，请检查网络设置')
+          } else {
+            setError('数据加载失败，正在使用模拟数据显示')
+          }
+        } else {
+          setError('未知错误，正在使用模拟数据显示')
+        }
+        // 不设置 dashboardData 为 null，让 API 客户端的 fallback 数据生效
       } finally {
         setLoading(false)
       }
     }
 
     fetchDashboardData()
-    // 每30秒更新一次数据
-    const interval = setInterval(fetchDashboardData, 30000)
-    
+    // 增加到60秒更新一次数据，减少服务器压力
+    const interval = setInterval(fetchDashboardData, 60000)
+
     return () => clearInterval(interval)
   }, [])
 
@@ -48,19 +59,23 @@ export default function HomePage() {
         <div className="text-center">
           <div className="animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
           <p>加载仪表盘数据...</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            如果加载时间较长，可能是服务器正在处理大量数据
+          </p>
         </div>
       </div>
     )
   }
 
+  // 确保 dashboardData 不为 null
   if (!dashboardData) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <p className="text-red-600">{error || "无法加载数据"}</p>
-          <Button 
-            onClick={() => window.location.reload()} 
+          <Button
+            onClick={() => window.location.reload()}
             className="mt-4"
           >
             重试
@@ -76,7 +91,20 @@ export default function HomePage() {
 
   return (
     <div className="space-y-8">
-        {/* 核心指标卡片 */}
+      {/* 错误提示横幅 */}
+      {error && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 mr-3" />
+            <div>
+              <p className="text-yellow-800 font-medium">数据加载警告</p>
+              <p className="text-yellow-700 text-sm">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 核心指标卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* 账户权益 */}
           <Card>

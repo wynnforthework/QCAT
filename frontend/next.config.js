@@ -15,10 +15,39 @@ const nextConfig = {
     CUSTOM_KEY: 'my-value',
   },
   
-  // 配置重定向
+  // 配置重定向 - 整合重复的策略页面
   async redirects() {
     return [
-      // 可以在这里添加重定向规则
+      // 策略管理页面重定向到统一页面
+      {
+        source: '/strategies',
+        destination: '/strategies-unified?view=management',
+        permanent: true,
+      },
+      // 策略池管理重定向
+      {
+        source: '/strategy-pool',
+        destination: '/strategies-unified?view=pool',
+        permanent: true,
+      },
+      // 策略工作流重定向
+      {
+        source: '/strategy-workflow',
+        destination: '/strategies-unified?view=workflow',
+        permanent: true,
+      },
+      // 双闭环概览重定向
+      {
+        source: '/dual-loop-overview',
+        destination: '/strategies-unified?view=overview',
+        permanent: true,
+      },
+      // 交易执行监控重定向
+      {
+        source: '/trading-execution',
+        destination: '/strategies-unified?view=execution',
+        permanent: true,
+      },
     ]
   },
   

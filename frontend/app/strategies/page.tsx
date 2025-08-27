@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import apiClient, { type Strategy } from "@/lib/api"
+import { StrategiesDeprecationNotice } from "@/components/migration/deprecation-notice"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -124,6 +125,15 @@ export default function StrategiesPage() {
 
   return (
     <div className="space-y-6">
+      {/* 迁移提示 */}
+      <StrategiesDeprecationNotice 
+        autoRedirect={false}
+        onDismiss={() => {
+          // 可以记录用户选择继续使用旧页面
+          console.log('User chose to continue using old page');
+        }}
+      />
+      
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">策略库管理</h1>
         <Button>

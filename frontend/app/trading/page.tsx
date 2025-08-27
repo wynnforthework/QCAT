@@ -11,6 +11,7 @@ import { RefreshCw, TrendingUp, TrendingDown, DollarSign, BarChart3, ChevronLeft
 import apiClient, { PositionItem, TradeHistoryItem, Strategy } from '@/lib/api'
 import TradingChart from '@/components/trading/TradingChart'
 import ProfitAnalysis from '@/components/trading/ProfitAnalysis'
+import { DryRunBanner } from '@/components/ui/dry-run-indicator'
 
 export default function TradingPage() {
   const [positions, setPositions] = useState<PositionItem[]>([])
@@ -153,6 +154,9 @@ export default function TradingPage() {
           刷新数据
         </Button>
       </div>
+
+      {/* Dry-Run 模式横幅 */}
+      <DryRunBanner />
 
       {/* 策略问题警告横幅 */}
       {strategyProblems && strategyProblems.critical_count > 0 && showProblemsAlert && (

@@ -120,9 +120,9 @@ const DualLoopOverviewPage = () => {
       {/* 页面标题 */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">双闭环系统总览</h1>
+          <h1 className="text-3xl font-bold">系统实时监控</h1>
           <p className="text-muted-foreground mt-2">
-            监控交易执行系统和多策略工作流系统的协同运行状态
+            实时监控双闭环系统运行状态、性能指标和协同效果
           </p>
         </div>
         <div className="text-sm text-muted-foreground">

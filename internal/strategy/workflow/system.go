@@ -413,6 +413,11 @@ func (msws *MultiStrategyWorkflowSystem) IsRunning() bool {
 	return msws.isRunning
 }
 
+// GetStrategyPool 获取策略池
+func (msws *MultiStrategyWorkflowSystem) GetStrategyPool() *TradingStrategyPool {
+	return msws.strategyPool
+}
+
 // GetDefaultSystemConfig 获取默认系统配置
 func GetDefaultSystemConfig() *SystemConfig {
 	return &SystemConfig{

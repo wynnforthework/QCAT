@@ -183,9 +183,9 @@ export default function AutomationPage() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">自动化系统总览</h1>
+          <h1 className="text-3xl font-bold">自动化功能管理</h1>
           <p className="text-muted-foreground">
-            监控和管理26项自动化功能的运行状态
+            配置和管理26项自动化功能，优化系统运行效率
           </p>
         </div>
         <div className="flex items-center space-x-2">
