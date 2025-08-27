@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"time"
 )
 
 // AutomationEventHandler 自动化事件处理器基类
@@ -32,7 +31,7 @@ func (aeh *AutomationEventHandler) GetPriority() int {
 // WorkflowCoordinatorHandler 工作流协调器处理器
 type WorkflowCoordinatorHandler struct {
 	*AutomationEventHandler
-	dependencyTracker map[int][]int // 功能ID -> 依赖的功能ID列表
+	dependencyTracker  map[int][]int // 功能ID -> 依赖的功能ID列表
 	completedFunctions map[int]bool  // 已完成的功能
 }
 
@@ -48,7 +47,7 @@ func NewWorkflowCoordinatorHandler() *WorkflowCoordinatorHandler {
 			},
 			priority: 10,
 		},
-		dependencyTracker: make(map[int][]int),
+		dependencyTracker:  make(map[int][]int),
 		completedFunctions: make(map[int]bool),
 	}
 }
@@ -63,7 +62,7 @@ func (wch *WorkflowCoordinatorHandler) Handle(ctx context.Context, event *Event)
 	case EventDependencyMet:
 		return wch.handleDependencyMet(ctx, event)
 	}
-	
+
 	return nil
 }
 
@@ -73,17 +72,17 @@ func (wch *WorkflowCoordinatorHandler) handleFunctionCompleted(ctx context.Conte
 	if !ok {
 		return fmt.Errorf("invalid function_id in event data")
 	}
-	
+
 	wch.completedFunctions[functionID] = true
-	
+
 	log.Printf("功能 %d 执行完成，检查依赖功能", functionID)
-	
+
 	// 检查哪些功能的依赖现在满足了
 	for depFunctionID, dependencies := range wch.dependencyTracker {
 		if wch.completedFunctions[depFunctionID] {
 			continue // 已经完成的功能跳过
 		}
-		
+
 		allDependenciesMet := true
 		for _, depID := range dependencies {
 			if !wch.completedFunctions[depID] {
@@ -91,25 +90,13 @@ func (wch *WorkflowCoordinatorHandler) handleFunctionCompleted(ctx context.Conte
 				break
 			}
 		}
-		
+
 		if allDependenciesMet {
-			// 发送依赖满足事件
-			dependencyEvent := &Event{
-				Type:   EventDependencyMet,
-				Source: "WorkflowCoordinator",
-				Priority: PriorityHigh,
-				Data: map[string]interface{}{
-					"function_id": depFunctionID,
-					"dependencies": dependencies,
-				},
-				CorrelationID: event.CorrelationID,
-			}
-			
 			// 这里应该发布事件，但需要访问事件总线
 			log.Printf("功能 %d 的依赖已满足，可以开始执行", depFunctionID)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -119,9 +106,9 @@ func (wch *WorkflowCoordinatorHandler) handleFunctionFailed(ctx context.Context,
 	if !ok {
 		return fmt.Errorf("invalid function_id in event data")
 	}
-	
+
 	log.Printf("功能 %d 执行失败，检查影响", functionID)
-	
+
 	// 检查哪些功能依赖于失败的功能
 	affectedFunctions := make([]int, 0)
 	for depFunctionID, dependencies := range wch.dependencyTracker {
@@ -132,29 +119,29 @@ func (wch *WorkflowCoordinatorHandler) handleFunctionFailed(ctx context.Context,
 			}
 		}
 	}
-	
+
 	if len(affectedFunctions) > 0 {
 		log.Printf("功能 %d 失败影响了功能: %v", functionID, affectedFunctions)
-		
+
 		// 发送依赖失败事件
 		for _, affectedID := range affectedFunctions {
 			failureEvent := &Event{
-				Type:   EventDependencyFailed,
-				Source: "WorkflowCoordinator",
+				Type:     EventDependencyFailed,
+				Source:   "WorkflowCoordinator",
 				Priority: PriorityCritical,
 				Data: map[string]interface{}{
-					"function_id": affectedID,
+					"function_id":       affectedID,
 					"failed_dependency": functionID,
-					"error": event.Data["error"],
+					"error":             event.Data["error"],
 				},
 				CorrelationID: event.CorrelationID,
 			}
-			
+
 			log.Printf("功能 %d 因依赖 %d 失败而受影响", affectedID, functionID)
 			_ = failureEvent // 这里应该发布事件
 		}
 	}
-	
+
 	return nil
 }
 
@@ -164,19 +151,19 @@ func (wch *WorkflowCoordinatorHandler) handleDependencyMet(ctx context.Context, 
 	if !ok {
 		return fmt.Errorf("invalid function_id in event data")
 	}
-	
+
 	log.Printf("功能 %d 的依赖已满足，准备执行", functionID)
-	
+
 	// 这里可以触发功能执行
 	// 实际实现中应该调用工作流引擎的执行方法
-	
+
 	return nil
 }
 
 // ResourceManagerHandler 资源管理器处理器
 type ResourceManagerHandler struct {
 	*AutomationEventHandler
-	resourceUsage map[string]int // 资源类型 -> 当前使用量
+	resourceUsage  map[string]int // 资源类型 -> 当前使用量
 	resourceLimits map[string]int // 资源类型 -> 限制
 }
 
@@ -216,7 +203,7 @@ func (rmh *ResourceManagerHandler) Handle(ctx context.Context, event *Event) err
 	case EventFunctionCompleted:
 		return rmh.handleFunctionCompleted(ctx, event)
 	}
-	
+
 	return nil
 }
 
@@ -226,29 +213,29 @@ func (rmh *ResourceManagerHandler) handleResourceAcquired(ctx context.Context, e
 	if !ok {
 		return fmt.Errorf("invalid resource_type in event data")
 	}
-	
+
 	rmh.resourceUsage[resourceType]++
-	
-	log.Printf("资源 %s 被获取，当前使用量: %d/%d", 
+
+	log.Printf("资源 %s 被获取，当前使用量: %d/%d",
 		resourceType, rmh.resourceUsage[resourceType], rmh.resourceLimits[resourceType])
-	
+
 	// 检查资源是否接近耗尽
 	if rmh.resourceUsage[resourceType] >= rmh.resourceLimits[resourceType] {
 		exhaustedEvent := &Event{
-			Type:   EventResourceExhausted,
-			Source: "ResourceManager",
+			Type:     EventResourceExhausted,
+			Source:   "ResourceManager",
 			Priority: PriorityHigh,
 			Data: map[string]interface{}{
 				"resource_type": resourceType,
-				"usage": rmh.resourceUsage[resourceType],
-				"limit": rmh.resourceLimits[resourceType],
+				"usage":         rmh.resourceUsage[resourceType],
+				"limit":         rmh.resourceLimits[resourceType],
 			},
 		}
-		
+
 		log.Printf("资源 %s 已耗尽", resourceType)
 		_ = exhaustedEvent // 这里应该发布事件
 	}
-	
+
 	return nil
 }
 
@@ -258,14 +245,14 @@ func (rmh *ResourceManagerHandler) handleResourceReleased(ctx context.Context, e
 	if !ok {
 		return fmt.Errorf("invalid resource_type in event data")
 	}
-	
+
 	if rmh.resourceUsage[resourceType] > 0 {
 		rmh.resourceUsage[resourceType]--
 	}
-	
-	log.Printf("资源 %s 被释放，当前使用量: %d/%d", 
+
+	log.Printf("资源 %s 被释放，当前使用量: %d/%d",
 		resourceType, rmh.resourceUsage[resourceType], rmh.resourceLimits[resourceType])
-	
+
 	return nil
 }
 
@@ -275,22 +262,22 @@ func (rmh *ResourceManagerHandler) handleFunctionStarted(ctx context.Context, ev
 	if !ok {
 		return fmt.Errorf("invalid function_id in event data")
 	}
-	
+
 	// 根据功能ID确定资源类型
 	resourceType := rmh.getResourceTypeForFunction(functionID)
-	
+
 	// 发送资源获取事件
 	acquiredEvent := &Event{
-		Type:   EventResourceAcquired,
-		Source: "ResourceManager",
+		Type:     EventResourceAcquired,
+		Source:   "ResourceManager",
 		Priority: PriorityNormal,
 		Data: map[string]interface{}{
 			"resource_type": resourceType,
-			"function_id": functionID,
+			"function_id":   functionID,
 		},
 		CorrelationID: event.CorrelationID,
 	}
-	
+
 	return rmh.handleResourceAcquired(ctx, acquiredEvent)
 }
 
@@ -300,22 +287,22 @@ func (rmh *ResourceManagerHandler) handleFunctionCompleted(ctx context.Context, 
 	if !ok {
 		return fmt.Errorf("invalid function_id in event data")
 	}
-	
+
 	// 根据功能ID确定资源类型
 	resourceType := rmh.getResourceTypeForFunction(functionID)
-	
+
 	// 发送资源释放事件
 	releasedEvent := &Event{
-		Type:   EventResourceReleased,
-		Source: "ResourceManager",
+		Type:     EventResourceReleased,
+		Source:   "ResourceManager",
 		Priority: PriorityNormal,
 		Data: map[string]interface{}{
 			"resource_type": resourceType,
-			"function_id": functionID,
+			"function_id":   functionID,
 		},
 		CorrelationID: event.CorrelationID,
 	}
-	
+
 	return rmh.handleResourceReleased(ctx, releasedEvent)
 }
 
@@ -380,7 +367,7 @@ func (cdh *ConflictDetectorHandler) Handle(ctx context.Context, event *Event) er
 	case EventFunctionCompleted, EventFunctionFailed:
 		return cdh.handleFunctionEnded(ctx, event)
 	}
-	
+
 	return nil
 }
 
@@ -390,32 +377,32 @@ func (cdh *ConflictDetectorHandler) handleFunctionStarted(ctx context.Context, e
 	if !ok {
 		return fmt.Errorf("invalid function_id in event data")
 	}
-	
+
 	// 检查冲突
 	if conflicts, exists := cdh.conflictRules[functionID]; exists {
 		for _, conflictID := range conflicts {
 			if cdh.activeFunctions[conflictID] {
 				// 发现冲突
 				conflictEvent := &Event{
-					Type:   EventConflictDetected,
-					Source: "ConflictDetector",
+					Type:     EventConflictDetected,
+					Source:   "ConflictDetector",
 					Priority: PriorityCritical,
 					Data: map[string]interface{}{
-						"function_id": functionID,
+						"function_id":   functionID,
 						"conflict_with": conflictID,
-						"message": fmt.Sprintf("功能 %d 与正在运行的功能 %d 冲突", functionID, conflictID),
+						"message":       fmt.Sprintf("功能 %d 与正在运行的功能 %d 冲突", functionID, conflictID),
 					},
 					CorrelationID: event.CorrelationID,
 				}
-				
+
 				log.Printf("检测到冲突: 功能 %d 与功能 %d", functionID, conflictID)
 				_ = conflictEvent // 这里应该发布事件
-				
+
 				return fmt.Errorf("conflict detected between function %d and %d", functionID, conflictID)
 			}
 		}
 	}
-	
+
 	cdh.activeFunctions[functionID] = true
 	return nil
 }
@@ -426,36 +413,36 @@ func (cdh *ConflictDetectorHandler) handleFunctionEnded(ctx context.Context, eve
 	if !ok {
 		return fmt.Errorf("invalid function_id in event data")
 	}
-	
+
 	delete(cdh.activeFunctions, functionID)
-	
+
 	// 检查是否有等待的冲突功能可以开始执行
 	for waitingID, conflicts := range cdh.conflictRules {
 		if cdh.activeFunctions[waitingID] {
 			continue // 已经在运行
 		}
-		
+
 		for _, conflictID := range conflicts {
 			if conflictID == functionID {
 				// 冲突解除
 				resolvedEvent := &Event{
-					Type:   EventConflictResolved,
-					Source: "ConflictDetector",
+					Type:     EventConflictResolved,
+					Source:   "ConflictDetector",
 					Priority: PriorityHigh,
 					Data: map[string]interface{}{
-						"function_id": waitingID,
+						"function_id":       waitingID,
 						"resolved_conflict": functionID,
-						"message": fmt.Sprintf("功能 %d 的冲突已解除，可以开始执行", waitingID),
+						"message":           fmt.Sprintf("功能 %d 的冲突已解除，可以开始执行", waitingID),
 					},
 					CorrelationID: event.CorrelationID,
 				}
-				
+
 				log.Printf("冲突解除: 功能 %d 可以开始执行", waitingID)
 				_ = resolvedEvent // 这里应该发布事件
 				break
 			}
 		}
 	}
-	
+
 	return nil
 }
