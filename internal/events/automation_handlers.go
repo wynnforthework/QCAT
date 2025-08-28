@@ -154,7 +154,7 @@ func (wch *WorkflowCoordinatorHandler) handleDependencyMet(ctx context.Context, 
 
 	log.Printf("功能 %d 的依赖已满足，准备执行", functionID)
 
-	// 这里可以触发功能执行
+	// TODO 触发功能执行
 	// 实际实现中应该调用工作流引擎的执行方法
 
 	return nil

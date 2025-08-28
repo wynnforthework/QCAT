@@ -522,7 +522,7 @@ func (teh *TaskEventHandler) GetPriority() int {
 
 // subscribeToEvents 订阅事件
 func (ts *TaskScheduler) subscribeToEvents() {
-	// 这里可以订阅一些通用事件
+	// TODO 订阅一些通用事件
 	log.Println("事件驱动功能已启用")
 }
 

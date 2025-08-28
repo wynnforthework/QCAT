@@ -273,3 +273,59 @@ type Trade struct {
 	Fee         float64   // 手续费
 	FeeCurrency string    // 手续费币种
 }
+
+// Account represents account information
+type Account struct {
+	Balances  []*AccountBalance // 余额信息
+	UpdatedAt time.Time         // 更新时间
+}
+
+// Ticker represents ticker information
+type Ticker struct {
+	Symbol    string    // 交易对
+	LastPrice float64   // 最新价格
+	BidPrice  float64   // 买一价
+	AskPrice  float64   // 卖一价
+	Volume    float64   // 24小时成交量
+	Change    float64   // 24小时涨跌幅
+	High      float64   // 24小时最高价
+	Low       float64   // 24小时最低价
+	Timestamp time.Time // 时间戳
+}
+
+// OrderBook represents order book
+type OrderBook struct {
+	Symbol    string      // 交易对
+	Bids      []*BookItem // 买单
+	Asks      []*BookItem // 卖单
+	Timestamp time.Time   // 时间戳
+}
+
+// BookItem represents order book item
+type BookItem struct {
+	Price    float64 // 价格
+	Quantity float64 // 数量
+}
+
+// AccountSnapshot represents historical account snapshot
+type AccountSnapshot struct {
+	TotalWalletBalance float64   // 总钱包余额
+	TotalUnrealizedPnL float64   // 总未实现盈亏
+	TotalMarginBalance float64   // 总保证金余额
+	TotalPositionValue float64   // 总持仓价值
+	Timestamp          time.Time // 时间戳
+}
+
+// Stats24Hr represents 24-hour statistics
+type Stats24Hr struct {
+	Symbol      string  // 交易对
+	Volume      float64 // 24小时成交量
+	QuoteVolume float64 // 24小时成交额
+	Count       int64   // 24小时成交笔数
+	Open        float64 // 开盘价
+	High        float64 // 最高价
+	Low         float64 // 最低价
+	Close       float64 // 收盘价
+	Change      float64 // 涨跌幅
+	ChangeRate  float64 // 涨跌幅百分比
+}

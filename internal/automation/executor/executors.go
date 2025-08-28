@@ -359,7 +359,56 @@ func (re *RiskExecutor) reduceLeverage(ctx context.Context, action *ExecutionAct
 
 	log.Printf("Reducing leverage for %s to %.1fx", symbol, targetLeverage)
 
-	// TODO: 实现降杠杆逻辑
+	// 实现降杠杆逻辑
+	if re.exchangeClient == nil {
+		return fmt.Errorf("exchange client not available")
+	}
+
+	// 获取当前仓位
+	positions, err := re.exchangeClient.GetPositions(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get positions: %w", err)
+	}
+
+	for _, pos := range positions {
+		if posMap, ok := pos.(map[string]interface{}); ok {
+			if posSymbol, exists := posMap["symbol"].(string); exists && posSymbol == symbol {
+				currentSize, _ := posMap["size"].(float64)
+				currentLeverage, _ := posMap["leverage"].(float64)
+				
+				if currentLeverage > targetLeverage && currentSize > 0 {
+					// 计算需要减少的仓位大小
+					newSize := currentSize * (targetLeverage / currentLeverage)
+					reduceSize := currentSize - newSize
+					
+					if reduceSize > 0 {
+						// 创建减仓订单
+						order := map[string]interface{}{
+							"symbol":   symbol,
+							"side":     "SELL", // 减多仓
+							"type":     "MARKET",
+							"quantity": reduceSize,
+							"reduceOnly": true,
+						}
+						
+						// 如果是空仓，则买入减仓
+						if side, exists := posMap["side"].(string); exists && side == "SHORT" {
+							order["side"] = "BUY"
+						}
+						
+						_, err := re.exchangeClient.PlaceOrder(ctx, order)
+						if err != nil {
+							return fmt.Errorf("failed to place reduce order: %w", err)
+						}
+						
+						log.Printf("Reduced position size for %s from %.4f to %.4f (leverage: %.1fx -> %.1fx)", 
+							symbol, currentSize, newSize, currentLeverage, targetLeverage)
+					}
+				}
+			}
+		}
+	}
+	
 	return nil
 }
 
@@ -373,7 +422,53 @@ func (re *RiskExecutor) hedgePosition(ctx context.Context, action *ExecutionActi
 
 	log.Printf("Hedging position for %s with ratio: %.2f", symbol, hedgeRatio)
 
-	// TODO: 实现对冲逻辑
+	// 实现对冲逻辑
+	if re.exchangeClient == nil {
+		return fmt.Errorf("exchange client not available")
+	}
+
+	// 获取当前仓位
+	positions, err := re.exchangeClient.GetPositions(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get positions: %w", err)
+	}
+
+	for _, pos := range positions {
+		if posMap, ok := pos.(map[string]interface{}); ok {
+			if posSymbol, exists := posMap["symbol"].(string); exists && posSymbol == symbol {
+				currentSize, _ := posMap["size"].(float64)
+				side, _ := posMap["side"].(string)
+				
+				if currentSize > 0 {
+					// 计算对冲仓位大小
+					hedgeSize := currentSize * hedgeRatio
+					
+					// 确定对冲方向（与原仓位相反）
+					hedgeSide := "SELL"
+					if side == "SHORT" {
+						hedgeSide = "BUY"
+					}
+					
+					// 创建对冲订单
+					hedgeOrder := map[string]interface{}{
+						"symbol":   symbol,
+						"side":     hedgeSide,
+						"type":     "MARKET",
+						"quantity": hedgeSize,
+					}
+					
+					_, err := re.exchangeClient.PlaceOrder(ctx, hedgeOrder)
+					if err != nil {
+						return fmt.Errorf("failed to place hedge order: %w", err)
+					}
+					
+					log.Printf("Placed hedge order for %s: %s %.4f (ratio: %.2f)", 
+						symbol, hedgeSide, hedgeSize, hedgeRatio)
+				}
+			}
+		}
+	}
+	
 	return nil
 }
 
@@ -381,10 +476,58 @@ func (re *RiskExecutor) hedgePosition(ctx context.Context, action *ExecutionActi
 func (re *RiskExecutor) circuitBreaker(ctx context.Context, action *ExecutionAction) error {
 	log.Printf("Triggering circuit breaker")
 
-	// TODO: 实现熔断器逻辑
+	// 实现熔断器逻辑
 	// 1. 暂停交易
+	re.mu.Lock()
+	re.emergencyMode = true
+	re.mu.Unlock()
+	
+	log.Printf("Emergency mode activated - all trading suspended")
+	
 	// 2. 评估风险
+	if re.exchangeClient != nil {
+		positions, err := re.exchangeClient.GetPositions(ctx)
+		if err != nil {
+			log.Printf("Failed to get positions during circuit breaker: %v", err)
+		} else {
+			totalExposure := 0.0
+			for _, pos := range positions {
+				if posMap, ok := pos.(map[string]interface{}); ok {
+					if size, exists := posMap["size"].(float64); exists {
+						if price, exists := posMap["markPrice"].(float64); exists {
+							totalExposure += size * price
+						}
+					}
+				}
+			}
+			log.Printf("Total position exposure during circuit breaker: $%.2f", totalExposure)
+		}
+	}
+	
 	// 3. 决定后续动作
+	threshold, ok := action.Parameters["emergency_threshold"].(float64)
+	if !ok {
+		threshold = 0.15 // 默认15%损失阈值
+	}
+	
+	// 如果损失超过阈值，触发紧急平仓
+	if drawdown, exists := action.Parameters["current_drawdown"].(float64); exists {
+		if drawdown > threshold {
+			log.Printf("Drawdown %.2f%% exceeds threshold %.2f%%, triggering emergency close", 
+				drawdown*100, threshold*100)
+			
+			// 创建紧急平仓动作
+			emergencyAction := &ExecutionAction{
+				Type:   "close_all_positions",
+				Symbol: "ALL",
+				Parameters: map[string]interface{}{
+					"reason": "circuit_breaker_triggered",
+				},
+			}
+			
+			return re.closeAllPositions(ctx, emergencyAction)
+		}
+	}
 
 	return nil
 }
@@ -646,7 +789,7 @@ func (oe *OrderExecutor) placeOrder(ctx context.Context, action *ExecutionAction
 		log.Printf("Warning: Failed to check account balance: %v", err)
 		// 继续执行，让交易所来验证余额
 	} else {
-		// 简单的余额检查（这里可以添加更复杂的逻辑）
+		// 简单的余额检查（TODO 添加更复杂的逻辑）
 		if len(balances) == 0 {
 			log.Printf("Warning: No account balance information available")
 		}
@@ -690,7 +833,17 @@ func (oe *OrderExecutor) cancelOrder(ctx context.Context, action *ExecutionActio
 
 	log.Printf("Cancelling order: %s", orderID)
 
-	// TODO: 实现撤单逻辑
+	// 实现撤单逻辑
+	if oe.exchangeClient == nil {
+		return fmt.Errorf("exchange client not available")
+	}
+
+	err := oe.exchangeClient.CancelOrder(ctx, orderID)
+	if err != nil {
+		return fmt.Errorf("failed to cancel order %s: %w", orderID, err)
+	}
+
+	log.Printf("Successfully cancelled order: %s", orderID)
 	return nil
 }
 
@@ -703,7 +856,60 @@ func (oe *OrderExecutor) modifyOrder(ctx context.Context, action *ExecutionActio
 
 	log.Printf("Modifying order: %s", orderID)
 
-	// TODO: 实现修改订单逻辑
+	// 实现修改订单逻辑
+	if oe.exchangeClient == nil {
+		return fmt.Errorf("exchange client not available")
+	}
+
+	// 获取修改参数
+	newPrice, hasPriceUpdate := action.Parameters["new_price"].(float64)
+	newQuantity, hasQuantityUpdate := action.Parameters["new_quantity"].(float64)
+	
+	if !hasPriceUpdate && !hasQuantityUpdate {
+		return fmt.Errorf("no modification parameters provided")
+	}
+
+	// 先获取原订单信息
+	orderStatus, err := oe.exchangeClient.GetOrderStatus(ctx, orderID)
+	if err != nil {
+		return fmt.Errorf("failed to get order status: %w", err)
+	}
+
+	// 取消原订单
+	err = oe.exchangeClient.CancelOrder(ctx, orderID)
+	if err != nil {
+		return fmt.Errorf("failed to cancel original order: %w", err)
+	}
+
+	// 创建新订单（基于原订单信息）
+	if orderMap, ok := orderStatus.(map[string]interface{}); ok {
+		newOrder := make(map[string]interface{})
+		
+		// 复制原订单信息
+		for k, v := range orderMap {
+			newOrder[k] = v
+		}
+		
+		// 应用修改
+		if hasPriceUpdate {
+			newOrder["price"] = newPrice
+		}
+		if hasQuantityUpdate {
+			newOrder["quantity"] = newQuantity
+		}
+		
+		// 移除订单ID（新订单）
+		delete(newOrder, "orderId")
+		delete(newOrder, "clientOrderId")
+		
+		newOrderID, err := oe.exchangeClient.PlaceOrder(ctx, newOrder)
+		if err != nil {
+			return fmt.Errorf("failed to place modified order: %w", err)
+		}
+		
+		log.Printf("Successfully modified order %s -> %s", orderID, newOrderID)
+	}
+
 	return nil
 }
 
@@ -773,7 +979,62 @@ func (oe *OrderExecutor) placeTakeProfit(ctx context.Context, action *ExecutionA
 
 	log.Printf("Placing take profit for %s at price: %.4f", symbol, profitPrice)
 
-	// TODO: 实现止盈逻辑
+	// 实现止盈逻辑
+	if oe.exchangeClient == nil {
+		return fmt.Errorf("exchange client not available")
+	}
+
+	// 1. 获取当前仓位信息
+	positions, err := oe.exchangeClient.GetPositions(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get positions: %w", err)
+	}
+
+	var targetPosition map[string]interface{}
+	for _, pos := range positions {
+		if posMap, ok := pos.(map[string]interface{}); ok {
+			if posSymbol, exists := posMap["symbol"].(string); exists && posSymbol == symbol {
+				targetPosition = posMap
+				break
+			}
+		}
+	}
+
+	if targetPosition == nil {
+		return fmt.Errorf("no position found for symbol %s", symbol)
+	}
+
+	// 2. 获取仓位信息
+	positionSize, _ := targetPosition["size"].(float64)
+	positionSide, _ := targetPosition["side"].(string)
+
+	if positionSize == 0 {
+		return fmt.Errorf("no position to set take profit for %s", symbol)
+	}
+
+	// 3. 确定止盈订单方向（与仓位相反）
+	orderSide := "SELL"
+	if positionSide == "SHORT" {
+		orderSide = "BUY"
+	}
+
+	// 4. 创建止盈订单
+	takeProfitOrder := map[string]interface{}{
+		"symbol":      symbol,
+		"side":        orderSide,
+		"type":        "TAKE_PROFIT_MARKET",
+		"quantity":    positionSize,
+		"stopPrice":   profitPrice,
+		"reduceOnly":  true,
+		"timeInForce": "GTC",
+	}
+
+	orderID, err := oe.exchangeClient.PlaceOrder(ctx, takeProfitOrder)
+	if err != nil {
+		return fmt.Errorf("failed to place take profit order: %w", err)
+	}
+
+	log.Printf("Take profit order placed for %s: OrderID %s, Price: %.4f", symbol, orderID, profitPrice)
 	return nil
 }
 

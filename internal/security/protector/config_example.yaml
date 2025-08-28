@@ -1,0 +1,186 @@
+# Fund Protector Configuration Example
+# 资金保护系统配置示例
+
+fund_protector:
+  # 基础配置
+  enabled: true
+  check_interval: 5m              # 检查间隔
+  profit_threshold: 0.10          # 10% 利润转移阈值
+  transfer_ratio: 0.30            # 30% 转移比例
+  max_daily_loss: 0.05            # 5% 最大日亏损
+  data_collection_interval: 1h    # 数据收集间隔
+
+  # 熔断器配置
+  circuit_breaker:
+    enabled: true
+    cooldown_period: 30m          # 30分钟冷却期
+    max_daily_loss: 0.05          # 5% 触发阈值
+
+  # 风险计算配置
+  risk_calculation:
+    var_confidence: 0.95          # VaR置信度
+    historical_days: 90           # 历史数据天数
+    min_data_points: 30           # 最少数据点
+    volatility_model: "ewma"      # 波动率模型: simple, ewma, garch
+
+  # 自动转账配置
+  auto_transfer:
+    enabled: true
+    cold_wallet_address: "${COLD_WALLET_ADDRESS}"
+    min_transfer_amount: 100.0
+    max_transfer_amount: 100000.0
+    daily_limit: 500000.0
+    rate_limit_per_hour: 10
+
+  # 紧急联系人配置
+  emergency_contacts:
+    - name: "Risk Manager"
+      role: "ADMIN"
+      email: "${RISK_MANAGER_EMAIL}"
+      phone: "${RISK_MANAGER_PHONE}"
+      priority: 1
+      is_available: true
+      channels: ["EMAIL", "SMS", "SLACK"]
+    
+    - name: "Trading Desk"
+      role: "TRADER"
+      email: "${TRADING_DESK_EMAIL}"
+      phone: "${TRADING_DESK_PHONE}"
+      priority: 2
+      is_available: true
+      channels: ["EMAIL", "WEBHOOK"]
+    
+    - name: "Fund Manager"
+      role: "OWNER"
+      email: "${FUND_MANAGER_EMAIL}"
+      phone: "${FUND_MANAGER_PHONE}"
+      priority: 1
+      is_available: true
+      channels: ["EMAIL", "SMS", "SLACK", "WEBHOOK"]
+
+# 通知系统配置
+notifications:
+  # 邮件配置
+  email:
+    enabled: true
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    username: "${SMTP_USERNAME}"
+    password: "${SMTP_PASSWORD}"
+    from: "${SMTP_FROM_ADDRESS}"
+    use_tls: true
+
+  # 短信配置
+  sms:
+    enabled: true
+    provider: "twilio"            # twilio, aws_sns
+    api_key: "${TWILIO_API_KEY}"
+    api_secret: "${TWILIO_API_SECRET}"
+    from: "${TWILIO_PHONE_NUMBER}"
+
+  # Webhook配置
+  webhook:
+    enabled: true
+    url: "${WEBHOOK_URL}"
+    timeout: 10s
+    headers:
+      Authorization: "Bearer ${WEBHOOK_TOKEN}"
+      Content-Type: "application/json"
+
+  # Slack配置
+  slack:
+    enabled: true
+    webhook_url: "${SLACK_WEBHOOK_URL}"
+    channel: "#fund-alerts"
+    username: "Fund Protector Bot"
+
+# 钱包配置
+wallet:
+  # 区块链提供者
+  provider: "ethereum"            # ethereum, bitcoin, binance_smart_chain
+  network_url: "${ETH_NETWORK_URL}"
+  
+  # 钱包地址
+  hot_wallet_address: "${HOT_WALLET_ADDRESS}"
+  cold_wallet_address: "${COLD_WALLET_ADDRESS}"
+  
+  # 安全配置
+  min_confirmations: 6
+  max_gas_price: 100.0           # Gwei
+  transfer_timeout: 5m
+  
+  # 多重签名配置
+  enable_multi_sig: true
+  multi_sig_threshold: 2         # 需要2个签名
+
+# 交易所配置
+exchange:
+  # 数据提供者配置
+  retry_attempts: 3
+  retry_delay: 1s
+  request_timeout: 30s
+  cache_ttl: 30s
+  
+  # 速率限制
+  rate_limit_window: 1m
+  rate_limit_requests: 60
+
+# 数据库配置
+database:
+  # 数据保留策略
+  retention_days: 365            # 保留1年数据
+  cleanup_interval: 24h          # 每天清理一次
+  
+  # 性能配置
+  connection_pool_size: 10
+  query_timeout: 30s
+
+# 监控配置
+monitoring:
+  # 指标收集
+  metrics_interval: 30s
+  health_check_interval: 5m
+  
+  # 告警配置
+  alert_cooldown: 5m             # 告警冷却期
+  max_alerts_per_hour: 20        # 每小时最大告警数
+
+# 日志配置
+logging:
+  level: "info"                  # debug, info, warn, error
+  format: "json"                 # json, text
+  audit_enabled: true            # 启用审计日志
+  
+# 环境变量说明
+# 以下环境变量需要在部署时设置：
+#
+# 交易所API密钥:
+# - BINANCE_API_KEY
+# - BINANCE_SECRET_KEY
+# - OKX_API_KEY
+# - OKX_SECRET_KEY
+#
+# 通知服务:
+# - SMTP_USERNAME
+# - SMTP_PASSWORD
+# - SMTP_FROM_ADDRESS
+# - TWILIO_API_KEY
+# - TWILIO_API_SECRET
+# - TWILIO_PHONE_NUMBER
+# - SLACK_WEBHOOK_URL
+# - WEBHOOK_URL
+# - WEBHOOK_TOKEN
+#
+# 钱包配置:
+# - HOT_WALLET_ADDRESS
+# - COLD_WALLET_ADDRESS
+# - ETH_NETWORK_URL
+# - WALLET_PRIVATE_KEY (加密存储)
+#
+# 联系人信息:
+# - RISK_MANAGER_EMAIL
+# - RISK_MANAGER_PHONE
+# - TRADING_DESK_EMAIL
+# - TRADING_DESK_PHONE
+# - FUND_MANAGER_EMAIL
+# - FUND_MANAGER_PHONE

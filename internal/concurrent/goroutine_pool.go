@@ -274,7 +274,7 @@ func (w *Worker) executeTask(task Task) {
 // resultCollector 结果收集器
 func (gp *GoroutinePool) resultCollector() {
 	for result := range gp.resultChan {
-		// 这里可以添加结果处理逻辑
+		// TODO 添加结果处理逻辑
 		// 比如记录到数据库、发送通知等
 		log.Printf("收集到任务结果: %s (成功: %t, 耗时: %v)",
 			result.TaskID, result.Success, result.Duration)

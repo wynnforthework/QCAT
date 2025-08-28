@@ -528,7 +528,7 @@ func (s *CacheOptimizationStrategy) OptimizeCache(ctx context.Context) error {
 	// 自动清理过期统计
 	if metrics.Gets+metrics.Sets+metrics.Deletes > 1000000 {
 		s.logger.Info("Clearing cache statistics due to high operation count")
-		// 这里可以添加清理逻辑
+		// TODO 添加清理逻辑
 	}
 	
 	s.logger.Info("Cache optimization completed")

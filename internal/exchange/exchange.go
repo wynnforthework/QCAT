@@ -66,6 +66,21 @@ type Exchange interface {
 
 	// GetSymbolPrice returns the current price for a symbol
 	GetSymbolPrice(ctx context.Context, symbol string) (float64, error)
+
+	// GetAccount returns account information
+	GetAccount(ctx context.Context) (*Account, error)
+
+	// GetTicker returns ticker information for a symbol
+	GetTicker(ctx context.Context, symbol string) (*Ticker, error)
+
+	// GetOrderBook returns order book for a symbol
+	GetOrderBook(ctx context.Context, symbol string, limit int) (*OrderBook, error)
+
+	// GetAccountSnapshots returns historical account snapshots
+	GetAccountSnapshots(ctx context.Context, days int) ([]*AccountSnapshot, error)
+
+	// Get24HrStats returns 24-hour statistics for a symbol
+	Get24HrStats(ctx context.Context, symbol string) (*Stats24Hr, error)
 }
 
 // BaseExchange provides common functionality for exchanges

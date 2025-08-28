@@ -1037,7 +1037,7 @@ func (irc *IntelligentRiskController) generateRiskReport() error {
 
 	log.Println(report)
 
-	// 这里可以将报告保存到数据库或发送给相关人员
+	// TODO 将报告保存到数据库或发送给相关人员
 	return nil
 }
 

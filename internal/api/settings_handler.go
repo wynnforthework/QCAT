@@ -122,7 +122,7 @@ func (h *SettingsHandler) UpdateSettings(w http.ResponseWriter, r *http.Request)
 
 // applyDryRunSettings 应用 Dry-Run 设置到交易系统
 func (h *SettingsHandler) applyDryRunSettings(dryRunMode bool) error {
-	// 这里可以集成到实际的交易系统中
+	// TODO 集成到实际的交易系统中
 	// 例如更新 PnL 服务的 DryRun 配置
 	log.Printf("Applying dry-run mode: %v", dryRunMode)
 	

@@ -153,7 +153,7 @@ func NewLoadTestRunner(config *LoadTestConfig, suite *TestSuite) *LoadTestRunner
 func (ltr *LoadTestRunner) RunLoadTest(testFunc func() error) *LoadTestResult {
 	ltr.Results.StartTime = time.Now()
 	
-	// 这里可以实现负载测试逻辑
+	// TODO 实现负载测试逻辑
 	// 简化实现，实际项目中可以使用更复杂的负载测试框架
 	
 	for i := 0; i < ltr.Config.Concurrency; i++ {

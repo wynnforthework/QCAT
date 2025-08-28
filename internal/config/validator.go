@@ -446,13 +446,102 @@ func (v *Validator) validateStrategy() error {
 
 // validateOptimizer 验证优化器配置
 func (v *Validator) validateOptimizer() error {
-	// TODO: Implement optimizer validation based on actual OptimizerConfig structure
+	if v.config.Optimizer == nil {
+		return fmt.Errorf("优化器配置不能为空")
+	}
+
+	if !v.config.Optimizer.Enabled {
+		return nil // 如果未启用，跳过验证
+	}
+
+	if v.config.Optimizer.Timeout <= 0 {
+		return fmt.Errorf("优化器超时时间必须大于0")
+	}
+
+	if v.config.Optimizer.MaxIterations <= 0 {
+		return fmt.Errorf("优化器最大迭代次数必须大于0")
+	}
+
+	if v.config.Optimizer.Concurrency <= 0 {
+		return fmt.Errorf("优化器并发数必须大于0")
+	}
+
+	// 验证算法列表
+	if len(v.config.Optimizer.Algorithms) == 0 {
+		return fmt.Errorf("优化器算法列表不能为空")
+	}
+
+	validAlgorithms := map[string]bool{
+		"walk_forward": true,
+		"grid_search":  true,
+		"bayesian":     true,
+		"genetic":      true,
+		"particle_swarm": true,
+	}
+
+	for _, algo := range v.config.Optimizer.Algorithms {
+		if !validAlgorithms[algo] {
+			return fmt.Errorf("不支持的优化算法: %s", algo)
+		}
+	}
+
+	// 验证默认算法
+	if v.config.Optimizer.DefaultAlgorithm != "" {
+		if !validAlgorithms[v.config.Optimizer.DefaultAlgorithm] {
+			return fmt.Errorf("不支持的默认优化算法: %s", v.config.Optimizer.DefaultAlgorithm)
+		}
+	}
+
 	return nil
 }
 
 // validateMarketData 验证市场数据配置
 func (v *Validator) validateMarketData() error {
-	// TODO: Implement market data validation based on actual MarketDataConfig structure
+	if v.config.MarketData == nil {
+		return fmt.Errorf("市场数据配置不能为空")
+	}
+
+	if !v.config.MarketData.Enabled {
+		return nil // 如果未启用，跳过验证
+	}
+
+	if v.config.MarketData.CacheTTL <= 0 {
+		return fmt.Errorf("市场数据缓存TTL必须大于0")
+	}
+
+	if v.config.MarketData.BatchSize <= 0 {
+		return fmt.Errorf("市场数据批处理大小必须大于0")
+	}
+
+	if v.config.MarketData.UpdateInterval <= 0 {
+		return fmt.Errorf("市场数据更新间隔必须大于0")
+	}
+
+	// 验证交易对列表
+	if len(v.config.MarketData.Symbols) == 0 {
+		return fmt.Errorf("市场数据交易对列表不能为空")
+	}
+
+	// 验证数据类型
+	if len(v.config.MarketData.DataTypes) == 0 {
+		return fmt.Errorf("市场数据类型列表不能为空")
+	}
+
+	validDataTypes := map[string]bool{
+		"klines":       true,
+		"trades":       true,
+		"orderbook":    true,
+		"funding_rate": true,
+		"open_interest": true,
+		"ticker":       true,
+	}
+
+	for _, dataType := range v.config.MarketData.DataTypes {
+		if !validDataTypes[dataType] {
+			return fmt.Errorf("不支持的市场数据类型: %s", dataType)
+		}
+	}
+
 	return nil
 }
 

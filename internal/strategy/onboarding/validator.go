@@ -332,7 +332,7 @@ func (r *PerformanceRule) Name() string {
 }
 
 func (r *PerformanceRule) Validate(ctx context.Context, req *OnboardingRequest) *ValidationError {
-	// 这里可以添加性能相关的验证
+	// TODO 添加性能相关的验证
 	// 例如：检查策略的预期性能指标
 	
 	// 模拟性能检查

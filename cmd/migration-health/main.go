@@ -74,7 +74,7 @@ func main() {
 		AutoRecovery:   true,
 		NotificationFunc: func(message string) {
 			log.Printf("📧 ALERT: %s", message)
-			// 这里可以集成邮件、Slack等通知
+			// TODO 集成邮件、Slack等通知
 		},
 	}
 

@@ -825,7 +825,7 @@ func (ss *StrategyScheduler) createDefaultOptimizationResult(taskID string) *Opt
 // getDefaultStrategyParameters 获取策略默认参数
 func (ss *StrategyScheduler) getDefaultStrategyParameters(taskID string) map[string]interface{} {
 	// 从策略配置或模板中获取默认参数
-	// 这里可以根据策略类型返回不同的默认参数
+	// TODO 根据策略类型返回不同的默认参数
 	return map[string]interface{}{
 		"fast_period":   12,
 		"slow_period":   26,

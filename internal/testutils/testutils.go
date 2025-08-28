@@ -118,7 +118,7 @@ func (s *TestSuite) TearDown() {
 
 // setupRealDB 设置真实数据库
 func (s *TestSuite) setupRealDB() {
-	// 这里可以连接到测试数据库
+	// TODO 连接到测试数据库
 	// 暂时使用内存数据库
 	s.setupMockDB()
 }
@@ -139,7 +139,7 @@ func (s *TestSuite) setupMockDB() {
 
 // setupRealCache 设置真实缓存
 func (s *TestSuite) setupRealCache() {
-	// 这里可以连接到测试Redis
+	// TODO 连接到测试Redis
 	// 暂时使用内存缓存
 	s.setupMockCache()
 }
@@ -552,7 +552,7 @@ func RandomPort() int {
 
 // IsPortAvailable 检查端口是否可用
 func IsPortAvailable(port int) bool {
-	// 这里可以实现端口检查逻辑
+	// TODO 实现端口检查逻辑
 	// 简单起见，直接返回true
 	return true
 }

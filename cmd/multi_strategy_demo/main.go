@@ -163,7 +163,7 @@ func printStrategyStatus(system *workflow.MultiStrategyWorkflowSystem) {
 	fmt.Println("策略状态概览")
 	fmt.Println("-"*50)
 	
-	// 这里可以添加更详细的策略状态信息
+	// TODO 添加更详细的策略状态信息
 	// 由于我们的系统设计，需要通过多策略管理器获取详细信息
 	
 	stats := system.GetSystemStats()

@@ -361,7 +361,7 @@ func (rf *RedisFallback) switchToRedis() {
 func (rf *RedisFallback) modeSwitchListener() {
 	for mode := range rf.fallbackChan {
 		log.Printf("Cache mode switched to: %s", mode)
-		// 这里可以添加模式切换的通知逻辑
+		// TODO 添加模式切换的通知逻辑
 	}
 }
 

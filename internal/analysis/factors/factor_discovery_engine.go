@@ -479,7 +479,33 @@ func NewFactorDiscoveryEngine(cfg *config.Config) (*FactorDiscoveryEngine, error
 
 	// 从配置文件读取参数
 	if cfg != nil {
-		// TODO: 从配置文件读取因子发现参数
+		// 从自动化配置读取学习参数
+		if cfg.Automation != nil && cfg.Automation.Learning != nil {
+			if cfg.Automation.Learning.Enabled {
+				fde.enabled = cfg.Automation.Learning.Enabled
+			}
+			if cfg.Automation.Learning.AutoMLEnabled {
+				fde.autoMLEnabled = cfg.Automation.Learning.AutoMLEnabled
+			}
+			if cfg.Automation.Learning.GeneticAlgorithmEnabled {
+				fde.geneticAlgorithmEnabled = cfg.Automation.Learning.GeneticAlgorithmEnabled
+			}
+		}
+		
+		// 从优化器配置读取参数
+		if cfg.Optimizer != nil {
+			if cfg.Optimizer.MaxIterations > 0 {
+				fde.maxIterations = cfg.Optimizer.MaxIterations
+			}
+			if cfg.Optimizer.Concurrency > 0 {
+				fde.maxConcurrentJobs = cfg.Optimizer.Concurrency
+			}
+		}
+		
+		// 从市场数据配置读取符号列表
+		if cfg.MarketData != nil && len(cfg.MarketData.Symbols) > 0 {
+			fde.symbols = cfg.MarketData.Symbols
+		}
 	}
 
 	// 初始化基础因子

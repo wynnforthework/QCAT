@@ -679,7 +679,7 @@ func (estf *EnhancedStressTestFramework) updateMonitoringStats() {
 
 	// 获取性能监控数据
 	if estf.performanceMonitor != nil {
-		// 这里可以获取CPU使用率等指标，暂时跳过
+		// TODO 获取CPU使用率等指标，暂时跳过
 		// cpuMetric := estf.performanceMonitor.GetMetric("cpu_usage")
 		// if cpuMetric != nil && cpuMetric.Current > estf.peakCPUUsage {
 		//     estf.peakCPUUsage = cpuMetric.Current

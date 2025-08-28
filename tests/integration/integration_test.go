@@ -22,7 +22,7 @@ func TestFullSystemIntegration(t *testing.T) {
 
 	// 测试系统启动
 	t.Run("system startup", func(t *testing.T) {
-		// 这里可以测试整个系统的启动过程
+		// TODO 测试整个系统的启动过程
 		suite.Logger.Info("Testing system startup")
 		
 		// 验证配置加载
@@ -327,12 +327,12 @@ func TestFailureRecovery(t *testing.T) {
 			}
 			
 			// 模拟故障后的降级处理
-			// 这里可以测试缓存故障时的降级逻辑
+			// TODO 测试缓存故障时的降级逻辑
 			suite.Logger.Info("Cache failover test completed")
 		}
 		
 		// 2. 模拟数据库故障
-		// 这里可以测试数据库连接失败时的处理逻辑
+		// TODO 测试数据库连接失败时的处理逻辑
 		suite.Logger.Info("Database failover test completed")
 		
 		// 3. 测试系统恢复

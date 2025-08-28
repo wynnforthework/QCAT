@@ -1992,14 +1992,45 @@ func NewAuditHandler(db *database.DB, metrics *monitor.MetricsCollector) *AuditH
 	}
 }
 
+// hasAuditPermission checks if user has permission to view audit logs
+func (h *AuditHandler) hasAuditPermission(userID string) bool {
+	// 查询数据库检查用户权限
+	ctx := context.Background()
+	
+	var hasPermission bool
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM user_permissions up
+			JOIN permissions p ON up.permission_id = p.id
+			WHERE up.user_id = $1 AND p.name = 'audit_logs_view'
+		)`
+	
+	err := h.db.QueryRowContext(ctx, query, userID).Scan(&hasPermission)
+	if err != nil {
+		log.Printf("Error checking audit permission for user %s: %v", userID, err)
+		return false
+	}
+	
+	return hasPermission
+}
+
 // GetLogs returns audit logs
 func (h *AuditHandler) GetLogs(c *gin.Context) {
 	// 实现获取审计日志逻辑
 	ctx := c.Request.Context()
 
-	// TODO: Remove this temporary bypass for testing
-	// This is a temporary fix to test the audit logs API without authentication
-	// In production, proper authentication should be enforced
+	// 验证用户权限
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+	
+	// 检查用户是否有审计日志查看权限
+	if !h.hasAuditPermission(userID.(string)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to view audit logs"})
+		return
+	}
 
 	// 获取查询参数
 	startDate := c.Query("start_date")
@@ -2778,8 +2809,8 @@ func (h *DashboardHandler) getAccountData() map[string]interface{} {
 		"equity":      totalEquity,
 		"pnl":         totalUnrealizedPnL,
 		"pnlPercent":  pnlPercent,
-		"drawdown":    0.0, // TODO: 从历史数据计算
-		"maxDrawdown": 0.0, // TODO: 从历史数据计算
+		"drawdown":    h.calculateCurrentDrawdown(),
+		"maxDrawdown": h.calculateMaxDrawdown()
 	}
 }
 

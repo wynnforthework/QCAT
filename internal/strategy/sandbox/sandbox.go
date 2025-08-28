@@ -242,15 +242,15 @@ func (s *Sandbox) handleError(ctx context.Context, err error) {
 	case strings.Contains(err.Error(), "connection"):
 		// 新增：连接错误，尝试重连
 		log.Printf("Connection error detected, attempting to reconnect...")
-		// 新增：这里可以实现重连逻辑
+		// 新增：TODO 实现重连逻辑
 	case strings.Contains(err.Error(), "rate limit"):
 		// 新增：速率限制错误，等待后重试
 		log.Printf("Rate limit error detected, waiting before retry...")
-		// 新增：这里可以实现等待和重试逻辑
+		// 新增：TODO 实现等待和重试逻辑
 	case strings.Contains(err.Error(), "insufficient balance"):
 		// 新增：余额不足错误，停止交易
 		log.Printf("Insufficient balance error detected, stopping trading...")
-		// 新增：这里可以实现停止交易逻辑
+		// 新增：TODO 实现停止交易逻辑
 	default:
 		// 新增：其他错误，记录并继续
 		log.Printf("Unknown error type: %v", err)

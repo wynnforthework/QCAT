@@ -310,7 +310,7 @@ func (cp *ConnectionPool) checkHealth() {
 
 		if consecutiveFailures >= 5 {
 			log.Printf("Too many consecutive failures (%d), considering pool restart", consecutiveFailures)
-			// 这里可以添加重启连接池的逻辑
+			// TODO 添加重启连接池的逻辑
 		}
 	}
 }

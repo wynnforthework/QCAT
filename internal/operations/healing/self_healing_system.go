@@ -2008,7 +2008,7 @@ func (shs *SelfHealingSystem) GetRecoveryHistory(limit int) []RecoveryAction {
 // getMetricValue 从监控系统获取指标值
 func (shs *SelfHealingSystem) getMetricValue(metricName string) (float64, error) {
 	// TODO: 实现从实际监控系统获取指标
-	// 这里可以集成Prometheus、InfluxDB等监控系统
+	// TODO 集成Prometheus、InfluxDB等监控系统
 
 	switch metricName {
 	case "response_time":

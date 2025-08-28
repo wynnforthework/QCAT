@@ -3672,7 +3672,7 @@ func (ps *PositionScheduler) recordHedgeEffectivenessMetrics(ctx context.Context
 func (ps *PositionScheduler) scheduleHedgeAdjustment(ctx context.Context, operation *HedgeOperation) {
 	log.Printf("Scheduling hedge adjustment for operation %s", operation.ID)
 
-	// 这里可以实现对冲调整的调度逻辑
+	// TODO 实现对冲调整的调度逻辑
 	// 例如：重新计算对冲比率、调整仓位等
 	// 目前只记录日志
 }
@@ -3974,19 +3974,19 @@ func (rs *RiskScheduler) detectMarketAnomalies(ctx context.Context) ([]*MarketAn
 // triggerMarginAlert 触发保证金告警
 func (rs *RiskScheduler) triggerMarginAlert(ctx context.Context, risk *MarginRisk) {
 	log.Printf("MARGIN ALERT: %s - %s", risk.Level, risk.Message)
-	// 这里可以集成实际的告警系统
+	// TODO 集成实际的告警系统
 }
 
 // triggerPositionAlert 触发仓位告警
 func (rs *RiskScheduler) triggerPositionAlert(ctx context.Context, risk *PositionRisk) {
 	log.Printf("POSITION ALERT: %s - %s risk score: %.4f", risk.Symbol, risk.RiskLevel, risk.RiskScore)
-	// 这里可以集成实际的告警系统
+	// TODO 集成实际的告警系统
 }
 
 // triggerAnomalyAlert 触发异常告警
 func (rs *RiskScheduler) triggerAnomalyAlert(ctx context.Context, anomaly *MarketAnomaly) {
 	log.Printf("MARKET ANOMALY ALERT: %s - %s - %s", anomaly.Symbol, anomaly.Type, anomaly.Description)
-	// 这里可以集成实际的告警系统
+	// TODO 集成实际的告警系统
 }
 
 // executeRiskControlMeasures 执行风险控制措施

@@ -682,7 +682,30 @@ func NewAutoBacktestingEngine(cfg *config.Config) (*AutoBacktestingEngine, error
 
 	// 从配置文件读取参数
 	if cfg != nil {
-		// TODO: 从配置文件读取回测参数
+		if cfg.Strategy != nil && cfg.Strategy.Backtest != nil {
+			if cfg.Strategy.Backtest.Enabled {
+				abe.enabled = cfg.Strategy.Backtest.Enabled
+			}
+			if cfg.Strategy.Backtest.Timeout > 0 {
+				abe.backtestTimeout = cfg.Strategy.Backtest.Timeout
+			}
+			if cfg.Strategy.Backtest.MaxConcurrency > 0 {
+				abe.maxConcurrentJobs = cfg.Strategy.Backtest.MaxConcurrency
+			}
+			if cfg.Strategy.Backtest.DataRetentionDays > 0 {
+				abe.dataRetentionDays = cfg.Strategy.Backtest.DataRetentionDays
+			}
+		}
+		
+		// 从优化器配置读取参数
+		if cfg.Optimizer != nil {
+			if cfg.Optimizer.MaxIterations > 0 {
+				abe.maxIterations = cfg.Optimizer.MaxIterations
+			}
+			if cfg.Optimizer.Timeout > 0 && abe.backtestTimeout == 0 {
+				abe.backtestTimeout = cfg.Optimizer.Timeout
+			}
+		}
 	}
 
 	return abe, nil
@@ -726,7 +749,30 @@ func NewAutoBacktestingEngineWithKline(cfg *config.Config, klineManager *kline.M
 
 	// 从配置文件读取参数
 	if cfg != nil {
-		// TODO: 从配置文件读取回测参数
+		if cfg.Strategy != nil && cfg.Strategy.Backtest != nil {
+			if cfg.Strategy.Backtest.Enabled {
+				abe.enabled = cfg.Strategy.Backtest.Enabled
+			}
+			if cfg.Strategy.Backtest.Timeout > 0 {
+				abe.backtestTimeout = cfg.Strategy.Backtest.Timeout
+			}
+			if cfg.Strategy.Backtest.MaxConcurrency > 0 {
+				abe.maxConcurrentJobs = cfg.Strategy.Backtest.MaxConcurrency
+			}
+			if cfg.Strategy.Backtest.DataRetentionDays > 0 {
+				abe.dataRetentionDays = cfg.Strategy.Backtest.DataRetentionDays
+			}
+		}
+		
+		// 从优化器配置读取参数
+		if cfg.Optimizer != nil {
+			if cfg.Optimizer.MaxIterations > 0 {
+				abe.maxIterations = cfg.Optimizer.MaxIterations
+			}
+			if cfg.Optimizer.Timeout > 0 && abe.backtestTimeout == 0 {
+				abe.backtestTimeout = cfg.Optimizer.Timeout
+			}
+		}
 	}
 
 	return abe, nil
