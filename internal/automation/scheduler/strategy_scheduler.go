@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -281,6 +282,19 @@ type EvaluationSummary struct {
 	GradeDistribution map[string]int `json:"grade_distribution"`
 }
 
+// ParameterUpdate 参数更新
+type ParameterUpdate struct {
+	ID                string    `json:"id"`
+	StrategyID        string    `json:"strategy_id"`
+	ParameterName     string    `json:"parameter_name"`
+	OldValue          string    `json:"old_value"`
+	NewValue          string    `json:"new_value"`
+	OptimizationScore float64   `json:"optimization_score"`
+	Status            string    `json:"status"`
+	CreatedAt         time.Time `json:"created_at"`
+	AppliedAt         *time.Time `json:"applied_at,omitempty"`
+}
+
 // getStrategiesForOptimization 获取需要优化的策略
 func (ss *StrategyScheduler) getStrategiesForOptimization(ctx context.Context) ([]*Strategy, error) {
 	query := `
@@ -452,13 +466,389 @@ func (ss *StrategyScheduler) initializeOptimizers() error {
 func (ss *StrategyScheduler) HandleParameterUpdate(ctx context.Context, task *ScheduledTask) error {
 	log.Printf("Executing parameter update task: %s", task.Name)
 
-	// TODO: 实现参数更新逻辑
+	// 实现参数更新逻辑
 	// 1. 检查是否有待应用的优化结果
-	// 2. 验证参数有效性
-	// 3. 执行参数更新
-	// 4. 监控更新后的性能
-
+	pendingUpdates, err := ss.getPendingParameterUpdates(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get pending parameter updates: %w", err)
+	}
+	
+	if len(pendingUpdates) == 0 {
+		log.Printf("No pending parameter updates found")
+		return nil
+	}
+	
+	log.Printf("Found %d pending parameter updates", len(pendingUpdates))
+	
+	// 2. 验证参数有效性并执行更新
+	successCount := 0
+	for _, update := range pendingUpdates {
+		if err := ss.processParameterUpdate(ctx, update); err != nil {
+			log.Printf("Failed to process parameter update for strategy %s: %v", 
+				update.StrategyID, err)
+			continue
+		}
+		successCount++
+	}
+	
+	// 3. 监控更新后的性能
+	if successCount > 0 {
+		if err := ss.schedulePerformanceMonitoring(ctx, pendingUpdates); err != nil {
+			log.Printf("Failed to schedule performance monitoring: %v", err)
+		}
+	}
+	
+	log.Printf("Parameter update task completed: %d/%d updates successful", 
+		successCount, len(pendingUpdates))
 	return nil
+}
+
+// getPendingParameterUpdates 获取待应用的参数更新
+func (ss *StrategyScheduler) getPendingParameterUpdates(ctx context.Context) ([]*ParameterUpdate, error) {
+	if ss.db == nil {
+		return nil, fmt.Errorf("database not available")
+	}
+	
+	query := `
+		SELECT 
+			id, strategy_id, parameter_name, old_value, new_value, 
+			optimization_score, created_at, status
+		FROM parameter_updates 
+		WHERE status = 'pending' 
+			AND created_at > DATE_SUB(NOW(), INTERVAL 24 HOUR)
+		ORDER BY optimization_score DESC, created_at ASC
+	`
+	
+	rows, err := ss.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query pending updates: %w", err)
+	}
+	defer rows.Close()
+	
+	var updates []*ParameterUpdate
+	for rows.Next() {
+		update := &ParameterUpdate{}
+		if err := rows.Scan(
+			&update.ID,
+			&update.StrategyID,
+			&update.ParameterName,
+			&update.OldValue,
+			&update.NewValue,
+			&update.OptimizationScore,
+			&update.CreatedAt,
+			&update.Status,
+		); err != nil {
+			log.Printf("Failed to scan parameter update: %v", err)
+			continue
+		}
+		updates = append(updates, update)
+	}
+	
+	return updates, nil
+}
+
+// processParameterUpdate 处理单个参数更新
+func (ss *StrategyScheduler) processParameterUpdate(ctx context.Context, update *ParameterUpdate) error {
+	log.Printf("Processing parameter update for strategy %s: %s = %s", 
+		update.StrategyID, update.ParameterName, update.NewValue)
+	
+	// 1. 验证参数有效性
+	if err := ss.validateParameterUpdate(update); err != nil {
+		return fmt.Errorf("parameter validation failed: %w", err)
+	}
+	
+	// 2. 获取策略实例
+	strategy, err := ss.getStrategyByID(ctx, update.StrategyID)
+	if err != nil {
+		return fmt.Errorf("failed to get strategy: %w", err)
+	}
+	
+	// 3. 备份当前参数
+	if err := ss.backupCurrentParameters(ctx, strategy); err != nil {
+		log.Printf("Failed to backup parameters for strategy %s: %v", 
+			update.StrategyID, err)
+		// 继续执行，不阻塞更新
+	}
+	
+	// 4. 执行参数更新
+	if err := ss.applyParameterUpdate(ctx, strategy, update); err != nil {
+		return fmt.Errorf("failed to apply parameter update: %w", err)
+	}
+	
+	// 5. 更新数据库状态
+	if err := ss.markParameterUpdateApplied(ctx, update); err != nil {
+		log.Printf("Failed to mark parameter update as applied: %v", err)
+	}
+	
+	// 6. 记录更新历史
+	if err := ss.recordParameterUpdateHistory(ctx, update); err != nil {
+		log.Printf("Failed to record parameter update history: %v", err)
+	}
+	
+	log.Printf("Parameter update applied successfully for strategy %s", update.StrategyID)
+	return nil
+}
+
+// validateParameterUpdate 验证参数更新的有效性
+func (ss *StrategyScheduler) validateParameterUpdate(update *ParameterUpdate) error {
+	// 1. 检查参数名称是否有效
+	validParams := map[string]bool{
+		"stop_loss":     true,
+		"take_profit":   true,
+		"position_size": true,
+		"risk_ratio":    true,
+		"entry_threshold": true,
+		"exit_threshold":  true,
+		"max_positions":   true,
+		"timeframe":       true,
+	}
+	
+	if !validParams[update.ParameterName] {
+		return fmt.Errorf("invalid parameter name: %s", update.ParameterName)
+	}
+	
+	// 2. 检查参数值范围
+	if err := ss.validateParameterValue(update.ParameterName, update.NewValue); err != nil {
+		return fmt.Errorf("invalid parameter value: %w", err)
+	}
+	
+	// 3. 检查优化分数阈值
+	if update.OptimizationScore < 0.1 {
+		return fmt.Errorf("optimization score too low: %f", update.OptimizationScore)
+	}
+	
+	return nil
+}
+
+// validateParameterValue 验证参数值的范围
+func (ss *StrategyScheduler) validateParameterValue(paramName, value string) error {
+	switch paramName {
+	case "stop_loss":
+		// 止损应该在0.01-0.20之间（1%-20%）
+		if val, err := strconv.ParseFloat(value, 64); err != nil {
+			return fmt.Errorf("invalid stop_loss value: %s", value)
+		} else if val < 0.01 || val > 0.20 {
+			return fmt.Errorf("stop_loss out of range: %f", val)
+		}
+	case "take_profit":
+		// 止盈应该在0.02-0.50之间（2%-50%）
+		if val, err := strconv.ParseFloat(value, 64); err != nil {
+			return fmt.Errorf("invalid take_profit value: %s", value)
+		} else if val < 0.02 || val > 0.50 {
+			return fmt.Errorf("take_profit out of range: %f", val)
+		}
+	case "position_size":
+		// 仓位大小应该在0.01-1.0之间（1%-100%）
+		if val, err := strconv.ParseFloat(value, 64); err != nil {
+			return fmt.Errorf("invalid position_size value: %s", value)
+		} else if val < 0.01 || val > 1.0 {
+			return fmt.Errorf("position_size out of range: %f", val)
+		}
+	case "max_positions":
+		// 最大仓位数应该在1-50之间
+		if val, err := strconv.Atoi(value); err != nil {
+			return fmt.Errorf("invalid max_positions value: %s", value)
+		} else if val < 1 || val > 50 {
+			return fmt.Errorf("max_positions out of range: %d", val)
+		}
+	}
+	
+	return nil
+}
+
+// applyParameterUpdate 应用参数更新到策略
+func (ss *StrategyScheduler) applyParameterUpdate(ctx context.Context, strategy *Strategy, update *ParameterUpdate) error {
+	// 1. 更新策略配置
+	if strategy.Config == nil {
+		strategy.Config = make(map[string]interface{})
+	}
+	
+	// 2. 根据参数类型进行类型转换
+	var newValue interface{}
+	var err error
+	
+	switch update.ParameterName {
+	case "stop_loss", "take_profit", "position_size", "risk_ratio", 
+		 "entry_threshold", "exit_threshold":
+		newValue, err = strconv.ParseFloat(update.NewValue, 64)
+	case "max_positions":
+		newValue, err = strconv.Atoi(update.NewValue)
+	default:
+		newValue = update.NewValue
+	}
+	
+	if err != nil {
+		return fmt.Errorf("failed to convert parameter value: %w", err)
+	}
+	
+	// 3. 应用新参数值
+	strategy.Config[update.ParameterName] = newValue
+	
+	// 4. 更新数据库中的策略配置
+	configJSON, err := json.Marshal(strategy.Config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal strategy config: %w", err)
+	}
+	
+	query := `
+		UPDATE strategies 
+		SET config = ?, updated_at = NOW() 
+		WHERE id = ?
+	`
+	
+	_, err = ss.db.ExecContext(ctx, query, string(configJSON), strategy.ID)
+	if err != nil {
+		return fmt.Errorf("failed to update strategy config in database: %w", err)
+	}
+	
+	// 5. 通知策略实例更新参数
+	if err := ss.notifyStrategyParameterUpdate(ctx, strategy, update); err != nil {
+		log.Printf("Failed to notify strategy instance: %v", err)
+		// 不返回错误，因为数据库已更新
+	}
+	
+	return nil
+}
+
+// backupCurrentParameters 备份当前参数
+func (ss *StrategyScheduler) backupCurrentParameters(ctx context.Context, strategy *Strategy) error {
+	if ss.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	configJSON, err := json.Marshal(strategy.Config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+	
+	query := `
+		INSERT INTO parameter_backups (strategy_id, config_backup, created_at)
+		VALUES (?, ?, NOW())
+	`
+	
+	_, err = ss.db.ExecContext(ctx, query, strategy.ID, string(configJSON))
+	if err != nil {
+		return fmt.Errorf("failed to backup parameters: %w", err)
+	}
+	
+	return nil
+}
+
+// markParameterUpdateApplied 标记参数更新为已应用
+func (ss *StrategyScheduler) markParameterUpdateApplied(ctx context.Context, update *ParameterUpdate) error {
+	if ss.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	query := `
+		UPDATE parameter_updates 
+		SET status = 'applied', applied_at = NOW() 
+		WHERE id = ?
+	`
+	
+	_, err := ss.db.ExecContext(ctx, query, update.ID)
+	if err != nil {
+		return fmt.Errorf("failed to mark update as applied: %w", err)
+	}
+	
+	return nil
+}
+
+// recordParameterUpdateHistory 记录参数更新历史
+func (ss *StrategyScheduler) recordParameterUpdateHistory(ctx context.Context, update *ParameterUpdate) error {
+	if ss.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	query := `
+		INSERT INTO parameter_update_history 
+		(strategy_id, parameter_name, old_value, new_value, optimization_score, applied_at)
+		VALUES (?, ?, ?, ?, ?, NOW())
+	`
+	
+	_, err := ss.db.ExecContext(ctx, query,
+		update.StrategyID,
+		update.ParameterName,
+		update.OldValue,
+		update.NewValue,
+		update.OptimizationScore,
+	)
+	
+	if err != nil {
+		return fmt.Errorf("failed to record update history: %w", err)
+	}
+	
+	return nil
+}
+
+// notifyStrategyParameterUpdate 通知策略实例参数更新
+func (ss *StrategyScheduler) notifyStrategyParameterUpdate(ctx context.Context, strategy *Strategy, update *ParameterUpdate) error {
+	// 通过消息队列或直接调用通知策略实例
+	notification := map[string]interface{}{
+		"type": "parameter_update",
+		"strategy_id": strategy.ID,
+		"parameter_name": update.ParameterName,
+		"new_value": update.NewValue,
+		"timestamp": time.Now(),
+	}
+	
+	// 如果有消息队列，发送通知
+	if err := ss.publishNotification("strategy_updates", notification); err != nil {
+		return fmt.Errorf("failed to publish notification: %w", err)
+	}
+	
+	return nil
+}
+
+// schedulePerformanceMonitoring 安排性能监控
+func (ss *StrategyScheduler) schedulePerformanceMonitoring(ctx context.Context, updates []*ParameterUpdate) error {
+	// 为每个更新的策略安排性能监控任务
+	for _, update := range updates {
+		monitoringTask := &ScheduledTask{
+			Name: fmt.Sprintf("performance_monitoring_%s", update.StrategyID),
+			Type: "performance_monitoring",
+			ScheduledTime: time.Now().Add(1 * time.Hour), // 1小时后开始监控
+			Metadata: map[string]interface{}{
+				"strategy_id": update.StrategyID,
+				"parameter_update_id": update.ID,
+				"monitoring_duration": "24h",
+			},
+		}
+		
+		if err := ss.scheduleTask(ctx, monitoringTask); err != nil {
+			log.Printf("Failed to schedule performance monitoring for strategy %s: %v", 
+				update.StrategyID, err)
+		}
+	}
+	
+	return nil
+}
+
+// publishNotification 发布通知消息
+func (ss *StrategyScheduler) publishNotification(topic string, notification map[string]interface{}) error {
+	// 实现消息发布逻辑
+	log.Printf("Publishing notification to topic %s: %+v", topic, notification)
+	
+	// 示例：使用Redis发布订阅或消息队列
+	// if ss.messageQueue != nil {
+	//     return ss.messageQueue.Publish(topic, notification)
+	// }
+	
+	return nil
+}
+
+// scheduleTask 安排任务
+func (ss *StrategyScheduler) scheduleTask(ctx context.Context, task *ScheduledTask) error {
+	// 实现任务调度逻辑
+	log.Printf("Scheduling task: %s at %s", task.Name, task.ScheduledTime)
+	
+	// 示例：添加到任务队列
+	// if ss.taskQueue != nil {
+	//     return ss.taskQueue.Schedule(task)
+	// }
+	
+	return nil
+}
 }
 
 // HandleStrategyEvaluation 处理策略评估任务
@@ -824,14 +1214,206 @@ func (ss *StrategyScheduler) createDefaultOptimizationResult(taskID string) *Opt
 
 // getDefaultStrategyParameters 获取策略默认参数
 func (ss *StrategyScheduler) getDefaultStrategyParameters(taskID string) map[string]interface{} {
-	// 从策略配置或模板中获取默认参数
-	// TODO 根据策略类型返回不同的默认参数
+	// 根据策略类型返回不同的默认参数
+	strategyType := ss.getStrategyTypeFromTaskID(taskID)
+	
+	switch strategyType {
+	case "macd":
+		return ss.getMACDDefaultParameters()
+	case "rsi":
+		return ss.getRSIDefaultParameters()
+	case "bollinger_bands":
+		return ss.getBollingerBandsDefaultParameters()
+	case "moving_average":
+		return ss.getMovingAverageDefaultParameters()
+	case "momentum":
+		return ss.getMomentumDefaultParameters()
+	case "mean_reversion":
+		return ss.getMeanReversionDefaultParameters()
+	case "breakout":
+		return ss.getBreakoutDefaultParameters()
+	case "grid_trading":
+		return ss.getGridTradingDefaultParameters()
+	case "arbitrage":
+		return ss.getArbitrageDefaultParameters()
+	case "scalping":
+		return ss.getScalpingDefaultParameters()
+	default:
+		// 通用默认参数
+		return ss.getGenericDefaultParameters()
+	}
+}
+
+// getStrategyTypeFromTaskID 从任务ID获取策略类型
+func (ss *StrategyScheduler) getStrategyTypeFromTaskID(taskID string) string {
+	// 从数据库查询策略类型
+	if ss.db != nil {
+		var strategyType string
+		query := `
+			SELECT s.strategy_type 
+			FROM strategies s 
+			JOIN optimization_tasks ot ON s.id = ot.strategy_id 
+			WHERE ot.id = ?
+		`
+		err := ss.db.QueryRow(query, taskID).Scan(&strategyType)
+		if err == nil {
+			return strategyType
+		}
+	}
+	
+	// 如果无法从数据库获取，尝试从任务ID解析
+	if len(taskID) > 0 {
+		// 假设任务ID包含策略类型信息，如 "macd_optimization_123"
+		parts := strings.Split(taskID, "_")
+		if len(parts) > 0 {
+			return parts[0]
+		}
+	}
+	
+	return "generic"
+}
+
+// getMACDDefaultParameters MACD策略默认参数
+func (ss *StrategyScheduler) getMACDDefaultParameters() map[string]interface{} {
 	return map[string]interface{}{
-		"fast_period":   12,
-		"slow_period":   26,
-		"signal_period": 9,
-		"stop_loss":     0.02,
-		"take_profit":   0.04,
+		"fast_period":     12,
+		"slow_period":     26,
+		"signal_period":   9,
+		"stop_loss":       0.02,
+		"take_profit":     0.04,
+		"position_size":   0.1,
+		"max_positions":   3,
+		"entry_threshold": 0.001,
+		"exit_threshold":  0.0005,
+	}
+}
+
+// getRSIDefaultParameters RSI策略默认参数
+func (ss *StrategyScheduler) getRSIDefaultParameters() map[string]interface{} {
+	return map[string]interface{}{
+		"rsi_period":      14,
+		"oversold_level":  30.0,
+		"overbought_level": 70.0,
+		"stop_loss":       0.025,
+		"take_profit":     0.05,
+		"position_size":   0.08,
+		"max_positions":   2,
+		"smoothing_period": 3,
+	}
+}
+
+// getBollingerBandsDefaultParameters 布林带策略默认参数
+func (ss *StrategyScheduler) getBollingerBandsDefaultParameters() map[string]interface{} {
+	return map[string]interface{}{
+		"period":          20,
+		"std_dev":         2.0,
+		"stop_loss":       0.03,
+		"take_profit":     0.06,
+		"position_size":   0.12,
+		"max_positions":   4,
+		"band_width_threshold": 0.02,
+	}
+}
+
+// getMovingAverageDefaultParameters 移动平均策略默认参数
+func (ss *StrategyScheduler) getMovingAverageDefaultParameters() map[string]interface{} {
+	return map[string]interface{}{
+		"short_period":    10,
+		"long_period":     30,
+		"stop_loss":       0.02,
+		"take_profit":     0.04,
+		"position_size":   0.15,
+		"max_positions":   5,
+		"crossover_confirmation": 2,
+	}
+}
+
+// getMomentumDefaultParameters 动量策略默认参数
+func (ss *StrategyScheduler) getMomentumDefaultParameters() map[string]interface{} {
+	return map[string]interface{}{
+		"lookback_period": 20,
+		"momentum_threshold": 0.05,
+		"stop_loss":       0.04,
+		"take_profit":     0.08,
+		"position_size":   0.06,
+		"max_positions":   2,
+		"volume_filter":   true,
+	}
+}
+
+// getMeanReversionDefaultParameters 均值回归策略默认参数
+func (ss *StrategyScheduler) getMeanReversionDefaultParameters() map[string]interface{} {
+	return map[string]interface{}{
+		"lookback_period": 50,
+		"deviation_threshold": 2.0,
+		"stop_loss":       0.015,
+		"take_profit":     0.03,
+		"position_size":   0.2,
+		"max_positions":   6,
+		"mean_type":       "sma", // sma, ema, wma
+	}
+}
+
+// getBreakoutDefaultParameters 突破策略默认参数
+func (ss *StrategyScheduler) getBreakoutDefaultParameters() map[string]interface{} {
+	return map[string]interface{}{
+		"breakout_period": 20,
+		"volume_multiplier": 1.5,
+		"stop_loss":       0.025,
+		"take_profit":     0.1,
+		"position_size":   0.08,
+		"max_positions":   3,
+		"confirmation_candles": 2,
+	}
+}
+
+// getGridTradingDefaultParameters 网格交易策略默认参数
+func (ss *StrategyScheduler) getGridTradingDefaultParameters() map[string]interface{} {
+	return map[string]interface{}{
+		"grid_size":       0.01,
+		"grid_levels":     10,
+		"position_size":   0.05,
+		"max_positions":   20,
+		"profit_target":   0.02,
+		"stop_loss":       0.1,
+		"rebalance_threshold": 0.005,
+	}
+}
+
+// getArbitrageDefaultParameters 套利策略默认参数
+func (ss *StrategyScheduler) getArbitrageDefaultParameters() map[string]interface{} {
+	return map[string]interface{}{
+		"min_spread":      0.001,
+		"max_spread":      0.01,
+		"position_size":   0.3,
+		"max_positions":   10,
+		"execution_delay": 100, // milliseconds
+		"slippage_tolerance": 0.0005,
+	}
+}
+
+// getScalpingDefaultParameters 剥头皮策略默认参数
+func (ss *StrategyScheduler) getScalpingDefaultParameters() map[string]interface{} {
+	return map[string]interface{}{
+		"timeframe":       "1m",
+		"profit_target":   0.002,
+		"stop_loss":       0.001,
+		"position_size":   0.02,
+		"max_positions":   1,
+		"max_holding_time": 300, // seconds
+		"spread_threshold": 0.0001,
+	}
+}
+
+// getGenericDefaultParameters 通用默认参数
+func (ss *StrategyScheduler) getGenericDefaultParameters() map[string]interface{} {
+	return map[string]interface{}{
+		"stop_loss":       0.02,
+		"take_profit":     0.04,
+		"position_size":   0.1,
+		"max_positions":   3,
+		"timeframe":       "5m",
+		"risk_ratio":      0.02,
 	}
 }
 

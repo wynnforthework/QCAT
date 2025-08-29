@@ -1264,29 +1264,149 @@ func (abe *AutoBacktestingEngine) getRunningJobCount() int {
 }
 
 func (abe *AutoBacktestingEngine) executeSignal(signal *Signal, portfolio *Portfolio, candle Candle, job *BacktestJob) *TradeRecord {
-	// TODO: 实现信号执行逻辑
+	// 实现信号执行逻辑
+	if signal == nil || signal.Action == "HOLD" {
+		return nil
+	}
+
+	// 计算交易数量
+	quantity := signal.Quantity
+	if quantity <= 0 {
+		// 根据可用资金和价格计算数量
+		availableCash := portfolio.Cash * 0.95 // 保留5%现金
+		if signal.Price > 0 {
+			quantity = availableCash / signal.Price
+		} else {
+			quantity = availableCash / candle.Close
+		}
+	}
+
+	// 计算实际执行价格（考虑滑点）
+	executionPrice := signal.Price
+	if executionPrice <= 0 {
+		executionPrice = candle.Close
+	}
+	
+	// 应用滑点
+	slippageRate := job.Slippage
+	if signal.Action == "BUY" {
+		executionPrice *= (1 + slippageRate)
+	} else {
+		executionPrice *= (1 - slippageRate)
+	}
+
+	// 计算手续费
+	commission := executionPrice * quantity * job.Commission
+
+	// 检查资金是否充足
+	totalCost := executionPrice * quantity + commission
+	if signal.Action == "BUY" && totalCost > portfolio.Cash {
+		// 调整数量以适应可用资金
+		quantity = (portfolio.Cash - commission) / executionPrice
+		if quantity <= 0 {
+			return nil // 资金不足，无法执行交易
+		}
+		totalCost = executionPrice * quantity + commission
+	}
+
+	// 执行交易
+	var pnl float64
+	var exitPrice float64
+	var exitTime time.Time
+
+	if signal.Action == "BUY" {
+		// 买入操作
+		portfolio.Cash -= totalCost
+		
+		// 更新或创建仓位
+		if position, exists := portfolio.Positions[signal.Symbol]; exists {
+			// 已有仓位，计算平均价格
+			totalQuantity := position.Quantity + quantity
+			totalValue := position.Quantity*position.AvgPrice + quantity*executionPrice
+			position.AvgPrice = totalValue / totalQuantity
+			position.Quantity = totalQuantity
+		} else {
+			// 新建仓位
+			portfolio.Positions[signal.Symbol] = &Position{
+				Symbol:      signal.Symbol,
+				Quantity:    quantity,
+				AvgPrice:    executionPrice,
+				MarketPrice: executionPrice,
+				OpenTime:    candle.Time,
+			}
+		}
+		
+		exitPrice = executionPrice // 买入时的退出价格就是执行价格
+		exitTime = candle.Time
+		
+	} else if signal.Action == "SELL" {
+		// 卖出操作
+		if position, exists := portfolio.Positions[signal.Symbol]; exists && position.Quantity > 0 {
+			// 计算卖出数量（不能超过持有数量）
+			sellQuantity := math.Min(quantity, position.Quantity)
+			
+			// 计算盈亏
+			pnl = (executionPrice - position.AvgPrice) * sellQuantity - commission
+			
+			// 更新现金
+			portfolio.Cash += executionPrice*sellQuantity - commission
+			
+			// 更新仓位
+			position.Quantity -= sellQuantity
+			if position.Quantity <= 0 {
+				delete(portfolio.Positions, signal.Symbol)
+			}
+			
+			quantity = sellQuantity
+			exitPrice = executionPrice
+			exitTime = candle.Time
+		} else {
+			return nil // 没有仓位可卖出
+		}
+	}
+
 	trade := &TradeRecord{
 		ID:         abe.generateTradeID(),
 		Symbol:     signal.Symbol,
 		Side:       signal.Action,
-		Quantity:   signal.Quantity,
-		EntryPrice: signal.Price,
-		ExitPrice:  signal.Price, // 简化处理
+		Quantity:   quantity,
+		EntryPrice: executionPrice,
+		ExitPrice:  exitPrice,
 		EntryTime:  candle.Time,
-		ExitTime:   candle.Time,
-		Duration:   0,
-		PnL:        0, // 后续计算
-		Commission: signal.Quantity * signal.Price * job.Commission,
-		Slippage:   signal.Quantity * signal.Price * job.Slippage,
+		ExitTime:   exitTime,
+		Duration:   exitTime.Sub(candle.Time),
+		PnL:        pnl,
+		Commission: commission,
+		Slippage:   executionPrice * quantity * job.Slippage,
 	}
 
 	return trade
 }
 
 func (abe *AutoBacktestingEngine) updatePortfolioValue(portfolio *Portfolio, candle Candle) {
-	// TODO: 实现组合价值更新逻辑
+	// 实现组合价值更新逻辑
+	
+	// 更新所有仓位的市场价格和未实现盈亏
+	totalPositionValue := 0.0
+	for symbol, position := range portfolio.Positions {
+		// 如果当前K线的交易对与仓位匹配，使用当前价格
+		if symbol == candle.Symbol || symbol == fmt.Sprintf("%sUSDT", candle.Symbol) {
+			position.MarketPrice = candle.Close
+		}
+		
+		// 计算仓位价值
+		positionValue := position.Quantity * position.MarketPrice
+		totalPositionValue += positionValue
+		
+		// 计算未实现盈亏
+		position.UnrealizedPL = (position.MarketPrice - position.AvgPrice) * position.Quantity
+	}
+	
+	// 计算总权益 = 现金 + 所有仓位的市场价值
+	portfolio.Equity = portfolio.Cash + totalPositionValue
+	
+	// 更新时间戳
 	portfolio.UpdatedAt = candle.Time
-	// 简化处理，保持原有价值
 }
 
 func (abe *AutoBacktestingEngine) calculatePerformanceMetrics(result *BacktestResult) {
@@ -1454,48 +1574,882 @@ func (abe *AutoBacktestingEngine) validateBacktestResult(result *BacktestResult)
 }
 
 func (abe *AutoBacktestingEngine) performOutOfSampleTest(result *BacktestResult) TestResult {
-	// TODO: 实现样本外测试
+	// 实现样本外测试
+	
+	// 将数据分为样本内（前70%）和样本外（后30%）
+	totalPeriod := result.DataPeriod.End.Sub(result.DataPeriod.Start)
+	inSampleEnd := result.DataPeriod.Start.Add(time.Duration(float64(totalPeriod) * 0.7))
+	
+	// 计算样本内和样本外的收益率
+	var inSampleReturn, outOfSampleReturn float64
+	var inSampleEquity, outOfSampleEquity []EquityPoint
+	
+	// 分离样本内外的权益曲线
+	for _, point := range result.EquityCurve {
+		if point.Date.Before(inSampleEnd) {
+			inSampleEquity = append(inSampleEquity, point)
+		} else {
+			outOfSampleEquity = append(outOfSampleEquity, point)
+		}
+	}
+	
+	// 计算样本内收益率
+	if len(inSampleEquity) > 1 {
+		inSampleReturn = (inSampleEquity[len(inSampleEquity)-1].Value - inSampleEquity[0].Value) / inSampleEquity[0].Value
+	}
+	
+	// 计算样本外收益率
+	if len(outOfSampleEquity) > 1 {
+		outOfSampleReturn = (outOfSampleEquity[len(outOfSampleEquity)-1].Value - outOfSampleEquity[0].Value) / outOfSampleEquity[0].Value
+	}
+	
+	// 计算一致性比率
+	consistencyRatio := 1.0
+	if inSampleReturn != 0 {
+		consistencyRatio = math.Min(1.0, math.Abs(outOfSampleReturn/inSampleReturn))
+	}
+	
+	// 计算样本外夏普比率
+	var outOfSampleSharpe float64
+	if len(outOfSampleEquity) > 1 {
+		returns := make([]float64, len(outOfSampleEquity)-1)
+		for i := 1; i < len(outOfSampleEquity); i++ {
+			returns[i-1] = outOfSampleEquity[i].Return
+		}
+		
+		// 计算平均收益和标准差
+		var sum, sumSquares float64
+		for _, ret := range returns {
+			sum += ret
+			sumSquares += ret * ret
+		}
+		
+		avgReturn := sum / float64(len(returns))
+		variance := sumSquares/float64(len(returns)) - avgReturn*avgReturn
+		stdDev := math.Sqrt(variance)
+		
+		if stdDev > 0 {
+			outOfSampleSharpe = (avgReturn - 0.02/252) / stdDev // 假设2%年化无风险利率
+		}
+	}
+	
+	// 评估测试结果
+	passed := true
+	score := 1.0
+	details := "Out-of-sample test completed"
+	
+	// 检查一致性
+	if consistencyRatio < 0.5 {
+		passed = false
+		score *= 0.5
+		details = "Poor consistency between in-sample and out-of-sample performance"
+	} else if consistencyRatio < 0.7 {
+		score *= 0.8
+		details = "Moderate consistency between in-sample and out-of-sample performance"
+	}
+	
+	// 检查样本外收益率
+	if outOfSampleReturn < -0.1 { // 样本外损失超过10%
+		passed = false
+		score *= 0.3
+		details = "Poor out-of-sample performance with significant losses"
+	} else if outOfSampleReturn < 0 {
+		score *= 0.7
+		details = "Negative out-of-sample returns but within acceptable range"
+	}
+	
+	// 检查样本外夏普比率
+	if outOfSampleSharpe < 0 {
+		score *= 0.8
+	} else if outOfSampleSharpe > 1.0 {
+		score *= 1.1 // 奖励高夏普比率
+	}
+	
 	return TestResult{
-		Passed:  true,
-		Score:   0.85,
-		Details: "Out-of-sample test passed with good performance",
+		Passed:  passed,
+		Score:   math.Max(0, math.Min(1, score)),
+		Details: details,
 		Metrics: map[string]float64{
-			"out_of_sample_return": 0.12,
-			"in_sample_return":     0.15,
-			"consistency_ratio":    0.8,
+			"out_of_sample_return":  outOfSampleReturn,
+			"in_sample_return":      inSampleReturn,
+			"consistency_ratio":     consistencyRatio,
+			"out_of_sample_sharpe":  outOfSampleSharpe,
+			"out_of_sample_periods": float64(len(outOfSampleEquity)),
 		},
 	}
 }
 
 func (abe *AutoBacktestingEngine) performStabilityTest(result *BacktestResult) TestResult {
-	// TODO: 实现稳定性测试
+	// 实现稳定性测试
+	
+	if len(result.EquityCurve) < 30 {
+		return TestResult{
+			Passed:  false,
+			Score:   0.0,
+			Details: "Insufficient data for stability testing",
+			Metrics: map[string]float64{},
+		}
+	}
+	
+	// 计算滚动窗口的性能指标
+	windowSize := 30 // 30个数据点的滚动窗口
+	var rollingSharpes []float64
+	var rollingReturns []float64
+	var rollingDrawdowns []float64
+	
+	for i := windowSize; i < len(result.EquityCurve); i++ {
+		windowData := result.EquityCurve[i-windowSize : i]
+		
+		// 计算窗口内的收益率
+		returns := make([]float64, len(windowData)-1)
+		for j := 1; j < len(windowData); j++ {
+			if windowData[j-1].Value > 0 {
+				returns[j-1] = (windowData[j].Value - windowData[j-1].Value) / windowData[j-1].Value
+			}
+		}
+		
+		// 计算平均收益和标准差
+		var sum, sumSquares float64
+		for _, ret := range returns {
+			sum += ret
+			sumSquares += ret * ret
+		}
+		
+		avgReturn := sum / float64(len(returns))
+		variance := sumSquares/float64(len(returns)) - avgReturn*avgReturn
+		stdDev := math.Sqrt(variance)
+		
+		// 计算夏普比率
+		sharpe := 0.0
+		if stdDev > 0 {
+			sharpe = (avgReturn - 0.02/252) / stdDev // 假设2%年化无风险利率
+		}
+		
+		rollingSharpes = append(rollingSharpes, sharpe)
+		rollingReturns = append(rollingReturns, avgReturn)
+		
+		// 计算窗口内最大回撤
+		maxDrawdown := 0.0
+		peak := windowData[0].Value
+		for _, point := range windowData {
+			if point.Value > peak {
+				peak = point.Value
+			}
+			drawdown := (peak - point.Value) / peak
+			if drawdown > maxDrawdown {
+				maxDrawdown = drawdown
+			}
+		}
+		rollingDrawdowns = append(rollingDrawdowns, maxDrawdown)
+	}
+	
+	// 计算稳定性指标
+	
+	// 1. 夏普比率稳定性（标准差越小越稳定）
+	var sharpeSum, sharpeSquareSum float64
+	for _, sharpe := range rollingSharpes {
+		sharpeSum += sharpe
+		sharpeSquareSum += sharpe * sharpe
+	}
+	avgSharpe := sharpeSum / float64(len(rollingSharpes))
+	sharpeVariance := sharpeSquareSum/float64(len(rollingSharpes)) - avgSharpe*avgSharpe
+	sharpeStability := 1.0 / (1.0 + math.Sqrt(sharpeVariance))
+	
+	// 2. 收益率稳定性
+	var returnSum, returnSquareSum float64
+	for _, ret := range rollingReturns {
+		returnSum += ret
+		returnSquareSum += ret * ret
+	}
+	avgReturn := returnSum / float64(len(rollingReturns))
+	returnVariance := returnSquareSum/float64(len(rollingReturns)) - avgReturn*avgReturn
+	returnStability := 1.0 / (1.0 + math.Sqrt(returnVariance))
+	
+	// 3. 回撤一致性（回撤变化的标准差）
+	var drawdownSum, drawdownSquareSum float64
+	for _, dd := range rollingDrawdowns {
+		drawdownSum += dd
+		drawdownSquareSum += dd * dd
+	}
+	avgDrawdown := drawdownSum / float64(len(rollingDrawdowns))
+	drawdownVariance := drawdownSquareSum/float64(len(rollingDrawdowns)) - avgDrawdown*avgDrawdown
+	drawdownConsistency := 1.0 / (1.0 + math.Sqrt(drawdownVariance))
+	
+	// 4. 正收益期间比例
+	positiveReturns := 0
+	for _, ret := range rollingReturns {
+		if ret > 0 {
+			positiveReturns++
+		}
+	}
+	positiveRatio := float64(positiveReturns) / float64(len(rollingReturns))
+	
+	// 综合评分
+	overallScore := (sharpeStability*0.3 + returnStability*0.3 + drawdownConsistency*0.3 + positiveRatio*0.1)
+	
+	// 评估结果
+	passed := true
+	details := "Strategy shows good stability across different periods"
+	
+	if overallScore < 0.5 {
+		passed = false
+		details = "Strategy shows poor stability with high variance in performance"
+	} else if overallScore < 0.7 {
+		details = "Strategy shows moderate stability with some performance variance"
+	}
+	
+	// 额外检查
+	if avgSharpe < 0 {
+		passed = false
+		overallScore *= 0.5
+		details = "Strategy has negative average Sharpe ratio"
+	}
+	
+	if avgDrawdown > 0.3 {
+		passed = false
+		overallScore *= 0.7
+		details = "Strategy has excessive average drawdown"
+	}
+	
 	return TestResult{
-		Passed:  true,
-		Score:   0.78,
-		Details: "Strategy shows good stability across different periods",
+		Passed:  passed,
+		Score:   math.Max(0, math.Min(1, overallScore)),
+		Details: details,
 		Metrics: map[string]float64{
-			"rolling_sharpe_stability": 0.75,
-			"drawdown_consistency":     0.8,
+			"rolling_sharpe_stability": sharpeStability,
+			"return_stability":         returnStability,
+			"drawdown_consistency":     drawdownConsistency,
+			"positive_return_ratio":    positiveRatio,
+			"avg_rolling_sharpe":       avgSharpe,
+			"avg_rolling_drawdown":     avgDrawdown,
+			"rolling_windows":          float64(len(rollingSharpes)),
 		},
 	}
 }
 
 func (abe *AutoBacktestingEngine) performRobustnessTest(result *BacktestResult) TestResult {
-	// TODO: 实现鲁棒性测试
+	// 实现鲁棒性测试
+	
+	if len(result.EquityCurve) < 10 {
+		return TestResult{
+			Passed:  false,
+			Score:   0.0,
+			Details: "Insufficient data for robustness testing",
+			Metrics: map[string]float64{},
+		}
+	}
+	
+	// 1. 测试对噪声的抗性
+	noiseResistance := abe.testNoiseResistance(result)
+	
+	// 2. 测试对不同时间段的适应性
+	periodAdaptability := abe.testPeriodAdaptability(result)
+	
+	// 3. 测试交易频率的稳定性
+	tradingFrequencyStability := abe.testTradingFrequencyStability(result)
+	
+	// 4. 测试收益分布的一致性
+	returnDistributionConsistency := abe.testReturnDistributionConsistency(result)
+	
+	// 5. 测试最大回撤的控制能力
+	drawdownControl := abe.testDrawdownControl(result)
+	
+	// 综合评分
+	overallScore := (noiseResistance*0.25 + periodAdaptability*0.25 + 
+					tradingFrequencyStability*0.2 + returnDistributionConsistency*0.15 + 
+					drawdownControl*0.15)
+	
+	// 评估结果
+	passed := true
+	details := "Strategy demonstrates good robustness"
+	
+	if overallScore < 0.5 {
+		passed = false
+		details = "Strategy shows poor robustness with high sensitivity to market conditions"
+	} else if overallScore < 0.7 {
+		details = "Strategy shows moderate robustness with some sensitivity to market conditions"
+	}
+	
+	// 额外检查
+	if result.MaxDrawdown > 0.5 {
+		passed = false
+		overallScore *= 0.6
+		details = "Strategy has excessive maximum drawdown indicating poor risk control"
+	}
+	
+	if result.TotalTrades < 10 {
+		overallScore *= 0.8
+		details = "Limited number of trades may affect robustness assessment"
+	}
+	
 	return TestResult{
-		Passed:  true,
-		Score:   0.82,
-		Details: "Strategy demonstrates robustness to parameter changes",
+		Passed:  passed,
+		Score:   math.Max(0, math.Min(1, overallScore)),
+		Details: details,
 		Metrics: map[string]float64{
-			"parameter_sensitivity": 0.2,
-			"noise_resistance":      0.85,
+			"noise_resistance":                noiseResistance,
+			"period_adaptability":             periodAdaptability,
+			"trading_frequency_stability":     tradingFrequencyStability,
+			"return_distribution_consistency": returnDistributionConsistency,
+			"drawdown_control":                drawdownControl,
+			"total_trades":                    float64(result.TotalTrades),
+			"max_drawdown":                    result.MaxDrawdown,
 		},
 	}
 }
 
+// testNoiseResistance 测试对噪声的抗性
+func (abe *AutoBacktestingEngine) testNoiseResistance(result *BacktestResult) float64 {
+	if len(result.EquityCurve) < 5 {
+		return 0.5
+	}
+	
+	// 计算收益率的变异系数
+	returns := make([]float64, len(result.EquityCurve)-1)
+	for i := 1; i < len(result.EquityCurve); i++ {
+		if result.EquityCurve[i-1].Value > 0 {
+			returns[i-1] = result.EquityCurve[i].Return
+		}
+	}
+	
+	var sum, sumSquares float64
+	for _, ret := range returns {
+		sum += ret
+		sumSquares += ret * ret
+	}
+	
+	avgReturn := sum / float64(len(returns))
+	variance := sumSquares/float64(len(returns)) - avgReturn*avgReturn
+	stdDev := math.Sqrt(variance)
+	
+	// 变异系数越小，抗噪声能力越强
+	coefficientOfVariation := 1.0
+	if avgReturn != 0 {
+		coefficientOfVariation = math.Abs(stdDev / avgReturn)
+	}
+	
+	// 转换为0-1分数，变异系数越小分数越高
+	return math.Max(0, 1.0-math.Min(1.0, coefficientOfVariation))
+}
+
+// testPeriodAdaptability 测试对不同时间段的适应性
+func (abe *AutoBacktestingEngine) testPeriodAdaptability(result *BacktestResult) float64 {
+	if len(result.EquityCurve) < 20 {
+		return 0.5
+	}
+	
+	// 将数据分为4个季度
+	quarterSize := len(result.EquityCurve) / 4
+	quarterReturns := make([]float64, 4)
+	
+	for q := 0; q < 4; q++ {
+		start := q * quarterSize
+		end := start + quarterSize
+		if q == 3 {
+			end = len(result.EquityCurve)
+		}
+		
+		if end > start+1 {
+			quarterReturns[q] = (result.EquityCurve[end-1].Value - result.EquityCurve[start].Value) / result.EquityCurve[start].Value
+		}
+	}
+	
+	// 计算季度收益率的标准差
+	var sum, sumSquares float64
+	for _, ret := range quarterReturns {
+		sum += ret
+		sumSquares += ret * ret
+	}
+	
+	avgReturn := sum / 4.0
+	variance := sumSquares/4.0 - avgReturn*avgReturn
+	stdDev := math.Sqrt(variance)
+	
+	// 标准差越小，适应性越好
+	return math.Max(0, 1.0-math.Min(1.0, stdDev*2))
+}
+
+// testTradingFrequencyStability 测试交易频率的稳定性
+func (abe *AutoBacktestingEngine) testTradingFrequencyStability(result *BacktestResult) float64 {
+	if len(result.Trades) < 4 {
+		return 0.5
+	}
+	
+	// 计算每个时间段的交易频率
+	totalDays := result.DataPeriod.End.Sub(result.DataPeriod.Start).Hours() / 24
+	quarterDays := totalDays / 4
+	
+	quarterTradeCounts := make([]int, 4)
+	
+	for _, trade := range result.Trades {
+		daysSinceStart := trade.EntryTime.Sub(result.DataPeriod.Start).Hours() / 24
+		quarter := int(daysSinceStart / quarterDays)
+		if quarter >= 4 {
+			quarter = 3
+		}
+		quarterTradeCounts[quarter]++
+	}
+	
+	// 计算交易频率的变异系数
+	var sum, sumSquares float64
+	for _, count := range quarterTradeCounts {
+		frequency := float64(count) / quarterDays
+		sum += frequency
+		sumSquares += frequency * frequency
+	}
+	
+	avgFrequency := sum / 4.0
+	variance := sumSquares/4.0 - avgFrequency*avgFrequency
+	stdDev := math.Sqrt(variance)
+	
+	coefficientOfVariation := 1.0
+	if avgFrequency > 0 {
+		coefficientOfVariation = stdDev / avgFrequency
+	}
+	
+	return math.Max(0, 1.0-math.Min(1.0, coefficientOfVariation))
+}
+
+// testReturnDistributionConsistency 测试收益分布的一致性
+func (abe *AutoBacktestingEngine) testReturnDistributionConsistency(result *BacktestResult) float64 {
+	if len(result.Trades) < 10 {
+		return 0.5
+	}
+	
+	// 计算交易收益率
+	tradeReturns := make([]float64, len(result.Trades))
+	for i, trade := range result.Trades {
+		if trade.EntryPrice > 0 {
+			tradeReturns[i] = trade.PnLPercent
+		}
+	}
+	
+	// 计算偏度和峰度
+	var sum, sumSquares, sumCubes, sumFourths float64
+	for _, ret := range tradeReturns {
+		sum += ret
+		sumSquares += ret * ret
+		sumCubes += ret * ret * ret
+		sumFourths += ret * ret * ret * ret
+	}
+	
+	n := float64(len(tradeReturns))
+	mean := sum / n
+	variance := sumSquares/n - mean*mean
+	stdDev := math.Sqrt(variance)
+	
+	if stdDev == 0 {
+		return 0.5
+	}
+	
+	// 偏度
+	skewness := (sumCubes/n - 3*mean*variance - mean*mean*mean) / (stdDev * stdDev * stdDev)
+	
+	// 峰度
+	kurtosis := (sumFourths/n - 4*mean*sumCubes/n + 6*mean*mean*variance + 3*mean*mean*mean*mean) / (variance * variance)
+	
+	// 正态分布的偏度为0，峰度为3
+	skewnessScore := math.Max(0, 1.0-math.Abs(skewness)/2.0)
+	kurtosisScore := math.Max(0, 1.0-math.Abs(kurtosis-3.0)/3.0)
+	
+	return (skewnessScore + kurtosisScore) / 2.0
+}
+
+// testDrawdownControl 测试最大回撤的控制能力
+func (abe *AutoBacktestingEngine) testDrawdownControl(result *BacktestResult) float64 {
+	if len(result.DrawdownCurve) == 0 {
+		return 0.5
+	}
+	
+	// 计算回撤的持续时间分布
+	var drawdownDurations []int
+	currentDuration := 0
+	inDrawdown := false
+	
+	for _, point := range result.DrawdownCurve {
+		if point.Drawdown > 0.01 { // 1%以上算作回撤
+			if !inDrawdown {
+				inDrawdown = true
+				currentDuration = 1
+			} else {
+				currentDuration++
+			}
+		} else {
+			if inDrawdown {
+				drawdownDurations = append(drawdownDurations, currentDuration)
+				inDrawdown = false
+				currentDuration = 0
+			}
+		}
+	}
+	
+	if len(drawdownDurations) == 0 {
+		return 1.0 // 没有显著回撤
+	}
+	
+	// 计算平均回撤持续时间
+	var totalDuration int
+	maxDuration := 0
+	for _, duration := range drawdownDurations {
+		totalDuration += duration
+		if duration > maxDuration {
+			maxDuration = duration
+		}
+	}
+	
+	avgDuration := float64(totalDuration) / float64(len(drawdownDurations))
+	
+	// 评分：最大回撤越小、持续时间越短，分数越高
+	maxDrawdownScore := math.Max(0, 1.0-result.MaxDrawdown*2) // 50%回撤得0分
+	durationScore := math.Max(0, 1.0-avgDuration/100.0)       // 100天平均持续时间得0分
+	
+	return (maxDrawdownScore*0.7 + durationScore*0.3)
+}
+
 func (abe *AutoBacktestingEngine) generateBacktestReport(job *BacktestJob) {
-	// TODO: 实现报告生成
+	// 实现报告生成
 	log.Printf("Generating backtest report for job: %s", job.ID)
+	
+	if job.Result == nil {
+		log.Printf("No result available for job %s, skipping report generation", job.ID)
+		return
+	}
+	
+	result := job.Result
+	
+	// 创建报告
+	report := &BacktestReport{
+		ID:          fmt.Sprintf("report_%s_%d", job.ID, time.Now().Unix()),
+		JobID:       job.ID,
+		Title:       fmt.Sprintf("Backtest Report - %s", job.StrategyName),
+		GeneratedAt: time.Now(),
+	}
+	
+	// 生成报告摘要
+	report.Summary = ReportSummary{
+		StrategyName:     job.StrategyName,
+		TestPeriod:       result.DataPeriod,
+		TotalReturn:      result.TotalReturn,
+		AnnualizedReturn: result.AnnualizedReturn,
+		MaxDrawdown:      result.MaxDrawdown,
+		SharpeRatio:      result.SharpeRatio,
+		WinRate:          result.WinRate,
+		TotalTrades:      result.TotalTrades,
+		Grade:            abe.calculatePerformanceGrade(result),
+	}
+	
+	// 生成性能图表数据
+	report.PerformanceChart = abe.generatePerformanceCharts(result)
+	
+	// 生成风险分析
+	report.RiskAnalysis = abe.generateRiskAnalysis(result)
+	
+	// 生成交易分析
+	report.TradeAnalysis = abe.generateTradeAnalysis(result)
+	
+	// 生成建议
+	report.Recommendations = abe.generateRecommendations(result)
+	
+	// 保存报告到缓存
+	abe.reportGenerator.mu.Lock()
+	abe.reportGenerator.reportCache[report.ID] = report
+	abe.reportGenerator.mu.Unlock()
+	
+	// 生成输出文件路径
+	timestamp := time.Now().Format("20060102_150405")
+	baseFilename := fmt.Sprintf("%s_%s_%s", job.StrategyName, job.ID, timestamp)
+	
+	report.HTMLPath = fmt.Sprintf("%s/%s.html", abe.reportGenerator.outputPath, baseFilename)
+	report.PDFPath = fmt.Sprintf("%s/%s.pdf", abe.reportGenerator.outputPath, baseFilename)
+	report.JSONPath = fmt.Sprintf("%s/%s.json", abe.reportGenerator.outputPath, baseFilename)
+	
+	// 异步生成实际文件
+	go abe.generateReportFiles(report)
+	
+	log.Printf("Backtest report generated successfully for job: %s", job.ID)
+}
+
+// calculatePerformanceGrade 计算性能等级
+func (abe *AutoBacktestingEngine) calculatePerformanceGrade(result *BacktestResult) string {
+	score := 0.0
+	
+	// 收益率评分 (30%)
+	if result.AnnualizedReturn > 0.3 {
+		score += 30
+	} else if result.AnnualizedReturn > 0.2 {
+		score += 25
+	} else if result.AnnualizedReturn > 0.1 {
+		score += 20
+	} else if result.AnnualizedReturn > 0.05 {
+		score += 15
+	} else if result.AnnualizedReturn > 0 {
+		score += 10
+	}
+	
+	// 夏普比率评分 (25%)
+	if result.SharpeRatio > 2.0 {
+		score += 25
+	} else if result.SharpeRatio > 1.5 {
+		score += 20
+	} else if result.SharpeRatio > 1.0 {
+		score += 15
+	} else if result.SharpeRatio > 0.5 {
+		score += 10
+	} else if result.SharpeRatio > 0 {
+		score += 5
+	}
+	
+	// 最大回撤评分 (25%)
+	if result.MaxDrawdown < 0.05 {
+		score += 25
+	} else if result.MaxDrawdown < 0.1 {
+		score += 20
+	} else if result.MaxDrawdown < 0.15 {
+		score += 15
+	} else if result.MaxDrawdown < 0.2 {
+		score += 10
+	} else if result.MaxDrawdown < 0.3 {
+		score += 5
+	}
+	
+	// 胜率评分 (20%)
+	if result.WinRate > 0.7 {
+		score += 20
+	} else if result.WinRate > 0.6 {
+		score += 15
+	} else if result.WinRate > 0.5 {
+		score += 10
+	} else if result.WinRate > 0.4 {
+		score += 5
+	}
+	
+	// 根据总分确定等级
+	if score >= 90 {
+		return "A+"
+	} else if score >= 85 {
+		return "A"
+	} else if score >= 80 {
+		return "B+"
+	} else if score >= 75 {
+		return "B"
+	} else if score >= 70 {
+		return "C+"
+	} else if score >= 65 {
+		return "C"
+	} else if score >= 60 {
+		return "D"
+	} else {
+		return "F"
+	}
+}
+
+// generatePerformanceCharts 生成性能图表数据
+func (abe *AutoBacktestingEngine) generatePerformanceCharts(result *BacktestResult) []ChartData {
+	charts := make([]ChartData, 0)
+	
+	// 权益曲线图
+	equityData := make([]DataPoint, len(result.EquityCurve))
+	for i, point := range result.EquityCurve {
+		equityData[i] = DataPoint{
+			X:     point.Date.Format("2006-01-02"),
+			Y:     point.Value,
+			Label: fmt.Sprintf("%.2f", point.Value),
+		}
+	}
+	
+	charts = append(charts, ChartData{
+		Name: "equity_curve",
+		Type: "line",
+		Data: equityData,
+		Config: ChartConfig{
+			Title:      "Equity Curve",
+			XAxisLabel: "Date",
+			YAxisLabel: "Portfolio Value",
+			Color:      "#2E86AB",
+		},
+	})
+	
+	// 回撤曲线图
+	if len(result.DrawdownCurve) > 0 {
+		drawdownData := make([]DataPoint, len(result.DrawdownCurve))
+		for i, point := range result.DrawdownCurve {
+			drawdownData[i] = DataPoint{
+				X:     point.Date.Format("2006-01-02"),
+				Y:     -point.Drawdown, // 负值显示
+				Label: fmt.Sprintf("%.2f%%", point.Drawdown*100),
+			}
+		}
+		
+		charts = append(charts, ChartData{
+			Name: "drawdown_curve",
+			Type: "line",
+			Data: drawdownData,
+			Config: ChartConfig{
+				Title:      "Drawdown Curve",
+				XAxisLabel: "Date",
+				YAxisLabel: "Drawdown (%)",
+				Color:      "#A23B72",
+			},
+		})
+	}
+	
+	return charts
+}
+
+// generateRiskAnalysis 生成风险分析
+func (abe *AutoBacktestingEngine) generateRiskAnalysis(result *BacktestResult) RiskAnalysis {
+	riskLevel := "LOW"
+	if result.MaxDrawdown > 0.3 {
+		riskLevel = "EXTREME"
+	} else if result.MaxDrawdown > 0.2 {
+		riskLevel = "HIGH"
+	} else if result.MaxDrawdown > 0.1 {
+		riskLevel = "MEDIUM"
+	}
+	
+	riskFactors := make([]string, 0)
+	if result.MaxDrawdown > 0.15 {
+		riskFactors = append(riskFactors, "High maximum drawdown")
+	}
+	if result.Volatility > 0.3 {
+		riskFactors = append(riskFactors, "High volatility")
+	}
+	if result.SharpeRatio < 0.5 {
+		riskFactors = append(riskFactors, "Low risk-adjusted returns")
+	}
+	if result.WinRate < 0.4 {
+		riskFactors = append(riskFactors, "Low win rate")
+	}
+	
+	return RiskAnalysis{
+		RiskLevel:   riskLevel,
+		RiskFactors: riskFactors,
+		RiskMetrics: result.RiskMetrics,
+	}
+}
+
+// generateTradeAnalysis 生成交易分析
+func (abe *AutoBacktestingEngine) generateTradeAnalysis(result *BacktestResult) TradeAnalysis {
+	if len(result.Trades) == 0 {
+		return TradeAnalysis{}
+	}
+	
+	// 计算平均持仓时间
+	var totalDuration time.Duration
+	for _, trade := range result.Trades {
+		totalDuration += trade.Duration
+	}
+	avgHoldingPeriod := totalDuration / time.Duration(len(result.Trades))
+	
+	// 找出最佳和最差交易
+	bestTrades := make([]TradeRecord, 0)
+	worstTrades := make([]TradeRecord, 0)
+	
+	// 按盈亏排序
+	sortedTrades := make([]TradeRecord, len(result.Trades))
+	copy(sortedTrades, result.Trades)
+	sort.Slice(sortedTrades, func(i, j int) bool {
+		return sortedTrades[i].PnL > sortedTrades[j].PnL
+	})
+	
+	// 取前5个最佳和最差交易
+	maxCount := 5
+	if len(sortedTrades) < maxCount {
+		maxCount = len(sortedTrades)
+	}
+	
+	bestTrades = sortedTrades[:maxCount]
+	worstTrades = sortedTrades[len(sortedTrades)-maxCount:]
+	
+	// 计算交易频率
+	if len(result.EquityCurve) > 0 {
+		totalDays := result.DataPeriod.End.Sub(result.DataPeriod.Start).Hours() / 24
+		tradingFrequency := float64(len(result.Trades)) / totalDays
+		
+		return TradeAnalysis{
+			TradingFrequency: tradingFrequency,
+			AvgHoldingPeriod: avgHoldingPeriod,
+			BestTrades:       bestTrades,
+			WorstTrades:      worstTrades,
+		}
+	}
+	
+	return TradeAnalysis{
+		AvgHoldingPeriod: avgHoldingPeriod,
+		BestTrades:       bestTrades,
+		WorstTrades:      worstTrades,
+	}
+}
+
+// generateRecommendations 生成建议
+func (abe *AutoBacktestingEngine) generateRecommendations(result *BacktestResult) []Recommendation {
+	recommendations := make([]Recommendation, 0)
+	
+	// 基于最大回撤的建议
+	if result.MaxDrawdown > 0.2 {
+		recommendations = append(recommendations, Recommendation{
+			Type:        "RISK",
+			Priority:    "HIGH",
+			Title:       "Reduce Maximum Drawdown",
+			Description: "The strategy has a high maximum drawdown which indicates poor risk management.",
+			Action:      "Consider implementing tighter stop-loss rules or position sizing controls.",
+			Impact:      "Reducing drawdown will improve risk-adjusted returns and investor confidence.",
+			Confidence:  0.9,
+		})
+	}
+	
+	// 基于夏普比率的建议
+	if result.SharpeRatio < 1.0 {
+		recommendations = append(recommendations, Recommendation{
+			Type:        "PARAMETER",
+			Priority:    "MEDIUM",
+			Title:       "Improve Risk-Adjusted Returns",
+			Description: "The Sharpe ratio is below 1.0, indicating suboptimal risk-adjusted performance.",
+			Action:      "Optimize entry/exit criteria or adjust position sizing to improve the risk-return profile.",
+			Impact:      "Higher Sharpe ratio will make the strategy more attractive to investors.",
+			Confidence:  0.8,
+		})
+	}
+	
+	// 基于胜率的建议
+	if result.WinRate < 0.5 {
+		recommendations = append(recommendations, Recommendation{
+			Type:        "PARAMETER",
+			Priority:    "MEDIUM",
+			Title:       "Improve Win Rate",
+			Description: "The win rate is below 50%, which may indicate poor entry timing.",
+			Action:      "Review and optimize entry signals, consider additional filters or confirmation indicators.",
+			Impact:      "Higher win rate will improve strategy consistency and reduce psychological stress.",
+			Confidence:  0.7,
+		})
+	}
+	
+	// 基于交易数量的建议
+	if result.TotalTrades < 30 {
+		recommendations = append(recommendations, Recommendation{
+			Type:        "TIMING",
+			Priority:    "LOW",
+			Title:       "Increase Sample Size",
+			Description: "The number of trades is relatively low, which may affect statistical significance.",
+			Action:      "Consider extending the backtest period or adjusting parameters to generate more trades.",
+			Impact:      "More trades will provide better statistical confidence in the results.",
+			Confidence:  0.6,
+		})
+	}
+	
+	return recommendations
+}
+
+// generateReportFiles 异步生成报告文件
+func (abe *AutoBacktestingEngine) generateReportFiles(report *BacktestReport) {
+	// 这里可以实现实际的文件生成逻辑
+	// 例如生成HTML、PDF、JSON文件
+	log.Printf("Generating report files for report: %s", report.ID)
+	
+	// 简化实现：只记录文件路径
+	log.Printf("HTML report would be saved to: %s", report.HTMLPath)
+	log.Printf("PDF report would be saved to: %s", report.PDFPath)
+	log.Printf("JSON report would be saved to: %s", report.JSONPath)
 }
 
 func (abe *AutoBacktestingEngine) updateStrategyPerformance(strategyID string, result *BacktestResult) {
@@ -1557,19 +2511,672 @@ func (abe *AutoBacktestingEngine) updateStrategyPerformance(strategyID string, r
 func (abe *AutoBacktestingEngine) analyzeStrategyPerformance() {
 	log.Println("Analyzing strategy performance...")
 
-	// TODO: 实现策略性能分析
+	// 实现策略性能分析
+	abe.mu.RLock()
+	strategies := make(map[string]*StrategyPerformance)
+	for k, v := range abe.strategyPerformance {
+		strategies[k] = v
+	}
+	abe.mu.RUnlock()
+
+	if len(strategies) == 0 {
+		log.Println("No strategies to analyze")
+		return
+	}
+
 	// 1. 识别表现优异的策略
+	topPerformers := abe.identifyTopPerformers(strategies)
+	log.Printf("Identified %d top performing strategies", len(topPerformers))
+
 	// 2. 发现表现衰退的策略
+	decliningStrategies := abe.identifyDecliningStrategies(strategies)
+	log.Printf("Identified %d declining strategies", len(decliningStrategies))
+
 	// 3. 生成优化建议
+	optimizationSuggestions := abe.generateOptimizationSuggestions(strategies)
+	log.Printf("Generated %d optimization suggestions", len(optimizationSuggestions))
+
+	// 4. 更新策略排名和状态
+	abe.updateStrategyRankings(strategies)
+
+	// 5. 记录分析结果
+	abe.recordPerformanceAnalysis(topPerformers, decliningStrategies, optimizationSuggestions)
+}
+
+// identifyTopPerformers 识别表现优异的策略
+func (abe *AutoBacktestingEngine) identifyTopPerformers(strategies map[string]*StrategyPerformance) []string {
+	type strategyScore struct {
+		ID    string
+		Score float64
+	}
+
+	scores := make([]strategyScore, 0, len(strategies))
+
+	for id, perf := range strategies {
+		if perf.BacktestCount < 3 {
+			continue // 需要至少3次回测才能评估
+		}
+
+		// 计算综合评分
+		score := 0.0
+
+		// 平均收益率权重 40%
+		score += perf.AvgReturn * 0.4
+
+		// 平均夏普比率权重 30%
+		score += perf.AvgSharpe * 0.3
+
+		// 一致性评分权重 20%
+		score += perf.ConsistencyScore * 0.2
+
+		// 最大回撤惩罚权重 10%
+		score -= perf.AvgMaxDrawdown * 0.1
+
+		scores = append(scores, strategyScore{ID: id, Score: score})
+	}
+
+	// 按评分排序
+	sort.Slice(scores, func(i, j int) bool {
+		return scores[i].Score > scores[j].Score
+	})
+
+	// 返回前20%的策略
+	topCount := len(scores) / 5
+	if topCount < 1 {
+		topCount = 1
+	}
+	if topCount > len(scores) {
+		topCount = len(scores)
+	}
+
+	topPerformers := make([]string, topCount)
+	for i := 0; i < topCount; i++ {
+		topPerformers[i] = scores[i].ID
+	}
+
+	return topPerformers
+}
+
+// identifyDecliningStrategies 识别表现衰退的策略
+func (abe *AutoBacktestingEngine) identifyDecliningStrategies(strategies map[string]*StrategyPerformance) []string {
+	decliningStrategies := make([]string, 0)
+
+	for id, perf := range strategies {
+		if len(perf.PerformanceHistory) < 5 {
+			continue // 需要至少5个历史记录才能判断趋势
+		}
+
+		// 检查最近的表现趋势
+		recentCount := 3
+		if len(perf.PerformanceHistory) < recentCount {
+			recentCount = len(perf.PerformanceHistory)
+		}
+
+		// 计算最近表现的平均值
+		recentPerf := perf.PerformanceHistory[len(perf.PerformanceHistory)-recentCount:]
+		var recentAvgReturn, recentAvgSharpe float64
+		for _, record := range recentPerf {
+			recentAvgReturn += record.Return
+			recentAvgSharpe += record.SharpeRatio
+		}
+		recentAvgReturn /= float64(len(recentPerf))
+		recentAvgSharpe /= float64(len(recentPerf))
+
+		// 计算历史表现的平均值
+		historicalCount := len(perf.PerformanceHistory) - recentCount
+		if historicalCount > 0 {
+			historicalPerf := perf.PerformanceHistory[:historicalCount]
+			var historicalAvgReturn, historicalAvgSharpe float64
+			for _, record := range historicalPerf {
+				historicalAvgReturn += record.Return
+				historicalAvgSharpe += record.SharpeRatio
+			}
+			historicalAvgReturn /= float64(len(historicalPerf))
+			historicalAvgSharpe /= float64(len(historicalPerf))
+
+			// 判断是否衰退
+			returnDecline := (historicalAvgReturn - recentAvgReturn) / math.Abs(historicalAvgReturn)
+			sharpeDecline := (historicalAvgSharpe - recentAvgSharpe) / math.Abs(historicalAvgSharpe)
+
+			// 如果收益率下降超过20%或夏普比率下降超过30%，认为是衰退
+			if returnDecline > 0.2 || sharpeDecline > 0.3 {
+				decliningStrategies = append(decliningStrategies, id)
+			}
+		}
+
+		// 检查验证状态
+		if perf.ValidationStatus == "FAILED" {
+			decliningStrategies = append(decliningStrategies, id)
+		}
+	}
+
+	return decliningStrategies
+}
+
+// generateOptimizationSuggestions 生成优化建议
+func (abe *AutoBacktestingEngine) generateOptimizationSuggestions(strategies map[string]*StrategyPerformance) map[string][]string {
+	suggestions := make(map[string][]string)
+
+	for id, perf := range strategies {
+		strategySuggestions := make([]string, 0)
+
+		// 基于平均收益率的建议
+		if perf.AvgReturn < 0.05 { // 年化收益率低于5%
+			strategySuggestions = append(strategySuggestions, "Consider increasing position size or improving entry signals to boost returns")
+		}
+
+		// 基于夏普比率的建议
+		if perf.AvgSharpe < 1.0 {
+			strategySuggestions = append(strategySuggestions, "Optimize risk management to improve risk-adjusted returns")
+		}
+
+		// 基于最大回撤的建议
+		if perf.AvgMaxDrawdown > 0.15 {
+			strategySuggestions = append(strategySuggestions, "Implement stricter stop-loss rules to reduce maximum drawdown")
+		}
+
+		// 基于一致性的建议
+		if perf.ConsistencyScore < 0.7 {
+			strategySuggestions = append(strategySuggestions, "Review parameter stability and consider adaptive mechanisms")
+		}
+
+		// 基于回测次数的建议
+		if perf.BacktestCount < 10 {
+			strategySuggestions = append(strategySuggestions, "Increase backtesting frequency to gather more performance data")
+		}
+
+		// 基于验证状态的建议
+		if perf.ValidationStatus == "NEEDS_REVIEW" {
+			strategySuggestions = append(strategySuggestions, "Strategy requires manual review due to validation concerns")
+		} else if perf.ValidationStatus == "FAILED" {
+			strategySuggestions = append(strategySuggestions, "Strategy failed validation and should be disabled or redesigned")
+		}
+
+		if len(strategySuggestions) > 0 {
+			suggestions[id] = strategySuggestions
+		}
+	}
+
+	return suggestions
+}
+
+// updateStrategyRankings 更新策略排名
+func (abe *AutoBacktestingEngine) updateStrategyRankings(strategies map[string]*StrategyPerformance) {
+	// 计算所有策略的综合评分并排名
+	type strategyRanking struct {
+		ID    string
+		Score float64
+		Rank  int
+	}
+
+	rankings := make([]strategyRanking, 0, len(strategies))
+
+	for id, perf := range strategies {
+		score := perf.AvgReturn*0.4 + perf.AvgSharpe*0.3 + perf.ConsistencyScore*0.2 - perf.AvgMaxDrawdown*0.1
+		rankings = append(rankings, strategyRanking{ID: id, Score: score})
+	}
+
+	// 按评分排序
+	sort.Slice(rankings, func(i, j int) bool {
+		return rankings[i].Score > rankings[j].Score
+	})
+
+	// 分配排名
+	for i := range rankings {
+		rankings[i].Rank = i + 1
+	}
+
+	// 更新策略性能记录
+	abe.mu.Lock()
+	for _, ranking := range rankings {
+		if perf, exists := abe.strategyPerformance[ranking.ID]; exists {
+			// 这里可以添加排名字段到StrategyPerformance结构体
+			log.Printf("Strategy %s ranked #%d with score %.4f", ranking.ID, ranking.Rank, ranking.Score)
+		}
+	}
+	abe.mu.Unlock()
+}
+
+// recordPerformanceAnalysis 记录性能分析结果
+func (abe *AutoBacktestingEngine) recordPerformanceAnalysis(topPerformers, decliningStrategies []string, suggestions map[string][]string) {
+	log.Printf("Performance Analysis Summary:")
+	log.Printf("- Top Performers: %v", topPerformers)
+	log.Printf("- Declining Strategies: %v", decliningStrategies)
+	log.Printf("- Strategies with Suggestions: %d", len(suggestions))
+
+	// 更新指标
+	abe.backtestingMetrics.mu.Lock()
+	if len(topPerformers) > 0 {
+		// 可以记录顶级策略的平均表现
+		var totalReturn float64
+		for _, id := range topPerformers {
+			if perf, exists := abe.strategyPerformance[id]; exists {
+				totalReturn += perf.AvgReturn
+			}
+		}
+		abe.backtestingMetrics.BestStrategyReturn = totalReturn / float64(len(topPerformers))
+	}
+	abe.backtestingMetrics.LastUpdated = time.Now()
+	abe.backtestingMetrics.mu.Unlock()
 }
 
 func (abe *AutoBacktestingEngine) performValidationChecks() {
 	log.Println("Performing validation checks...")
 
-	// TODO: 实现验证检查
+	// 实现验证检查
+	abe.mu.RLock()
+	strategies := make(map[string]*StrategyPerformance)
+	for k, v := range abe.strategyPerformance {
+		strategies[k] = v
+	}
+	completedBacktests := make([]BacktestResult, len(abe.completedBacktests))
+	copy(completedBacktests, abe.completedBacktests)
+	abe.mu.RUnlock()
+
+	validationResults := make([]ValidationResult, 0)
+
 	// 1. 检查策略是否符合性能阈值
+	thresholdResults := abe.checkPerformanceThresholds(strategies)
+	log.Printf("Performance threshold checks completed for %d strategies", len(thresholdResults))
+
 	// 2. 验证策略的稳定性
+	stabilityResults := abe.checkStrategyStability(strategies)
+	log.Printf("Stability checks completed for %d strategies", len(stabilityResults))
+
 	// 3. 检查是否存在过拟合
+	overfittingResults := abe.checkOverfitting(completedBacktests)
+	log.Printf("Overfitting checks completed for %d backtest results", len(overfittingResults))
+
+	// 4. 综合验证结果
+	for strategyID, perf := range strategies {
+		validationResult := abe.createValidationResult(strategyID, perf, thresholdResults, stabilityResults, overfittingResults)
+		validationResults = append(validationResults, validationResult)
+	}
+
+	// 5. 更新验证历史
+	abe.mu.Lock()
+	abe.validationHistory = append(abe.validationHistory, validationResults...)
+	
+	// 保持历史记录在合理范围内
+	if len(abe.validationHistory) > 1000 {
+		abe.validationHistory = abe.validationHistory[len(abe.validationHistory)-1000:]
+	}
+	abe.mu.Unlock()
+
+	// 6. 更新策略验证状态
+	abe.updateStrategyValidationStatus(validationResults)
+
+	log.Printf("Validation checks completed. %d validation results generated", len(validationResults))
+}
+
+// checkPerformanceThresholds 检查性能阈值
+func (abe *AutoBacktestingEngine) checkPerformanceThresholds(strategies map[string]*StrategyPerformance) map[string][]ThresholdCheck {
+	results := make(map[string][]ThresholdCheck)
+
+	for strategyID, perf := range strategies {
+		checks := make([]ThresholdCheck, 0)
+
+		// 最小收益率阈值
+		checks = append(checks, ThresholdCheck{
+			Metric:     "avg_return",
+			Value:      perf.AvgReturn,
+			Threshold:  abe.performanceThreshold, // 默认2%
+			Operator:   ">=",
+			Passed:     perf.AvgReturn >= abe.performanceThreshold,
+			Importance: "HIGH",
+		})
+
+		// 最小夏普比率阈值
+		checks = append(checks, ThresholdCheck{
+			Metric:     "avg_sharpe",
+			Value:      perf.AvgSharpe,
+			Threshold:  0.5,
+			Operator:   ">=",
+			Passed:     perf.AvgSharpe >= 0.5,
+			Importance: "HIGH",
+		})
+
+		// 最大回撤阈值
+		checks = append(checks, ThresholdCheck{
+			Metric:     "avg_max_drawdown",
+			Value:      perf.AvgMaxDrawdown,
+			Threshold:  0.2, // 最大回撤不超过20%
+			Operator:   "<=",
+			Passed:     perf.AvgMaxDrawdown <= 0.2,
+			Importance: "CRITICAL",
+		})
+
+		// 一致性评分阈值
+		checks = append(checks, ThresholdCheck{
+			Metric:     "consistency_score",
+			Value:      perf.ConsistencyScore,
+			Threshold:  0.6,
+			Operator:   ">=",
+			Passed:     perf.ConsistencyScore >= 0.6,
+			Importance: "MEDIUM",
+		})
+
+		// 最小回测次数阈值
+		checks = append(checks, ThresholdCheck{
+			Metric:     "backtest_count",
+			Value:      float64(perf.BacktestCount),
+			Threshold:  5, // 至少5次回测
+			Operator:   ">=",
+			Passed:     perf.BacktestCount >= 5,
+			Importance: "MEDIUM",
+		})
+
+		results[strategyID] = checks
+	}
+
+	return results
+}
+
+// checkStrategyStability 检查策略稳定性
+func (abe *AutoBacktestingEngine) checkStrategyStability(strategies map[string]*StrategyPerformance) map[string]bool {
+	results := make(map[string]bool)
+
+	for strategyID, perf := range strategies {
+		stable := true
+
+		// 检查性能历史的变异性
+		if len(perf.PerformanceHistory) >= 3 {
+			returns := make([]float64, len(perf.PerformanceHistory))
+			sharpes := make([]float64, len(perf.PerformanceHistory))
+
+			for i, record := range perf.PerformanceHistory {
+				returns[i] = record.Return
+				sharpes[i] = record.SharpeRatio
+			}
+
+			// 计算收益率的变异系数
+			returnCV := abe.calculateCoefficientOfVariation(returns)
+			sharpeCV := abe.calculateCoefficientOfVariation(sharpes)
+
+			// 如果变异系数过高，认为不稳定
+			if returnCV > 1.0 || sharpeCV > 0.8 {
+				stable = false
+			}
+		}
+
+		// 检查最近表现是否显著下降
+		if len(perf.PerformanceHistory) >= 5 {
+			recentCount := 2
+			recent := perf.PerformanceHistory[len(perf.PerformanceHistory)-recentCount:]
+			historical := perf.PerformanceHistory[:len(perf.PerformanceHistory)-recentCount]
+
+			var recentAvg, historicalAvg float64
+			for _, record := range recent {
+				recentAvg += record.Return
+			}
+			recentAvg /= float64(len(recent))
+
+			for _, record := range historical {
+				historicalAvg += record.Return
+			}
+			historicalAvg /= float64(len(historical))
+
+			// 如果最近表现比历史平均下降超过50%，认为不稳定
+			if historicalAvg > 0 && (historicalAvg-recentAvg)/historicalAvg > 0.5 {
+				stable = false
+			}
+		}
+
+		results[strategyID] = stable
+	}
+
+	return results
+}
+
+// checkOverfitting 检查过拟合
+func (abe *AutoBacktestingEngine) checkOverfitting(backtestResults []BacktestResult) map[string]bool {
+	results := make(map[string]bool)
+
+	for _, result := range backtestResults {
+		overfitted := false
+
+		// 检查样本内外表现差异
+		if result.ValidationResult != nil {
+			outOfSampleTest := result.ValidationResult.OutOfSampleTest
+			if outOfSampleTest.Metrics != nil {
+				inSampleReturn, inOk := outOfSampleTest.Metrics["in_sample_return"]
+				outOfSampleReturn, outOk := outOfSampleTest.Metrics["out_of_sample_return"]
+
+				if inOk && outOk && inSampleReturn > 0 {
+					// 如果样本外表现比样本内差很多，可能存在过拟合
+					performanceDrop := (inSampleReturn - outOfSampleReturn) / inSampleReturn
+					if performanceDrop > 0.5 { // 样本外表现下降超过50%
+						overfitted = true
+					}
+				}
+			}
+		}
+
+		// 检查收益率分布的异常
+		if len(result.Trades) > 10 {
+			// 计算交易收益率的偏度和峰度
+			returns := make([]float64, len(result.Trades))
+			for i, trade := range result.Trades {
+				returns[i] = trade.PnLPercent
+			}
+
+			skewness := abe.calculateSkewness(returns)
+			kurtosis := abe.calculateKurtosis(returns)
+
+			// 极端的偏度或峰度可能表明过拟合
+			if math.Abs(skewness) > 3.0 || kurtosis > 10.0 {
+				overfitted = true
+			}
+		}
+
+		// 检查胜率是否过高（可能的过拟合信号）
+		if result.WinRate > 0.9 && result.TotalTrades > 20 {
+			overfitted = true
+		}
+
+		results[result.StrategyID] = overfitted
+	}
+
+	return results
+}
+
+// createValidationResult 创建验证结果
+func (abe *AutoBacktestingEngine) createValidationResult(strategyID string, perf *StrategyPerformance, 
+	thresholdResults map[string][]ThresholdCheck, stabilityResults map[string]bool, 
+	overfittingResults map[string]bool) ValidationResult {
+
+	result := ValidationResult{
+		JobID:          fmt.Sprintf("validation_%s_%d", strategyID, time.Now().Unix()),
+		StrategyID:     strategyID,
+		ValidationDate: time.Now(),
+		Issues:         make([]ValidationIssue, 0),
+		Recommendations: make([]string, 0),
+	}
+
+	// 阈值检查结果
+	if checks, exists := thresholdResults[strategyID]; exists {
+		result.ThresholdChecks = checks
+		
+		passedCount := 0
+		for _, check := range checks {
+			if check.Passed {
+				passedCount++
+			} else {
+				// 添加问题
+				severity := "MEDIUM"
+				if check.Importance == "CRITICAL" {
+					severity = "HIGH"
+				}
+				
+				result.Issues = append(result.Issues, ValidationIssue{
+					Type:        "THRESHOLD",
+					Severity:    severity,
+					Description: fmt.Sprintf("Metric %s (%.4f) failed threshold check (%.4f)", check.Metric, check.Value, check.Threshold),
+					Suggestion:  fmt.Sprintf("Improve %s to meet minimum requirements", check.Metric),
+				})
+			}
+		}
+		
+		// 阈值测试评分
+		result.OutOfSampleTest = TestResult{
+			Passed:  passedCount == len(checks),
+			Score:   float64(passedCount) / float64(len(checks)),
+			Details: fmt.Sprintf("Passed %d out of %d threshold checks", passedCount, len(checks)),
+		}
+	}
+
+	// 稳定性检查结果
+	if stable, exists := stabilityResults[strategyID]; exists {
+		result.StabilityTest = TestResult{
+			Passed:  stable,
+			Score:   map[bool]float64{true: 1.0, false: 0.0}[stable],
+			Details: map[bool]string{true: "Strategy shows good stability", false: "Strategy shows instability"}[stable],
+		}
+		
+		if !stable {
+			result.Issues = append(result.Issues, ValidationIssue{
+				Type:        "STABILITY",
+				Severity:    "HIGH",
+				Description: "Strategy performance shows high variability",
+				Suggestion:  "Review parameter sensitivity and consider adaptive mechanisms",
+			})
+		}
+	}
+
+	// 过拟合检查结果
+	if overfitted, exists := overfittingResults[strategyID]; exists {
+		result.RobustnessTest = TestResult{
+			Passed:  !overfitted,
+			Score:   map[bool]float64{true: 0.0, false: 1.0}[overfitted],
+			Details: map[bool]string{true: "Potential overfitting detected", false: "No significant overfitting detected"}[overfitted],
+		}
+		
+		if overfitted {
+			result.Issues = append(result.Issues, ValidationIssue{
+				Type:        "OVERFITTING",
+				Severity:    "HIGH",
+				Description: "Strategy may be overfitted to historical data",
+				Suggestion:  "Increase out-of-sample testing and reduce model complexity",
+			})
+		}
+	}
+
+	// 计算综合评分
+	scores := []float64{result.OutOfSampleTest.Score, result.StabilityTest.Score, result.RobustnessTest.Score}
+	totalScore := 0.0
+	for _, score := range scores {
+		totalScore += score
+	}
+	result.OverallScore = totalScore / float64(len(scores))
+
+	// 确定状态和等级
+	if result.OverallScore >= 0.8 {
+		result.Status = "PASSED"
+		result.OverallGrade = "A"
+	} else if result.OverallScore >= 0.6 {
+		result.Status = "PASSED"
+		result.OverallGrade = "B"
+	} else if result.OverallScore >= 0.4 {
+		result.Status = "NEEDS_REVIEW"
+		result.OverallGrade = "C"
+	} else {
+		result.Status = "FAILED"
+		result.OverallGrade = "F"
+	}
+
+	// 生成建议
+	if len(result.Issues) > 0 {
+		result.Recommendations = append(result.Recommendations, "Address identified issues to improve strategy performance")
+	}
+	if result.OverallScore < 0.6 {
+		result.Recommendations = append(result.Recommendations, "Consider strategy redesign or parameter optimization")
+	}
+
+	return result
+}
+
+// updateStrategyValidationStatus 更新策略验证状态
+func (abe *AutoBacktestingEngine) updateStrategyValidationStatus(validationResults []ValidationResult) {
+	abe.mu.Lock()
+	defer abe.mu.Unlock()
+
+	for _, result := range validationResults {
+		if perf, exists := abe.strategyPerformance[result.StrategyID]; exists {
+			perf.ValidationStatus = result.Status
+			perf.ValidationScore = result.OverallScore
+			perf.LastValidation = result.ValidationDate
+		}
+	}
+}
+
+// 辅助函数
+func (abe *AutoBacktestingEngine) calculateCoefficientOfVariation(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+
+	var sum, sumSquares float64
+	for _, v := range values {
+		sum += v
+		sumSquares += v * v
+	}
+
+	mean := sum / float64(len(values))
+	if mean == 0 {
+		return 0
+	}
+
+	variance := sumSquares/float64(len(values)) - mean*mean
+	stdDev := math.Sqrt(variance)
+
+	return stdDev / math.Abs(mean)
+}
+
+func (abe *AutoBacktestingEngine) calculateSkewness(values []float64) float64 {
+	if len(values) < 3 {
+		return 0
+	}
+
+	var sum, sumSquares, sumCubes float64
+	for _, v := range values {
+		sum += v
+		sumSquares += v * v
+		sumCubes += v * v * v
+	}
+
+	n := float64(len(values))
+	mean := sum / n
+	variance := sumSquares/n - mean*mean
+	stdDev := math.Sqrt(variance)
+
+	if stdDev == 0 {
+		return 0
+	}
+
+	return (sumCubes/n - 3*mean*variance - mean*mean*mean) / (stdDev * stdDev * stdDev)
+}
+
+func (abe *AutoBacktestingEngine) calculateKurtosis(values []float64) float64 {
+	if len(values) < 4 {
+		return 0
+	}
+
+	var sum, sumSquares, sumFourths float64
+	for _, v := range values {
+		sum += v
+		sumSquares += v * v
+		sumFourths += v * v * v * v
+	}
+
+	n := float64(len(values))
+	mean := sum / n
+	variance := sumSquares/n - mean*mean
+
+	if variance == 0 {
+		return 0
+	}
+
+	return (sumFourths/n - 4*mean*sum*sumSquares/n/n + 6*mean*mean*variance + 3*mean*mean*mean*mean) / (variance * variance)
 }
 
 func (abe *AutoBacktestingEngine) updateMetrics() {

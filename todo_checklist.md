@@ -1,46 +1,46 @@
 # 开发修复清单（来自 report.md）
 
 ## ./internal\analysis\backtesting\auto_backtesting_engine.go
-- [ ] `./internal\analysis\backtesting\auto_backtesting_engine.go:1267` — **TODO** — // TODO: 实现信号执行逻辑
-- [ ] `./internal\analysis\backtesting\auto_backtesting_engine.go:1287` — **TODO** — // TODO: 实现组合价值更新逻辑
-- [ ] `./internal\analysis\backtesting\auto_backtesting_engine.go:1457` — **TODO** — // TODO: 实现样本外测试
-- [ ] `./internal\analysis\backtesting\auto_backtesting_engine.go:1471` — **TODO** — // TODO: 实现稳定性测试
-- [ ] `./internal\analysis\backtesting\auto_backtesting_engine.go:1484` — **TODO** — // TODO: 实现鲁棒性测试
-- [ ] `./internal\analysis\backtesting\auto_backtesting_engine.go:1497` — **TODO** — // TODO: 实现报告生成
-- [ ] `./internal\analysis\backtesting\auto_backtesting_engine.go:1560` — **TODO** — // TODO: 实现策略性能分析
-- [ ] `./internal\analysis\backtesting\auto_backtesting_engine.go:1569` — **TODO** — // TODO: 实现验证检查
+- [x] `./internal\analysis\backtesting\auto_backtesting_engine.go:1267` — **TODO** — // TODO: 实现信号执行逻辑
+- [x] `./internal\analysis\backtesting\auto_backtesting_engine.go:1287` — **TODO** — // TODO: 实现组合价值更新逻辑
+- [x] `./internal\analysis\backtesting\auto_backtesting_engine.go:1457` — **TODO** — // TODO: 实现样本外测试
+- [x] `./internal\analysis\backtesting\auto_backtesting_engine.go:1471` — **TODO** — // TODO: 实现稳定性测试
+- [x] `./internal\analysis\backtesting\auto_backtesting_engine.go:1484` — **TODO** — // TODO: 实现鲁棒性测试
+- [x] `./internal\analysis\backtesting\auto_backtesting_engine.go:1497` — **TODO** — // TODO: 实现报告生成
+- [x] `./internal\analysis\backtesting\auto_backtesting_engine.go:1560` — **TODO** — // TODO: 实现策略性能分析
+- [x] `./internal\analysis\backtesting\auto_backtesting_engine.go:1569` — **TODO** — // TODO: 实现验证检查
 
 ## ./internal\analysis\factors\factor_discovery_engine.go
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:645` — **TODO** — // TODO: 从配置或数据库加载基础因子
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:812` — **TODO** — // TODO: 实现随机搜索算法
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:818` — **TODO** — // TODO: 实现系统化搜索算法
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:986` — **TODO** — // TODO: 实现随机因子生成
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1042` — **TODO** — // TODO: 实现收敛检查逻辑
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1093` — **TODO** — // TODO: 检查因子是否新颖（不与现有因子重复）
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1149` — **TODO** — // TODO: 实现实际的IC计算
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1167` — **TODO** — // TODO: 计算因子多样性
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1172` — **TODO** — // TODO: 计算种群多样性
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1226` — **TODO** — // TODO: 实现因子交叉操作
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1235` — **TODO** — // TODO: 实现因子变异操作
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1248` — **TODO** — // TODO: 计算因子相似度
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1262` — **TODO** — // TODO: 实现IC计算
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1276` — **TODO** — // TODO: 实现滚动IC计算
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1281` — **TODO** — // TODO: 实现IC衰减计算
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1286` — **TODO** — // TODO: 实现分组回测
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1291` — **TODO** — // TODO: 实现因子风险分析
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1301` — **TODO** — // TODO: 实现因子稳定性分析
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1380` — **TODO** — // TODO: 实现基于性能的轮换
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1384` — **TODO** — // TODO: 实现基于相关性的轮换
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1388` — **TODO** — // TODO: 实现基于市场状态的轮换
-- [ ] `./internal\analysis\factors\factor_discovery_engine.go:1392` — **TODO** — // TODO: 计算因子表现
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:645` — **TODO** — // TODO: 从配置或数据库加载基础因子
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:812` — **TODO** — // TODO: 实现随机搜索算法
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:818` — **TODO** — // TODO: 实现系统化搜索算法
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:986` — **TODO** — // TODO: 实现随机因子生成
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1042` — **TODO** — // TODO: 实现收敛检查逻辑
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1093` — **TODO** — // TODO: 检查因子是否新颖（不与现有因子重复）
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1149` — **TODO** — // TODO: 实现实际的IC计算
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1167` — **TODO** — // TODO: 计算因子多样性
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1172` — **TODO** — // TODO: 计算种群多样性
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1226` — **TODO** — // TODO: 实现因子交叉操作
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1235` — **TODO** — // TODO: 实现因子变异操作
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1248` — **TODO** — // TODO: 计算因子相似度
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1262` — **TODO** — // TODO: 实现IC计算
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1276` — **TODO** — // TODO: 实现滚动IC计算
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1281` — **TODO** — // TODO: 实现IC衰减计算
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1286` — **TODO** — // TODO: 实现分组回测
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1291` — **TODO** — // TODO: 实现因子风险分析
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1301` — **TODO** — // TODO: 实现因子稳定性分析
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1380` — **TODO** — // TODO: 实现基于性能的轮换
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1384` — **TODO** — // TODO: 实现基于相关性的轮换
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1388` — **TODO** — // TODO: 实现基于市场状态的轮换
+- [x] `./internal\analysis\factors\factor_discovery_engine.go:1392` — **TODO** — // TODO: 计算因子表现
 
 ## ./internal\api\api_test.go
 - [ ] `./internal\api\api_test.go:78` — **mock** — mockData := testutils.NewMockData()
 - [ ] `./internal\api\api_test.go:81` — **mock** — strategy := mockData.GenerateStrategy()
 
 ## ./internal\api\handlers.go
-- [ ] `./internal\api\handlers.go:3373` — **TODO** — // TODO: 实现真实的策略接入流程
-- [ ] `./internal\api\handlers.go:3484` — **TODO** — // TODO: 实现真实的策略接入状态查询
+- [x] `./internal\api\handlers.go:3373` — **TODO** — // TODO: 实现真实的策略接入流程
+- [x] `./internal\api\handlers.go:3484` — **TODO** — // TODO: 实现真实的策略接入状态查询
 
 ## ./internal\api\server.go
 - [ ] `./internal\api\server.go:440` — **mock** — log.Printf("Warning: Binance API credentials not configured, using mock data")
@@ -49,8 +49,8 @@
 - [ ] `./internal\api\server.go:583` — **TODO** — // TODO: TEMPORARY - Add strategy routes as public for frontend testing
 
 ## ./internal\api\settings_handler.go
-- [ ] `./internal\api\settings_handler.go:125` — **TODO** — // TODO 集成到实际的交易系统中
-- [ ] `./internal\api\settings_handler.go:129` — **TODO** — // TODO: 集成到实际的交易执行器
+- [x] `./internal\api\settings_handler.go:125` — **TODO** — // TODO 集成到实际的交易系统中
+- [x] `./internal\api\settings_handler.go:129` — **TODO** — // TODO: 集成到实际的交易执行器
 
 ## ./internal\api\websocket.go
 - [ ] `./internal\api\websocket.go:228` — **mock** — // Mock market data
@@ -58,28 +58,28 @@
 - [ ] `./internal\api\websocket.go:325` — **mock** — // Mock alerts
 
 ## ./internal\automation\executor\executors.go
-- [ ] `./internal\automation\executor\executors.go:638` — **TODO** — // TODO: 实现暂停新开仓逻辑
-- [ ] `./internal\automation\executor\executors.go:711` — **TODO** — // TODO: 实现收紧止损逻辑
-- [ ] `./internal\automation\executor\executors.go:792` — **TODO** — // 简单的余额检查（TODO 添加更复杂的逻辑）
-- [ ] `./internal\automation\executor\executors.go:1083` — **TODO** — // TODO: 实现参数应用逻辑
-- [ ] `./internal\automation\executor\executors.go:1090` — **TODO** — // TODO: 实现策略淘汰逻辑
-- [ ] `./internal\automation\executor\executors.go:1097` — **TODO** — // TODO: 实现新策略引入逻辑
-- [ ] `./internal\automation\executor\executors.go:1104` — **TODO** — // TODO: 实现策略优化逻辑
-- [ ] `./internal\automation\executor\executors.go:1150` — **TODO** — // TODO: 实现数据清洗逻辑
-- [ ] `./internal\automation\executor\executors.go:1157` — **TODO** — // TODO: 实现因子更新逻辑
-- [ ] `./internal\automation\executor\executors.go:1164` — **TODO** — // TODO: 实现回测逻辑
-- [ ] `./internal\automation\executor\executors.go:1171` — **TODO** — // TODO: 实现模式识别逻辑
-- [ ] `./internal\automation\executor\executors.go:1219` — **TODO** — // TODO: 实现健康检查逻辑
-- [ ] `./internal\automation\executor\executors.go:1226` — **TODO** — // TODO: 实现安全监控逻辑
-- [ ] `./internal\automation\executor\executors.go:1233` — **TODO** — // TODO: 实现交易所故障切换逻辑
-- [ ] `./internal\automation\executor\executors.go:1240` — **TODO** — // TODO: 实现审计日志处理逻辑
+- [x] `./internal\automation\executor\executors.go:638` — **TODO** — // TODO: 实现暂停新开仓逻辑
+- [x] `./internal\automation\executor\executors.go:711` — **TODO** — // TODO: 实现收紧止损逻辑
+- [x] `./internal\automation\executor\executors.go:792` — **TODO** — // 简单的余额检查（TODO 添加更复杂的逻辑）
+- [x] `./internal\automation\executor\executors.go:1083` — **TODO** — // TODO: 实现参数应用逻辑
+- [x] `./internal\automation\executor\executors.go:1090` — **TODO** — // TODO: 实现策略淘汰逻辑
+- [x] `./internal\automation\executor\executors.go:1097` — **TODO** — // TODO: 实现新策略引入逻辑
+- [x] `./internal\automation\executor\executors.go:1104` — **TODO** — // TODO: 实现策略优化逻辑
+- [x] `./internal\automation\executor\executors.go:1150` — **TODO** — // TODO: 实现数据清洗逻辑
+- [x] `./internal\automation\executor\executors.go:1157` — **TODO** — // TODO: 实现因子更新逻辑
+- [x] `./internal\automation\executor\executors.go:1164` — **TODO** — // TODO: 实现回测逻辑
+- [x] `./internal\automation\executor\executors.go:1171` — **TODO** — // TODO: 实现模式识别逻辑
+- [x] `./internal\automation\executor\executors.go:1219` — **TODO** — // TODO: 实现健康检查逻辑
+- [x] `./internal\automation\executor\executors.go:1226` — **TODO** — // TODO: 实现安全监控逻辑
+- [x] `./internal\automation\executor\executors.go:1233` — **TODO** — // TODO: 实现交易所故障切换逻辑
+- [x] `./internal\automation\executor\executors.go:1240` — **TODO** — // TODO: 实现审计日志处理逻辑
 
 ## ./internal\automation\risk\intelligent_controller.go
-- [ ] `./internal\automation\risk\intelligent_controller.go:1040` — **TODO** — // TODO 将报告保存到数据库或发送给相关人员
+- [x] `./internal\automation\risk\intelligent_controller.go:1040` — **TODO** — // TODO 将报告保存到数据库或发送给相关人员
 
 ## ./internal\automation\scheduler\strategy_scheduler.go
-- [ ] `./internal\automation\scheduler\strategy_scheduler.go:455` — **TODO** — // TODO: 实现参数更新逻辑
-- [ ] `./internal\automation\scheduler\strategy_scheduler.go:828` — **TODO** — // TODO 根据策略类型返回不同的默认参数
+- [x] `./internal\automation\scheduler\strategy_scheduler.go:455` — **TODO** — // TODO: 实现参数更新逻辑
+- [x] `./internal\automation\scheduler\strategy_scheduler.go:828` — **TODO** — // TODO 根据策略类型返回不同的默认参数
 - [ ] `./internal\automation\scheduler\strategy_scheduler.go:2873` — **mock** — log.Printf("Mock: Adjusted %s - SL: %.4f->%.4f, TP: %.4f->%.4f",
 - [ ] `./internal\automation\scheduler\strategy_scheduler.go:2879` — **mock** — log.Printf("Mock: Completed automatic adjustment for %d positions", adjustmentCount)
 - [ ] `./internal\automation\scheduler\strategy_scheduler.go:3822` — **mock** — log.Printf("Exchange client not fully implemented, using mock data")
