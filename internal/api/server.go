@@ -765,12 +765,13 @@ func (s *Server) setupRoutes() {
 					unifiedStrategy.GET("/workflow/status", s.handlers.UnifiedStrategy.GetWorkflowStatus)
 				}
 			}
-			audit := protected.Group("/audit")
+
+			audit1 := protected.Group("/audit")
 			{
 				// audit.GET("/logs", s.handlers.Audit.GetLogs) // MOVED TO PUBLIC FOR TESTING
-				audit.GET("/decisions", s.handlers.Audit.GetDecisionChains)
-				audit.GET("/performance", s.handlers.Audit.GetPerformanceMetrics)
-				audit.POST("/export", s.handlers.Audit.ExportReport)
+				audit1.GET("/decisions", s.handlers.Audit.GetDecisionChains)
+				audit1.GET("/performance", s.handlers.Audit.GetPerformanceMetrics)
+				audit1.POST("/export", s.handlers.Audit.ExportReport)
 			}
 
 			// Cache management routes
