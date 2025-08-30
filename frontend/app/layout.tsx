@@ -315,7 +315,6 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
           {/* Dry-Run 模式指示器 */}
           <DryRunIndicator />
-          </div>
         </div>
       </ProtectedRoute>
     );

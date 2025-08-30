@@ -79,6 +79,7 @@ func NewIngestor(db *sql.DB, apiKey, apiSecret string, testnet bool) *Ingestor {
 		APIKey:    apiKey,
 		APISecret: apiSecret,
 		TestNet:   testnet,
+		ProxyURL:  "", // 可以从环境变量或配置文件中读取
 	}
 
 	// Create rate limiter (using nil cache for now)

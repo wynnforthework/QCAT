@@ -48,8 +48,10 @@ func main() {
 		APIKey:                cfg.Exchange.APIKey,
 		APISecret:             cfg.Exchange.APISecret,
 		TestNet:               cfg.Exchange.TestNet,
-		SuppressCacheWarnings: true, // Attempt to suppress banexg cache warnings
 		BaseURL:               cfg.Exchange.BaseURL,
+		FuturesBaseURL:        cfg.Exchange.FuturesBaseURL,
+		ProxyURL:              cfg.Exchange.ProxyURL,
+		SuppressCacheWarnings: true, // Attempt to suppress banexg cache warnings
 	}
 
 	// Create rate limiter (simple implementation)

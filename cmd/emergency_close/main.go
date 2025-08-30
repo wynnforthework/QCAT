@@ -23,9 +23,13 @@ type EmergencyCloser struct {
 func NewEmergencyCloser(cfg *config.Config) (*EmergencyCloser, error) {
 	// Initialize Binance client
 	exchangeConfig := &exchange.ExchangeConfig{
-		APIKey:    cfg.Exchange.APIKey,
-		APISecret: cfg.Exchange.APISecret,
-		TestNet:   cfg.Exchange.TestNet,
+		Name:           cfg.Exchange.Name,
+		APIKey:         cfg.Exchange.APIKey,
+		APISecret:      cfg.Exchange.APISecret,
+		TestNet:        cfg.Exchange.TestNet,
+		BaseURL:        cfg.Exchange.BaseURL,
+		FuturesBaseURL: cfg.Exchange.FuturesBaseURL,
+		ProxyURL:       cfg.Exchange.ProxyURL,
 	}
 
 	// Create rate limiter with more conservative settings

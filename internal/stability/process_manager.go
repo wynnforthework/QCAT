@@ -1612,10 +1612,13 @@ func (pm *ProcessManager) runStrategyProcess(process *Process) {
 
 	// 新增：创建交易所连接器
 	exchangeConfig := &exchange.ExchangeConfig{
-		Name:      cfg.Exchange.Name,
-		APIKey:    cfg.Exchange.APIKey,
-		APISecret: cfg.Exchange.APISecret,
-		TestNet:   cfg.Exchange.TestNet,
+		Name:           cfg.Exchange.Name,
+		APIKey:         cfg.Exchange.APIKey,
+		APISecret:      cfg.Exchange.APISecret,
+		TestNet:        cfg.Exchange.TestNet,
+		BaseURL:        cfg.Exchange.BaseURL,
+		FuturesBaseURL: cfg.Exchange.FuturesBaseURL,
+		ProxyURL:       cfg.Exchange.ProxyURL,
 	}
 
 	// 新增：创建速率限制器
@@ -1991,10 +1994,13 @@ func (pm *ProcessManager) runExchangeProcess(process *Process) {
 
 	// 新增：创建交易所配置
 	exchangeConfig := &exchange.ExchangeConfig{
-		Name:      exchangeName,
-		APIKey:    apiKey,
-		APISecret: apiSecret,
-		TestNet:   cfg.Exchange.TestNet,
+		Name:           exchangeName,
+		APIKey:         apiKey,
+		APISecret:      apiSecret,
+		TestNet:        cfg.Exchange.TestNet,
+		BaseURL:        cfg.Exchange.BaseURL,
+		FuturesBaseURL: cfg.Exchange.FuturesBaseURL,
+		ProxyURL:       cfg.Exchange.ProxyURL,
 	}
 
 	// 新增：创建Redis缓存（用于速率限制器）

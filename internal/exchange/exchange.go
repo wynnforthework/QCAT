@@ -97,6 +97,9 @@ type ExchangeConfig struct {
 	BaseURL        string
 	FuturesBaseURL string
 
+	// Proxy configuration
+	ProxyURL string // HTTP/HTTPS/SOCKS5 proxy URL, e.g., "http://127.0.0.1:1080"
+
 	// SuppressCacheWarnings indicates whether to attempt suppressing cache warnings
 	// from the underlying exchange library (like banexg). Note that this may not
 	// completely eliminate all warnings due to library-internal caching mechanisms.

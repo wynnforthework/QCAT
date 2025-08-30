@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 	"time"
 
@@ -56,9 +55,13 @@ func main() {
 
 	// 创建Binance客户端
 	binanceClient := binance.NewClient(&exchange.ExchangeConfig{
-		APIKey:    cfg.Exchange.APIKey,
-		APISecret: cfg.Exchange.APISecret,
-		TestNet:   cfg.Exchange.TestNet,
+		Name:           cfg.Exchange.Name,
+		APIKey:         cfg.Exchange.APIKey,
+		APISecret:      cfg.Exchange.APISecret,
+		TestNet:        cfg.Exchange.TestNet,
+		BaseURL:        cfg.Exchange.BaseURL,
+		FuturesBaseURL: cfg.Exchange.FuturesBaseURL,
+		ProxyURL:       cfg.Exchange.ProxyURL,
 	}, nil)
 
 	// 创建K线管理器
@@ -129,8 +132,8 @@ func main() {
 						fmt.Printf("    ... 还有 %d 个间隙\n", len(report.Gaps)-5)
 						break
 					}
-					fmt.Printf("    %s 到 %s\n", 
-						gap.Start.Format("2006-01-02 15:04"), 
+					fmt.Printf("    %s 到 %s\n",
+						gap.Start.Format("2006-01-02 15:04"),
 						gap.End.Format("2006-01-02 15:04"))
 				}
 			}

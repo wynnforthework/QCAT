@@ -104,6 +104,7 @@ type ExchangeConfig struct {
 	WebsocketURL        string `yaml:"websocket_url"`
 	FuturesBaseURL      string `yaml:"futures_base_url"`
 	FuturesWebsocketURL string `yaml:"futures_websocket_url"`
+	ProxyURL            string `yaml:"proxy_url"` // 代理配置
 
 	RateLimit     ExchangeRateLimit `yaml:"rate_limit"`
 	Timeout       time.Duration     `yaml:"timeout"`
@@ -569,6 +570,9 @@ func (c *Config) overrideWithEnv(env *EnvManager) {
 	}
 	if env.GetString("EXCHANGE_WEBSOCKET_URL", "") != "" {
 		c.Exchange.WebsocketURL = env.GetString("EXCHANGE_WEBSOCKET_URL", c.Exchange.WebsocketURL)
+	}
+	if env.GetString("EXCHANGE_PROXY_URL", "") != "" {
+		c.Exchange.ProxyURL = env.GetString("EXCHANGE_PROXY_URL", c.Exchange.ProxyURL)
 	}
 
 	// JWT configuration

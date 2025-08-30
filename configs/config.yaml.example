@@ -63,6 +63,9 @@ exchange:
   websocket_url: "wss://stream.binance.com:9443"
   futures_base_url: "https://fapi.binance.com"
   futures_websocket_url: "wss://fstream.binance.com"
+  # 代理配置 - 如果需要通过代理访问Binance API
+  # proxy_url: "http://127.0.0.1:1080"  # 取消注释并设置你的代理地址和端口
+  # proxy_url: "socks5://127.0.0.1:1080"  # SOCKS5代理示例
   rate_limit:
     enabled: true
     requests_per_minute: 1200

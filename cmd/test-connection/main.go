@@ -30,6 +30,7 @@ func main() {
 		TestNet:        cfg.Exchange.TestNet,
 		BaseURL:        cfg.Exchange.BaseURL,
 		FuturesBaseURL: cfg.Exchange.FuturesBaseURL,
+		ProxyURL:       cfg.Exchange.ProxyURL,
 	}
 
 	log.Printf("Configuration:")

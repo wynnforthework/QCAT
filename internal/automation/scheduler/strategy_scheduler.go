@@ -73,6 +73,7 @@ func NewStrategyScheduler(
 			TestNet:        cfg.Exchange.TestNet,
 			BaseURL:        cfg.Exchange.BaseURL,
 			FuturesBaseURL: cfg.Exchange.FuturesBaseURL,
+			ProxyURL:       cfg.Exchange.ProxyURL,
 		}
 
 		// 创建简单的速率限制器

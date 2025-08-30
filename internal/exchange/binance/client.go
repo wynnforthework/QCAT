@@ -61,31 +61,46 @@ func NewClient(config *exchange.ExchangeConfig, rateLimiter *exchange.RateLimite
 	}
 
 	// 创建统一的HTTP客户端配置，修复网络连接超时问题
+	transport := &http.Transport{
+		// 连接池配置
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     90 * time.Second,
+		DisableKeepAlives:   false,
+
+		// 连接超时配置
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second, // 连接超时
+			KeepAlive: 30 * time.Second, // 保持连接
+		}).DialContext,
+
+		// TLS和响应超时配置
+		TLSHandshakeTimeout:   30 * time.Second,
+		ResponseHeaderTimeout: 30 * time.Second,
+
+		// 强制使用HTTP/1.1，避免HTTP/2可能的问题
+		ForceAttemptHTTP2: false,
+	}
+
+	// 配置代理设置
+	if config.ProxyURL != "" {
+		// 使用配置中指定的代理
+		proxyURL, err := url.Parse(config.ProxyURL)
+		if err != nil {
+			log.Printf("Warning: Invalid proxy URL %s: %v, falling back to system proxy", config.ProxyURL, err)
+			transport.Proxy = http.ProxyFromEnvironment
+		} else {
+			transport.Proxy = http.ProxyURL(proxyURL)
+			log.Printf("Using configured proxy: %s", config.ProxyURL)
+		}
+	} else {
+		// 使用系统代理设置
+		transport.Proxy = http.ProxyFromEnvironment
+	}
+
 	httpClient := &http.Client{
-		Timeout: 60 * time.Second, // 增加超时时间到60秒
-		Transport: &http.Transport{
-			// 使用系统代理设置 - 这可能是浏览器能访问而Go程序不能的原因
-			Proxy: http.ProxyFromEnvironment,
-
-			// 连接池配置
-			MaxIdleConns:        100,
-			MaxIdleConnsPerHost: 10,
-			IdleConnTimeout:     90 * time.Second,
-			DisableKeepAlives:   false,
-
-			// 连接超时配置
-			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second, // 连接超时
-				KeepAlive: 30 * time.Second, // 保持连接
-			}).DialContext,
-
-			// TLS和响应超时配置
-			TLSHandshakeTimeout:   30 * time.Second,
-			ResponseHeaderTimeout: 30 * time.Second,
-
-			// 强制使用HTTP/1.1，避免HTTP/2可能的问题
-			ForceAttemptHTTP2: false,
-		},
+		Timeout:   60 * time.Second, // 增加超时时间到60秒
+		Transport: transport,
 	}
 
 	// Create banexg adapter

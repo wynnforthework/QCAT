@@ -425,6 +425,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 			TestNet:        cfg.Exchange.TestNet,
 			BaseURL:        cfg.Exchange.BaseURL,
 			FuturesBaseURL: cfg.Exchange.FuturesBaseURL,
+			ProxyURL:       cfg.Exchange.ProxyURL,
 		}
 
 		// Create rate limiter for Binance
@@ -453,6 +454,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 				TestNet:        cfg.Exchange.TestNet,
 				BaseURL:        cfg.Exchange.BaseURL,
 				FuturesBaseURL: cfg.Exchange.FuturesBaseURL,
+				ProxyURL:       cfg.Exchange.ProxyURL,
 			}
 			rateLimiter := exchange.NewRateLimiter(redis, time.Second)
 			exchangeClient = binance.NewClient(exchangeConfig, rateLimiter)

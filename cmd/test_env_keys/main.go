@@ -66,11 +66,13 @@ func main() {
 
 	// Create exchange config for testnet
 	exchangeConfig := &exchange.ExchangeConfig{
-		Name:      "binance",
-		APIKey:    apiKey,
-		APISecret: apiSecret,
-		TestNet:   true, // Use testnet
-		BaseURL:   "https://testnet.binancefuture.com",
+		Name:           "binance",
+		APIKey:         apiKey,
+		APISecret:      apiSecret,
+		TestNet:        true, // Use testnet
+		BaseURL:        "https://testnet.binancefuture.com",
+		FuturesBaseURL: "https://testnet.binancefuture.com",
+		ProxyURL:       os.Getenv("EXCHANGE_PROXY_URL"), // 从环境变量读取代理配置
 	}
 
 	// Create rate limiter
