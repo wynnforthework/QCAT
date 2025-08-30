@@ -169,28 +169,19 @@ monitoring:
   enable_profiling: false
   profiling_port: 6060
 
-# 数据库配置
+# 数据库配置 - 统一使用PostgreSQL
 database:
-  # 策略数据存储
-  strategy_db:
-    type: "sqlite"
-    connection: "data/strategies.db"
-    max_connections: 10
-    connection_timeout: "30s"
-  
-  # 性能数据存储
-  performance_db:
-    type: "sqlite"
-    connection: "data/performance.db"
-    max_connections: 5
-    connection_timeout: "30s"
-  
-  # 事件数据存储
-  event_db:
-    type: "sqlite"
-    connection: "data/events.db"
-    max_connections: 5
-    connection_timeout: "30s"
+  host: "${QCAT_DATABASE_HOST:-localhost}"
+  port: "${QCAT_DATABASE_PORT:-5432}"
+  user: "${QCAT_DATABASE_USER:-postgres}"
+  password: "${QCAT_DATABASE_PASSWORD}"
+  dbname: "${QCAT_DATABASE_NAME:-qcat}"
+  sslmode: "${QCAT_DATABASE_SSL_MODE:-disable}"
+  max_open: 25
+  max_idle: 5
+  timeout: 30s
+  conn_max_lifetime: 1h
+  conn_max_idle_time: 15m
 
 # 安全配置
 security:

@@ -13,7 +13,7 @@ import (
 // PostgresDAOManager implements DAOManager using PostgreSQL
 type PostgresDAOManager struct {
 	db *sqlx.DB
-	
+
 	// DAO instances
 	historicalReturns    HistoricalReturnsDAO
 	historicalEquity     HistoricalEquityDAO
@@ -29,18 +29,18 @@ type PostgresDAOManager struct {
 // NewPostgresDAOManager creates a new PostgreSQL DAO manager
 func NewPostgresDAOManager(db *sqlx.DB) *PostgresDAOManager {
 	manager := &PostgresDAOManager{db: db}
-	
+
 	// Initialize DAO instances
-	manager.historicalReturns = &postgresHistoricalReturnsDAO{db: db}
-	manager.historicalEquity = &postgresHistoricalEquityDAO{db: db}
-	manager.riskSnapshots = &postgresRiskSnapshotsDAO{db: db}
-	manager.transferRecords = &postgresTransferRecordsDAO{db: db}
-	manager.emergencyEvents = &postgresEmergencyEventsDAO{db: db}
-	manager.positionSnapshots = &postgresPositionSnapshotsDAO{db: db}
-	manager.fundStatusSnapshots = &postgresFundStatusSnapshotsDAO{db: db}
-	manager.circuitBreakerEvents = &postgresCircuitBreakerEventsDAO{db: db}
-	manager.protectionMetrics = &postgresProtectionMetricsDAO{db: db}
-	
+	manager.historicalReturns = &postgresHistoricalReturnsDAO{baseDAO: newBaseDAO(db)}
+	manager.historicalEquity = &postgresHistoricalEquityDAO{baseDAO: newBaseDAO(db)}
+	manager.riskSnapshots = &postgresRiskSnapshotsDAO{baseDAO: newBaseDAO(db)}
+	manager.transferRecords = &postgresTransferRecordsDAO{baseDAO: newBaseDAO(db)}
+	manager.emergencyEvents = &postgresEmergencyEventsDAO{baseDAO: newBaseDAO(db)}
+	manager.positionSnapshots = &postgresPositionSnapshotsDAO{baseDAO: newBaseDAO(db)}
+	manager.fundStatusSnapshots = &postgresFundStatusSnapshotsDAO{baseDAO: newBaseDAO(db)}
+	manager.circuitBreakerEvents = &postgresCircuitBreakerEventsDAO{baseDAO: newBaseDAO(db)}
+	manager.protectionMetrics = &postgresProtectionMetricsDAO{baseDAO: newBaseDAO(db)}
+
 	return manager
 }
 
@@ -95,18 +95,18 @@ func (m *PostgresDAOManager) BeginTx(ctx context.Context) (TxManager, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	
+
 	return &postgresTxManager{
-		tx: tx,
-		historicalReturns:    &postgresHistoricalReturnsDAO{tx: tx},
-		historicalEquity:     &postgresHistoricalEquityDAO{tx: tx},
-		riskSnapshots:        &postgresRiskSnapshotsDAO{tx: tx},
-		transferRecords:      &postgresTransferRecordsDAO{tx: tx},
-		emergencyEvents:      &postgresEmergencyEventsDAO{tx: tx},
-		positionSnapshots:    &postgresPositionSnapshotsDAO{tx: tx},
-		fundStatusSnapshots:  &postgresFundStatusSnapshotsDAO{tx: tx},
-		circuitBreakerEvents: &postgresCircuitBreakerEventsDAO{tx: tx},
-		protectionMetrics:    &postgresProtectionMetricsDAO{tx: tx},
+		tx:                   tx,
+		historicalReturns:    &postgresHistoricalReturnsDAO{baseDAO: newBaseDAO(tx)},
+		historicalEquity:     &postgresHistoricalEquityDAO{baseDAO: newBaseDAO(tx)},
+		riskSnapshots:        &postgresRiskSnapshotsDAO{baseDAO: newBaseDAO(tx)},
+		transferRecords:      &postgresTransferRecordsDAO{baseDAO: newBaseDAO(tx)},
+		emergencyEvents:      &postgresEmergencyEventsDAO{baseDAO: newBaseDAO(tx)},
+		positionSnapshots:    &postgresPositionSnapshotsDAO{baseDAO: newBaseDAO(tx)},
+		fundStatusSnapshots:  &postgresFundStatusSnapshotsDAO{baseDAO: newBaseDAO(tx)},
+		circuitBreakerEvents: &postgresCircuitBreakerEventsDAO{baseDAO: newBaseDAO(tx)},
+		protectionMetrics:    &postgresProtectionMetricsDAO{baseDAO: newBaseDAO(tx)},
 	}, nil
 }
 
@@ -118,7 +118,7 @@ func (m *PostgresDAOManager) Close() error {
 // postgresTxManager implements TxManager for PostgreSQL transactions
 type postgresTxManager struct {
 	tx *sqlx.Tx
-	
+
 	// DAO instances for transaction
 	historicalReturns    HistoricalReturnsDAO
 	historicalEquity     HistoricalEquityDAO
@@ -194,6 +194,7 @@ type Queryer interface {
 	GetContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
 	SelectContext(ctx context.Context, dest interface{}, query string, args ...interface{}) error
 	NamedExecContext(ctx context.Context, query string, arg interface{}) (sql.Result, error)
+	NamedQuery(query string, arg interface{}) (*sqlx.Rows, error)
 }
 
 // baseDAO provides common functionality for all DAOs

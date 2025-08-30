@@ -1043,18 +1043,18 @@ func (irc *IntelligentRiskController) generateRiskReport() error {
 		log.Printf("Failed to save report to database: %v", err)
 		// 不返回错误，继续尝试其他通知方式
 	}
-	
+
 	// 发送报告给相关人员
 	if err := irc.sendReportToStakeholders(report, &metrics); err != nil {
 		log.Printf("Failed to send report to stakeholders: %v", err)
 		// 不返回错误，因为报告已经生成并记录
 	}
-	
+
 	// 更新报告生成历史
 	if err := irc.updateReportHistory(report); err != nil {
 		log.Printf("Failed to update report history: %v", err)
 	}
-	
+
 	return nil
 }
 
@@ -1101,14 +1101,15 @@ func (irc *IntelligentRiskController) generateRiskRecommendations() string {
 
 	return result
 }
+
 // saveReportToDatabase 将报告保存到数据库
-func (irc *IntelligentRiskController) saveReportToDatabase(report string, metrics *RiskMetrics) error {
+func (irc *IntelligentRiskController) saveReportToDatabase(report string, metrics *RealTimeRiskMetrics) error {
 	if irc.db == nil {
 		return fmt.Errorf("database not available")
 	}
-	
+
 	ctx := context.Background()
-	
+
 	// 保存风险报告到数据库
 	query := `
 		INSERT INTO risk_reports (
@@ -1123,7 +1124,7 @@ func (irc *IntelligentRiskController) saveReportToDatabase(report string, metric
 			generated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	
+
 	_, err := irc.db.ExecContext(ctx, query,
 		report,
 		string(irc.currentRiskLevel),
@@ -1135,49 +1136,49 @@ func (irc *IntelligentRiskController) saveReportToDatabase(report string, metric
 		metrics.LiquidityRisk,
 		time.Now(),
 	)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to save risk report to database: %w", err)
 	}
-	
+
 	log.Printf("Risk report saved to database successfully")
 	return nil
 }
 
 // sendReportToStakeholders 发送报告给相关人员
-func (irc *IntelligentRiskController) sendReportToStakeholders(report string, metrics *RiskMetrics) error {
+func (irc *IntelligentRiskController) sendReportToStakeholders(report string, metrics *RealTimeRiskMetrics) error {
 	// 1. 发送邮件通知
 	if err := irc.sendEmailNotification(report, metrics); err != nil {
 		log.Printf("Failed to send email notification: %v", err)
 	}
-	
+
 	// 2. 发送Slack通知
 	if err := irc.sendSlackNotification(report, metrics); err != nil {
 		log.Printf("Failed to send Slack notification: %v", err)
 	}
-	
+
 	// 3. 发送短信通知（仅在高风险情况下）
 	if irc.currentRiskLevel >= RiskLevelHigh {
 		if err := irc.sendSMSNotification(report, metrics); err != nil {
 			log.Printf("Failed to send SMS notification: %v", err)
 		}
 	}
-	
+
 	// 4. 发送Webhook通知
 	if err := irc.sendWebhookNotification(report, metrics); err != nil {
 		log.Printf("Failed to send webhook notification: %v", err)
 	}
-	
+
 	log.Printf("Risk report notifications sent to stakeholders")
 	return nil
 }
 
 // sendEmailNotification 发送邮件通知
-func (irc *IntelligentRiskController) sendEmailNotification(report string, metrics *RiskMetrics) error {
+func (irc *IntelligentRiskController) sendEmailNotification(report string, metrics *RealTimeRiskMetrics) error {
 	// 构建邮件内容
-	subject := fmt.Sprintf("风险控制报告 - %s - %s", 
+	subject := fmt.Sprintf("风险控制报告 - %s - %s",
 		irc.currentRiskLevel, time.Now().Format("2006-01-02 15:04"))
-	
+
 	emailBody := fmt.Sprintf(`
 <html>
 <body>
@@ -1201,7 +1202,7 @@ func (irc *IntelligentRiskController) sendEmailNotification(report string, metri
 <p><em>此报告由智能风险控制系统自动生成</em></p>
 </body>
 </html>
-	`, 
+	`,
 		irc.currentRiskLevel,
 		time.Now().Format("2006-01-02 15:04:05"),
 		metrics.PortfolioVaR,
@@ -1212,10 +1213,10 @@ func (irc *IntelligentRiskController) sendEmailNotification(report string, metri
 		metrics.LiquidityRisk,
 		report,
 	)
-	
+
 	// 获取收件人列表
 	recipients := irc.getEmailRecipients()
-	
+
 	// 发送邮件
 	for _, recipient := range recipients {
 		if err := irc.sendEmail(recipient, subject, emailBody); err != nil {
@@ -1224,12 +1225,12 @@ func (irc *IntelligentRiskController) sendEmailNotification(report string, metri
 			log.Printf("Risk report email sent to %s", recipient)
 		}
 	}
-	
+
 	return nil
 }
 
 // sendSlackNotification 发送Slack通知
-func (irc *IntelligentRiskController) sendSlackNotification(report string, metrics *RiskMetrics) error {
+func (irc *IntelligentRiskController) sendSlackNotification(report string, metrics *RealTimeRiskMetrics) error {
 	// 构建Slack消息
 	message := fmt.Sprintf(`
 🚨 *风险控制报告* 🚨
@@ -1251,28 +1252,28 @@ func (irc *IntelligentRiskController) sendSlackNotification(report string, metri
 		metrics.ConcentrationRisk,
 		irc.getRiskLevelEmoji(),
 	)
-	
+
 	// 发送到Slack频道
 	if err := irc.sendSlackMessage(message); err != nil {
 		return fmt.Errorf("failed to send Slack message: %w", err)
 	}
-	
+
 	log.Printf("Risk report Slack notification sent")
 	return nil
 }
 
 // sendSMSNotification 发送短信通知
-func (irc *IntelligentRiskController) sendSMSNotification(report string, metrics *RiskMetrics) error {
+func (irc *IntelligentRiskController) sendSMSNotification(report string, metrics *RealTimeRiskMetrics) error {
 	// 构建短信内容（简化版）
 	message := fmt.Sprintf("风险警报: %s级别风险，VaR: %.4f，请立即查看详细报告。时间: %s",
 		irc.currentRiskLevel,
 		metrics.PortfolioVaR,
 		time.Now().Format("15:04"),
 	)
-	
+
 	// 获取短信接收人列表
 	phoneNumbers := irc.getSMSRecipients()
-	
+
 	// 发送短信
 	for _, phone := range phoneNumbers {
 		if err := irc.sendSMS(phone, message); err != nil {
@@ -1281,32 +1282,32 @@ func (irc *IntelligentRiskController) sendSMSNotification(report string, metrics
 			log.Printf("Risk report SMS sent to %s", phone)
 		}
 	}
-	
+
 	return nil
 }
 
 // sendWebhookNotification 发送Webhook通知
-func (irc *IntelligentRiskController) sendWebhookNotification(report string, metrics *RiskMetrics) error {
+func (irc *IntelligentRiskController) sendWebhookNotification(report string, metrics *RealTimeRiskMetrics) error {
 	// 构建Webhook负载
 	payload := map[string]interface{}{
-		"type": "risk_report",
-		"timestamp": time.Now().Unix(),
+		"type":       "risk_report",
+		"timestamp":  time.Now().Unix(),
 		"risk_level": string(irc.currentRiskLevel),
 		"metrics": map[string]float64{
-			"portfolio_var": metrics.PortfolioVaR,
-			"portfolio_cvar": metrics.PortfolioCVaR,
-			"max_drawdown": metrics.MaxDrawdown,
+			"portfolio_var":      metrics.PortfolioVaR,
+			"portfolio_cvar":     metrics.PortfolioCVaR,
+			"max_drawdown":       metrics.MaxDrawdown,
 			"concentration_risk": metrics.ConcentrationRisk,
-			"correlation_risk": metrics.CorrelationRisk,
-			"liquidity_risk": metrics.LiquidityRisk,
+			"correlation_risk":   metrics.CorrelationRisk,
+			"liquidity_risk":     metrics.LiquidityRisk,
 		},
-		"report": report,
+		"report":          report,
 		"recommendations": irc.generateRiskRecommendations(),
 	}
-	
+
 	// 获取Webhook URL列表
 	webhookURLs := irc.getWebhookURLs()
-	
+
 	// 发送Webhook
 	for _, url := range webhookURLs {
 		if err := irc.sendWebhook(url, payload); err != nil {
@@ -1315,7 +1316,7 @@ func (irc *IntelligentRiskController) sendWebhookNotification(report string, met
 			log.Printf("Risk report webhook sent to %s", url)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -1324,34 +1325,34 @@ func (irc *IntelligentRiskController) updateReportHistory(report string) error {
 	if irc.db == nil {
 		return fmt.Errorf("database not available")
 	}
-	
+
 	ctx := context.Background()
-	
+
 	// 更新报告生成统计
 	query := `
 		INSERT INTO risk_report_history (report_hash, generated_at, risk_level)
 		VALUES (?, ?, ?)
 	`
-	
+
 	// 计算报告哈希值用于去重
 	reportHash := fmt.Sprintf("%x", sha256.Sum256([]byte(report)))
-	
+
 	_, err := irc.db.ExecContext(ctx, query, reportHash, time.Now(), string(irc.currentRiskLevel))
 	if err != nil {
 		return fmt.Errorf("failed to update report history: %w", err)
 	}
-	
+
 	// 清理旧的报告历史（保留最近30天）
 	cleanupQuery := `
 		DELETE FROM risk_report_history 
 		WHERE generated_at < DATE_SUB(NOW(), INTERVAL 30 DAY)
 	`
-	
+
 	_, err = irc.db.ExecContext(ctx, cleanupQuery)
 	if err != nil {
 		log.Printf("Failed to cleanup old report history: %v", err)
 	}
-	
+
 	log.Printf("Report history updated successfully")
 	return nil
 }
@@ -1412,11 +1413,11 @@ func (irc *IntelligentRiskController) sendEmail(recipient, subject, body string)
 	// 实现实际的邮件发送逻辑
 	// 可以集成SMTP服务器、SendGrid、AWS SES等
 	log.Printf("Sending email to %s: %s", recipient, subject)
-	
+
 	// 示例实现（实际应该使用真实的邮件服务）
 	// emailService := irc.getEmailService()
 	// return emailService.Send(recipient, subject, body)
-	
+
 	return nil
 }
 
@@ -1424,11 +1425,11 @@ func (irc *IntelligentRiskController) sendEmail(recipient, subject, body string)
 func (irc *IntelligentRiskController) sendSlackMessage(message string) error {
 	// 实现实际的Slack消息发送逻辑
 	log.Printf("Sending Slack message: %s", message)
-	
+
 	// 示例实现（实际应该使用Slack API）
 	// slackService := irc.getSlackService()
 	// return slackService.SendMessage(message)
-	
+
 	return nil
 }
 
@@ -1436,11 +1437,11 @@ func (irc *IntelligentRiskController) sendSlackMessage(message string) error {
 func (irc *IntelligentRiskController) sendSMS(phone, message string) error {
 	// 实现实际的短信发送逻辑
 	log.Printf("Sending SMS to %s: %s", phone, message)
-	
+
 	// 示例实现（实际应该使用Twilio、AWS SNS等）
 	// smsService := irc.getSMSService()
 	// return smsService.Send(phone, message)
-	
+
 	return nil
 }
 
@@ -1448,10 +1449,10 @@ func (irc *IntelligentRiskController) sendSMS(phone, message string) error {
 func (irc *IntelligentRiskController) sendWebhook(url string, payload map[string]interface{}) error {
 	// 实现实际的Webhook发送逻辑
 	log.Printf("Sending webhook to %s with payload: %+v", url, payload)
-	
+
 	// 示例实现（实际应该使用HTTP客户端）
 	// httpClient := irc.getHTTPClient()
 	// return httpClient.PostJSON(url, payload)
-	
+
 	return nil
 }

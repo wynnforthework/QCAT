@@ -2,8 +2,8 @@ package protector
 
 import (
 	"context"
-	"fmt"
 	"log"
+	"qcat/internal/security/protector/dao"
 	"time"
 )
 
@@ -60,17 +60,17 @@ func (fp *FundProtector) logTradingEvent(eventType, description string) {
 		defer cancel()
 
 		// 创建紧急事件记录
-		event := &EmergencyEvent{
+		event := &dao.EmergencyEvent{
 			ID:          fp.generateEmergencyID(),
 			Type:        eventType,
 			Severity:    "INFO", // 交易事件通常为信息级别
 			Description: description,
-			Timestamp:   time.Now(),
-			TriggerData: map[string]interface{}{
+			TriggerData: dao.JSONMap{
 				"event_source": "trading_operations",
 				"event_type":   eventType,
 			},
-			Status: "LOGGED",
+			Status:    "ACTIVE",
+			CreatedAt: time.Now(),
 		}
 
 		if err := fp.daoManager.EmergencyEvents().Insert(ctx, event); err != nil {
@@ -98,82 +98,4 @@ func (fp *FundProtector) logTradingEvent(eventType, description string) {
 			log.Printf("Failed to send trading event to monitoring system: %v", err)
 		}
 	}
-}
-
-// stopAllTrading 停止所有交易
-func (fp *FundProtector) stopAllTrading() error {
-	log.Printf("Stopping all trading activities...")
-
-	if fp.exchangeProvider == nil {
-		log.Printf("Exchange provider not configured, cannot stop trading")
-		return fmt.Errorf("exchange provider not configured")
-	}
-
-	// 检查连接健康状态
-	if !fp.exchangeProvider.IsHealthy() {
-		return fmt.Errorf("exchange connection is not healthy")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// 1. 获取所有开放订单并取消
-	if err := fp.cancelAllOpenOrders(ctx); err != nil {
-		log.Printf("Failed to cancel all open orders: %v", err)
-		return fmt.Errorf("failed to cancel open orders: %w", err)
-	}
-
-	// 2. 停止自动交易策略（通过设置标志）
-	fp.setTradingHalted(true)
-
-	// 3. 记录交易停止事件
-	fp.logTradingEvent("TRADING_HALTED", "All trading activities stopped due to circuit breaker")
-
-	log.Printf("All trading activities successfully stopped")
-	return nil
-}
-
-// closePosition 平仓指定仓位
-func (fp *FundProtector) closePosition(pos *Position) error {
-	log.Printf("Closing position: %s, Size: %.8f, Side: %s", pos.Symbol, pos.Size, pos.Side)
-
-	if fp.exchangeProvider == nil {
-		return fmt.Errorf("exchange provider not configured")
-	}
-
-	// 检查连接健康状态
-	if !fp.exchangeProvider.IsHealthy() {
-		return fmt.Errorf("exchange connection is not healthy")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	// 实际实现中，这里应该调用交易所的平仓API
-	// 由于当前的ExchangeDataProvider接口只提供数据获取功能，
-	// 需要扩展接口或使用单独的交易接口来执行平仓操作
-
-	// 获取当前价格用于平仓
-	currentPrice, err := fp.exchangeProvider.GetSymbolPrice(ctx, pos.Symbol)
-	if err != nil {
-		return fmt.Errorf("failed to get current price for %s: %w", pos.Symbol, err)
-	}
-
-	// 计算平仓订单参数
-	orderSide := "SELL"
-	if pos.Side == "SHORT" {
-		orderSide = "BUY"
-	}
-
-	log.Printf("Executing market order to close position: %s %s %.8f at ~%.2f",
-		orderSide, pos.Symbol, pos.Size, currentPrice)
-
-	// 这里应该调用实际的交易API
-	// 例如: fp.tradingClient.PlaceMarketOrder(ctx, orderSide, pos.Symbol, pos.Size)
-
-	// 模拟平仓延迟
-	time.Sleep(100 * time.Millisecond)
-
-	log.Printf("Position closed successfully: %s", pos.Symbol)
-	return nil
 }

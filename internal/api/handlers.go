@@ -2000,7 +2000,7 @@ func NewAuditHandler(db *database.DB, metrics *monitor.MetricsCollector) *AuditH
 func (h *AuditHandler) hasAuditPermission(userID string) bool {
 	// 查询数据库检查用户权限
 	ctx := context.Background()
-	
+
 	var hasPermission bool
 	query := `
 		SELECT EXISTS(
@@ -2008,13 +2008,13 @@ func (h *AuditHandler) hasAuditPermission(userID string) bool {
 			JOIN permissions p ON up.permission_id = p.id
 			WHERE up.user_id = $1 AND p.name = 'audit_logs_view'
 		)`
-	
+
 	err := h.db.QueryRowContext(ctx, query, userID).Scan(&hasPermission)
 	if err != nil {
 		log.Printf("Error checking audit permission for user %s: %v", userID, err)
 		return false
 	}
-	
+
 	return hasPermission
 }
 
@@ -2029,7 +2029,7 @@ func (h *AuditHandler) GetLogs(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
 		return
 	}
-	
+
 	// 检查用户是否有审计日志查看权限
 	if !h.hasAuditPermission(userID.(string)) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Insufficient permissions to view audit logs"})
@@ -2813,8 +2813,8 @@ func (h *DashboardHandler) getAccountData() map[string]interface{} {
 		"equity":      totalEquity,
 		"pnl":         totalUnrealizedPnL,
 		"pnlPercent":  pnlPercent,
-		"drawdown":    h.calculateCurrentDrawdown(),
-		"maxDrawdown": h.calculateMaxDrawdown()
+		"drawdown":    0.0, // TODO: Implement calculateCurrentDrawdown
+		"maxDrawdown": 0.0, // TODO: Implement calculateMaxDrawdown
 	}
 }
 
@@ -3375,44 +3375,62 @@ func (h *StrategyHandler) OnboardStrategy(c *gin.Context) {
 	}
 
 	// 实现真实的策略接入流程
-	
+
+	// Convert anonymous struct to StrategyOnboardingRequest
+	onboardingReq := &StrategyOnboardingRequest{
+		StrategyID:   req.StrategyID,
+		StrategyName: req.StrategyID, // Use ID as name if not provided
+		StrategyType: "unknown",      // Default type
+		Parameters:   req.Parameters,
+		Code:         req.StrategyCode,
+		RiskProfile: RiskProfile{
+			MaxDrawdown:     req.RiskProfile.MaxDrawdown,
+			MaxLeverage:     req.RiskProfile.MaxLeverage,
+			MaxPositionSize: req.RiskProfile.MaxPositionSize,
+			StopLoss:        req.RiskProfile.StopLoss,
+			RiskLevel:       req.RiskProfile.RiskLevel,
+		},
+		TestMode:   req.TestMode,
+		AutoDeploy: req.AutoDeploy,
+	}
+
 	// 1. 策略验证
-	validationResult, err := h.validateStrategy(req)
+	validationResult, err := h.validateStrategy(onboardingReq)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, APIResponse{
+		c.JSON(http.StatusInternalServerError, Response{
 			Success: false,
 			Error:   "Strategy validation failed: " + err.Error(),
 		})
 		return
 	}
-	
+
 	// 2. 风险评估
-	riskAssessment, err := h.assessStrategyRisk(req)
+	riskAssessment, err := h.assessStrategyRisk(onboardingReq)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, APIResponse{
+		c.JSON(http.StatusInternalServerError, Response{
 			Success: false,
 			Error:   "Risk assessment failed: " + err.Error(),
 		})
 		return
 	}
-	
+
 	// 3. 性能回测
-	backtestResult, err := h.performStrategyBacktest(req)
+	backtestResult, err := h.performStrategyBacktest(onboardingReq)
 	if err != nil {
-		log.Printf("Backtest failed for strategy %s: %v", req.StrategyID, err)
+		log.Printf("Backtest failed for strategy %s: %v", onboardingReq.StrategyID, err)
 		// 回测失败不阻止接入，但会影响评分
 	}
-	
+
 	// 4. 合规检查
-	complianceResult, err := h.checkStrategyCompliance(req)
+	complianceResult, err := h.checkStrategyCompliance(onboardingReq)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, APIResponse{
+		c.JSON(http.StatusBadRequest, Response{
 			Success: false,
 			Error:   "Compliance check failed: " + err.Error(),
 		})
 		return
 	}
-	
+
 	// 5. 决定策略状态
 	status := "pending"
 	if validationResult.IsValid && riskAssessment.OverallScore >= 70.0 && complianceResult.Passed {
@@ -3424,46 +3442,47 @@ func (h *StrategyHandler) OnboardStrategy(c *gin.Context) {
 	} else if !validationResult.IsValid || !complianceResult.Passed {
 		status = "rejected"
 	}
-	
+
 	// 6. 保存策略信息到数据库
 	strategyRecord := &StrategyRecord{
-		ID:               req.StrategyID,
-		Name:             req.StrategyName,
-		Description:      req.Description,
-		Type:             req.StrategyType,
+		ID:               onboardingReq.StrategyID,
+		Name:             onboardingReq.StrategyName,
+		Description:      onboardingReq.Description,
+		Type:             onboardingReq.StrategyType,
 		Status:           status,
 		ValidationResult: validationResult,
 		RiskAssessment:   riskAssessment,
 		ComplianceResult: complianceResult,
 		BacktestResult:   backtestResult,
-		RiskProfile:      req.RiskProfile,
+		RiskProfile:      onboardingReq.RiskProfile,
 		CreatedAt:        time.Now(),
 		UpdatedAt:        time.Now(),
 	}
-	
+
 	if err := h.saveStrategyRecord(strategyRecord); err != nil {
 		log.Printf("Failed to save strategy record: %v", err)
 		// 不阻止流程，但记录错误
 	}
-	
+
 	// 7. 如果需要自动部署且通过所有检查
 	var deploymentInfo map[string]interface{}
 	if status == "approved_for_deployment" {
-		deploymentInfo, err = h.deployStrategy(req, strategyRecord)
+		deploymentInfo, err = h.deployStrategy(onboardingReq, strategyRecord)
 		if err != nil {
-			log.Printf("Auto deployment failed for strategy %s: %v", req.StrategyID, err)
+			log.Printf("Auto deployment failed for strategy %s: %v", onboardingReq.StrategyID, err)
 			status = "deployment_failed"
 		} else {
 			status = "deployed"
 		}
 	}
-	
+
 	result := map[string]interface{}{
 		"success":           true,
-		"strategy_id":       req.StrategyID,
+		"strategy_id":       onboardingReq.StrategyID,
 		"status":            status,
 		"message":           h.getStatusMessage(status),
 		"validation_result": validationResult,
+		"deployment_info":   deploymentInfo,
 		"risk_assessment": map[string]interface{}{
 			"overall_score":     75.0,
 			"risk_level":        req.RiskProfile.RiskLevel,
@@ -3510,7 +3529,7 @@ func (h *StrategyHandler) OnboardStrategy(c *gin.Context) {
 		}
 	} else {
 		result["next_steps"] = append(result["next_steps"].([]string), "Manual deployment required")
-		if req.RiskProfile.RiskLevel == "high" {
+		if onboardingReq.RiskProfile.RiskLevel == "high" {
 			result["next_steps"] = append(result["next_steps"].([]string), "High risk strategy requires manual review")
 		}
 	}
@@ -3527,14 +3546,14 @@ func (h *StrategyHandler) OnboardStrategy(c *gin.Context) {
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 	`
 
-	_, err := h.db.ExecContext(ctx, query,
+	_, err = h.db.ExecContext(ctx, query,
 		onboardingID,
-		req.StrategyID,
+		onboardingReq.StrategyID,
 		result["status"],
-		req.RiskProfile.RiskLevel,
+		onboardingReq.RiskProfile.RiskLevel,
 		85.0, // validation score
 		75.0, // risk score
-		req.AutoDeploy,
+		onboardingReq.AutoDeploy,
 		now,
 		now,
 	)
@@ -3563,7 +3582,7 @@ func (h *StrategyHandler) GetOnboardingStatus(c *gin.Context) {
 
 	// 实现真实的策略接入状态查询
 	ctx := c.Request.Context()
-	
+
 	// 1. 查询策略接入记录
 	var record StrategyRecord
 	query := `
@@ -3573,29 +3592,29 @@ func (h *StrategyHandler) GetOnboardingStatus(c *gin.Context) {
 		FROM strategy_onboarding 
 		WHERE id = ?
 	`
-	
+
 	err := h.db.QueryRowContext(ctx, query, strategyID).Scan(
 		&record.ID, &record.Name, &record.Description, &record.Type, &record.Status,
 		&record.ValidationResult.Score, &record.RiskAssessment.OverallScore, &record.ComplianceResult.Passed,
 		&record.CreatedAt, &record.UpdatedAt,
 	)
-	
+
 	if err != nil {
 		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, APIResponse{
+			c.JSON(http.StatusNotFound, Response{
 				Success: false,
 				Error:   "Strategy not found in onboarding system",
 			})
 			return
 		}
-		
-		c.JSON(http.StatusInternalServerError, APIResponse{
+
+		c.JSON(http.StatusInternalServerError, Response{
 			Success: false,
 			Error:   "Failed to query strategy status: " + err.Error(),
 		})
 		return
 	}
-	
+
 	// 2. 查询部署信息（如果已部署）
 	var deploymentInfo map[string]interface{}
 	if record.Status == "deployed" || record.Status == "approved_for_deployment" {
@@ -3606,14 +3625,14 @@ func (h *StrategyHandler) GetOnboardingStatus(c *gin.Context) {
 			ORDER BY created_at DESC 
 			LIMIT 1
 		`
-		
+
 		var deploymentID, environment, deployStatus string
 		var deployCreated, deployUpdated time.Time
-		
+
 		err := h.db.QueryRowContext(ctx, deploymentQuery, strategyID).Scan(
 			&deploymentID, &environment, &deployStatus, &deployCreated, &deployUpdated,
 		)
-		
+
 		if err == nil {
 			deploymentInfo = map[string]interface{}{
 				"deployment_id": deploymentID,
@@ -3622,36 +3641,36 @@ func (h *StrategyHandler) GetOnboardingStatus(c *gin.Context) {
 				"deployed_at":   deployCreated,
 				"last_updated":  deployUpdated,
 				"health_check": map[string]interface{}{
-					"status":       "healthy",
-					"last_check":   time.Now(),
+					"status":        "healthy",
+					"last_check":    time.Now(),
 					"response_time": "45ms",
 				},
 			}
 		}
 	}
-	
+
 	// 3. 计算进度和当前阶段
 	progress, currentStage := h.calculateOnboardingProgress(record.Status)
-	
+
 	// 4. 生成阶段详情
 	stages := h.generateStageDetails(record)
-	
+
 	// 5. 估算剩余时间
 	estimatedTime := h.estimateRemainingTime(record.Status, record.CreatedAt)
-	
+
 	// 6. 生成状态消息
 	message := h.getDetailedStatusMessage(record.Status, record.UpdatedAt)
-	
+
 	status := map[string]interface{}{
-		"strategy_id":     strategyID,
-		"strategy_name":   record.Name,
-		"current_stage":   currentStage,
-		"overall_status":  record.Status,
-		"progress":        progress,
-		"last_updated":    record.UpdatedAt,
-		"estimated_time":  estimatedTime,
-		"message":         message,
-		"stages":          stages,
+		"strategy_id":    strategyID,
+		"strategy_name":  record.Name,
+		"current_stage":  currentStage,
+		"overall_status": record.Status,
+		"progress":       progress,
+		"last_updated":   record.UpdatedAt,
+		"estimated_time": estimatedTime,
+		"message":        message,
+		"stages":         stages,
 		"validation": map[string]interface{}{
 			"score":      record.ValidationResult.Score,
 			"passed":     record.ValidationResult.Score >= 70.0,
@@ -4053,13 +4072,13 @@ func (h *StrategyValidationHandler) GetStrategyProblems(c *gin.Context) {
 // validateStrategy validates a strategy
 func (h *StrategyHandler) validateStrategy(req *StrategyOnboardingRequest) (*ValidationResult, error) {
 	result := &ValidationResult{
-		IsValid: true,
-		Score:   0.0,
-		Errors:  []string{},
+		IsValid:  true,
+		Score:    0.0,
+		Errors:   []string{},
 		Warnings: []string{},
-		Passed:  []string{},
+		Passed:   []string{},
 	}
-	
+
 	// 1. 基本信息验证
 	if req.StrategyID == "" {
 		result.Errors = append(result.Errors, "Strategy ID is required")
@@ -4068,7 +4087,7 @@ func (h *StrategyHandler) validateStrategy(req *StrategyOnboardingRequest) (*Val
 		result.Passed = append(result.Passed, "Strategy ID validation")
 		result.Score += 10
 	}
-	
+
 	if req.StrategyName == "" {
 		result.Errors = append(result.Errors, "Strategy name is required")
 		result.IsValid = false
@@ -4076,7 +4095,7 @@ func (h *StrategyHandler) validateStrategy(req *StrategyOnboardingRequest) (*Val
 		result.Passed = append(result.Passed, "Strategy name validation")
 		result.Score += 10
 	}
-	
+
 	// 2. 策略类型验证
 	validTypes := []string{"trend_following", "mean_reversion", "arbitrage", "market_making", "momentum"}
 	isValidType := false
@@ -4086,7 +4105,7 @@ func (h *StrategyHandler) validateStrategy(req *StrategyOnboardingRequest) (*Val
 			break
 		}
 	}
-	
+
 	if !isValidType {
 		result.Errors = append(result.Errors, "Invalid strategy type")
 		result.IsValid = false
@@ -4094,7 +4113,7 @@ func (h *StrategyHandler) validateStrategy(req *StrategyOnboardingRequest) (*Val
 		result.Passed = append(result.Passed, "Strategy type validation")
 		result.Score += 15
 	}
-	
+
 	// 3. 参数验证
 	if len(req.Parameters) == 0 {
 		result.Warnings = append(result.Warnings, "No parameters provided")
@@ -4102,7 +4121,7 @@ func (h *StrategyHandler) validateStrategy(req *StrategyOnboardingRequest) (*Val
 		result.Passed = append(result.Passed, "Parameters validation")
 		result.Score += 10
 	}
-	
+
 	// 4. 代码质量检查（如果提供了代码）
 	if req.Code != "" {
 		if len(req.Code) < 100 {
@@ -4111,7 +4130,7 @@ func (h *StrategyHandler) validateStrategy(req *StrategyOnboardingRequest) (*Val
 			result.Passed = append(result.Passed, "Code length validation")
 			result.Score += 15
 		}
-		
+
 		// 检查危险函数
 		dangerousFunctions := []string{"exec", "eval", "system", "os.system"}
 		for _, dangerous := range dangerousFunctions {
@@ -4120,13 +4139,13 @@ func (h *StrategyHandler) validateStrategy(req *StrategyOnboardingRequest) (*Val
 				result.IsValid = false
 			}
 		}
-		
+
 		if result.IsValid {
 			result.Passed = append(result.Passed, "Code security validation")
 			result.Score += 20
 		}
 	}
-	
+
 	// 5. 依赖检查
 	if len(req.Dependencies) > 10 {
 		result.Warnings = append(result.Warnings, "Too many dependencies may affect performance")
@@ -4134,7 +4153,7 @@ func (h *StrategyHandler) validateStrategy(req *StrategyOnboardingRequest) (*Val
 		result.Passed = append(result.Passed, "Dependencies validation")
 		result.Score += 10
 	}
-	
+
 	// 6. 资源需求验证
 	if req.ResourceRequirements.Memory > 8192 { // 8GB
 		result.Warnings = append(result.Warnings, "High memory requirement")
@@ -4142,10 +4161,10 @@ func (h *StrategyHandler) validateStrategy(req *StrategyOnboardingRequest) (*Val
 	if req.ResourceRequirements.CPU > 4.0 {
 		result.Warnings = append(result.Warnings, "High CPU requirement")
 	}
-	
+
 	result.Passed = append(result.Passed, "Resource requirements validation")
 	result.Score += 10
-	
+
 	return result, nil
 }
 
@@ -4158,11 +4177,11 @@ func (h *StrategyHandler) assessStrategyRisk(req *StrategyOnboardingRequest) (*R
 		ExpectedSharpe:   0.0,
 		ExpectedDrawdown: 0.0,
 		ConfidenceLevel:  0.0,
-		Recommendations: []string{},
+		Recommendations:  []string{},
 	}
-	
+
 	score := 75.0 // 基础分数
-	
+
 	// 1. 基于策略类型的风险评估
 	switch req.StrategyType {
 	case "arbitrage":
@@ -4195,24 +4214,24 @@ func (h *StrategyHandler) assessStrategyRisk(req *StrategyOnboardingRequest) (*R
 		assessment.ExpectedSharpe = 1.0
 		assessment.ExpectedDrawdown = 0.10
 	}
-	
+
 	// 2. 基于风险配置的评估
 	if req.RiskProfile.MaxDrawdown > 0.2 {
 		score -= 15
 		assessment.RiskLevel = "high"
 		assessment.Recommendations = append(assessment.Recommendations, "Consider reducing maximum drawdown limit")
 	}
-	
+
 	if req.RiskProfile.MaxLeverage > 5.0 {
 		score -= 10
 		assessment.Recommendations = append(assessment.Recommendations, "High leverage increases risk significantly")
 	}
-	
+
 	if req.RiskProfile.MaxPositionSize > 0.3 {
 		score -= 5
 		assessment.Recommendations = append(assessment.Recommendations, "Large position sizes may increase concentration risk")
 	}
-	
+
 	// 3. 基于历史表现的评估（如果有）
 	if req.HistoricalPerformance != nil {
 		if req.HistoricalPerformance.SharpeRatio > 1.5 {
@@ -4220,16 +4239,16 @@ func (h *StrategyHandler) assessStrategyRisk(req *StrategyOnboardingRequest) (*R
 		} else if req.HistoricalPerformance.SharpeRatio < 0.5 {
 			score -= 15
 		}
-		
+
 		if req.HistoricalPerformance.MaxDrawdown > 0.25 {
 			score -= 10
 		}
-		
+
 		if req.HistoricalPerformance.WinRate > 0.6 {
 			score += 5
 		}
 	}
-	
+
 	// 4. 设置置信度
 	if score >= 85 {
 		assessment.ConfidenceLevel = 0.9
@@ -4240,14 +4259,14 @@ func (h *StrategyHandler) assessStrategyRisk(req *StrategyOnboardingRequest) (*R
 	} else {
 		assessment.ConfidenceLevel = 0.6
 	}
-	
+
 	// 5. 添加通用建议
 	assessment.Recommendations = append(assessment.Recommendations, "Monitor performance closely during initial period")
 	assessment.Recommendations = append(assessment.Recommendations, "Consider implementing automated rebalancing")
 	assessment.Recommendations = append(assessment.Recommendations, "Regular risk assessment reviews recommended")
-	
+
 	assessment.OverallScore = math.Max(0, math.Min(100, score))
-	
+
 	return assessment, nil
 }
 
@@ -4264,7 +4283,7 @@ func (h *StrategyHandler) performStrategyBacktest(req *StrategyOnboardingRequest
 		StartDate:        time.Now().AddDate(-1, 0, 0),
 		EndDate:          time.Now(),
 	}
-	
+
 	// 基于策略类型生成模拟回测结果
 	switch req.StrategyType {
 	case "arbitrage":
@@ -4289,20 +4308,20 @@ func (h *StrategyHandler) performStrategyBacktest(req *StrategyOnboardingRequest
 		result.WinRate = 0.55 + (rand.Float64()-0.5)*0.1
 		result.TotalTrades = 200 + rand.Intn(150)
 	}
-	
+
 	return result, nil
 }
 
 // checkStrategyCompliance checks strategy compliance
 func (h *StrategyHandler) checkStrategyCompliance(req *StrategyOnboardingRequest) (*ComplianceResult, error) {
 	result := &ComplianceResult{
-		Passed:      true,
-		Score:       100.0,
-		Violations:  []string{},
-		Warnings:    []string{},
+		Passed:       true,
+		Score:        100.0,
+		Violations:   []string{},
+		Warnings:     []string{},
 		ChecksPassed: []string{},
 	}
-	
+
 	// 1. 杠杆限制检查
 	if req.RiskProfile.MaxLeverage > 10.0 {
 		result.Violations = append(result.Violations, "Maximum leverage exceeds regulatory limit (10x)")
@@ -4311,7 +4330,7 @@ func (h *StrategyHandler) checkStrategyCompliance(req *StrategyOnboardingRequest
 	} else {
 		result.ChecksPassed = append(result.ChecksPassed, "Leverage compliance")
 	}
-	
+
 	// 2. 仓位大小检查
 	if req.RiskProfile.MaxPositionSize > 0.5 {
 		result.Violations = append(result.Violations, "Maximum position size exceeds limit (50%)")
@@ -4320,7 +4339,7 @@ func (h *StrategyHandler) checkStrategyCompliance(req *StrategyOnboardingRequest
 	} else {
 		result.ChecksPassed = append(result.ChecksPassed, "Position size compliance")
 	}
-	
+
 	// 3. 回撤限制检查
 	if req.RiskProfile.MaxDrawdown > 0.3 {
 		result.Warnings = append(result.Warnings, "High maximum drawdown may require additional oversight")
@@ -4328,7 +4347,7 @@ func (h *StrategyHandler) checkStrategyCompliance(req *StrategyOnboardingRequest
 	} else {
 		result.ChecksPassed = append(result.ChecksPassed, "Drawdown limit compliance")
 	}
-	
+
 	// 4. 策略类型合规检查
 	prohibitedTypes := []string{"high_frequency_manipulation", "wash_trading"}
 	for _, prohibited := range prohibitedTypes {
@@ -4338,11 +4357,11 @@ func (h *StrategyHandler) checkStrategyCompliance(req *StrategyOnboardingRequest
 			result.Score -= 50
 		}
 	}
-	
+
 	if result.Passed {
 		result.ChecksPassed = append(result.ChecksPassed, "Strategy type compliance")
 	}
-	
+
 	// 5. 资金要求检查
 	if req.MinCapital > 1000000 { // $1M
 		result.Warnings = append(result.Warnings, "High minimum capital requirement")
@@ -4350,7 +4369,7 @@ func (h *StrategyHandler) checkStrategyCompliance(req *StrategyOnboardingRequest
 	} else {
 		result.ChecksPassed = append(result.ChecksPassed, "Capital requirement compliance")
 	}
-	
+
 	return result, nil
 }
 
@@ -4369,45 +4388,45 @@ func (h *StrategyHandler) saveStrategyRecord(record *StrategyRecord) error {
 			compliance_passed = VALUES(compliance_passed),
 			updated_at = VALUES(updated_at)
 	`
-	
+
 	_, err := h.db.ExecContext(context.Background(), query,
 		record.ID, record.Name, record.Description, record.Type, record.Status,
 		record.ValidationResult.Score, record.RiskAssessment.OverallScore, record.ComplianceResult.Passed,
 		record.CreatedAt, record.UpdatedAt,
 	)
-	
+
 	return err
 }
 
 // deployStrategy deploys a strategy
 func (h *StrategyHandler) deployStrategy(req *StrategyOnboardingRequest, record *StrategyRecord) (map[string]interface{}, error) {
 	deploymentID := fmt.Sprintf("deploy_%s_%d", req.StrategyID, time.Now().Unix())
-	
+
 	// 模拟部署过程
 	time.Sleep(100 * time.Millisecond) // 模拟部署时间
-	
+
 	environment := "production"
 	if req.TestMode {
 		environment = "test"
 	}
-	
+
 	deploymentInfo := map[string]interface{}{
 		"deployment_id": deploymentID,
 		"environment":   environment,
 		"start_time":    time.Now(),
 		"status":        "deployed",
 		"health_check": map[string]interface{}{
-			"status":      "healthy",
-			"last_check":  time.Now(),
+			"status":        "healthy",
+			"last_check":    time.Now(),
 			"response_time": "50ms",
 		},
 		"resource_allocation": map[string]interface{}{
-			"cpu":    req.ResourceRequirements.CPU,
-			"memory": req.ResourceRequirements.Memory,
+			"cpu":     req.ResourceRequirements.CPU,
+			"memory":  req.ResourceRequirements.Memory,
 			"storage": req.ResourceRequirements.Storage,
 		},
 	}
-	
+
 	// 保存部署信息到数据库
 	deployQuery := `
 		INSERT INTO strategy_deployments (
@@ -4415,53 +4434,53 @@ func (h *StrategyHandler) deployStrategy(req *StrategyOnboardingRequest, record 
 			created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?)
 	`
-	
+
 	_, err := h.db.ExecContext(context.Background(), deployQuery,
 		deploymentID, req.StrategyID, environment, "deployed",
 		time.Now(), time.Now(),
 	)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to save deployment info: %v", err)
 	}
-	
+
 	return deploymentInfo, nil
 }
 
 // getStatusMessage returns status message
 func (h *StrategyHandler) getStatusMessage(status string) string {
 	messages := map[string]string{
-		"pending":                    "Strategy onboarding request received and queued for processing",
-		"approved_for_deployment":    "Strategy approved and ready for automatic deployment",
+		"pending":                     "Strategy onboarding request received and queued for processing",
+		"approved_for_deployment":     "Strategy approved and ready for automatic deployment",
 		"approved_pending_deployment": "Strategy approved but requires manual deployment",
-		"deployed":                   "Strategy successfully deployed and active",
-		"rejected":                   "Strategy onboarding rejected due to validation or compliance issues",
-		"deployment_failed":          "Strategy approved but deployment failed",
+		"deployed":                    "Strategy successfully deployed and active",
+		"rejected":                    "Strategy onboarding rejected due to validation or compliance issues",
+		"deployment_failed":           "Strategy approved but deployment failed",
 	}
-	
+
 	if msg, exists := messages[status]; exists {
 		return msg
 	}
-	
+
 	return "Unknown status"
 }
 
 // Data structures for strategy integration
 
 type StrategyOnboardingRequest struct {
-	StrategyID           string                 `json:"strategy_id" binding:"required"`
-	StrategyName         string                 `json:"strategy_name" binding:"required"`
-	Description          string                 `json:"description"`
-	StrategyType         string                 `json:"strategy_type" binding:"required"`
-	Parameters           map[string]interface{} `json:"parameters"`
-	Code                 string                 `json:"code"`
-	Dependencies         []string               `json:"dependencies"`
-	ResourceRequirements ResourceRequirements   `json:"resource_requirements"`
-	RiskProfile          RiskProfile            `json:"risk_profile"`
+	StrategyID            string                 `json:"strategy_id" binding:"required"`
+	StrategyName          string                 `json:"strategy_name" binding:"required"`
+	Description           string                 `json:"description"`
+	StrategyType          string                 `json:"strategy_type" binding:"required"`
+	Parameters            map[string]interface{} `json:"parameters"`
+	Code                  string                 `json:"code"`
+	Dependencies          []string               `json:"dependencies"`
+	ResourceRequirements  ResourceRequirements   `json:"resource_requirements"`
+	RiskProfile           RiskProfile            `json:"risk_profile"`
 	HistoricalPerformance *HistoricalPerformance `json:"historical_performance"`
-	AutoDeploy           bool                   `json:"auto_deploy"`
-	TestMode             bool                   `json:"test_mode"`
-	MinCapital           float64                `json:"min_capital"`
+	AutoDeploy            bool                   `json:"auto_deploy"`
+	TestMode              bool                   `json:"test_mode"`
+	MinCapital            float64                `json:"min_capital"`
 }
 
 type ResourceRequirements struct {
@@ -4479,11 +4498,11 @@ type RiskProfile struct {
 }
 
 type HistoricalPerformance struct {
-	TotalReturn     float64 `json:"total_return"`
-	SharpeRatio     float64 `json:"sharpe_ratio"`
-	MaxDrawdown     float64 `json:"max_drawdown"`
-	WinRate         float64 `json:"win_rate"`
-	TotalTrades     int     `json:"total_trades"`
+	TotalReturn float64 `json:"total_return"`
+	SharpeRatio float64 `json:"sharpe_ratio"`
+	MaxDrawdown float64 `json:"max_drawdown"`
+	WinRate     float64 `json:"win_rate"`
+	TotalTrades int     `json:"total_trades"`
 }
 
 type ValidationResult struct {
@@ -4536,8 +4555,9 @@ type StrategyRecord struct {
 	RiskProfile      RiskProfile       `json:"risk_profile"`
 	CreatedAt        time.Time         `json:"created_at"`
 	UpdatedAt        time.Time         `json:"updated_at"`
-}// 
-Helper functions for strategy status query
+}
+
+// Helper functions for strategy status query
 
 // calculateOnboardingProgress calculates progress and current stage
 func (h *StrategyHandler) calculateOnboardingProgress(status string) (int, string) {
@@ -4571,49 +4591,49 @@ func (h *StrategyHandler) calculateOnboardingProgress(status string) (int, strin
 func (h *StrategyHandler) generateStageDetails(record StrategyRecord) []map[string]interface{} {
 	stages := []map[string]interface{}{
 		{
-			"name":        "validation",
-			"status":      h.getStageStatus("validation", record.Status),
-			"duration":    h.getStageDuration("validation", record.CreatedAt, record.UpdatedAt),
-			"details":     h.getValidationDetails(record.ValidationResult),
-			"score":       record.ValidationResult.Score,
-			"started_at":  record.CreatedAt,
+			"name":         "validation",
+			"status":       h.getStageStatus("validation", record.Status),
+			"duration":     h.getStageDuration("validation", record.CreatedAt, record.UpdatedAt),
+			"details":      h.getValidationDetails(record.ValidationResult),
+			"score":        record.ValidationResult.Score,
+			"started_at":   record.CreatedAt,
 			"completed_at": h.getStageCompletionTime("validation", record.Status, record.UpdatedAt),
 		},
 		{
-			"name":        "risk_assessment",
-			"status":      h.getStageStatus("risk_assessment", record.Status),
-			"duration":    h.getStageDuration("risk_assessment", record.CreatedAt, record.UpdatedAt),
-			"details":     h.getRiskAssessmentDetails(record.RiskAssessment),
-			"score":       record.RiskAssessment.OverallScore,
-			"started_at":  record.CreatedAt.Add(30 * time.Second), // 假设验证后30秒开始
+			"name":         "risk_assessment",
+			"status":       h.getStageStatus("risk_assessment", record.Status),
+			"duration":     h.getStageDuration("risk_assessment", record.CreatedAt, record.UpdatedAt),
+			"details":      h.getRiskAssessmentDetails(record.RiskAssessment),
+			"score":        record.RiskAssessment.OverallScore,
+			"started_at":   record.CreatedAt.Add(30 * time.Second), // 假设验证后30秒开始
 			"completed_at": h.getStageCompletionTime("risk_assessment", record.Status, record.UpdatedAt),
 		},
 		{
-			"name":        "compliance_check",
-			"status":      h.getStageStatus("compliance_check", record.Status),
-			"duration":    h.getStageDuration("compliance_check", record.CreatedAt, record.UpdatedAt),
-			"details":     h.getComplianceDetails(record.ComplianceResult),
-			"passed":      record.ComplianceResult.Passed,
-			"started_at":  record.CreatedAt.Add(75 * time.Second), // 假设风险评估后45秒开始
+			"name":         "compliance_check",
+			"status":       h.getStageStatus("compliance_check", record.Status),
+			"duration":     h.getStageDuration("compliance_check", record.CreatedAt, record.UpdatedAt),
+			"details":      h.getComplianceDetails(record.ComplianceResult),
+			"passed":       record.ComplianceResult.Passed,
+			"started_at":   record.CreatedAt.Add(75 * time.Second), // 假设风险评估后45秒开始
 			"completed_at": h.getStageCompletionTime("compliance_check", record.Status, record.UpdatedAt),
 		},
 		{
-			"name":        "deployment",
-			"status":      h.getStageStatus("deployment", record.Status),
-			"duration":    h.getStageDuration("deployment", record.CreatedAt, record.UpdatedAt),
-			"details":     h.getDeploymentDetails(record.Status),
-			"started_at":  h.getDeploymentStartTime(record.Status, record.UpdatedAt),
+			"name":         "deployment",
+			"status":       h.getStageStatus("deployment", record.Status),
+			"duration":     h.getStageDuration("deployment", record.CreatedAt, record.UpdatedAt),
+			"details":      h.getDeploymentDetails(record.Status),
+			"started_at":   h.getDeploymentStartTime(record.Status, record.UpdatedAt),
 			"completed_at": h.getStageCompletionTime("deployment", record.Status, record.UpdatedAt),
 		},
 		{
-			"name":        "monitoring",
-			"status":      h.getStageStatus("monitoring", record.Status),
-			"duration":    h.getStageDuration("monitoring", record.CreatedAt, record.UpdatedAt),
-			"details":     h.getMonitoringDetails(record.Status),
-			"started_at":  h.getMonitoringStartTime(record.Status, record.UpdatedAt),
+			"name":       "monitoring",
+			"status":     h.getStageStatus("monitoring", record.Status),
+			"duration":   h.getStageDuration("monitoring", record.CreatedAt, record.UpdatedAt),
+			"details":    h.getMonitoringDetails(record.Status),
+			"started_at": h.getMonitoringStartTime(record.Status, record.UpdatedAt),
 		},
 	}
-	
+
 	return stages
 }
 
@@ -4626,7 +4646,7 @@ func (h *StrategyHandler) getStageStatus(stage, overallStatus string) string {
 		"deployment":       4,
 		"monitoring":       5,
 	}
-	
+
 	statusStage := map[string]int{
 		"pending":                     0,
 		"validating":                  1,
@@ -4639,17 +4659,17 @@ func (h *StrategyHandler) getStageStatus(stage, overallStatus string) string {
 		"rejected":                    -1,
 		"deployment_failed":           4,
 	}
-	
+
 	currentStageNum := statusStage[overallStatus]
 	stageNum := stageOrder[stage]
-	
+
 	if overallStatus == "rejected" {
 		if stageNum <= 3 {
 			return "failed"
 		}
 		return "not_started"
 	}
-	
+
 	if stageNum < currentStageNum {
 		return "completed"
 	} else if stageNum == currentStageNum {
@@ -4751,7 +4771,7 @@ func (h *StrategyHandler) getStageCompletionTime(stage, status string, updatedAt
 		"deployment":       4,
 		"monitoring":       5,
 	}
-	
+
 	statusStage := map[string]int{
 		"pending":                     0,
 		"validating":                  1,
@@ -4762,16 +4782,16 @@ func (h *StrategyHandler) getStageCompletionTime(stage, status string, updatedAt
 		"deploying":                   4,
 		"deployed":                    5,
 	}
-	
+
 	currentStageNum := statusStage[status]
 	stageNum := stageOrder[stage]
-	
+
 	if stageNum < currentStageNum {
 		// 已完成的阶段，返回估算的完成时间
 		completionTime := updatedAt.Add(-time.Duration(currentStageNum-stageNum) * 30 * time.Second)
 		return &completionTime
 	}
-	
+
 	return nil
 }
 
@@ -4832,10 +4852,10 @@ func (h *StrategyHandler) getDetailedStatusMessage(status string, updatedAt time
 		"rejected":                    "Strategy onboarding rejected due to validation or compliance issues",
 		"deployment_failed":           "Strategy approved but deployment failed, manual intervention required",
 	}
-	
+
 	if msg, exists := messages[status]; exists {
 		return msg
 	}
-	
+
 	return "Unknown status"
 }

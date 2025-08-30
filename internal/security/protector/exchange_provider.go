@@ -232,8 +232,8 @@ func (p *DefaultExchangeProvider) fetchFundData(ctx context.Context) (*ExchangeF
 
 	for _, balance := range account.Balances {
 		if balance.Asset == "USDT" || balance.Asset == "USD" {
-			totalBalance += balance.Free + balance.Locked
-			availableBalance += balance.Free
+			totalBalance += balance.Total
+			availableBalance += balance.Available
 			lockedBalance += balance.Locked
 		}
 	}

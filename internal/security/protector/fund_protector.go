@@ -244,27 +244,27 @@ func NewFundProtector(cfg *config.Config, exchangeProvider ExchangeDataProvider,
 	ctx, cancel := context.WithCancel(context.Background())
 
 	fp := &FundProtector{
-		config:                cfg,
-		circuitBreaker:        NewCircuitBreaker(0.05, 30*time.Minute), // 5%最大日亏损，30分钟冷却
-		autoTransferManager:   NewAutoTransferManager(),
-		emergencyProtocol:     NewEmergencyProtocol(),
-		riskAssessment:        NewRiskAssessment(),
-		ctx:                   ctx,
-		cancel:                cancel,
-		fundStatus:            &FundStatus{},
-		protectionMetrics:     &ProtectionMetrics{},
-		transferHistory:       make([]TransferRecord, 0),
-		emergencyEvents:       make([]EmergencyEvent, 0),
-		profitThreshold:       0.1,  // 10%利润转移阈值
-		transferRatio:         0.3,  // 30%转移比例
-		maxDailyLoss:          0.05, // 5%最大日亏损
-		checkInterval:         5 * time.Minute,
-		circuitBreakerEnabled: true,
-		exchangeProvider:      exchangeProvider,
-		notificationService:   notificationService,
-		walletService:         walletService,
-		exchange:              ex,
-		daoManager:            daoManager,
+		config:                 cfg,
+		circuitBreaker:         NewCircuitBreaker(0.05, 30*time.Minute), // 5%最大日亏损，30分钟冷却
+		autoTransferManager:    NewAutoTransferManager(),
+		emergencyProtocol:      NewEmergencyProtocol(),
+		riskAssessment:         NewRiskAssessment(),
+		ctx:                    ctx,
+		cancel:                 cancel,
+		fundStatus:             &FundStatus{},
+		protectionMetrics:      &ProtectionMetrics{},
+		transferHistory:        make([]TransferRecord, 0),
+		emergencyEvents:        make([]EmergencyEvent, 0),
+		profitThreshold:        0.1,  // 10%利润转移阈值
+		transferRatio:          0.3,  // 30%转移比例
+		maxDailyLoss:           0.05, // 5%最大日亏损
+		checkInterval:          5 * time.Minute,
+		circuitBreakerEnabled:  true,
+		exchangeProvider:       exchangeProvider,
+		notificationService:    notificationService,
+		walletService:          walletService,
+		exchange:               ex,
+		daoManager:             daoManager,
 		dataCollectionInterval: 1 * time.Hour, // 每小时收集一次数据
 	}
 
@@ -282,18 +282,18 @@ func (fp *FundProtector) loadConfigurationParameters(cfg *config.Config) {
 	if cfg.Risk.MaxDrawdown > 0 {
 		fp.maxDailyLoss = cfg.Risk.MaxDrawdown
 	}
-	
+
 	if cfg.Risk.CheckInterval > 0 {
 		fp.checkInterval = cfg.Risk.CheckInterval
 	}
-	
+
 	// 从环境变量或配置中读取其他参数
 	// 这些参数应该在config.yaml中定义
-	
+
 	// 设置最大风险限制
 	fp.fundStatus.MaxRisk = 0.15 // 15% 最大风险
-	
-	log.Printf("Fund protector configuration loaded: maxDailyLoss=%.2f%%, checkInterval=%v", 
+
+	log.Printf("Fund protector configuration loaded: maxDailyLoss=%.2f%%, checkInterval=%v",
 		fp.maxDailyLoss*100, fp.checkInterval)
 }
 
@@ -372,7 +372,7 @@ func (fp *FundProtector) Start() error {
 	if fp.daoManager != nil {
 		fp.wg.Add(1)
 		go fp.runDataCollection()
-		
+
 		// 启动数据清理（每天执行一次）
 		fp.wg.Add(1)
 		go fp.runDataCleanup()
@@ -731,7 +731,7 @@ func (fp *FundProtector) triggerCircuitBreaker(reason string, lossRatio float64)
 
 	// 实施具体的熔断动作
 	log.Printf("Executing circuit breaker actions...")
-	
+
 	// 1. 停止所有交易
 	if err := fp.stopAllTrading(); err != nil {
 		log.Printf("Failed to stop all trading: %v", err)
@@ -845,7 +845,7 @@ func (fp *FundProtector) calculateCurrentRisk() float64 {
 
 	// 计算综合风险评分
 	riskComponents := fp.calculateRiskComponents(positions)
-	
+
 	// 加权计算总风险
 	totalRisk := fp.aggregateRiskComponents(riskComponents)
 
@@ -905,7 +905,7 @@ func (fp *FundProtector) calculateIndividualPositionRisk(positions []*Position) 
 	for _, pos := range positions {
 		// 计算单个持仓的风险
 		posRisk := fp.calculateSinglePositionRisk(pos)
-		
+
 		// 按名义价值加权
 		totalRisk += posRisk * pos.Notional
 		totalNotional += pos.Notional
@@ -973,7 +973,7 @@ func (fp *FundProtector) calculateLeverageRisk(positions []*Position) float64 {
 	}
 
 	effectiveLeverage := totalNotional / totalMargin
-	
+
 	// 将杠杆转换为风险评分 (1x = 0风险, 10x+ = 高风险)
 	leverageRisk := math.Min(effectiveLeverage/10.0, 1.0)
 
@@ -988,14 +988,14 @@ func (fp *FundProtector) calculateLiquidityRisk(positions []*Position) float64 {
 
 	// 简化的流动性风险评估
 	// 在实际应用中，这应该基于订单簿深度、交易量等数据
-	
+
 	var totalRisk float64
 	var totalNotional float64
 
 	for _, pos := range positions {
 		// 基于持仓大小的流动性风险评估
 		liquidityRisk := fp.estimateSymbolLiquidityRisk(pos.Symbol, pos.Notional)
-		
+
 		totalRisk += liquidityRisk * pos.Notional
 		totalNotional += pos.Notional
 	}
@@ -1011,7 +1011,7 @@ func (fp *FundProtector) calculateLiquidityRisk(positions []*Position) float64 {
 func (fp *FundProtector) estimateSymbolLiquidityRisk(symbol string, notional float64) float64 {
 	// 简化的流动性风险模型
 	// 实际应该基于市场数据
-	
+
 	// 主要交易对流动性较好
 	majorPairs := map[string]float64{
 		"BTCUSDT": 0.1,
@@ -1052,7 +1052,7 @@ func (fp *FundProtector) calculateVolatilityRisk(positions []*Position) float64 
 	}
 
 	volatility := fp.calculateSimpleVolatility(historicalReturns)
-	
+
 	// 将年化波动率转换为风险评分
 	// 20%年化波动率对应0.5风险，40%+对应1.0风险
 	volatilityRisk := math.Min(volatility/0.4, 1.0)
@@ -1082,7 +1082,7 @@ func (fp *FundProtector) calculatePnLVolatilityRisk(positions []*Position) float
 	}
 
 	avgPnLRatio := totalPnLRatio / float64(count)
-	
+
 	// 将平均盈亏比例转换为风险评分
 	return math.Min(avgPnLRatio*2, 1.0)
 }
@@ -1095,7 +1095,7 @@ func (fp *FundProtector) calculateCorrelationRisk(positions []*Position) float64
 
 	// 简化的相关性风险评估
 	// 实际应该基于历史价格相关性矩阵
-	
+
 	// 检查是否有相同类型的资产
 	assetTypes := make(map[string]float64)
 	var totalNotional float64
@@ -1154,10 +1154,10 @@ func contains(s string, substrs []string) bool {
 func (fp *FundProtector) calculateMarketRisk(positions []*Position) float64 {
 	// 简化的市场风险评估
 	// 实际应该基于市场情绪指标、VIX等
-	
+
 	// 基于持仓的市场暴露度
 	var longExposure, shortExposure float64
-	
+
 	for _, pos := range positions {
 		if pos.Side == "LONG" {
 			longExposure += pos.Notional
@@ -1176,7 +1176,7 @@ func (fp *FundProtector) calculateMarketRisk(positions []*Position) float64 {
 	directionalRisk := netExposure / totalExposure
 
 	// 市场风险与方向性偏差和总暴露度相关
-	marketRisk := directionalRisk * 0.7 + math.Min(totalExposure/1000000, 0.3) // 暴露度标准化
+	marketRisk := directionalRisk*0.7 + math.Min(totalExposure/1000000, 0.3) // 暴露度标准化
 
 	return math.Min(marketRisk, 1.0)
 }
@@ -1259,14 +1259,14 @@ func (fp *FundProtector) calculateExpectedShortfallFromReturns(returns []float64
 
 	// 使用历史模拟法计算Expected Shortfall
 	historicalES := fp.calculateHistoricalExpectedShortfall(returns, confidence)
-	
+
 	// 使用参数法计算Expected Shortfall
 	parametricES := fp.calculateParametricExpectedShortfall(returns, confidence)
 
 	// 取两种方法的加权平均，历史模拟法权重更高
 	finalES := historicalES*0.7 + parametricES*0.3
 
-	log.Printf("Expected Shortfall calculation (%.1f%% confidence): Historical=%.4f, Parametric=%.4f, Final=%.4f", 
+	log.Printf("Expected Shortfall calculation (%.1f%% confidence): Historical=%.4f, Parametric=%.4f, Final=%.4f",
 		confidence*100, historicalES, parametricES, finalES)
 
 	return finalES
@@ -1329,7 +1329,7 @@ func (fp *FundProtector) calculateParametricExpectedShortfall(returns []float64,
 	// 对于正态分布，Expected Shortfall的公式为：
 	// ES = -μ - σ * φ(z_α) / α
 	// 其中 φ(z) 是标准正态分布的概率密度函数
-	
+
 	// 计算标准正态分布在z_α处的概率密度
 	phi := (1.0 / math.Sqrt(2*math.Pi)) * math.Exp(-0.5*zAlpha*zAlpha)
 
@@ -1357,7 +1357,7 @@ func (fp *FundProtector) calculateTailRisk(returns []float64) map[string]float64
 	for _, confidence := range confidenceLevels {
 		var_ := fp.calculateHistoricalVaR(returns, confidence)
 		es := fp.calculateHistoricalExpectedShortfall(returns, confidence)
-		
+
 		confidenceStr := fmt.Sprintf("%.0f", confidence*100)
 		tailRisk[fmt.Sprintf("VaR_%s", confidenceStr)] = var_
 		tailRisk[fmt.Sprintf("ES_%s", confidenceStr)] = es
@@ -1401,23 +1401,23 @@ func (fp *FundProtector) calculateRiskScore() float64 {
 
 	// 计算详细的风险组件
 	riskComponents := fp.calculateRiskComponents(positions)
-	
+
 	// 多因子风险评分权重
 	weights := map[string]float64{
-		"var":           0.25,  // VaR权重
-		"volatility":    0.20,  // 波动率权重
-		"concentration": 0.15,  // 集中度权重
-		"leverage":      0.15,  // 杠杆权重
-		"position":      0.10,  // 持仓风险权重
-		"liquidity":     0.08,  // 流动性风险权重
-		"correlation":   0.07,  // 相关性风险权重
+		"var":           0.25, // VaR权重
+		"volatility":    0.20, // 波动率权重
+		"concentration": 0.15, // 集中度权重
+		"leverage":      0.15, // 杠杆权重
+		"position":      0.10, // 持仓风险权重
+		"liquidity":     0.08, // 流动性风险权重
+		"correlation":   0.07, // 相关性风险权重
 	}
 
 	// 标准化各个指标到0-1范围
-	normalizedVaR := math.Min(var95/0.1, 1.0)           // VaR超过10%视为高风险
+	normalizedVaR := math.Min(var95/0.1, 1.0)             // VaR超过10%视为高风险
 	normalizedVolatility := math.Min(volatility/0.5, 1.0) // 波动率超过50%视为高风险
 	normalizedConcentration := concentration              // 已经是0-1范围
-	normalizedLeverage := math.Min(leverage/20.0, 1.0)   // 杠杆超过20倍视为高风险
+	normalizedLeverage := math.Min(leverage/20.0, 1.0)    // 杠杆超过20倍视为高风险
 
 	// 综合风险评分
 	riskScore := normalizedVaR*weights["var"] +
@@ -1545,7 +1545,7 @@ func (fp *FundProtector) getEmergencyDescription(eventType string) string {
 
 func (fp *FundProtector) shouldExecuteAction(action ResponseAction, emergency EmergencyEvent) bool {
 	// 检查动作是否应该执行
-	
+
 	// 1. 检查动作条件
 	if action.Condition != "" {
 		if !fp.evaluateActionCondition(action.Condition, emergency) {
@@ -1555,7 +1555,6 @@ func (fp *FundProtector) shouldExecuteAction(action ResponseAction, emergency Em
 	}
 
 	// 2. 检查紧急事件严重程度
-	severityLevel := fp.getSeverityLevel(emergency.Severity)
 	actionPriority := action.Priority
 
 	// 高优先级动作在任何严重程度下都执行
@@ -1582,7 +1581,7 @@ func (fp *FundProtector) shouldExecuteAction(action ResponseAction, emergency Em
 func (fp *FundProtector) evaluateActionCondition(condition string, emergency EmergencyEvent) bool {
 	// 简化的条件评估系统
 	// 实际应该实现更复杂的表达式解析器
-	
+
 	switch condition {
 	case "DAILY_LOSS_EXCEEDED":
 		return emergency.Type == "DAILY_LOSS_EXCEEDED"
@@ -1629,7 +1628,7 @@ func (fp *FundProtector) getSeverityLevel(severity string) int {
 // stopAllTrading 停止所有交易
 func (fp *FundProtector) stopAllTrading() error {
 	log.Printf("Stopping all trading activities...")
-	
+
 	if fp.exchangeProvider == nil {
 		log.Printf("Exchange provider not configured, cannot stop trading")
 		return fmt.Errorf("exchange provider not configured")
@@ -1660,7 +1659,7 @@ func (fp *FundProtector) stopAllTrading() error {
 	var cancelErrors []error
 	for symbol := range symbols {
 		log.Printf("Cancelling all orders for symbol: %s", symbol)
-		
+
 		// 使用exchange接口取消所有订单
 		if err := fp.exchange.CancelAllOrders(ctx, symbol); err != nil {
 			log.Printf("Failed to cancel orders for %s: %v", symbol, err)
@@ -1702,7 +1701,7 @@ func (fp *FundProtector) closeHighRiskPositions() error {
 
 	// 识别高风险仓位
 	highRiskPositions := fp.identifyHighRiskPositions(positions)
-	
+
 	if len(highRiskPositions) == 0 {
 		log.Printf("No high risk positions found")
 		return nil
@@ -1732,48 +1731,48 @@ func (fp *FundProtector) closeHighRiskPositions() error {
 // identifyHighRiskPositions 识别高风险仓位
 func (fp *FundProtector) identifyHighRiskPositions(positions []*Position) []*Position {
 	highRiskPositions := make([]*Position, 0)
-	
+
 	for _, pos := range positions {
 		risk := fp.calculateSinglePositionRisk(pos)
-		
+
 		// 风险阈值：0.7以上为高风险
 		if risk > 0.7 {
 			highRiskPositions = append(highRiskPositions, pos)
 			log.Printf("High risk position identified: %s (risk: %.4f)", pos.Symbol, risk)
 		}
-		
+
 		// 强平风险：距离强平价格小于5%
 		liquidationRisk := fp.calculateLiquidationRisk(pos)
 		if liquidationRisk > 0.8 {
 			highRiskPositions = append(highRiskPositions, pos)
 			log.Printf("Near liquidation position identified: %s (liquidation risk: %.4f)", pos.Symbol, liquidationRisk)
 		}
-		
+
 		// 大额亏损：未实现亏损超过名义价值的20%
 		if pos.UnrealizedPnL < 0 && math.Abs(pos.UnrealizedPnL) > pos.Notional*0.2 {
 			highRiskPositions = append(highRiskPositions, pos)
 			log.Printf("Large loss position identified: %s (loss: %.2f)", pos.Symbol, pos.UnrealizedPnL)
 		}
 	}
-	
+
 	// 去重
 	uniquePositions := make([]*Position, 0)
 	seen := make(map[string]bool)
-	
+
 	for _, pos := range highRiskPositions {
 		if !seen[pos.Symbol] {
 			uniquePositions = append(uniquePositions, pos)
 			seen[pos.Symbol] = true
 		}
 	}
-	
+
 	return uniquePositions
 }
 
 // closePosition 平仓指定仓位
 func (fp *FundProtector) closePosition(pos *Position) error {
 	log.Printf("Closing position: %s, Size: %.8f, Side: %s", pos.Symbol, pos.Size, pos.Side)
-	
+
 	if fp.exchange == nil {
 		return fmt.Errorf("exchange not configured")
 	}
@@ -1800,11 +1799,11 @@ func (fp *FundProtector) closePosition(pos *Position) error {
 		Side:        orderSide,
 		Type:        "MARKET",
 		Quantity:    pos.Size,
-		ReduceOnly:  true, // 仅减仓，不开新仓
+		ReduceOnly:  true,  // 仅减仓，不开新仓
 		TimeInForce: "IOC", // 立即成交或取消
 	}
 
-	log.Printf("Placing close order: %s %s %.8f %s (ReduceOnly)", 
+	log.Printf("Placing close order: %s %s %.8f %s (ReduceOnly)",
 		orderRequest.Side, orderRequest.Symbol, orderRequest.Quantity, orderRequest.Type)
 
 	// 下单平仓
@@ -1813,7 +1812,7 @@ func (fp *FundProtector) closePosition(pos *Position) error {
 		return fmt.Errorf("failed to place close order: %w", err)
 	}
 
-	log.Printf("Close order placed successfully: OrderID=%s, Status=%s", 
+	log.Printf("Close order placed successfully: OrderID=%s, Status=%s",
 		response.OrderID, response.Status)
 
 	// 检查订单状态
@@ -1821,27 +1820,27 @@ func (fp *FundProtector) closePosition(pos *Position) error {
 		log.Printf("Position %s closed successfully", pos.Symbol)
 		return nil
 	} else if response.Status == "PARTIALLY_FILLED" {
-		log.Printf("Position %s partially closed: %.8f/%.8f", 
+		log.Printf("Position %s partially closed: %.8f/%.8f",
 			pos.Symbol, response.ExecutedQty, orderRequest.Quantity)
-		
+
 		// 对于部分成交，可以选择等待或取消剩余订单
 		// 这里选择等待一段时间
 		time.Sleep(2 * time.Second)
-		
+
 		// 检查订单最终状态
 		finalOrder, err := fp.exchange.GetOrder(ctx, pos.Symbol, response.OrderID)
 		if err != nil {
 			log.Printf("Failed to get final order status: %v", err)
 			return nil // 不返回错误，因为部分平仓已经成功
 		}
-		
+
 		if finalOrder.Status == "FILLED" {
 			log.Printf("Position %s fully closed after waiting", pos.Symbol)
 		} else {
-			log.Printf("Position %s still partially open: Status=%s, Executed=%.8f", 
+			log.Printf("Position %s still partially open: Status=%s, Executed=%.8f",
 				pos.Symbol, finalOrder.Status, finalOrder.ExecutedQty)
 		}
-		
+
 		return nil
 	} else {
 		return fmt.Errorf("close order failed with status: %s", response.Status)
@@ -1869,10 +1868,10 @@ func (fp *FundProtector) executeEmergencyTransfer() error {
 	}
 
 	emergencyAmount := availableBalance * 0.8 // 转移80%的可用余额
-	
+
 	// 检查转移限额
 	if emergencyAmount < fp.autoTransferManager.minTransferAmount {
-		log.Printf("Emergency transfer amount %.2f below minimum %.2f", 
+		log.Printf("Emergency transfer amount %.2f below minimum %.2f",
 			emergencyAmount, fp.autoTransferManager.minTransferAmount)
 		return nil
 	}
@@ -1909,7 +1908,7 @@ func (fp *FundProtector) executeEmergencyTransfer() error {
 		log.Printf("Emergency transfer completed: %s", transfer.ID)
 		transfer.Status = "COMPLETED"
 		transfer.TransactionHash = fp.generateTransactionHash()
-		
+
 		// 更新指标
 		fp.protectionMetrics.mu.Lock()
 		fp.protectionMetrics.AutoTransfers++
@@ -1943,7 +1942,7 @@ func (fp *FundProtector) sendEmergencyNotifications(emergency EmergencyEvent) []
 
 	// 根据严重程度确定通知范围
 	severityLevel := fp.getSeverityLevel(emergency.Severity)
-	
+
 	// 构建通知消息
 	message := fp.buildEmergencyMessage(emergency)
 
@@ -1980,7 +1979,7 @@ func (fp *FundProtector) buildEmergencyMessage(emergency EmergencyEvent) string 
 	message += fmt.Sprintf("Severity: %s\n", emergency.Severity)
 	message += fmt.Sprintf("Description: %s\n", emergency.Description)
 	message += fmt.Sprintf("Time: %s\n", emergency.Timestamp.Format("2006-01-02 15:04:05"))
-	
+
 	// 添加触发数据
 	if len(emergency.TriggerData) > 0 {
 		message += "\nTrigger Data:\n"
@@ -1997,7 +1996,7 @@ func (fp *FundProtector) buildEmergencyMessage(emergency EmergencyEvent) string 
 	message += fmt.Sprintf("- Current Risk: %.4f\n", fundStatus.CurrentRisk)
 
 	message += "\nPlease take immediate action if required."
-	
+
 	return message
 }
 
@@ -2005,12 +2004,12 @@ func (fp *FundProtector) buildEmergencyMessage(emergency EmergencyEvent) string 
 func (fp *FundProtector) sortContactsByPriority(contacts []EmergencyContact) []EmergencyContact {
 	sortedContacts := make([]EmergencyContact, len(contacts))
 	copy(sortedContacts, contacts)
-	
+
 	// 按优先级排序（数字越小优先级越高）
 	sort.Slice(sortedContacts, func(i, j int) bool {
 		return sortedContacts[i].Priority < sortedContacts[j].Priority
 	})
-	
+
 	return sortedContacts
 }
 
@@ -2110,13 +2109,13 @@ func (fp *FundProtector) sendWebhookNotification(contact EmergencyContact, messa
 	defer cancel()
 
 	payload := map[string]interface{}{
-		"event_type":    emergency.Type,
-		"severity":      emergency.Severity,
-		"description":   emergency.Description,
-		"timestamp":     emergency.Timestamp,
-		"trigger_data":  emergency.TriggerData,
-		"contact_name":  contact.Name,
-		"message":       message,
+		"event_type":   emergency.Type,
+		"severity":     emergency.Severity,
+		"description":  emergency.Description,
+		"timestamp":    emergency.Timestamp,
+		"trigger_data": emergency.TriggerData,
+		"contact_name": contact.Name,
+		"message":      message,
 	}
 
 	// 使用联系人的webhook URL或默认URL
@@ -2140,7 +2139,7 @@ func (fp *FundProtector) sendSlackNotification(contact EmergencyContact, message
 	defer cancel()
 
 	// 格式化Slack消息
-	slackMessage := fmt.Sprintf("🚨 *Fund Protector Alert*\n*Type:* %s\n*Severity:* %s\n*Time:* %s\n\n%s", 
+	slackMessage := fmt.Sprintf("🚨 *Fund Protector Alert*\n*Type:* %s\n*Severity:* %s\n*Time:* %s\n\n%s",
 		emergency.Type, emergency.Severity, emergency.Timestamp.Format("2006-01-02 15:04:05"), message)
 
 	return fp.notificationService.SendSlack(ctx, "", slackMessage)
@@ -2199,12 +2198,12 @@ func (fp *FundProtector) validateTransferParameters(transfer TransferRecord) err
 
 	// 检查转账限额
 	if transfer.Amount < fp.autoTransferManager.minTransferAmount {
-		return fmt.Errorf("transfer amount %.2f below minimum %.2f", 
+		return fmt.Errorf("transfer amount %.2f below minimum %.2f",
 			transfer.Amount, fp.autoTransferManager.minTransferAmount)
 	}
 
 	if transfer.Amount > fp.autoTransferManager.maxTransferAmount {
-		return fmt.Errorf("transfer amount %.2f exceeds maximum %.2f", 
+		return fmt.Errorf("transfer amount %.2f exceeds maximum %.2f",
 			transfer.Amount, fp.autoTransferManager.maxTransferAmount)
 	}
 
@@ -2218,14 +2217,14 @@ func (fp *FundProtector) checkFundAvailability(transfer TransferRecord) error {
 	fp.fundStatus.mu.RUnlock()
 
 	if transfer.Amount > availableBalance {
-		return fmt.Errorf("insufficient available balance: need %.2f, have %.2f", 
+		return fmt.Errorf("insufficient available balance: need %.2f, have %.2f",
 			transfer.Amount, availableBalance)
 	}
 
 	// 保留一定的安全余额
 	safetyBuffer := availableBalance * 0.05 // 5%安全缓冲
 	if transfer.Amount > (availableBalance - safetyBuffer) {
-		return fmt.Errorf("transfer would exceed safety buffer: need %.2f, safe amount %.2f", 
+		return fmt.Errorf("transfer would exceed safety buffer: need %.2f, safe amount %.2f",
 			transfer.Amount, availableBalance-safetyBuffer)
 	}
 
@@ -2288,7 +2287,7 @@ func (fp *FundProtector) validateDestinationAddress(address string) error {
 
 	// 实现更严格的地址格式验证
 	// 根据不同的区块链网络验证地址格式
-	
+
 	// 以太坊地址验证
 	if len(address) == 42 && address[:2] == "0x" {
 		// 验证是否为有效的十六进制字符
@@ -2300,7 +2299,7 @@ func (fp *FundProtector) validateDestinationAddress(address string) error {
 		}
 		return nil
 	}
-	
+
 	// 比特币地址验证（简化）
 	if len(address) >= 26 && len(address) <= 35 {
 		// 检查是否以1、3或bc1开头（比特币地址格式）
@@ -2308,7 +2307,7 @@ func (fp *FundProtector) validateDestinationAddress(address string) error {
 			return nil
 		}
 	}
-	
+
 	return fmt.Errorf("unsupported or invalid address format: %s", address)
 }
 
@@ -2318,7 +2317,7 @@ func (fp *FundProtector) executeTransfer(transfer TransferRecord) error {
 		return fmt.Errorf("wallet service not configured")
 	}
 
-	log.Printf("Executing transfer via wallet service: %s -> %s, Amount: %.2f", 
+	log.Printf("Executing transfer via wallet service: %s -> %s, Amount: %.2f",
 		transfer.From, transfer.To, transfer.Amount)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
@@ -2345,7 +2344,7 @@ func (fp *FundProtector) executeTransfer(transfer TransferRecord) error {
 	transfer.TransactionHash = response.TransactionHash
 	transfer.Status = response.Status
 
-	log.Printf("Transfer executed successfully: %s (TxHash: %s)", 
+	log.Printf("Transfer executed successfully: %s (TxHash: %s)",
 		response.TransferID, response.TransactionHash)
 
 	return nil
@@ -2368,8 +2367,8 @@ func (fp *FundProtector) recordTransfer(transfer TransferRecord) error {
 		FromAddress:     transfer.From,
 		ToAddress:       transfer.To,
 		Status:          transfer.Status,
-		TriggerReason:   transfer.TriggerReason,
-		TransactionHash: transfer.TransactionHash,
+		TriggerReason:   &transfer.TriggerReason,
+		TransactionHash: &transfer.TransactionHash,
 		Metadata:        transfer.Metadata,
 		CreatedAt:       transfer.Timestamp,
 		UpdatedAt:       time.Now(),
@@ -2408,7 +2407,7 @@ func (fp *FundProtector) updateProtectionMetrics() {
 		accuracy, falsePositiveRate := fp.calculateProtectionAccuracy()
 		fp.protectionMetrics.ProtectionAccuracy = accuracy
 		fp.protectionMetrics.FalsePositiveRate = falsePositiveRate
-		
+
 		// 计算系统运行时间
 		if fp.isRunning {
 			startTime := time.Now().Add(-fp.protectionMetrics.SystemUptime)
@@ -2423,7 +2422,7 @@ func (fp *FundProtector) updateProtectionMetrics() {
 func (fp *FundProtector) calculateProtectionAccuracy() (accuracy float64, falsePositiveRate float64) {
 	// 简化的准确率计算
 	// 实际实现中应该基于历史数据分析保护措施的有效性
-	
+
 	totalEvents := fp.protectionMetrics.CircuitBreakerTriggered + fp.protectionMetrics.EmergencyActivations
 	if totalEvents == 0 {
 		return 0.0, 0.0
@@ -2431,13 +2430,13 @@ func (fp *FundProtector) calculateProtectionAccuracy() (accuracy float64, falseP
 
 	// 假设保护措施的基础准确率为85%
 	baseAccuracy := 0.85
-	
+
 	// 根据避免的损失调整准确率
 	if fp.protectionMetrics.LossesPrevented > 0 {
 		// 如果成功避免了损失，提高准确率
 		baseAccuracy += 0.1
 	}
-	
+
 	// 根据误报情况调整
 	// 这里简化为基于事件频率的估算
 	if totalEvents > 10 {
@@ -2450,7 +2449,7 @@ func (fp *FundProtector) calculateProtectionAccuracy() (accuracy float64, falseP
 
 	accuracy = math.Min(baseAccuracy, 1.0)
 	accuracy = math.Max(accuracy, 0.0)
-	
+
 	return accuracy, falsePositiveRate
 }
 
@@ -2500,15 +2499,6 @@ func (fp *FundProtector) GetStatus() map[string]interface{} {
 	}
 }
 
-// ExchangeFundData 交易所资金数据
-type ExchangeFundData struct {
-	TotalBalance     float64 `json:"total_balance"`
-	AvailableBalance float64 `json:"available_balance"`
-	LockedBalance    float64 `json:"locked_balance"`
-	DailyPL          float64 `json:"daily_pl"`
-	UnrealizedPL     float64 `json:"unrealized_pl"`
-}
-
 // getFundDataFromExchange 从交易所获取资金数据
 func (fp *FundProtector) getFundDataFromExchange() (*ExchangeFundData, error) {
 	if fp.exchangeProvider == nil {
@@ -2536,7 +2526,7 @@ func (fp *FundProtector) getFundDataFromExchange() (*ExchangeFundData, error) {
 		return nil, fmt.Errorf("fund data validation failed: %w", err)
 	}
 
-	log.Printf("Successfully retrieved fund data: TotalBalance=%.2f, AvailableBalance=%.2f, DailyPL=%.2f", 
+	log.Printf("Successfully retrieved fund data: TotalBalance=%.2f, AvailableBalance=%.2f, DailyPL=%.2f",
 		fundData.TotalBalance, fundData.AvailableBalance, fundData.DailyPL)
 
 	return fundData, nil
@@ -2563,19 +2553,19 @@ func (fp *FundProtector) validateFundData(data *ExchangeFundData) error {
 
 	// 检查余额关系的合理性
 	if data.AvailableBalance+data.LockedBalance > data.TotalBalance*1.01 { // 允许1%的误差
-		return fmt.Errorf("available + locked balance (%.2f) exceeds total balance (%.2f)", 
+		return fmt.Errorf("available + locked balance (%.2f) exceeds total balance (%.2f)",
 			data.AvailableBalance+data.LockedBalance, data.TotalBalance)
 	}
 
 	// 检查P&L数据的合理性（允许较大的波动）
 	maxReasonablePL := data.TotalBalance * 0.5 // 最大合理P&L为总余额的50%
 	if math.Abs(data.DailyPL) > maxReasonablePL {
-		log.Printf("Warning: Daily P&L (%.2f) seems unusually large compared to total balance (%.2f)", 
+		log.Printf("Warning: Daily P&L (%.2f) seems unusually large compared to total balance (%.2f)",
 			data.DailyPL, data.TotalBalance)
 	}
 
 	if math.Abs(data.UnrealizedPL) > maxReasonablePL {
-		log.Printf("Warning: Unrealized P&L (%.2f) seems unusually large compared to total balance (%.2f)", 
+		log.Printf("Warning: Unrealized P&L (%.2f) seems unusually large compared to total balance (%.2f)",
 			data.UnrealizedPL, data.TotalBalance)
 	}
 
@@ -2663,10 +2653,10 @@ func (fp *FundProtector) validatePosition(pos *Position) error {
 	// 检查P&L的合理性
 	expectedPnL := fp.calculateExpectedPnL(pos)
 	pnlDifference := math.Abs(pos.UnrealizedPnL - expectedPnL)
-	
+
 	// 允许5%的误差
 	if pnlDifference > math.Abs(expectedPnL)*0.05 && math.Abs(expectedPnL) > 1.0 {
-		log.Printf("Warning: P&L mismatch for %s - Expected: %.2f, Actual: %.2f", 
+		log.Printf("Warning: P&L mismatch for %s - Expected: %.2f, Actual: %.2f",
 			pos.Symbol, expectedPnL, pos.UnrealizedPnL)
 	}
 
@@ -2695,7 +2685,7 @@ func (fp *FundProtector) updatePositionStatistics(positions []*Position) {
 	for _, pos := range positions {
 		if pos.Size > 0 {
 			fp.fundStatus.ActivePositions++
-			
+
 			if pos.Side == "LONG" {
 				fp.fundStatus.LongPositions++
 			} else if pos.Side == "SHORT" {
@@ -2704,8 +2694,8 @@ func (fp *FundProtector) updatePositionStatistics(positions []*Position) {
 		}
 	}
 
-	log.Printf("Position statistics updated: Total=%d, Active=%d, Long=%d, Short=%d", 
-		fp.fundStatus.TotalPositions, fp.fundStatus.ActivePositions, 
+	log.Printf("Position statistics updated: Total=%d, Active=%d, Long=%d, Short=%d",
+		fp.fundStatus.TotalPositions, fp.fundStatus.ActivePositions,
 		fp.fundStatus.LongPositions, fp.fundStatus.ShortPositions)
 }
 
@@ -2721,7 +2711,7 @@ func (fp *FundProtector) calculatePositionRisk(positions []*Position) float64 {
 	for _, pos := range positions {
 		// 计算单个持仓的风险
 		positionRisk := fp.calculateSinglePositionRisk(pos)
-		
+
 		// 按名义价值加权
 		totalRisk += positionRisk * pos.Notional
 		totalNotional += pos.Notional
@@ -2736,7 +2726,7 @@ func (fp *FundProtector) calculatePositionRisk(positions []*Position) float64 {
 
 	// 应用集中度调整
 	concentrationMultiplier := fp.calculateConcentrationMultiplier(positions)
-	
+
 	return averageRisk * concentrationMultiplier
 }
 
@@ -2744,21 +2734,21 @@ func (fp *FundProtector) calculatePositionRisk(positions []*Position) float64 {
 func (fp *FundProtector) calculateSinglePositionRisk(pos *Position) float64 {
 	// 基于杠杆和波动率计算风险
 	leverageRisk := float64(pos.Leverage) / 100.0 // 杠杆风险系数
-	
+
 	// 基于未实现盈亏的波动性
 	pnlRatio := math.Abs(pos.UnrealizedPnL) / pos.Notional
-	
+
 	// 基于距离强平价格的风险
 	liquidationRisk := fp.calculateLiquidationRisk(pos)
-	
+
 	// 综合风险评分
 	totalRisk := (leverageRisk*0.4 + pnlRatio*0.3 + liquidationRisk*0.3)
-	
+
 	// 限制风险值在合理范围内
 	if totalRisk > 1.0 {
 		totalRisk = 1.0
 	}
-	
+
 	return totalRisk
 }
 
@@ -2782,7 +2772,7 @@ func (fp *FundProtector) calculateLiquidationRisk(pos *Position) float64 {
 
 	// 风险与距离成反比
 	risk := 1.0 / (1.0 + distanceToLiquidation*10) // 10倍缩放因子
-	
+
 	return math.Min(risk, 1.0)
 }
 
@@ -2810,7 +2800,7 @@ func (fp *FundProtector) calculateConcentrationMultiplier(positions []*Position)
 
 	// 集中度越高，风险乘数越大
 	concentrationMultiplier := 0.5 + herfindahlIndex
-	
+
 	return math.Min(concentrationMultiplier, 2.0) // 限制最大乘数为2
 }
 
@@ -2897,7 +2887,7 @@ func (fp *FundProtector) validateHistoricalReturns(returns []float64) []float64 
 	}
 
 	validReturns := make([]float64, 0, len(returns))
-	
+
 	for i, ret := range returns {
 		// 检查是否为有效数值
 		if math.IsNaN(ret) || math.IsInf(ret, 0) {
@@ -2928,11 +2918,11 @@ func (fp *FundProtector) storeHistoricalReturns(returns []float64) {
 
 	// 从今天开始往前推算日期
 	currentDate := time.Now().Truncate(24 * time.Hour)
-	
+
 	for i, ret := range returns {
 		// 计算对应的日期（从最新到最旧）
-		date := currentDate.AddDate(0, 0, -(len(returns)-1-i))
-		
+		date := currentDate.AddDate(0, 0, -(len(returns) - 1 - i))
+
 		historicalReturn := &dao.HistoricalReturn{
 			Date:        date,
 			ReturnValue: ret,
@@ -2966,17 +2956,17 @@ func (fp *FundProtector) calculateVaRFromReturns(returns []float64, confidence f
 
 	// 使用历史模拟法计算VaR
 	historicalVaR := fp.calculateHistoricalVaR(returns, confidence)
-	
+
 	// 使用参数法计算VaR作为对比
 	parametricVaR := fp.calculateParametricVaR(returns, confidence)
-	
+
 	// 使用蒙特卡洛模拟法计算VaR
 	monteCarloVaR := fp.calculateMonteCarloVaR(returns, confidence)
 
 	// 取三种方法的加权平均，历史模拟法权重最高
 	finalVaR := historicalVaR*0.5 + parametricVaR*0.3 + monteCarloVaR*0.2
 
-	log.Printf("VaR calculation (%.1f%% confidence): Historical=%.4f, Parametric=%.4f, MonteCarlo=%.4f, Final=%.4f", 
+	log.Printf("VaR calculation (%.1f%% confidence): Historical=%.4f, Parametric=%.4f, MonteCarlo=%.4f, Final=%.4f",
 		confidence*100, historicalVaR, parametricVaR, monteCarloVaR, finalVaR)
 
 	return finalVaR
@@ -2996,19 +2986,19 @@ func (fp *FundProtector) calculateHistoricalVaR(returns []float64, confidence fl
 	// 计算分位数位置
 	alpha := 1.0 - confidence
 	position := alpha * float64(len(sortedReturns)-1)
-	
+
 	// 线性插值计算VaR
 	lowerIndex := int(math.Floor(position))
 	upperIndex := int(math.Ceil(position))
-	
+
 	if lowerIndex == upperIndex {
 		return -sortedReturns[lowerIndex] // VaR通常表示为正值（损失）
 	}
-	
+
 	// 线性插值
 	weight := position - float64(lowerIndex)
 	var_ := sortedReturns[lowerIndex]*(1-weight) + sortedReturns[upperIndex]*weight
-	
+
 	return -var_ // 返回正值表示损失
 }
 
@@ -3051,7 +3041,7 @@ func (fp *FundProtector) calculateMonteCarloVaR(returns []float64, confidence fl
 		// 使用Box-Muller变换生成正态分布随机数
 		u1 := fp.randomFloat()
 		u2 := fp.randomFloat()
-		
+
 		z := math.Sqrt(-2*math.Log(u1)) * math.Cos(2*math.Pi*u2)
 		simulatedReturns[i] = mean + z*stdDev
 	}
@@ -3093,7 +3083,7 @@ func (fp *FundProtector) calculateStandardDeviation(values []float64, mean float
 func (fp *FundProtector) getNormalQuantile(p float64) float64 {
 	// 使用Beasley-Springer-Moro算法的简化版本
 	// 这是一个近似算法，对于风险管理应用足够精确
-	
+
 	if p <= 0 || p >= 1 {
 		return 0.0
 	}
@@ -3126,11 +3116,11 @@ func (fp *FundProtector) randomFloat() float64 {
 	// 使用当前时间的纳秒作为种子生成伪随机数
 	// 注意：这不是加密安全的随机数，但对于风险计算足够
 	nanos := time.Now().UnixNano()
-	
+
 	// 简单的线性同余生成器
 	seed := uint64(nanos)
 	seed = (seed*1103515245 + 12345) & 0x7fffffff
-	
+
 	return float64(seed) / float64(0x7fffffff)
 }
 
@@ -3217,7 +3207,7 @@ func (fp *FundProtector) validateHistoricalEquity(equity []float64) []float64 {
 	}
 
 	validEquity := make([]float64, 0, len(equity))
-	
+
 	for i, eq := range equity {
 		// 检查是否为有效数值
 		if math.IsNaN(eq) || math.IsInf(eq, 0) {
@@ -3236,7 +3226,7 @@ func (fp *FundProtector) validateHistoricalEquity(equity []float64) []float64 {
 			prevEquity := validEquity[len(validEquity)-1]
 			change := math.Abs(eq-prevEquity) / prevEquity
 			if change > 0.5 {
-				log.Printf("Warning: Large equity change at index %d: %.2f%% (from %.2f to %.2f)", 
+				log.Printf("Warning: Large equity change at index %d: %.2f%% (from %.2f to %.2f)",
 					i, change*100, prevEquity, eq)
 			}
 		}
@@ -3258,11 +3248,11 @@ func (fp *FundProtector) storeHistoricalEquity(equity []float64) {
 
 	// 从今天开始往前推算时间
 	currentTime := time.Now()
-	
+
 	for i, eq := range equity {
 		// 计算对应的时间戳（从最新到最旧）
 		timestamp := currentTime.Add(-time.Duration(len(equity)-1-i) * 24 * time.Hour)
-		
+
 		historicalEquity := &dao.HistoricalEquity{
 			Timestamp:   timestamp,
 			EquityValue: eq,
@@ -3270,7 +3260,7 @@ func (fp *FundProtector) storeHistoricalEquity(equity []float64) {
 
 		err := fp.daoManager.HistoricalEquity().Insert(ctx, historicalEquity)
 		if err != nil {
-			log.Printf("Failed to store historical equity for %s: %v", 
+			log.Printf("Failed to store historical equity for %s: %v",
 				timestamp.Format("2006-01-02 15:04:05"), err)
 		}
 	}
@@ -3290,7 +3280,7 @@ func (fp *FundProtector) calculateDrawdownFromEquity(equity []float64) float64 {
 	avgDrawdown := fp.calculateAverageDrawdown(equity)
 	currentDrawdown := fp.calculateCurrentDrawdown(equity)
 
-	log.Printf("Drawdown calculation: Max=%.4f, Avg=%.4f, Current=%.4f", 
+	log.Printf("Drawdown calculation: Max=%.4f, Avg=%.4f, Current=%.4f",
 		maxDrawdown, avgDrawdown, currentDrawdown)
 
 	// 返回最大回撤作为主要指标
@@ -3368,13 +3358,13 @@ func (fp *FundProtector) calculateCurrentDrawdown(equity []float64) float64 {
 
 // DrawdownPeriod 回撤期间结构
 type DrawdownPeriod struct {
-	StartIndex   int     `json:"start_index"`
-	EndIndex     int     `json:"end_index"`
-	PeakIndex    int     `json:"peak_index"`
-	TroughIndex  int     `json:"trough_index"`
-	MaxDrawdown  float64 `json:"max_drawdown"`
-	Duration     int     `json:"duration"`
-	Recovery     bool    `json:"recovery"`
+	StartIndex  int     `json:"start_index"`
+	EndIndex    int     `json:"end_index"`
+	PeakIndex   int     `json:"peak_index"`
+	TroughIndex int     `json:"trough_index"`
+	MaxDrawdown float64 `json:"max_drawdown"`
+	Duration    int     `json:"duration"`
+	Recovery    bool    `json:"recovery"`
 }
 
 // getAllDrawdowns 获取所有回撤期间
@@ -3520,41 +3510,6 @@ func (fp *FundProtector) calculateDrawdownMetrics(equity []float64) map[string]f
 	return metrics
 }
 
-// Position 持仓信息结构
-type Position struct {
-	Symbol            string  `json:"symbol"`
-	Side              string  `json:"side"` // LONG, SHORT
-	Size              float64 `json:"size"`
-	Notional          float64 `json:"notional"`
-	EntryPrice        float64 `json:"entry_price"`
-	MarkPrice         float64 `json:"mark_price"`
-	UnrealizedPnL     float64 `json:"unrealized_pnl"`
-	RealizedPnL       float64 `json:"realized_pnl"`
-	Leverage          int     `json:"leverage"`
-	MarginType        string  `json:"margin_type"`        // ISOLATED, CROSS
-	IsolatedMargin    float64 `json:"isolated_margin"`
-	MaintenanceMargin float64 `json:"maintenance_margin"`
-	LiquidationPrice  float64 `json:"liquidation_price"`
-}
-
-// ExchangeDataProvider 交易所数据提供者接口
-type ExchangeDataProvider interface {
-	// IsHealthy 检查连接健康状态
-	IsHealthy() bool
-	
-	// GetFundData 获取资金数据
-	GetFundData(ctx context.Context) (*ExchangeFundData, error)
-	
-	// GetPositions 获取持仓数据
-	GetPositions(ctx context.Context) ([]*Position, error)
-	
-	// GetHistoricalReturns 获取历史收益率
-	GetHistoricalReturns(ctx context.Context, days int) ([]float64, error)
-	
-	// GetHistoricalEquity 获取历史净值
-	GetHistoricalEquity(ctx context.Context, days int) ([]float64, error)
-}
-
 // calculateVolatilityFromReturns 从收益率计算波动率
 func (fp *FundProtector) calculateVolatilityFromReturns(returns []float64) float64 {
 	if len(returns) < 2 {
@@ -3570,7 +3525,7 @@ func (fp *FundProtector) calculateVolatilityFromReturns(returns []float64) float
 	// 加权平均，EWMA权重最高（更适合金融时间序列）
 	finalVolatility := simpleVol*0.2 + ewmaVol*0.5 + garchVol*0.3
 
-	log.Printf("Volatility calculation: Simple=%.4f, EWMA=%.4f, GARCH=%.4f, Final=%.4f", 
+	log.Printf("Volatility calculation: Simple=%.4f, EWMA=%.4f, GARCH=%.4f, Final=%.4f",
 		simpleVol, ewmaVol, garchVol, finalVolatility)
 
 	return finalVolatility
@@ -3632,9 +3587,9 @@ func (fp *FundProtector) calculateGARCHVolatility(returns []float64) float64 {
 	}
 
 	// GARCH(1,1)参数（简化估计）
-	omega := 0.000001  // 常数项
-	alpha := 0.1       // ARCH项系数
-	beta := 0.85       // GARCH项系数
+	omega := 0.000001 // 常数项
+	alpha := 0.1      // ARCH项系数
+	beta := 0.85      // GARCH项系数
 
 	// 初始化条件方差
 	mean := fp.calculateMean(returns)
@@ -3791,7 +3746,7 @@ func (fp *FundProtector) calculateCorrelationMatrix(positions []*Position) (map[
 
 	// 获取各个交易对的历史收益率
 	symbolReturns := make(map[string][]float64)
-	
+
 	for _, pos := range positions {
 		returns, err := fp.getSymbolHistoricalReturns(pos.Symbol, 30)
 		if err != nil {
@@ -3805,10 +3760,10 @@ func (fp *FundProtector) calculateCorrelationMatrix(positions []*Position) (map[
 
 	// 计算相关性矩阵
 	correlationMatrix := make(map[string]map[string]float64)
-	
+
 	for symbol1, returns1 := range symbolReturns {
 		correlationMatrix[symbol1] = make(map[string]float64)
-		
+
 		for symbol2, returns2 := range symbolReturns {
 			correlation := fp.calculateCorrelation(returns1, returns2)
 			correlationMatrix[symbol1][symbol2] = correlation
@@ -3822,13 +3777,10 @@ func (fp *FundProtector) calculateCorrelationMatrix(positions []*Position) (map[
 func (fp *FundProtector) getSymbolHistoricalReturns(symbol string, days int) ([]float64, error) {
 	// 这里应该从交易所或数据库获取特定交易对的历史价格数据
 	// 然后计算收益率，这里提供一个简化的实现
-	
+
 	if fp.exchangeProvider == nil {
 		return nil, fmt.Errorf("exchange provider not configured")
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
 
 	// 这里需要扩展ExchangeDataProvider接口来支持单个交易对的历史数据
 	// 暂时返回空数据，实际实现时需要添加相应的方法
@@ -3843,18 +3795,18 @@ func (fp *FundProtector) calculateCorrelation(x, y []float64) float64 {
 	}
 
 	n := len(x)
-	
+
 	// 计算均值
 	meanX := fp.calculateMean(x)
 	meanY := fp.calculateMean(y)
 
 	// 计算协方差和方差
 	var covariance, varianceX, varianceY float64
-	
+
 	for i := 0; i < n; i++ {
 		dx := x[i] - meanX
 		dy := y[i] - meanY
-		
+
 		covariance += dx * dy
 		varianceX += dx * dx
 		varianceY += dy * dy
@@ -3930,7 +3882,7 @@ func (fp *FundProtector) calculateSharpeRatio(returns []float64, riskFreeRate fl
 	// 年化夏普比率
 	annualReturn := mean * 252
 	annualVolatility := stdDev * math.Sqrt(252)
-	
+
 	return (annualReturn - riskFreeRate) / annualVolatility
 }
 
@@ -3950,7 +3902,7 @@ func (fp *FundProtector) calculateSortinoRatio(returns []float64, targetReturn f
 	// 年化索提诺比率
 	annualReturn := mean * 252
 	annualDownsideVol := downsideDeviation * math.Sqrt(252)
-	
+
 	return (annualReturn - targetReturn*252) / annualDownsideVol
 }
 
@@ -4009,7 +3961,7 @@ func (fp *FundProtector) calculateMaximumLikelihoodVolatility(returns []float64)
 
 	// 对于正态分布，最大似然估计等于样本标准差
 	mean := fp.calculateMean(returns)
-	
+
 	var sumSquaredDeviations float64
 	for _, ret := range returns {
 		deviation := ret - mean
@@ -4017,7 +3969,7 @@ func (fp *FundProtector) calculateMaximumLikelihoodVolatility(returns []float64)
 	}
 
 	variance := sumSquaredDeviations / float64(len(returns)) // MLE使用n而不是n-1
-	return math.Sqrt(variance * 252) // 年化
+	return math.Sqrt(variance * 252)                         // 年化
 }
 
 // calculateRiskAdjustedReturns 计算风险调整收益指标
@@ -4031,7 +3983,7 @@ func (fp *FundProtector) calculateRiskAdjustedReturns(returns []float64, benchma
 	// 基础统计
 	mean := fp.calculateMean(returns)
 	volatility := fp.calculateStandardDeviation(returns, mean)
-	
+
 	// 年化指标
 	annualReturn := mean * 252
 	annualVolatility := volatility * math.Sqrt(252)
@@ -4049,7 +4001,7 @@ func (fp *FundProtector) calculateRiskAdjustedReturns(returns []float64, benchma
 	if len(benchmarkReturns) == len(returns) {
 		metrics["Beta"] = fp.calculateBeta(returns, benchmarkReturns)
 		metrics["InformationRatio"] = fp.calculateInformationRatio(returns, benchmarkReturns)
-		
+
 		// Alpha (CAPM)
 		benchmarkMean := fp.calculateMean(benchmarkReturns)
 		alpha := mean - (riskFreeRate/252 + metrics["Beta"]*(benchmarkMean-riskFreeRate/252))
@@ -4092,13 +4044,13 @@ func (fp *FundProtector) calculateLeverageFromPositions(positions []*Position) f
 
 	for _, pos := range positions {
 		totalNotional += pos.Notional
-		
+
 		// 计算保证金使用量
 		marginUsed := pos.Notional / float64(pos.Leverage)
 		if pos.IsolatedMargin > 0 {
 			marginUsed = pos.IsolatedMargin
 		}
-		
+
 		totalMarginUsed += marginUsed
 	}
 
@@ -4109,7 +4061,7 @@ func (fp *FundProtector) calculateLeverageFromPositions(positions []*Position) f
 	// 有效杠杆 = 总名义价值 / 总保证金使用量
 	effectiveLeverage := totalNotional / totalMarginUsed
 
-	log.Printf("Portfolio leverage calculation: TotalNotional=%.2f, TotalMargin=%.2f, EffectiveLeverage=%.2fx", 
+	log.Printf("Portfolio leverage calculation: TotalNotional=%.2f, TotalMargin=%.2f, EffectiveLeverage=%.2fx",
 		totalNotional, totalMarginUsed, effectiveLeverage)
 
 	return effectiveLeverage
@@ -4143,8 +4095,8 @@ func (fp *FundProtector) calculateMarginUtilization() (float64, error) {
 	}
 
 	utilizationRate := totalMarginUsed / fundData.TotalBalance
-	
-	log.Printf("Margin utilization: Used=%.2f, Total=%.2f, Rate=%.2f%%", 
+
+	log.Printf("Margin utilization: Used=%.2f, Total=%.2f, Rate=%.2f%%",
 		totalMarginUsed, fundData.TotalBalance, utilizationRate*100)
 
 	return utilizationRate, nil
@@ -4163,7 +4115,7 @@ func (fp *FundProtector) checkLeverageRisk() error {
 
 	// 计算有效杠杆
 	effectiveLeverage := fp.calculateLeverageFromPositions(positions)
-	
+
 	// 计算保证金使用率
 	marginUtilization, err := fp.calculateMarginUtilization()
 	if err != nil {
@@ -4172,31 +4124,31 @@ func (fp *FundProtector) checkLeverageRisk() error {
 	}
 
 	// 杠杆风险阈值
-	maxLeverage := 20.0        // 最大有效杠杆20倍
+	maxLeverage := 20.0         // 最大有效杠杆20倍
 	maxMarginUtilization := 0.8 // 最大保证金使用率80%
 
 	// 检查杠杆是否超限
 	if effectiveLeverage > maxLeverage {
-		log.Printf("WARNING: Effective leverage %.2fx exceeds maximum %.2fx", 
+		log.Printf("WARNING: Effective leverage %.2fx exceeds maximum %.2fx",
 			effectiveLeverage, maxLeverage)
-		
+
 		// 触发杠杆风险警告
 		fp.triggerEmergency("LEVERAGE_RISK_EXCEEDED", map[string]interface{}{
 			"effective_leverage": effectiveLeverage,
-			"max_leverage":      maxLeverage,
+			"max_leverage":       maxLeverage,
 			"margin_utilization": marginUtilization,
 		})
 	}
 
 	// 检查保证金使用率是否过高
 	if marginUtilization > maxMarginUtilization {
-		log.Printf("WARNING: Margin utilization %.2f%% exceeds maximum %.2f%%", 
+		log.Printf("WARNING: Margin utilization %.2f%% exceeds maximum %.2f%%",
 			marginUtilization*100, maxMarginUtilization*100)
-		
+
 		// 触发保证金风险警告
 		fp.triggerEmergency("MARGIN_UTILIZATION_HIGH", map[string]interface{}{
 			"margin_utilization": marginUtilization,
-			"max_utilization":   maxMarginUtilization,
+			"max_utilization":    maxMarginUtilization,
 			"effective_leverage": effectiveLeverage,
 		})
 	}
@@ -4213,10 +4165,10 @@ func (fp *FundProtector) getLeverageMetrics() map[string]float64 {
 	}
 
 	metrics := make(map[string]float64)
-	
+
 	// 有效杠杆
 	metrics["effective_leverage"] = fp.calculateLeverageFromPositions(positions)
-	
+
 	// 保证金使用率
 	if marginUtilization, err := fp.calculateMarginUtilization(); err == nil {
 		metrics["margin_utilization"] = marginUtilization
@@ -4227,11 +4179,11 @@ func (fp *FundProtector) getLeverageMetrics() map[string]float64 {
 		var totalLeverage float64
 		var maxLeverage float64
 		var minLeverage float64 = float64(positions[0].Leverage)
-		
+
 		for _, pos := range positions {
 			leverage := float64(pos.Leverage)
 			totalLeverage += leverage
-			
+
 			if leverage > maxLeverage {
 				maxLeverage = leverage
 			}
@@ -4239,7 +4191,7 @@ func (fp *FundProtector) getLeverageMetrics() map[string]float64 {
 				minLeverage = leverage
 			}
 		}
-		
+
 		metrics["avg_position_leverage"] = totalLeverage / float64(len(positions))
 		metrics["max_position_leverage"] = maxLeverage
 		metrics["min_position_leverage"] = minLeverage
@@ -4268,30 +4220,30 @@ func (fp *FundProtector) adjustLeverageForRisk() error {
 
 	// 计算当前风险水平
 	currentRisk := fp.calculateCurrentRisk()
-	
+
 	// 如果风险过高，降低杠杆
 	if currentRisk > 0.7 { // 风险超过70%
 		log.Printf("High risk detected (%.2f), reducing leverage for high-risk positions", currentRisk)
-		
+
 		for _, pos := range positions {
 			positionRisk := fp.calculateSinglePositionRisk(pos)
-			
+
 			// 对于高风险持仓，降低杠杆
 			if positionRisk > 0.6 && pos.Leverage > 5 {
 				newLeverage := pos.Leverage / 2 // 杠杆减半
 				if newLeverage < 1 {
 					newLeverage = 1
 				}
-				
-				log.Printf("Reducing leverage for %s from %dx to %dx (risk: %.2f)", 
+
+				log.Printf("Reducing leverage for %s from %dx to %dx (risk: %.2f)",
 					pos.Symbol, pos.Leverage, newLeverage, positionRisk)
-				
+
 				err := fp.exchange.SetLeverage(ctx, pos.Symbol, newLeverage)
 				if err != nil {
 					log.Printf("Failed to set leverage for %s: %v", pos.Symbol, err)
 					continue
 				}
-				
+
 				log.Printf("Successfully reduced leverage for %s to %dx", pos.Symbol, newLeverage)
 			}
 		}
@@ -4322,27 +4274,27 @@ func (fp *FundProtector) calculateConcentrationFromPositions(positions []*Positi
 	// 计算赫芬达尔-赫希曼指数 (HHI)
 	var hhi float64
 	maxShare := 0.0
-	
+
 	for symbol, notional := range symbolNotional {
 		share := notional / totalNotional
 		hhi += share * share
-		
+
 		if share > maxShare {
 			maxShare = share
 		}
-		
-		log.Printf("Position concentration - %s: %.2f%% (%.2f)", 
+
+		log.Printf("Position concentration - %s: %.2f%% (%.2f)",
 			symbol, share*100, notional)
 	}
 
 	// HHI 范围: 1/n (完全分散) 到 1 (完全集中)
 	// 其中 n 是持仓数量
 	minHHI := 1.0 / float64(len(symbolNotional))
-	
+
 	// 标准化集中度指数 (0 = 完全分散, 1 = 完全集中)
 	concentrationIndex := (hhi - minHHI) / (1.0 - minHHI)
-	
-	log.Printf("Portfolio concentration: HHI=%.4f, MaxShare=%.2f%%, ConcentrationIndex=%.4f", 
+
+	log.Printf("Portfolio concentration: HHI=%.4f, MaxShare=%.2f%%, ConcentrationIndex=%.4f",
 		hhi, maxShare*100, concentrationIndex)
 
 	return concentrationIndex
@@ -4373,7 +4325,7 @@ func (fp *FundProtector) calculateSectorConcentration(positions []*Position) flo
 	for sector, notional := range sectorNotional {
 		share := notional / totalNotional
 		sectorHHI += share * share
-		log.Printf("Sector concentration - %s: %.2f%% (%.2f)", 
+		log.Printf("Sector concentration - %s: %.2f%% (%.2f)",
 			sector, share*100, notional)
 	}
 
@@ -4381,7 +4333,7 @@ func (fp *FundProtector) calculateSectorConcentration(positions []*Position) flo
 	minHHI := 1.0 / float64(len(sectorNotional))
 	sectorConcentration := (sectorHHI - minHHI) / (1.0 - minHHI)
 
-	log.Printf("Sector concentration: HHI=%.4f, Concentration=%.4f", 
+	log.Printf("Sector concentration: HHI=%.4f, Concentration=%.4f",
 		sectorHHI, sectorConcentration)
 
 	return math.Min(sectorConcentration, 1.0)
@@ -4441,7 +4393,7 @@ func (fp *FundProtector) calculateGeographicConcentration(positions []*Position)
 	for region, notional := range regionNotional {
 		share := notional / totalNotional
 		geoHHI += share * share
-		log.Printf("Geographic concentration - %s: %.2f%% (%.2f)", 
+		log.Printf("Geographic concentration - %s: %.2f%% (%.2f)",
 			region, share*100, notional)
 	}
 
@@ -4449,7 +4401,7 @@ func (fp *FundProtector) calculateGeographicConcentration(positions []*Position)
 	minHHI := 1.0 / float64(len(regionNotional))
 	geoConcentration := (geoHHI - minHHI) / (1.0 - minHHI)
 
-	log.Printf("Geographic concentration: HHI=%.4f, Concentration=%.4f", 
+	log.Printf("Geographic concentration: HHI=%.4f, Concentration=%.4f",
 		geoHHI, geoConcentration)
 
 	return math.Min(geoConcentration, 1.0)
@@ -4517,11 +4469,11 @@ func (fp *FundProtector) calculateCorrelationBasedConcentration(positions []*Pos
 	}
 
 	avgCorrelation := totalCorrelation / float64(pairCount)
-	
+
 	// 相关性越高，集中度风险越大
 	correlationRisk := avgCorrelation
 
-	log.Printf("Correlation-based concentration: AvgCorrelation=%.4f, Risk=%.4f", 
+	log.Printf("Correlation-based concentration: AvgCorrelation=%.4f, Risk=%.4f",
 		avgCorrelation, correlationRisk)
 
 	return math.Min(correlationRisk, 1.0)
@@ -4544,25 +4496,25 @@ func (fp *FundProtector) getConcentrationMetrics() map[string]float64 {
 	metrics["correlation_concentration"] = fp.calculateCorrelationBasedConcentration(positions)
 
 	// 综合集中度风险评分
-	totalConcentrationRisk := (metrics["symbol_concentration"]*0.4 + 
-		metrics["sector_concentration"]*0.3 + 
-		metrics["geographic_concentration"]*0.2 + 
+	totalConcentrationRisk := (metrics["symbol_concentration"]*0.4 +
+		metrics["sector_concentration"]*0.3 +
+		metrics["geographic_concentration"]*0.2 +
 		metrics["correlation_concentration"]*0.1)
-	
+
 	metrics["total_concentration_risk"] = totalConcentrationRisk
 
 	// 持仓数量和分散度
 	metrics["position_count"] = float64(len(positions))
-	
+
 	if len(positions) > 0 {
 		// 最大单一持仓占比
 		var maxPositionShare float64
 		var totalNotional float64
-		
+
 		for _, pos := range positions {
 			totalNotional += pos.Notional
 		}
-		
+
 		if totalNotional > 0 {
 			for _, pos := range positions {
 				share := pos.Notional / totalNotional
@@ -4571,7 +4523,7 @@ func (fp *FundProtector) getConcentrationMetrics() map[string]float64 {
 				}
 			}
 		}
-		
+
 		metrics["max_position_share"] = maxPositionShare
 		metrics["diversification_ratio"] = 1.0 / maxPositionShare // 分散化比率
 	}
@@ -4582,7 +4534,7 @@ func (fp *FundProtector) getConcentrationMetrics() map[string]float64 {
 // checkConcentrationRisk 检查集中度风险
 func (fp *FundProtector) checkConcentrationRisk() error {
 	metrics := fp.getConcentrationMetrics()
-	
+
 	// 集中度风险阈值
 	maxSymbolConcentration := 0.7    // 最大符号集中度70%
 	maxSectorConcentration := 0.8    // 最大行业集中度80%
@@ -4591,49 +4543,49 @@ func (fp *FundProtector) checkConcentrationRisk() error {
 
 	// 检查符号集中度
 	if symbolConc := metrics["symbol_concentration"]; symbolConc > maxSymbolConcentration {
-		log.Printf("WARNING: Symbol concentration %.2f%% exceeds maximum %.2f%%", 
+		log.Printf("WARNING: Symbol concentration %.2f%% exceeds maximum %.2f%%",
 			symbolConc*100, maxSymbolConcentration*100)
-		
+
 		fp.triggerEmergency("SYMBOL_CONCENTRATION_HIGH", map[string]interface{}{
 			"symbol_concentration": symbolConc,
-			"max_concentration":   maxSymbolConcentration,
-			"metrics":            metrics,
+			"max_concentration":    maxSymbolConcentration,
+			"metrics":              metrics,
 		})
 	}
 
 	// 检查行业集中度
 	if sectorConc := metrics["sector_concentration"]; sectorConc > maxSectorConcentration {
-		log.Printf("WARNING: Sector concentration %.2f%% exceeds maximum %.2f%%", 
+		log.Printf("WARNING: Sector concentration %.2f%% exceeds maximum %.2f%%",
 			sectorConc*100, maxSectorConcentration*100)
-		
+
 		fp.triggerEmergency("SECTOR_CONCENTRATION_HIGH", map[string]interface{}{
 			"sector_concentration": sectorConc,
-			"max_concentration":   maxSectorConcentration,
-			"metrics":            metrics,
+			"max_concentration":    maxSectorConcentration,
+			"metrics":              metrics,
 		})
 	}
 
 	// 检查单一持仓占比
 	if maxShare := metrics["max_position_share"]; maxShare > maxPositionShare {
-		log.Printf("WARNING: Maximum position share %.2f%% exceeds limit %.2f%%", 
+		log.Printf("WARNING: Maximum position share %.2f%% exceeds limit %.2f%%",
 			maxShare*100, maxPositionShare*100)
-		
+
 		fp.triggerEmergency("POSITION_CONCENTRATION_HIGH", map[string]interface{}{
 			"max_position_share": maxShare,
-			"max_allowed_share": maxPositionShare,
-			"metrics":           metrics,
+			"max_allowed_share":  maxPositionShare,
+			"metrics":            metrics,
 		})
 	}
 
 	// 检查综合集中度风险
 	if totalRisk := metrics["total_concentration_risk"]; totalRisk > maxTotalConcentrationRisk {
-		log.Printf("WARNING: Total concentration risk %.2f%% exceeds maximum %.2f%%", 
+		log.Printf("WARNING: Total concentration risk %.2f%% exceeds maximum %.2f%%",
 			totalRisk*100, maxTotalConcentrationRisk*100)
-		
+
 		fp.triggerEmergency("TOTAL_CONCENTRATION_RISK_HIGH", map[string]interface{}{
 			"total_concentration_risk": totalRisk,
-			"max_risk":                maxTotalConcentrationRisk,
-			"metrics":                 metrics,
+			"max_risk":                 maxTotalConcentrationRisk,
+			"metrics":                  metrics,
 		})
 	}
 
@@ -4727,7 +4679,7 @@ func (fp *FundProtector) collectFundStatusSnapshot(ctx context.Context) error {
 		return fmt.Errorf("failed to insert fund status snapshot: %w", err)
 	}
 
-	log.Printf("Fund status snapshot saved: Balance=%.2f, PL=%.2f", 
+	log.Printf("Fund status snapshot saved: Balance=%.2f, PL=%.2f",
 		snapshot.TotalBalance, snapshot.ProfitLoss)
 	return nil
 }
@@ -4799,7 +4751,7 @@ func (fp *FundProtector) collectRiskSnapshot(ctx context.Context) error {
 		return fmt.Errorf("failed to insert risk snapshot: %w", err)
 	}
 
-	log.Printf("Risk snapshot saved: Level=%s, Score=%.4f", 
+	log.Printf("Risk snapshot saved: Level=%s, Score=%.4f",
 		snapshot.RiskLevel, snapshot.RiskScore)
 	return nil
 }
@@ -4829,7 +4781,7 @@ func (fp *FundProtector) collectProtectionMetrics(ctx context.Context) error {
 		return fmt.Errorf("failed to insert protection metrics: %w", err)
 	}
 
-	log.Printf("Protection metrics saved: Transfers=%d, Emergencies=%d", 
+	log.Printf("Protection metrics saved: Transfers=%d, Emergencies=%d",
 		metrics.AutoTransfers, metrics.EmergencyActivations)
 	return nil
 }
@@ -4868,7 +4820,7 @@ func (fp *FundProtector) calculateAndStoreDailyReturn(ctx context.Context) error
 		return fmt.Errorf("failed to insert daily return: %w", err)
 	}
 
-	log.Printf("Daily return calculated and stored: %.4f%% (%.2f -> %.2f)", 
+	log.Printf("Daily return calculated and stored: %.4f%% (%.2f -> %.2f)",
 		dailyReturn*100, yesterdayEquity, currentEquity)
 	return nil
 }
@@ -4876,7 +4828,7 @@ func (fp *FundProtector) calculateAndStoreDailyReturn(ctx context.Context) error
 // getEquityForDate 获取指定日期的净值
 func (fp *FundProtector) getEquityForDate(ctx context.Context, date time.Time) (float64, error) {
 	// 首先尝试从资金状态快照获取
-	snapshots, err := fp.daoManager.FundStatusSnapshots().GetByTimeRange(ctx, 
+	snapshots, err := fp.daoManager.FundStatusSnapshots().GetByTimeRange(ctx,
 		date, date.Add(24*time.Hour))
 	if err != nil {
 		return 0, fmt.Errorf("failed to get fund status snapshots: %w", err)
@@ -4888,7 +4840,7 @@ func (fp *FundProtector) getEquityForDate(ctx context.Context, date time.Time) (
 	}
 
 	// 如果没有快照，尝试从历史净值获取
-	equityData, err := fp.daoManager.HistoricalEquity().GetByTimeRange(ctx, 
+	equityData, err := fp.daoManager.HistoricalEquity().GetByTimeRange(ctx,
 		date, date.Add(24*time.Hour))
 	if err != nil {
 		return 0, fmt.Errorf("failed to get historical equity: %w", err)
@@ -4956,11 +4908,11 @@ func (fp *FundProtector) cleanupOldData() {
 // GetDataCollectionStatus 获取数据收集状态
 func (fp *FundProtector) GetDataCollectionStatus() map[string]interface{} {
 	return map[string]interface{}{
-		"enabled":              fp.daoManager != nil,
-		"collection_interval":  fp.dataCollectionInterval.String(),
-		"last_collection":      fp.lastDataCollection,
-		"next_collection":      fp.lastDataCollection.Add(fp.dataCollectionInterval),
-		"time_until_next":      time.Until(fp.lastDataCollection.Add(fp.dataCollectionInterval)).String(),
+		"enabled":             fp.daoManager != nil,
+		"collection_interval": fp.dataCollectionInterval.String(),
+		"last_collection":     fp.lastDataCollection,
+		"next_collection":     fp.lastDataCollection.Add(fp.dataCollectionInterval),
+		"time_until_next":     time.Until(fp.lastDataCollection.Add(fp.dataCollectionInterval)).String(),
 	}
 }
 

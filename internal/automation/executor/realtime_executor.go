@@ -9,9 +9,11 @@ import (
 
 	"qcat/internal/config"
 	"qcat/internal/database"
+	"qcat/internal/events"
 	"qcat/internal/exchange"
 	"qcat/internal/exchange/account"
 	"qcat/internal/monitor"
+	"qcat/internal/security/protector"
 )
 
 // RealtimeExecutor 实时执行引擎
@@ -310,7 +312,18 @@ func (re *RealtimeExecutor) updateStats() {
 // initializeExecutors 初始化执行器
 func (re *RealtimeExecutor) initializeExecutors() {
 	re.positionExecutor = NewPositionExecutor(re.config, re.db, re.exchange, re.accountManager)
-	re.riskExecutor = NewRiskExecutor(re.config, re.db, re.exchange, re.accountManager)
+
+	// Create default services if not provided
+	var notificationService protector.NotificationService
+	var eventBus *events.EventBus
+
+	// Use the metrics from RealtimeExecutor or create a default one
+	metrics := re.metrics
+	if metrics == nil {
+		metrics = monitor.NewMetricsCollector()
+	}
+
+	re.riskExecutor = NewRiskExecutor(re.config, re.db, re.exchange, re.accountManager, notificationService, metrics, eventBus)
 	re.orderExecutor = NewOrderExecutor(re.config, re.db, re.exchange, re.accountManager)
 	re.strategyExecutor = NewStrategyExecutor(re.config, re.db, re.exchange, re.accountManager)
 	re.dataExecutor = NewDataExecutor(re.config, re.db, re.exchange, re.accountManager)

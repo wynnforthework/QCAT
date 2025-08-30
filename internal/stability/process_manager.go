@@ -327,33 +327,41 @@ func (b *binanceExchangeAdapter) Ping(ctx context.Context) error {
 }
 
 // 新增：GetAccount方法
-func (b *binanceExchangeAdapter) GetAccount(ctx context.Context) (*binance.AccountInfo, error) {
+func (b *binanceExchangeAdapter) GetAccount(ctx context.Context) (*exchange.Account, error) {
 	// 新增：实现获取账户信息
-	_, err := b.client.GetAccountBalance(ctx)
+	balances, err := b.client.GetAccountBalance(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	positions, err := b.client.GetPositions(ctx)
-	if err != nil {
-		return nil, err
+	// 转换为exchange.Account格式
+	accountBalances := make([]*exchange.AccountBalance, 0, len(balances))
+	for _, balance := range balances {
+		accountBalances = append(accountBalances, balance)
 	}
 
-	// 新增：转换positions类型
-	binancePositions := make([]binance.Position, len(positions))
-	for i, pos := range positions {
-		binancePositions[i] = binance.Position{
-			Symbol:           pos.Symbol,
-			PositionAmt:      fmt.Sprintf("%f", pos.Size),
-			EntryPrice:       fmt.Sprintf("%f", pos.EntryPrice),
-			UnrealizedProfit: fmt.Sprintf("%f", pos.UnrealizedPnL),
-		}
-	}
-
-	return &binance.AccountInfo{
-		Assets:    []binance.Asset{},
-		Positions: binancePositions,
+	return &exchange.Account{
+		Balances:  accountBalances,
+		UpdatedAt: time.Now(),
 	}, nil
+}
+
+// GetAccountSnapshots implements exchange.Exchange
+func (b *binanceExchangeAdapter) GetAccountSnapshots(ctx context.Context, days int) ([]*exchange.AccountSnapshot, error) {
+	// 委托给底层客户端
+	return b.client.GetAccountSnapshots(ctx, days)
+}
+
+// GetOrderBook implements exchange.Exchange
+func (b *binanceExchangeAdapter) GetOrderBook(ctx context.Context, symbol string, limit int) (*exchange.OrderBook, error) {
+	// 委托给底层客户端
+	return b.client.GetOrderBook(ctx, symbol, limit)
+}
+
+// GetTicker implements exchange.Exchange
+func (b *binanceExchangeAdapter) GetTicker(ctx context.Context, symbol string) (*exchange.Ticker, error) {
+	// 委托给底层客户端
+	return b.client.GetTicker(ctx, symbol)
 }
 
 // 新增：Close方法
