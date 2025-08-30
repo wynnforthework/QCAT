@@ -2,19 +2,19 @@ package middleware
 
 import (
 	"encoding/json"
-	"net/http"
 	"runtime/debug"
 
-	"github.com/gin-gonic/gin"
 	"qcat/internal/errors"
 	"qcat/internal/logger"
+
+	"github.com/gin-gonic/gin"
 )
 
 // ErrorHandler 错误处理中间件
 func ErrorHandler() gin.HandlerFunc {
 	return gin.CustomRecovery(func(c *gin.Context, recovered interface{}) {
 		var err error
-		
+
 		// 处理panic
 		if recovered != nil {
 			// 记录panic堆栈
@@ -24,7 +24,7 @@ func ErrorHandler() gin.HandlerFunc {
 				"path", c.Request.URL.Path,
 				"method", c.Request.Method,
 			)
-			
+
 			// 创建内部服务器错误
 			err = errors.NewAppError(
 				errors.ErrCodeInternal,
@@ -32,7 +32,7 @@ func ErrorHandler() gin.HandlerFunc {
 				nil,
 			).WithRequestID(getRequestID(c))
 		}
-		
+
 		// 处理错误响应
 		handleError(c, err)
 	})
@@ -41,7 +41,7 @@ func ErrorHandler() gin.HandlerFunc {
 // HandleError 处理错误的中间件函数
 func HandleError(c *gin.Context) {
 	c.Next()
-	
+
 	// 检查是否有错误
 	if len(c.Errors) > 0 {
 		err := c.Errors.Last().Err
@@ -54,9 +54,9 @@ func handleError(c *gin.Context, err error) {
 	if err == nil {
 		return
 	}
-	
+
 	var appErr *errors.AppError
-	
+
 	// 转换为应用错误
 	if errors.IsAppError(err) {
 		appErr = errors.GetAppError(err)
@@ -64,28 +64,28 @@ func handleError(c *gin.Context, err error) {
 		// 包装标准错误
 		appErr = errors.WrapError(err, errors.ErrCodeInternal, "Internal server error")
 	}
-	
+
 	// 添加请求上下文
 	if appErr.RequestID == "" {
 		appErr = appErr.WithRequestID(getRequestID(c))
 	}
-	
+
 	// 添加用户ID（如果存在）
 	if userID, exists := c.Get("user_id"); exists {
 		if uid, ok := userID.(string); ok {
 			appErr = appErr.WithUserID(uid)
 		}
 	}
-	
+
 	// 记录错误日志
 	logError(c, appErr)
-	
+
 	// 创建错误响应
 	response := errors.NewErrorResponse(appErr, c.Request.URL.Path)
-	
+
 	// 设置响应头
 	c.Header("Content-Type", "application/json")
-	
+
 	// 返回错误响应
 	c.JSON(appErr.HTTPStatus(), response)
 	c.Abort()
@@ -104,23 +104,23 @@ func logError(c *gin.Context, err *errors.AppError) {
 		"user_agent", c.Request.UserAgent(),
 		"ip", c.ClientIP(),
 	}
-	
+
 	// 添加错误详情
 	if err.Details != "" {
 		fields = append(fields, "details", err.Details)
 	}
-	
+
 	// 添加上下文信息
 	if len(err.Context) > 0 {
 		contextJSON, _ := json.Marshal(err.Context)
 		fields = append(fields, "context", string(contextJSON))
 	}
-	
+
 	// 添加原始错误
 	if err.Cause != nil {
 		fields = append(fields, "cause", err.Cause.Error())
 	}
-	
+
 	// 根据严重程度选择日志级别
 	switch err.Severity {
 	case errors.SeverityCritical:
@@ -152,12 +152,12 @@ func ValidationErrorHandler(err error) *errors.AppError {
 	if err == nil {
 		return nil
 	}
-	
+
 	// 如果已经是应用错误，直接返回
 	if appErr := errors.GetAppError(err); appErr != nil {
 		return appErr
 	}
-	
+
 	// 包装为验证错误
 	return errors.NewAppError(
 		errors.ErrCodeInvalidInput,
@@ -171,9 +171,9 @@ func DatabaseErrorHandler(err error) *errors.AppError {
 	if err == nil {
 		return nil
 	}
-	
+
 	errMsg := err.Error()
-	
+
 	// 根据错误信息判断错误类型
 	switch {
 	case containsAny(errMsg, []string{"connection", "connect", "dial"}):
@@ -208,9 +208,9 @@ func CacheErrorHandler(err error) *errors.AppError {
 	if err == nil {
 		return nil
 	}
-	
+
 	errMsg := err.Error()
-	
+
 	// 根据错误信息判断错误类型
 	switch {
 	case containsAny(errMsg, []string{"connection", "connect", "dial", "timeout"}):
@@ -239,9 +239,9 @@ func ExchangeErrorHandler(err error) *errors.AppError {
 	if err == nil {
 		return nil
 	}
-	
+
 	errMsg := err.Error()
-	
+
 	// 根据错误信息判断错误类型
 	switch {
 	case containsAny(errMsg, []string{"connection", "connect", "timeout", "network"}):
@@ -296,27 +296,27 @@ func RetryableErrorHandler(err error, maxRetries int) (*errors.AppError, bool) {
 	if err == nil {
 		return nil, false
 	}
-	
+
 	appErr := errors.GetAppError(err)
 	if appErr == nil {
 		appErr = errors.WrapError(err, errors.ErrCodeInternal, "Internal error")
 	}
-	
+
 	// 检查是否可重试
 	if appErr.IsRetryable() && maxRetries > 0 {
 		return appErr, true
 	}
-	
+
 	return appErr, false
 }
 
 // ErrorMetrics 错误指标收集
 type ErrorMetrics struct {
-	TotalErrors   int64            `json:"total_errors"`
-	ErrorsByCode  map[string]int64 `json:"errors_by_code"`
-	ErrorsByPath  map[string]int64 `json:"errors_by_path"`
-	CriticalErrors int64           `json:"critical_errors"`
-	HighErrors    int64            `json:"high_errors"`
+	TotalErrors    int64            `json:"total_errors"`
+	ErrorsByCode   map[string]int64 `json:"errors_by_code"`
+	ErrorsByPath   map[string]int64 `json:"errors_by_path"`
+	CriticalErrors int64            `json:"critical_errors"`
+	HighErrors     int64            `json:"high_errors"`
 }
 
 var globalErrorMetrics = &ErrorMetrics{
@@ -329,7 +329,7 @@ func collectErrorMetrics(c *gin.Context, err *errors.AppError) {
 	globalErrorMetrics.TotalErrors++
 	globalErrorMetrics.ErrorsByCode[string(err.Code)]++
 	globalErrorMetrics.ErrorsByPath[c.Request.URL.Path]++
-	
+
 	switch err.Severity {
 	case errors.SeverityCritical:
 		globalErrorMetrics.CriticalErrors++
