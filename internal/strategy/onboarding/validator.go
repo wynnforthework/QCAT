@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -332,10 +333,28 @@ func (r *PerformanceRule) Name() string {
 }
 
 func (r *PerformanceRule) Validate(ctx context.Context, req *OnboardingRequest) *ValidationError {
-	// TODO 添加性能相关的验证
-	// 例如：检查策略的预期性能指标
+	// 添加性能相关的验证
+	// 检查策略的预期性能指标
 	
-	// 模拟性能检查
+	// 1. 验证预期收益率合理性
+	if err := r.validateExpectedReturn(req); err != nil {
+		return err
+	}
+	
+	// 2. 验证风险指标
+	if err := r.validateRiskMetrics(req); err != nil {
+		return err
+	}
+	
+	// 3. 验证回撤控制
+	if err := r.validateDrawdownControl(req); err != nil {
+		return err
+	}
+	
+	// 4. 验证夏普比率预期
+	if err := r.validateSharpeRatio(req); err != nil {
+		return err
+	}
 	if req.Config != nil && req.Config.Params != nil {
 		if expectedReturn, exists := req.Config.Params["expected_return"]; exists {
 			if er, ok := expectedReturn.(float64); ok {
@@ -386,5 +405,199 @@ func (r *SecurityRule) Validate(ctx context.Context, req *OnboardingRequest) *Va
 		}
 	}
 
+	return nil
+}
+// validateExpectedReturn 验证预期收益率
+func (r *PerformanceRule) validateExpectedReturn(req *OnboardingRequest) *ValidationError {
+	if req.Config == nil || req.Config.Params == nil {
+		return nil
+	}
+	
+	expectedReturn, exists := req.Config.Params["expected_return"]
+	if !exists {
+		return &ValidationError{
+			Field:   "expected_return",
+			Message: "Expected return parameter is required for performance validation",
+		}
+	}
+	
+	// 转换为float64
+	var returnRate float64
+	switch v := expectedReturn.(type) {
+	case float64:
+		returnRate = v
+	case string:
+		var err error
+		returnRate, err = strconv.ParseFloat(v, 64)
+		if err != nil {
+			return &ValidationError{
+				Field:   "expected_return",
+				Message: "Invalid expected return format",
+			}
+		}
+	default:
+		return &ValidationError{
+			Field:   "expected_return",
+			Message: "Expected return must be a number",
+		}
+	}
+	
+	// 验证收益率范围（年化收益率应在合理范围内）
+	if returnRate < -0.5 || returnRate > 3.0 {
+		return &ValidationError{
+			Field:   "expected_return",
+			Message: "Expected return should be between -50% and 300% annually",
+		}
+	}
+	
+	return nil
+}
+
+// validateRiskMetrics 验证风险指标
+func (r *PerformanceRule) validateRiskMetrics(req *OnboardingRequest) *ValidationError {
+	if req.Config == nil || req.Config.Params == nil {
+		return nil
+	}
+	
+	// 验证波动率
+	if volatility, exists := req.Config.Params["volatility"]; exists {
+		var vol float64
+		switch v := volatility.(type) {
+		case float64:
+			vol = v
+		case string:
+			var err error
+			vol, err = strconv.ParseFloat(v, 64)
+			if err != nil {
+				return &ValidationError{
+					Field:   "volatility",
+					Message: "Invalid volatility format",
+				}
+			}
+		}
+		
+		// 波动率应在合理范围内
+		if vol < 0 || vol > 2.0 {
+			return &ValidationError{
+				Field:   "volatility",
+				Message: "Volatility should be between 0% and 200%",
+			}
+		}
+	}
+	
+	// 验证VaR (Value at Risk)
+	if var95, exists := req.Config.Params["var_95"]; exists {
+		var varValue float64
+		switch v := var95.(type) {
+		case float64:
+			varValue = v
+		case string:
+			var err error
+			varValue, err = strconv.ParseFloat(v, 64)
+			if err != nil {
+				return &ValidationError{
+					Field:   "var_95",
+					Message: "Invalid VaR format",
+				}
+			}
+		}
+		
+		// VaR应为负值且在合理范围内
+		if varValue > 0 || varValue < -0.5 {
+			return &ValidationError{
+				Field:   "var_95",
+				Message: "95% VaR should be negative and above -50%",
+			}
+		}
+	}
+	
+	return nil
+}
+
+// validateDrawdownControl 验证回撤控制
+func (r *PerformanceRule) validateDrawdownControl(req *OnboardingRequest) *ValidationError {
+	if req.Config == nil || req.Config.Params == nil {
+		return nil
+	}
+	
+	maxDrawdown, exists := req.Config.Params["max_drawdown"]
+	if !exists {
+		return &ValidationError{
+			Field:   "max_drawdown",
+			Message: "Maximum drawdown parameter is required",
+		}
+	}
+	
+	var drawdown float64
+	switch v := maxDrawdown.(type) {
+	case float64:
+		drawdown = v
+	case string:
+		var err error
+		drawdown, err = strconv.ParseFloat(v, 64)
+		if err != nil {
+			return &ValidationError{
+				Field:   "max_drawdown",
+				Message: "Invalid max drawdown format",
+			}
+		}
+	default:
+		return &ValidationError{
+			Field:   "max_drawdown",
+			Message: "Max drawdown must be a number",
+		}
+	}
+	
+	// 最大回撤应为负值且在合理范围内
+	if drawdown > 0 || drawdown < -0.8 {
+		return &ValidationError{
+			Field:   "max_drawdown",
+			Message: "Maximum drawdown should be between 0% and -80%",
+		}
+	}
+	
+	return nil
+}
+
+// validateSharpeRatio 验证夏普比率预期
+func (r *PerformanceRule) validateSharpeRatio(req *OnboardingRequest) *ValidationError {
+	if req.Config == nil || req.Config.Params == nil {
+		return nil
+	}
+	
+	sharpeRatio, exists := req.Config.Params["expected_sharpe_ratio"]
+	if !exists {
+		// 夏普比率不是必需的，但如果提供了就要验证
+		return nil
+	}
+	
+	var sharpe float64
+	switch v := sharpeRatio.(type) {
+	case float64:
+		sharpe = v
+	case string:
+		var err error
+		sharpe, err = strconv.ParseFloat(v, 64)
+		if err != nil {
+			return &ValidationError{
+				Field:   "expected_sharpe_ratio",
+				Message: "Invalid Sharpe ratio format",
+			}
+		}
+	default:
+		return &ValidationError{
+			Field:   "expected_sharpe_ratio",
+			Message: "Sharpe ratio must be a number",
+		}
+	}
+	
+	// 夏普比率应在合理范围内
+	if sharpe < -2.0 || sharpe > 5.0 {
+		return &ValidationError{
+			Field:   "expected_sharpe_ratio",
+			Message: "Expected Sharpe ratio should be between -2.0 and 5.0",
+		}
+	}
+	
 	return nil
 }

@@ -40,6 +40,8 @@ type EnhancedStressTestFramework struct {
 	peakMemoryUsage uint64
 	peakGoroutines  int64
 	peakCPUUsage    float64
+	totalNetworkIO  float64
+	totalDiskIO     float64
 
 	// 错误统计
 	errorCounts      map[string]*int64
@@ -679,11 +681,29 @@ func (estf *EnhancedStressTestFramework) updateMonitoringStats() {
 
 	// 获取性能监控数据
 	if estf.performanceMonitor != nil {
-		// TODO 获取CPU使用率等指标，暂时跳过
-		// cpuMetric := estf.performanceMonitor.GetMetric("cpu_usage")
-		// if cpuMetric != nil && cpuMetric.Current > estf.peakCPUUsage {
-		//     estf.peakCPUUsage = cpuMetric.Current
-		// }
+		// 获取CPU使用率等指标
+		cpuMetric := estf.performanceMonitor.GetMetric("cpu_usage")
+		if cpuMetric != nil && cpuMetric.Current > estf.peakCPUUsage {
+			estf.peakCPUUsage = cpuMetric.Current
+		}
+		
+		// 获取内存使用率
+		memMetric := estf.performanceMonitor.GetMetric("memory_usage")
+		if memMetric != nil && memMetric.Current > estf.peakMemoryUsage {
+			estf.peakMemoryUsage = memMetric.Current
+		}
+		
+		// 获取网络I/O指标
+		networkMetric := estf.performanceMonitor.GetMetric("network_io")
+		if networkMetric != nil {
+			estf.totalNetworkIO += networkMetric.Current
+		}
+		
+		// 获取磁盘I/O指标
+		diskMetric := estf.performanceMonitor.GetMetric("disk_io")
+		if diskMetric != nil {
+			estf.totalDiskIO += diskMetric.Current
+		}
 	}
 
 	// 打印当前状态

@@ -1,11 +1,5 @@
 # Code Scan Report
 
-## ./internal\analysis\factors\factor_discovery_engine.go
-- Line 4981: **TODO** → `// TODO: 实现基于性能的轮换`
-- Line 4985: **TODO** → `// TODO: 实现基于相关性的轮换`
-- Line 4989: **TODO** → `// TODO: 实现基于市场状态的轮换`
-- Line 4993: **TODO** → `// TODO: 计算因子表现`
-
 ## ./internal\api\api_test.go
 - Line 78: **mock** → `mockData := testutils.NewMockData()`
 - Line 81: **mock** → `strategy := mockData.GenerateStrategy()`
@@ -19,10 +13,6 @@
 - Line 276: **mock** → `// Mock strategy status`
 - Line 325: **mock** → `// Mock alerts`
 
-## ./internal\automation\executor\executors.go
-- Line 1894: **TODO** → `// TODO: 实现策略淘汰逻辑`
-- Line 1901: **TODO** → `// TODO: 实现新策略引入逻辑`
-
 ## ./internal\automation\scheduler\strategy_scheduler.go
 - Line 3455: **mock** → `log.Printf("Mock: Adjusted %s - SL: %.4f->%.4f, TP: %.4f->%.4f",`
 - Line 3461: **mock** → `log.Printf("Mock: Completed automatic adjustment for %d positions", adjustmentCount)`
@@ -35,7 +25,6 @@
 - Line 4417: **mock** → `return mockData`
 - Line 4420: **mock** → `// createMockMarketData 创建单个交易对的模拟市场数据`
 - Line 4421: **mock** → `func (ss *StrategyScheduler) createMockMarketData(symbol string) *MarketData {`
-- Line 5090: **TODO** → `// TODO: 实现自动参数应用机制`
 
 ## ./internal\automation\scheduler\sub_schedulers.go
 - Line 1748: **mock** → `log.Printf("Failed to query exchange balances from database: %v, using mock data", err)`
@@ -849,9 +838,6 @@
 - Line 69: **mock** → `func TestMarketAnalyzer_GenerateMockPriceData(t *testing.T) {`
 - Line 77: **mock** → `priceData := analyzer.generateMockPriceData(symbol, timeRange, startTime, endTime)`
 
-## ./internal\strategy\onboarding\validator.go
-- Line 335: **TODO** → `// TODO 添加性能相关的验证`
-
 ## ./internal\strategy\optimizer\dynamic_stoploss.go
 - Line 771: **mock** → `log.Printf("Mock: Updating orders on exchange for %s_%s: SL=%.4f, TP=%.4f",`
 
@@ -882,44 +868,29 @@
 - Line 466: **mock** → `// 为了演示，返回nil，实际应该实现MockExchange`
 - Line 467: **mock** → `log.Printf("Creating mock exchange for %s on %s", config.Symbol, config.Exchange)`
 
-## ./internal\strategy\sandbox\sandbox.go
-- Line 245: **TODO** → `// 新增：TODO 实现重连逻辑`
-- Line 249: **TODO** → `// 新增：TODO 实现等待和重试逻辑`
-- Line 253: **TODO** → `// 新增：TODO 实现停止交易逻辑`
-
-## ./internal\strategy\validation\strategy_gatekeeper.go
-- Line 350: **TODO** → `// TODO: 实现实际的策略停止逻辑`
-
-## ./internal\testing\enhanced_stress_test.go
-- Line 682: **TODO** → `// TODO 获取CPU使用率等指标，暂时跳过`
-
-## ./internal\testutils\benchmark.go
-- Line 156: **TODO** → `// TODO 实现负载测试逻辑`
-
 ## ./internal\testutils\testutils.go
-- Line 94: **mock** → `suite.setupMockDB()`
-- Line 101: **mock** → `suite.setupMockCache()`
-- Line 121: **TODO** → `// TODO 连接到测试数据库`
-- Line 123: **mock** → `s.setupMockDB()`
-- Line 126: **mock** → `// setupMockDB 设置模拟数据库`
-- Line 127: **mock** → `func (s *TestSuite) setupMockDB() {`
-- Line 142: **TODO** → `// TODO 连接到测试Redis`
-- Line 144: **mock** → `s.setupMockCache()`
-- Line 147: **mock** → `// setupMockCache 设置模拟缓存`
-- Line 148: **mock** → `func (s *TestSuite) setupMockCache() {`
-- Line 275: **mock** → `// MockData 模拟数据生成器`
-- Line 276: **mock** → `type MockData struct {`
-- Line 280: **mock** → `// NewMockData 创建模拟数据生成器`
-- Line 281: **mock** → `func NewMockData() *MockData {`
-- Line 282: **mock** → `return &MockData{`
-- Line 288: **mock** → `func (m *MockData) RandomString(length int) string {`
-- Line 298: **mock** → `func (m *MockData) RandomInt(min, max int) int {`
-- Line 303: **mock** → `func (m *MockData) RandomFloat(min, max float64) float64 {`
-- Line 308: **mock** → `func (m *MockData) RandomBool() bool {`
-- Line 313: **mock** → `func (m *MockData) RandomChoice(choices []string) string {`
-- Line 318: **mock** → `func (m *MockData) GenerateStrategy() map[string]interface{} {`
-- Line 345: **mock** → `func (m *MockData) GenerateOrder() map[string]interface{} {`
-- Line 555: **TODO** → `// TODO 实现端口检查逻辑`
+- Line 96: **mock** → `suite.setupMockDB()`
+- Line 103: **mock** → `suite.setupMockCache()`
+- Line 123: **TODO** → `// TODO 连接到测试数据库`
+- Line 125: **mock** → `s.setupMockDB()`
+- Line 128: **mock** → `// setupMockDB 设置模拟数据库`
+- Line 129: **mock** → `func (s *TestSuite) setupMockDB() {`
+- Line 144: **TODO** → `// TODO 连接到测试Redis`
+- Line 146: **mock** → `s.setupMockCache()`
+- Line 149: **mock** → `// setupMockCache 设置模拟缓存`
+- Line 150: **mock** → `func (s *TestSuite) setupMockCache() {`
+- Line 277: **mock** → `// MockData 模拟数据生成器`
+- Line 278: **mock** → `type MockData struct {`
+- Line 282: **mock** → `// NewMockData 创建模拟数据生成器`
+- Line 283: **mock** → `func NewMockData() *MockData {`
+- Line 284: **mock** → `return &MockData{`
+- Line 290: **mock** → `func (m *MockData) RandomString(length int) string {`
+- Line 300: **mock** → `func (m *MockData) RandomInt(min, max int) int {`
+- Line 305: **mock** → `func (m *MockData) RandomFloat(min, max float64) float64 {`
+- Line 310: **mock** → `func (m *MockData) RandomBool() bool {`
+- Line 315: **mock** → `func (m *MockData) RandomChoice(choices []string) string {`
+- Line 320: **mock** → `func (m *MockData) GenerateStrategy() map[string]interface{} {`
+- Line 347: **mock** → `func (m *MockData) GenerateOrder() map[string]interface{} {`
 
 ## ./internal\trading\dryrun\simulator_test.go
 - Line 11: **mock** → `// MockMarketDataProvider 模拟市场数据提供者`

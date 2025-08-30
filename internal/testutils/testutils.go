@@ -5,8 +5,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -552,8 +554,15 @@ func RandomPort() int {
 
 // IsPortAvailable 检查端口是否可用
 func IsPortAvailable(port int) bool {
-	// TODO 实现端口检查逻辑
-	// 简单起见，直接返回true
+	// 实现端口检查逻辑
+	// 尝试监听指定端口，如果成功则端口可用
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return false // 端口被占用或其他错误
+	}
+	
+	// 立即关闭监听器
+	listener.Close()
 	return true
 }
 
