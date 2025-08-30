@@ -1,4 +1,4 @@
-package main
+package protector
 
 import (
 	"bufio"
@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// 这个脚本用于清理fund_protector.go中的重复方法
-func main() {
+// CleanupDuplicates 清理fund_protector.go中的重复方法
+func CleanupDuplicates() {
 	inputFile := "internal/security/protector/fund_protector.go"
 	outputFile := "internal/security/protector/fund_protector_clean.go"
 
@@ -53,7 +53,7 @@ func main() {
 			// 开始新函数
 			inFunction = true
 			functionLines = []string{line}
-			
+
 			// 提取函数名
 			parts := strings.Split(line, "func (fp *FundProtector) ")
 			if len(parts) > 1 {
@@ -62,7 +62,7 @@ func main() {
 			}
 		} else if inFunction {
 			functionLines = append(functionLines, line)
-			
+
 			// 检测函数结束（简单的大括号匹配）
 			if strings.TrimSpace(line) == "}" && len(functionLines) > 5 {
 				// 函数可能结束了，但我们需要更智能的检测
