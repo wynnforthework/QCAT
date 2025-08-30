@@ -362,9 +362,10 @@ func (s *UnifiedStrategyService) getStrategiesFromDB(ctx context.Context, option
 
 		s.db.DB.QueryRowContext(ctx, countQuery, countArgs...).Scan(&total)
 	} else {
-		// 返回模拟数据用于测试
-		strategies = s.getMockStrategies()
-		total = len(strategies)
+		// 如果没有数据库连接，返回空结果而不是 mock 数据
+		log.Printf("No database connection available for strategy query")
+		strategies = []BasicStrategy{}
+		total = 0
 	}
 
 	return strategies, total, nil
@@ -413,17 +414,8 @@ func (s *UnifiedStrategyService) getStrategyFromDB(ctx context.Context, strategy
 			strategy.Config = make(map[string]interface{})
 		}
 	} else {
-		// 返回模拟数据
-		mockStrategies := s.getMockStrategies()
-		for _, mock := range mockStrategies {
-			if mock.ID == strategyID {
-				strategy = mock
-				break
-			}
-		}
-		if strategy.ID == "" {
-			return strategy, fmt.Errorf("strategy not found: %s", strategyID)
-		}
+		// 如果没有数据库连接，返回错误而不是 mock 数据
+		return strategy, fmt.Errorf("no database connection available and strategy %s not found", strategyID)
 	}
 
 	return strategy, nil
@@ -470,11 +462,47 @@ func (s *UnifiedStrategyService) enhanceStrategyInfo(ctx context.Context, basic 
 		}
 	}
 
-	// 如果没有从策略池获取到信息，使用模拟数据
+	// 如果没有从策略池获取到信息，使用默认值而不是 mock 数据
 	if unified.Execution.ExecutionCount == 0 {
-		unified.Execution = s.getMockExecutionInfo()
-		unified.Performance = s.getMockPerformanceInfo()
-		unified.Pool = s.getMockPoolInfo()
+		unified.Execution = ExecutionInfo{
+			IsRunning:      false,
+			LastExecution:  time.Time{},
+			NextExecution:  time.Time{},
+			ExecutionCount: 0,
+			SuccessCount:   0,
+			ErrorCount:     0,
+			SuccessRate:    0.0,
+			AvgLatency:     0.0,
+		}
+		unified.Performance = PerformanceInfo{
+			PNL:          0.0,
+			TotalReturn:  0.0,
+			SharpeRatio:  0.0,
+			MaxDrawdown:  0.0,
+			WinRate:      0.0,
+			ProfitFactor: 0.0,
+			Volatility:   0.0,
+			TradeCount:   0,
+			AvgTrade:     0.0,
+			BestTrade:    0.0,
+			WorstTrade:   0.0,
+		}
+		unified.Pool = PoolInfo{
+			PoolStatus: "disabled",
+			Priority:   "low",
+			ResourceAllocation: ResourceAllocation{
+				CPU:    0.0,
+				Memory: 0.0,
+			},
+			PoolMetrics: PoolMetrics{
+				QueuePosition:   0,
+				ExecutionWeight: 0.0,
+				ResourceUsage:   0.0,
+				ConflictCount:   0,
+			},
+			LastSync:   time.Time{},
+			SyncStatus: "no_data",
+		}
 	}
 
 	return unified, nil
@@ -563,95 +591,8 @@ func (s *UnifiedStrategyService) generateSummary(strategies []UnifiedStrategy) S
 	return summary
 }
 
-// getMockStrategies 获取模拟策略数据
-func (s *UnifiedStrategyService) getMockStrategies() []BasicStrategy {
-	return []BasicStrategy{
-		{
-			ID:          "strategy_001",
-			Name:        "动量策略Alpha",
-			Type:        "momentum",
-			Description: "基于动量指标的交易策略",
-			Version:     "1.2.0",
-			Status:      "active",
-			Stage:       "production",
-			CreatedAt:   time.Now().Add(-30 * 24 * time.Hour),
-			UpdatedAt:   time.Now().Add(-2 * time.Hour),
-			Config:      map[string]interface{}{"lookback": 14, "threshold": 0.02},
-		},
-		{
-			ID:          "strategy_002",
-			Name:        "均值回归策略Beta",
-			Type:        "mean_reversion",
-			Description: "基于均值回归的交易策略",
-			Version:     "2.1.0",
-			Status:      "active",
-			Stage:       "production",
-			CreatedAt:   time.Now().Add(-45 * 24 * time.Hour),
-			UpdatedAt:   time.Now().Add(-1 * time.Hour),
-			Config:      map[string]interface{}{"window": 20, "deviation": 2.0},
-		},
-		{
-			ID:          "strategy_003",
-			Name:        "套利策略Gamma",
-			Type:        "arbitrage",
-			Description: "跨交易所套利策略",
-			Version:     "1.0.0",
-			Status:      "testing",
-			Stage:       "testing",
-			CreatedAt:   time.Now().Add(-7 * 24 * time.Hour),
-			UpdatedAt:   time.Now().Add(-30 * time.Minute),
-			Config:      map[string]interface{}{"min_spread": 0.001, "max_position": 10000},
-		},
-	}
-}
+// 删除了 getMockStrategies 方法，不再使用 mock 数据
 
-// getMockExecutionInfo 获取模拟执行信息
-func (s *UnifiedStrategyService) getMockExecutionInfo() ExecutionInfo {
-	return ExecutionInfo{
-		IsRunning:      true,
-		LastExecution:  time.Now().Add(-5 * time.Minute),
-		NextExecution:  time.Now().Add(10 * time.Minute),
-		ExecutionCount: 1234,
-		SuccessCount:   1180,
-		ErrorCount:     54,
-		SuccessRate:    95.6,
-		AvgLatency:     8.5,
-	}
-}
+// 删除了 getMockExecutionInfo 方法，不再使用 mock 数据
 
-// getMockPerformanceInfo 获取模拟性能信息
-func (s *UnifiedStrategyService) getMockPerformanceInfo() PerformanceInfo {
-	return PerformanceInfo{
-		PNL:          15420.50,
-		TotalReturn:  0.156,
-		SharpeRatio:  2.34,
-		MaxDrawdown:  0.08,
-		WinRate:      0.67,
-		ProfitFactor: 1.85,
-		Volatility:   0.12,
-		TradeCount:   456,
-		AvgTrade:     33.8,
-		BestTrade:    245.6,
-		WorstTrade:   -89.2,
-	}
-}
-
-// getMockPoolInfo 获取模拟池信息
-func (s *UnifiedStrategyService) getMockPoolInfo() PoolInfo {
-	return PoolInfo{
-		PoolStatus: "enabled",
-		Priority:   "high",
-		ResourceAllocation: ResourceAllocation{
-			CPU:    1.2,
-			Memory: 2.1,
-		},
-		PoolMetrics: PoolMetrics{
-			QueuePosition:   3,
-			ExecutionWeight: 0.85,
-			ResourceUsage:   0.65,
-			ConflictCount:   0,
-		},
-		LastSync:   time.Now().Add(-2 * time.Minute),
-		SyncStatus: "success",
-	}
-}
+// 删除了 getMockPerformanceInfo 和 getMockPoolInfo 方法，不再使用 mock 数据

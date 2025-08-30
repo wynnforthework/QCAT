@@ -10,28 +10,30 @@ import (
 
 // Config 应用配置
 type Config struct {
-	App        AppConfig        `yaml:"app"`
-	Ports      PortsConfig      `yaml:"ports"`
-	Server     ServerConfig     `yaml:"server"`
-	Database   DatabaseConfig   `yaml:"database"`
-	Redis      RedisConfig      `yaml:"redis"`
-	Exchange   ExchangeConfig   `yaml:"exchange"`
-	JWT        JWTConfig        `yaml:"jwt"`
-	Monitoring MonitoringConfig `yaml:"monitoring"`
-	CORS       CORSConfig       `yaml:"cors"`
-	RateLimit  RateLimitConfig  `yaml:"rate_limit"`
-	Security   SecurityConfig   `yaml:"security"`
-	Logging    LoggingConfig    `yaml:"logging"`
-	Memory     MemoryConfig     `yaml:"memory"`
-	Network    NetworkConfig    `yaml:"network"`
-	Health     HealthConfig     `yaml:"health"`
-	Shutdown   ShutdownConfig   `yaml:"shutdown"`
-	Strategy   StrategyConfig   `yaml:"strategy"`
-	Optimizer  OptimizerConfig  `yaml:"optimizer"`
-	MarketData MarketDataConfig `yaml:"market_data"`
-	Order      OrderConfig      `yaml:"order"`
-	Risk       RiskConfig       `yaml:"risk"`
-	Cache      CacheConfig      `yaml:"cache"`
+	App             AppConfig             `yaml:"app"`
+	Ports           PortsConfig           `yaml:"ports"`
+	Server          ServerConfig          `yaml:"server"`
+	Database        DatabaseConfig        `yaml:"database"`
+	Redis           RedisConfig           `yaml:"redis"`
+	Exchange        ExchangeConfig        `yaml:"exchange"`
+	JWT             JWTConfig             `yaml:"jwt"`
+	Monitoring      MonitoringConfig      `yaml:"monitoring"`
+	CORS            CORSConfig            `yaml:"cors"`
+	RateLimit       RateLimitConfig       `yaml:"rate_limit"`
+	Security        SecurityConfig        `yaml:"security"`
+	Logging         LoggingConfig         `yaml:"logging"`
+	Memory          MemoryConfig          `yaml:"memory"`
+	Network         NetworkConfig         `yaml:"network"`
+	Health          HealthConfig          `yaml:"health"`
+	Shutdown        ShutdownConfig        `yaml:"shutdown"`
+	Strategy        StrategyConfig        `yaml:"strategy"`
+	Optimizer       OptimizerConfig       `yaml:"optimizer"`
+	MarketData      MarketDataConfig      `yaml:"market_data"`
+	Order           OrderConfig           `yaml:"order"`
+	Risk            RiskConfig            `yaml:"risk"`
+	Cache           CacheConfig           `yaml:"cache"`
+	Hedging         HedgingConfig         `yaml:"hedging"`
+	LayeredPosition LayeredPositionConfig `yaml:"layered_position"`
 }
 
 // AppConfig 应用配置
@@ -369,6 +371,44 @@ type CacheConfig struct {
 	CleanupInterval    time.Duration `yaml:"cleanup_interval"`
 	CompressionEnabled bool          `yaml:"compression_enabled"`
 	EncryptionEnabled  bool          `yaml:"encryption_enabled"`
+}
+
+// HedgingConfig 对冲配置
+type HedgingConfig struct {
+	Enabled              bool          `yaml:"enabled"`
+	CorrelationThreshold float64       `yaml:"correlation_threshold"`
+	HedgeFrequency       time.Duration `yaml:"hedge_frequency"`
+	DynamicAdjustment    bool          `yaml:"dynamic_adjustment"`
+	MinHedgeRatio        float64       `yaml:"min_hedge_ratio"`
+	MaxHedgeRatio        float64       `yaml:"max_hedge_ratio"`
+	HedgeRatioModel      string        `yaml:"hedge_ratio_model"`
+	RebalanceStrategy    string        `yaml:"rebalance_strategy"`
+	LookbackWindow       int           `yaml:"lookback_window"`
+	HalfLife             float64       `yaml:"half_life"`
+	Confidence           float64       `yaml:"confidence"`
+	RiskAversion         float64       `yaml:"risk_aversion"`
+	SlippageLimit        float64       `yaml:"slippage_limit"`
+	MaxRetries           int           `yaml:"max_retries"`
+	OrderTimeout         time.Duration `yaml:"order_timeout"`
+	ExecutionStrategy    string        `yaml:"execution_strategy"`
+}
+
+// LayeredPositionConfig 分层仓位配置
+type LayeredPositionConfig struct {
+	Enabled            bool          `yaml:"enabled"`
+	LayerCount         int           `yaml:"layer_count"`
+	LayerSizes         []float64     `yaml:"layer_sizes"`
+	RebalanceThreshold float64       `yaml:"rebalance_threshold"`
+	RebalanceInterval  time.Duration `yaml:"rebalance_interval"`
+	MaxLayers          int           `yaml:"max_layers"`
+	MinLayerSize       float64       `yaml:"min_layer_size"`
+	MaxLayerSize       float64       `yaml:"max_layer_size"`
+	RiskLevels         []string      `yaml:"risk_levels"`
+	AllocationMethod   string        `yaml:"allocation_method"`
+	DiversificationMin int           `yaml:"diversification_min"`
+	MaxLeverage        float64       `yaml:"max_leverage"`
+	MaxDrawdown        float64       `yaml:"max_drawdown"`
+	VolatilityWindow   int           `yaml:"volatility_window"`
 }
 
 // Load 加载配置文件

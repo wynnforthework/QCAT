@@ -521,19 +521,41 @@ func (a *BanexgAdapter) GetOrderBook(ctx context.Context, symbol string, limit i
 		return nil, fmt.Errorf("failed to fetch order book: %w", err)
 	}
 
-	bids := make([]*BookItem, len(orderBook.Bids))
-	for i, bid := range orderBook.Bids {
-		bids[i] = &BookItem{
-			Price:    bid[0],
-			Quantity: bid[1],
+	// 检查 orderBook.Bids 和 orderBook.Asks 是否为 nil
+	var bids []*BookItem
+	var asks []*BookItem
+
+	if orderBook.Bids != nil {
+		// 使用 OdBookSide 的 Price 和 Size 切片
+		bidCount := len(orderBook.Bids.Price)
+		if limit > 0 && limit < bidCount {
+			bidCount = limit
+		}
+
+		bids = make([]*BookItem, bidCount)
+		for i := 0; i < bidCount; i++ {
+			price, size := orderBook.Bids.Level(i)
+			bids[i] = &BookItem{
+				Price:    price,
+				Quantity: size,
+			}
 		}
 	}
 
-	asks := make([]*BookItem, len(orderBook.Asks))
-	for i, ask := range orderBook.Asks {
-		asks[i] = &BookItem{
-			Price:    ask[0],
-			Quantity: ask[1],
+	if orderBook.Asks != nil {
+		// 使用 OdBookSide 的 Price 和 Size 切片
+		askCount := len(orderBook.Asks.Price)
+		if limit > 0 && limit < askCount {
+			askCount = limit
+		}
+
+		asks = make([]*BookItem, askCount)
+		for i := 0; i < askCount; i++ {
+			price, size := orderBook.Asks.Level(i)
+			asks[i] = &BookItem{
+				Price:    price,
+				Quantity: size,
+			}
 		}
 	}
 
@@ -549,7 +571,7 @@ func (a *BanexgAdapter) GetOrderBook(ctx context.Context, symbol string, limit i
 func (a *BanexgAdapter) GetAccountSnapshots(ctx context.Context, days int) ([]*AccountSnapshot, error) {
 	// banexg doesn't provide historical account snapshots
 	// We'll simulate this by creating snapshots based on current data
-	
+
 	// Get current account balance
 	balances, err := a.GetAccountBalance(ctx)
 	if err != nil {
@@ -564,7 +586,7 @@ func (a *BanexgAdapter) GetAccountSnapshots(ctx context.Context, days int) ([]*A
 
 	// Calculate current values
 	var totalWalletBalance, totalUnrealizedPnL, totalPositionValue float64
-	
+
 	if usdtBalance, exists := balances["USDT"]; exists {
 		totalWalletBalance = usdtBalance.Total
 	}
@@ -579,11 +601,11 @@ func (a *BanexgAdapter) GetAccountSnapshots(ctx context.Context, days int) ([]*A
 	// Create snapshots for the requested days (simulated historical data)
 	snapshots := make([]*AccountSnapshot, days)
 	baseTime := time.Now().Truncate(24 * time.Hour)
-	
+
 	for i := 0; i < days; i++ {
 		// Simulate slight variations in historical data
 		variation := 1.0 + (float64(i%7)-3)*0.01 // ±3% variation
-		
+
 		snapshots[i] = &AccountSnapshot{
 			TotalWalletBalance: totalWalletBalance * variation,
 			TotalUnrealizedPnL: totalUnrealizedPnL * variation,

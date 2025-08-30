@@ -13,12 +13,12 @@ import (
 
 // MarketData represents market data for analysis
 type MarketData struct {
-	Symbol      string    `json:"symbol"`
-	Price       float64   `json:"price"`
-	Volume      float64   `json:"volume"`
-	Volatility  float64   `json:"volatility"`
-	Liquidity   float64   `json:"liquidity"`
-	Timestamp   time.Time `json:"timestamp"`
+	Symbol     string    `json:"symbol"`
+	Price      float64   `json:"price"`
+	Volume     float64   `json:"volume"`
+	Volatility float64   `json:"volatility"`
+	Liquidity  float64   `json:"liquidity"`
+	Timestamp  time.Time `json:"timestamp"`
 }
 
 // getHistoricalPrices retrieves historical price data for a symbol
@@ -30,7 +30,7 @@ func (rm *RiskMonitor) getHistoricalPrices(ctx context.Context, symbol string, d
 		AND timestamp >= NOW() - INTERVAL '%d days'
 		ORDER BY timestamp ASC
 	`
-	
+
 	rows, err := rm.db.QueryContext(ctx, fmt.Sprintf(query, days), symbol)
 	if err != nil {
 		return nil, err
@@ -46,10 +46,10 @@ func (rm *RiskMonitor) getHistoricalPrices(ctx context.Context, symbol string, d
 		prices = append(prices, price)
 	}
 
-	// If no data in database, return mock data for testing
+	// If no data in database, return empty data
 	if len(prices) == 0 {
-		log.Printf("No historical data found for %s, generating mock data", symbol)
-		return rm.generateMockPrices(100.0, days*24, 0.02), nil
+		log.Printf("No historical data found for %s", symbol)
+		return []float64{}, nil
 	}
 
 	return prices, nil
@@ -68,7 +68,7 @@ func (rm *RiskMonitor) getTotalPortfolioValue(ctx context.Context) (float64, err
 		FROM positions 
 		WHERE status = 'ACTIVE'
 	`
-	
+
 	var totalValue sql.NullFloat64
 	err := rm.db.QueryRowContext(ctx, query).Scan(&totalValue)
 	if err != nil {
@@ -86,16 +86,16 @@ func (rm *RiskMonitor) getTotalPortfolioValue(ctx context.Context) (float64, err
 func (rm *RiskMonitor) calculateSymbolLiquidityRisk(symbol string) float64 {
 	// Simplified liquidity risk calculation based on symbol type
 	// In practice, this would use order book depth, trading volume, etc.
-	
+
 	majorPairs := map[string]bool{
 		"BTCUSDT": true, "ETHUSDT": true, "BNBUSDT": true,
 		"ADAUSDT": true, "SOLUSDT": true, "XRPUSDT": true,
 	}
-	
+
 	if majorPairs[symbol] {
 		return 0.1 // Low liquidity risk for major pairs
 	}
-	
+
 	return 0.3 // Higher liquidity risk for other pairs
 }
 
@@ -108,7 +108,7 @@ func (rm *RiskMonitor) calculateConcentrationRisk(positions []shared.Position) f
 	// Calculate total portfolio value
 	totalValue := 0.0
 	positionValues := make([]float64, len(positions))
-	
+
 	for i, pos := range positions {
 		value := pos.Size * pos.CurrentPrice
 		positionValues[i] = value
@@ -152,7 +152,7 @@ func (rm *RiskMonitor) calculateCorrelationRisk(ctx context.Context, positions [
 	// Calculate average correlation
 	totalCorrelation := 0.0
 	count := 0
-	
+
 	for i := 0; i < len(symbols); i++ {
 		for j := i + 1; j < len(symbols); j++ {
 			if corr, exists := correlationMatrix[symbols[i]][symbols[j]]; exists {
@@ -182,7 +182,7 @@ func (rm *RiskMonitor) calculateLiquidityRisk(ctx context.Context, positions []s
 	for _, pos := range positions {
 		value := pos.Size * pos.CurrentPrice
 		liquidityRisk := rm.calculateSymbolLiquidityRisk(pos.Symbol)
-		
+
 		weightedLiquidityRisk += value * liquidityRisk
 		totalValue += value
 	}
@@ -202,7 +202,7 @@ func (rm *RiskMonitor) calculatePortfolioVaR(ctx context.Context, positions []sh
 
 	// Simplified portfolio VaR calculation
 	// In practice, this would use full covariance matrix and Monte Carlo simulation
-	
+
 	totalVaR := 0.0
 	for _, pos := range positions {
 		// Get historical returns for the position
@@ -261,7 +261,7 @@ func (rm *RiskMonitor) calculateMaxDrawdown(ctx context.Context) float64 {
 		WHERE timestamp >= NOW() - INTERVAL '30 days'
 		ORDER BY timestamp ASC
 	`
-	
+
 	rows, err := rm.db.QueryContext(ctx, query)
 	if err != nil {
 		log.Printf("Warning: Could not get equity curve for drawdown calculation: %v", err)
@@ -326,7 +326,7 @@ func (rm *RiskMonitor) generateRiskRecommendations(totalRisk, concentrationRisk,
 // calculateCorrelationMatrix calculates correlation matrix for symbols
 func (rm *RiskMonitor) calculateCorrelationMatrix(ctx context.Context, symbols []string) (map[string]map[string]float64, error) {
 	correlationMatrix := make(map[string]map[string]float64)
-	
+
 	// Initialize matrix
 	for _, symbol1 := range symbols {
 		correlationMatrix[symbol1] = make(map[string]float64)
@@ -395,7 +395,7 @@ func (rm *RiskMonitor) getMarketDataForAnalysis(ctx context.Context) ([]MarketDa
 		ORDER BY volume_24h DESC
 		LIMIT 50
 	`
-	
+
 	rows, err := rm.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -414,10 +414,10 @@ func (rm *RiskMonitor) getMarketDataForAnalysis(ctx context.Context) ([]MarketDa
 		marketData = append(marketData, data)
 	}
 
-	// If no data in database, generate mock data for testing
+	// If no data in database, return empty data
 	if len(marketData) == 0 {
-		log.Printf("No market data found, generating mock data for testing")
-		return rm.generateMockMarketData(), nil
+		log.Printf("No market data found")
+		return []MarketData{}, nil
 	}
 
 	return marketData, nil
@@ -441,13 +441,13 @@ func (rm *RiskMonitor) detectVolatilitySpike(marketData []MarketData) *MarketAno
 	for i, data := range marketData {
 		volatilities[i] = data.Volatility
 	}
-	
+
 	stdDev := shared.CalculateStandardDeviation(volatilities)
 	threshold := avgVolatility + 2*stdDev
 
 	var affectedSymbols []string
 	var maxVolatility float64
-	
+
 	for _, data := range marketData {
 		if data.Volatility > threshold {
 			affectedSymbols = append(affectedSymbols, data.Symbol)
@@ -509,13 +509,13 @@ func (rm *RiskMonitor) detectLiquidityDrop(marketData []MarketData) *MarketAnoma
 	for i, data := range marketData {
 		liquidities[i] = data.Liquidity
 	}
-	
+
 	stdDev := shared.CalculateStandardDeviation(liquidities)
 	threshold := avgLiquidity - 2*stdDev
 
 	var affectedSymbols []string
 	var minLiquidity float64 = 1.0
-	
+
 	for _, data := range marketData {
 		if data.Liquidity < threshold {
 			affectedSymbols = append(affectedSymbols, data.Symbol)
@@ -580,7 +580,7 @@ func (rm *RiskMonitor) detectCorrelationBreakdown(ctx context.Context, marketDat
 	// Analyze correlation breakdown (correlations suddenly becoming very low or negative)
 	var lowCorrelations []string
 	lowCorrCount := 0
-	
+
 	for i, symbol1 := range symbols[:min(10, len(symbols))] {
 		for j := i + 1; j < min(10, len(symbols)); j++ {
 			symbol2 := symbols[j]
@@ -643,37 +643,4 @@ func min(a, b int) int {
 		return a
 	}
 	return b
-}
-
-// generateMockPrices generates mock price data for testing
-func (rm *RiskMonitor) generateMockPrices(startPrice float64, count int, volatility float64) []float64 {
-	prices := make([]float64, count)
-	prices[0] = startPrice
-	
-	for i := 1; i < count; i++ {
-		// Simple random walk with volatility
-		change := (shared.GenerateRandomFloat() - 0.5) * volatility
-		prices[i] = prices[i-1] * (1 + change)
-	}
-	
-	return prices
-}
-
-// generateMockMarketData generates mock market data for testing
-func (rm *RiskMonitor) generateMockMarketData() []MarketData {
-	symbols := []string{"BTCUSDT", "ETHUSDT", "BNBUSDT", "ADAUSDT", "SOLUSDT"}
-	data := make([]MarketData, len(symbols))
-	
-	for i, symbol := range symbols {
-		data[i] = MarketData{
-			Symbol:     symbol,
-			Price:      50000 + float64(i)*1000, // Mock prices
-			Volume:     1000000 + float64(i)*100000,
-			Volatility: 0.02 + float64(i)*0.005,
-			Liquidity:  0.8 - float64(i)*0.1,
-			Timestamp:  time.Now(),
-		}
-	}
-	
-	return data
 }

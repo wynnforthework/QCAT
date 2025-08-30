@@ -2,6 +2,7 @@ package cache
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -186,12 +187,11 @@ func BenchmarkMemoryCache(b *testing.B) {
 	testutils.RunBenchmark(b, "MemoryCache_Set_Get", config, func(b *testing.B, suite *testutils.BenchmarkSuite) {
 		cache := NewMemoryCache(10000)
 		ctx := context.Background()
-		mockData := testutils.NewMockData()
 
 		b.RunParallel(func(pb *testing.PB) {
 			for pb.Next() {
-				key := mockData.RandomString(10)
-				value := mockData.RandomString(100)
+				key := fmt.Sprintf("test_key_%d", b.N)
+				value := fmt.Sprintf("test_value_%d", b.N)
 
 				// Set
 				cache.Set(ctx, key, value, time.Minute)

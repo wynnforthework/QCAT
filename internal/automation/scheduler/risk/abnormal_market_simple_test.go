@@ -11,12 +11,12 @@ import (
 
 func TestCircuitBreakerConfig(t *testing.T) {
 	config := CircuitBreakerConfig{
-		VolatilityThreshold:    2.0,
-		LiquidityThreshold:     0.5,
-		CorrelationThreshold:   0.3,
-		PriceChangeThreshold:   0.1,
-		VolumeChangeThreshold:  3.0,
-		ActivationDuration:     time.Minute * 15,
+		VolatilityThreshold:   2.0,
+		LiquidityThreshold:    0.5,
+		CorrelationThreshold:  0.3,
+		PriceChangeThreshold:  0.1,
+		VolumeChangeThreshold: 3.0,
+		ActivationDuration:    time.Minute * 15,
 	}
 
 	assert.Equal(t, 2.0, config.VolatilityThreshold)
@@ -164,14 +164,14 @@ func TestScaledPositionInfo(t *testing.T) {
 
 func TestHedgePositionInfo(t *testing.T) {
 	info := HedgePositionInfo{
-		HedgeID:         "hedge123",
-		Instrument:      "BTC_PERP",
-		HedgeSize:       0.5,
-		HedgePrice:      51000.0,
-		TargetAsset:     "BTC/USDT",
-		HedgeRatio:      0.3,
-		ExpectedOffset:  15000.0,
-		Status:          "ACTIVE",
+		HedgeID:        "hedge123",
+		Instrument:     "BTC_PERP",
+		HedgeSize:      0.5,
+		HedgePrice:     51000.0,
+		TargetAsset:    "BTC/USDT",
+		HedgeRatio:     0.3,
+		ExpectedOffset: 15000.0,
+		Status:         "ACTIVE",
 	}
 
 	assert.Equal(t, "hedge123", info.HedgeID)
@@ -273,24 +273,24 @@ func TestExchangeHealthStatus(t *testing.T) {
 // Test helper functions
 
 func TestCalculateReturns(t *testing.T) {
-	// Create a mock detector to test the helper method
+	// Create a detector instance to test the helper method
 	detector := &AbnormalMarketDetector{}
-	
+
 	prices := []float64{100.0, 102.0, 101.0, 103.0, 105.0}
 	returns := detector.calculateReturns(prices)
-	
+
 	assert.Len(t, returns, 4) // Should be len(prices) - 1
-	
+
 	// Verify first return: ln(102/100) ≈ 0.0198
 	assert.InDelta(t, 0.0198, returns[0], 0.001)
-	
+
 	// Verify second return: ln(101/102) ≈ -0.0099
 	assert.InDelta(t, -0.0099, returns[1], 0.001)
 }
 
 func TestDetermineVolatilitySeverity(t *testing.T) {
 	detector := &AbnormalMarketDetector{}
-	
+
 	// Test different volatility ratios
 	assert.Equal(t, shared.AlertSeverityCritical, detector.determineVolatilitySeverity(5.5))
 	assert.Equal(t, shared.AlertSeverityHigh, detector.determineVolatilitySeverity(3.5))
@@ -300,45 +300,45 @@ func TestDetermineVolatilitySeverity(t *testing.T) {
 
 func TestDetermineLiquiditySeverity(t *testing.T) {
 	detector := &AbnormalMarketDetector{}
-	
+
 	// Test critical liquidity (very low ratio and high spread)
 	assert.Equal(t, shared.AlertSeverityCritical, detector.determineLiquiditySeverity(0.1, 0.06))
-	
+
 	// Test high severity (low ratio)
 	assert.Equal(t, shared.AlertSeverityHigh, detector.determineLiquiditySeverity(0.3, 0.04))
-	
+
 	// Test medium severity
 	assert.Equal(t, shared.AlertSeverityMedium, detector.determineLiquiditySeverity(0.5, 0.025))
-	
+
 	// Test low severity (good liquidity)
 	assert.Equal(t, shared.AlertSeverityLow, detector.determineLiquiditySeverity(0.8, 0.01))
 }
 
 func TestDetermineCorrelationSeverity(t *testing.T) {
 	detector := &AbnormalMarketDetector{}
-	
+
 	// Test critical correlation breakdown
 	assert.Equal(t, shared.AlertSeverityCritical, detector.determineCorrelationSeverity(0.8, 0.2, 0.9))
-	
+
 	// Test high severity
 	assert.Equal(t, shared.AlertSeverityHigh, detector.determineCorrelationSeverity(0.6, 0.3, 0.8))
-	
+
 	// Test medium severity
 	assert.Equal(t, shared.AlertSeverityMedium, detector.determineCorrelationSeverity(0.4, 0.4, 0.7))
-	
+
 	// Test low severity
 	assert.Equal(t, shared.AlertSeverityLow, detector.determineCorrelationSeverity(0.2, 0.6, 0.7))
 }
 
 func TestGenerateVolatilityRecommendations(t *testing.T) {
 	detector := &AbnormalMarketDetector{}
-	
+
 	// Test critical recommendations
 	recommendations := detector.generateVolatilityRecommendations("BTC/USDT", 5.0, shared.AlertSeverityCritical)
 	assert.NotEmpty(t, recommendations)
 	assert.Contains(t, recommendations[0], "URGENT")
 	assert.Contains(t, recommendations[0], "5.0x normal")
-	
+
 	// Test high severity recommendations
 	recommendations = detector.generateVolatilityRecommendations("ETH/USDT", 3.0, shared.AlertSeverityHigh)
 	assert.NotEmpty(t, recommendations)
@@ -348,13 +348,13 @@ func TestGenerateVolatilityRecommendations(t *testing.T) {
 
 func TestGenerateLiquidityRecommendations(t *testing.T) {
 	detector := &AbnormalMarketDetector{}
-	
+
 	// Test critical recommendations
 	recommendations := detector.generateLiquidityRecommendations("BTC/USDT", 0.2, shared.AlertSeverityCritical)
 	assert.NotEmpty(t, recommendations)
 	assert.Contains(t, recommendations[0], "CRITICAL")
 	assert.Contains(t, recommendations[0], "20.0% of normal")
-	
+
 	// Test medium severity recommendations
 	recommendations = detector.generateLiquidityRecommendations("ETH/USDT", 0.6, shared.AlertSeverityMedium)
 	assert.NotEmpty(t, recommendations)
@@ -364,16 +364,16 @@ func TestGenerateLiquidityRecommendations(t *testing.T) {
 
 func TestGenerateCorrelationRecommendations(t *testing.T) {
 	detector := &AbnormalMarketDetector{}
-	
+
 	pair := []string{"BTC/USDT", "ETH/USDT"}
-	
+
 	// Test critical recommendations
 	recommendations := detector.generateCorrelationRecommendations(pair, 0.7, shared.AlertSeverityCritical)
 	assert.NotEmpty(t, recommendations)
 	assert.Contains(t, recommendations[0], "CRITICAL")
 	assert.Contains(t, recommendations[0], "BTC/USDT/ETH/USDT")
 	assert.Contains(t, recommendations[0], "70.0% change")
-	
+
 	// Test medium severity recommendations
 	recommendations = detector.generateCorrelationRecommendations(pair, 0.4, shared.AlertSeverityMedium)
 	assert.NotEmpty(t, recommendations)

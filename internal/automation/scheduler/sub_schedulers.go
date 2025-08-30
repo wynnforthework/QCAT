@@ -308,7 +308,7 @@ func (ps *PositionScheduler) HandleOptimization(ctx context.Context, task *Sched
 		if err != nil {
 			return fmt.Errorf("failed to execute position adjustments: %w", err)
 		}
-		
+
 		successCount := 0
 		for _, result := range executionResults {
 			if result.Success {
@@ -501,7 +501,7 @@ func (ds *DataScheduler) HandleCleaning(ctx context.Context, task *ScheduledTask
 	if err != nil {
 		return fmt.Errorf("failed to clean invalid data: %w", err)
 	}
-	log.Printf("Data cleaning completed: %d records processed, %d cleaned", 
+	log.Printf("Data cleaning completed: %d records processed, %d cleaned",
 		cleaningResults.TotalRecords, cleaningResults.CleanedRecords)
 
 	// 3. 校正数据格式
@@ -637,7 +637,7 @@ func (ds *DataScheduler) HandleFactorLibraryUpdate(ctx context.Context, task *Sc
 	if err != nil {
 		return fmt.Errorf("failed to update factor library: %w", err)
 	}
-	log.Printf("Factor library updated: %d factors added, %d updated", 
+	log.Printf("Factor library updated: %d factors added, %d updated",
 		updateResults.AddedFactors, updateResults.UpdatedFactors)
 
 	// 4. 清理过期因子
@@ -661,7 +661,7 @@ func (ds *DataScheduler) HandleMarketPatternRecognition(ctx context.Context, tas
 	if err != nil {
 		return fmt.Errorf("failed to analyze current market state: %w", err)
 	}
-	log.Printf("Market state analysis completed: regime=%s, volatility=%.4f", 
+	log.Printf("Market state analysis completed: regime=%s, volatility=%.4f",
 		marketState.Regime, marketState.Volatility)
 
 	// 2. 识别市场模式变化
@@ -683,7 +683,7 @@ func (ds *DataScheduler) HandleMarketPatternRecognition(ctx context.Context, tas
 					successfulSwitches++
 				}
 			}
-			log.Printf("Strategy switching completed: %d/%d successful", 
+			log.Printf("Strategy switching completed: %d/%d successful",
 				successfulSwitches, len(strategySwitchResults))
 		}
 	}
@@ -742,7 +742,7 @@ func (ss *SystemScheduler) HandleHealthCheck(ctx context.Context, task *Schedule
 	if err != nil {
 		return fmt.Errorf("failed to check system resource usage: %w", err)
 	}
-	log.Printf("System resource usage: CPU=%.2f%%, Memory=%.2f%%, Disk=%.2f%%", 
+	log.Printf("System resource usage: CPU=%.2f%%, Memory=%.2f%%, Disk=%.2f%%",
 		resourceUsage.CPU, resourceUsage.Memory, resourceUsage.Disk)
 
 	// 2. 监控服务状态
@@ -815,7 +815,7 @@ func (ss *SystemScheduler) HandleAccountSecurityMonitoring(ctx context.Context, 
 	if err != nil {
 		return fmt.Errorf("failed to analyze trading behavior patterns: %w", err)
 	}
-	log.Printf("Trading pattern analysis completed: %d suspicious patterns detected", 
+	log.Printf("Trading pattern analysis completed: %d suspicious patterns detected",
 		len(tradingPatternAnalysis.SuspiciousPatterns))
 
 	// 4. 触发安全告警
@@ -859,7 +859,7 @@ func (ss *SystemScheduler) HandleMultiExchangeRedundancy(ctx context.Context, ta
 			healthyExchanges++
 		}
 	}
-	log.Printf("Exchange connection check completed: %d/%d exchanges healthy", 
+	log.Printf("Exchange connection check completed: %d/%d exchanges healthy",
 		healthyExchanges, len(connectionStatuses))
 
 	// 2. 监控交易所性能
@@ -882,7 +882,7 @@ func (ss *SystemScheduler) HandleMultiExchangeRedundancy(ctx context.Context, ta
 					successfulSwitches++
 				}
 			}
-			log.Printf("Exchange switching completed: %d/%d successful", 
+			log.Printf("Exchange switching completed: %d/%d successful",
 				successfulSwitches, len(switchResults))
 		}
 	}
@@ -892,7 +892,7 @@ func (ss *SystemScheduler) HandleMultiExchangeRedundancy(ctx context.Context, ta
 	if err != nil {
 		log.Printf("Failed to maintain redundant connections: %v", err)
 	} else {
-		log.Printf("Redundant connections maintained: %d connections active", 
+		log.Printf("Redundant connections maintained: %d connections active",
 			redundancyResults.ActiveConnections)
 	}
 
@@ -916,7 +916,7 @@ func (ss *SystemScheduler) HandleAuditLogging(ctx context.Context, task *Schedul
 	if err != nil {
 		return fmt.Errorf("failed to generate audit report: %w", err)
 	}
-	log.Printf("Audit report generated: %s (covering %d operations)", 
+	log.Printf("Audit report generated: %s (covering %d operations)",
 		auditReport.ReportID, auditReport.TotalOperations)
 
 	// 3. 检查日志完整性
@@ -924,7 +924,7 @@ func (ss *SystemScheduler) HandleAuditLogging(ctx context.Context, task *Schedul
 	if err != nil {
 		return fmt.Errorf("failed to check log integrity: %w", err)
 	}
-	log.Printf("Log integrity check completed: %.2f%% integrity score", 
+	log.Printf("Log integrity check completed: %.2f%% integrity score",
 		integrityResults.IntegrityScore*100)
 
 	// 4. 清理过期日志
@@ -932,7 +932,7 @@ func (ss *SystemScheduler) HandleAuditLogging(ctx context.Context, task *Schedul
 	if err != nil {
 		log.Printf("Failed to cleanup expired logs: %v", err)
 	} else {
-		log.Printf("Expired logs cleanup completed: %d entries removed, %.2f MB freed", 
+		log.Printf("Expired logs cleanup completed: %d entries removed, %.2f MB freed",
 			cleanupResults.RemovedEntries, cleanupResults.FreedSpaceMB)
 	}
 
@@ -986,7 +986,7 @@ func (ls *LearningScheduler) HandleLearning(ctx context.Context, task *Scheduled
 	if err != nil {
 		return fmt.Errorf("failed to collect training data: %w", err)
 	}
-	log.Printf("Training data collected: %d samples, %d features", 
+	log.Printf("Training data collected: %d samples, %d features",
 		len(trainingData.Samples), trainingData.FeatureCount)
 
 	// 2. 训练模型
@@ -1045,7 +1045,7 @@ func (ls *LearningScheduler) HandleAutoMLLearning(ctx context.Context, task *Sch
 	if err != nil {
 		return fmt.Errorf("failed to perform feature engineering: %w", err)
 	}
-	log.Printf("Feature engineering completed: %d new features generated", 
+	log.Printf("Feature engineering completed: %d new features generated",
 		featureEngineeringResults.NewFeaturesCount)
 
 	// 4. 模型集成
@@ -1053,7 +1053,7 @@ func (ls *LearningScheduler) HandleAutoMLLearning(ctx context.Context, task *Sch
 	if err != nil {
 		return fmt.Errorf("failed to create model ensemble: %w", err)
 	}
-	log.Printf("Model ensemble created: %d base models, accuracy=%.4f", 
+	log.Printf("Model ensemble created: %d base models, accuracy=%.4f",
 		ensembleModel.BaseModelCount, ensembleModel.Accuracy)
 
 	// 部署最佳模型
@@ -1745,8 +1745,8 @@ func (rs *RiskScheduler) getExchangeFundDistribution(ctx context.Context) (map[s
 
 	rows, err := rs.db.QueryContext(ctx, query)
 	if err != nil {
-		log.Printf("Failed to query exchange balances from database: %v, using mock data", err)
-		return rs.getMockExchangeFundDistribution(), nil
+		log.Printf("Failed to query exchange balances from database: %v", err)
+		return make(map[string]float64), err
 	}
 	defer rows.Close()
 
@@ -1763,22 +1763,11 @@ func (rs *RiskScheduler) getExchangeFundDistribution(ctx context.Context) (map[s
 
 	// 如果没有数据，使用模拟数据
 	if len(distribution) == 0 {
-		log.Printf("No exchange balance data available, using mock data")
-		return rs.getMockExchangeFundDistribution(), nil
+		log.Printf("No exchange balance data available")
+		return make(map[string]float64), nil
 	}
 
 	return distribution, nil
-}
-
-// getMockExchangeFundDistribution 获取模拟的交易所资金分布
-func (rs *RiskScheduler) getMockExchangeFundDistribution() map[string]float64 {
-	return map[string]float64{
-		"binance":     50000.0, // 50,000 USDT
-		"okx":         30000.0, // 30,000 USDT
-		"bybit":       20000.0, // 20,000 USDT
-		"hot_wallet":  15000.0, // 15,000 USDT
-		"cold_wallet": 85000.0, // 85,000 USDT
-	}
 }
 
 // getWalletFundDistribution 获取钱包资金分布
@@ -1793,8 +1782,8 @@ func (rs *RiskScheduler) getWalletFundDistribution(ctx context.Context) (map[str
 
 	rows, err := rs.db.QueryContext(ctx, query)
 	if err != nil {
-		log.Printf("Failed to query wallet balances from database: %v, using mock data", err)
-		return rs.getMockWalletFundDistribution(), nil
+		log.Printf("Failed to query wallet balances from database: %v", err)
+		return make(map[string]float64), err
 	}
 	defer rows.Close()
 
@@ -1811,20 +1800,11 @@ func (rs *RiskScheduler) getWalletFundDistribution(ctx context.Context) (map[str
 
 	// 如果没有数据，使用模拟数据
 	if len(distribution) == 0 {
-		log.Printf("No wallet balance data available, using mock data")
-		return rs.getMockWalletFundDistribution(), nil
+		log.Printf("No wallet balance data available")
+		return make(map[string]float64), nil
 	}
 
 	return distribution, nil
-}
-
-// getMockWalletFundDistribution 获取模拟的钱包资金分布
-func (rs *RiskScheduler) getMockWalletFundDistribution() map[string]float64 {
-	return map[string]float64{
-		"hot_wallet":  15000.0, // 15,000 USDT
-		"cold_wallet": 85000.0, // 85,000 USDT
-		"treasury":    50000.0, // 50,000 USDT
-	}
 }
 
 // calculateConcentrationRatio 计算集中度比率
@@ -3682,29 +3662,29 @@ func (ps *PositionScheduler) scheduleHedgeAdjustment(ctx context.Context, operat
 		log.Printf("Failed to analyze hedge effectiveness: %v", err)
 		return
 	}
-	
+
 	// 2. 判断是否需要调整
 	if ps.shouldAdjustHedge(effectiveness) {
 		log.Printf("Hedge adjustment needed for operation %s", operation.ID)
-		
+
 		// 3. 计算新的对冲比率
 		newRatio, err := ps.calculateOptimalHedgeRatio(ctx, operation)
 		if err != nil {
 			log.Printf("Failed to calculate optimal hedge ratio: %v", err)
 			return
 		}
-		
+
 		// 4. 执行对冲调整
 		if err := ps.executeHedgeAdjustment(ctx, operation, newRatio); err != nil {
 			log.Printf("Failed to execute hedge adjustment: %v", err)
 			return
 		}
-		
+
 		// 5. 记录调整历史
 		if err := ps.recordHedgeAdjustment(ctx, operation, effectiveness, newRatio); err != nil {
 			log.Printf("Failed to record hedge adjustment: %v", err)
 		}
-		
+
 		log.Printf("Hedge adjustment completed for operation %s", operation.ID)
 	} else {
 		log.Printf("No hedge adjustment needed for operation %s", operation.ID)
@@ -3852,7 +3832,7 @@ func (rs *RiskScheduler) checkMarginRatio(ctx context.Context) (*MarginRisk, err
 		FROM account_balances 
 		WHERE updated_at > NOW() - INTERVAL '1 hour'
 	`
-	
+
 	var marginUsed, totalBalance float64
 	err := rs.db.QueryRowContext(ctx, query).Scan(&marginUsed, &totalBalance)
 	if err != nil {
@@ -3861,14 +3841,14 @@ func (rs *RiskScheduler) checkMarginRatio(ctx context.Context) (*MarginRisk, err
 		totalBalance = 100000.0
 		log.Printf("Using simulated margin data: used=%.2f, total=%.2f", marginUsed, totalBalance)
 	}
-	
+
 	// 计算保证金比率
 	marginRatio := marginUsed / totalBalance
-	
+
 	risk := &MarginRisk{
 		Ratio: marginRatio,
 	}
-	
+
 	// 确定风险等级
 	if marginRatio > 0.9 {
 		risk.Level = "CRITICAL"
@@ -3883,7 +3863,7 @@ func (rs *RiskScheduler) checkMarginRatio(ctx context.Context) (*MarginRisk, err
 		risk.Level = "LOW"
 		risk.Message = fmt.Sprintf("Normal margin ratio: %.2f%%", marginRatio*100)
 	}
-	
+
 	return risk, nil
 }
 
@@ -3895,7 +3875,7 @@ func (rs *RiskScheduler) monitorPositionRisk(ctx context.Context) ([]*PositionRi
 		WHERE status = 'ACTIVE'
 		AND updated_at > NOW() - INTERVAL '1 hour'
 	`
-	
+
 	rows, err := rs.db.QueryContext(ctx, query)
 	if err != nil {
 		// 返回模拟数据
@@ -3905,21 +3885,21 @@ func (rs *RiskScheduler) monitorPositionRisk(ctx context.Context) ([]*PositionRi
 		}, nil
 	}
 	defer rows.Close()
-	
+
 	var risks []*PositionRisk
 	for rows.Next() {
 		var symbol string
 		var positionSize, entryPrice, currentPrice float64
-		
+
 		if err := rows.Scan(&symbol, &positionSize, &entryPrice, &currentPrice); err != nil {
 			continue
 		}
-		
+
 		// 计算风险指标
 		exposure := positionSize * currentPrice
 		priceChange := math.Abs(currentPrice-entryPrice) / entryPrice
 		riskScore := priceChange * (exposure / 100000) // 简化风险评分
-		
+
 		var riskLevel string
 		if riskScore > 0.8 {
 			riskLevel = "CRITICAL"
@@ -3930,7 +3910,7 @@ func (rs *RiskScheduler) monitorPositionRisk(ctx context.Context) ([]*PositionRi
 		} else {
 			riskLevel = "LOW"
 		}
-		
+
 		risks = append(risks, &PositionRisk{
 			Symbol:    symbol,
 			RiskLevel: riskLevel,
@@ -3938,7 +3918,7 @@ func (rs *RiskScheduler) monitorPositionRisk(ctx context.Context) ([]*PositionRi
 			Exposure:  exposure,
 		})
 	}
-	
+
 	return risks, nil
 }
 
@@ -3949,7 +3929,7 @@ func (rs *RiskScheduler) detectMarketAnomalies(ctx context.Context) ([]*MarketAn
 		FROM market_data 
 		WHERE updated_at > NOW() - INTERVAL '5 minutes'
 	`
-	
+
 	rows, err := rs.db.QueryContext(ctx, query)
 	if err != nil {
 		// 返回模拟异常数据
@@ -3958,16 +3938,16 @@ func (rs *RiskScheduler) detectMarketAnomalies(ctx context.Context) ([]*MarketAn
 		}, nil
 	}
 	defer rows.Close()
-	
+
 	var anomalies []*MarketAnomaly
 	for rows.Next() {
 		var symbol string
 		var price, volume, priceChange, volatility float64
-		
+
 		if err := rows.Scan(&symbol, &price, &volume, &priceChange, &volatility); err != nil {
 			continue
 		}
-		
+
 		// 检测波动率异常
 		if volatility > 0.1 {
 			anomalies = append(anomalies, &MarketAnomaly{
@@ -3978,7 +3958,7 @@ func (rs *RiskScheduler) detectMarketAnomalies(ctx context.Context) ([]*MarketAn
 				Value:       volatility,
 			})
 		}
-		
+
 		// 检测价格异常变动
 		if math.Abs(priceChange) > 0.15 {
 			anomalies = append(anomalies, &MarketAnomaly{
@@ -3989,7 +3969,7 @@ func (rs *RiskScheduler) detectMarketAnomalies(ctx context.Context) ([]*MarketAn
 				Value:       priceChange,
 			})
 		}
-		
+
 		// 检测交易量异常
 		if volume > 1000000000 { // 10亿以上交易量
 			anomalies = append(anomalies, &MarketAnomaly{
@@ -4001,30 +3981,30 @@ func (rs *RiskScheduler) detectMarketAnomalies(ctx context.Context) ([]*MarketAn
 			})
 		}
 	}
-	
+
 	return anomalies, nil
 }
 
 // triggerMarginAlert 触发保证金告警
 func (rs *RiskScheduler) triggerMarginAlert(ctx context.Context, risk *MarginRisk) {
 	log.Printf("MARGIN ALERT: %s - %s", risk.Level, risk.Message)
-	
+
 	// 集成实际的告警系统
 	alert := &Alert{
-		ID:          uuid.New().String(),
-		Type:        "MARGIN_RISK",
-		Level:       risk.Level,
-		Title:       "保证金风险告警",
-		Message:     risk.Message,
-		Source:      "RiskScheduler",
-		Timestamp:   time.Now(),
+		ID:        uuid.New().String(),
+		Type:      "MARGIN_RISK",
+		Level:     risk.Level,
+		Title:     "保证金风险告警",
+		Message:   risk.Message,
+		Source:    "RiskScheduler",
+		Timestamp: time.Now(),
 		Metadata: map[string]interface{}{
-			"margin_ratio":    risk.MarginRatio,
-			"required_margin": risk.RequiredMargin,
+			"margin_ratio":     risk.MarginRatio,
+			"required_margin":  risk.RequiredMargin,
 			"available_margin": risk.AvailableMargin,
 		},
 	}
-	
+
 	if err := rs.sendAlert(ctx, alert); err != nil {
 		log.Printf("Failed to send margin alert: %v", err)
 	}
@@ -4033,7 +4013,7 @@ func (rs *RiskScheduler) triggerMarginAlert(ctx context.Context, risk *MarginRis
 // triggerPositionAlert 触发仓位告警
 func (rs *RiskScheduler) triggerPositionAlert(ctx context.Context, risk *PositionRisk) {
 	log.Printf("POSITION ALERT: %s - %s risk score: %.4f", risk.Symbol, risk.RiskLevel, risk.RiskScore)
-	
+
 	// 集成实际的告警系统
 	alert := &Alert{
 		ID:        uuid.New().String(),
@@ -4044,13 +4024,13 @@ func (rs *RiskScheduler) triggerPositionAlert(ctx context.Context, risk *Positio
 		Source:    "RiskScheduler",
 		Timestamp: time.Now(),
 		Metadata: map[string]interface{}{
-			"symbol":     risk.Symbol,
-			"risk_score": risk.RiskScore,
-			"position_size": risk.PositionSize,
+			"symbol":         risk.Symbol,
+			"risk_score":     risk.RiskScore,
+			"position_size":  risk.PositionSize,
 			"unrealized_pnl": risk.UnrealizedPnL,
 		},
 	}
-	
+
 	if err := rs.sendAlert(ctx, alert); err != nil {
 		log.Printf("Failed to send position alert: %v", err)
 	}
@@ -4059,7 +4039,7 @@ func (rs *RiskScheduler) triggerPositionAlert(ctx context.Context, risk *Positio
 // triggerAnomalyAlert 触发异常告警
 func (rs *RiskScheduler) triggerAnomalyAlert(ctx context.Context, anomaly *MarketAnomaly) {
 	log.Printf("MARKET ANOMALY ALERT: %s - %s - %s", anomaly.Symbol, anomaly.Type, anomaly.Description)
-	
+
 	// 集成实际的告警系统
 	alert := &Alert{
 		ID:        uuid.New().String(),
@@ -4070,13 +4050,13 @@ func (rs *RiskScheduler) triggerAnomalyAlert(ctx context.Context, anomaly *Marke
 		Source:    "RiskScheduler",
 		Timestamp: time.Now(),
 		Metadata: map[string]interface{}{
-			"symbol":      anomaly.Symbol,
+			"symbol":       anomaly.Symbol,
 			"anomaly_type": anomaly.Type,
-			"confidence":  anomaly.Confidence,
-			"detected_at": anomaly.DetectedAt,
+			"confidence":   anomaly.Confidence,
+			"detected_at":  anomaly.DetectedAt,
 		},
 	}
-	
+
 	if err := rs.sendAlert(ctx, alert); err != nil {
 		log.Printf("Failed to send anomaly alert: %v", err)
 	}
@@ -4089,7 +4069,7 @@ func (rs *RiskScheduler) executeRiskControlMeasures(ctx context.Context, marginR
 		log.Printf("Executing emergency margin control measures")
 		// 紧急降低杠杆、平仓等
 	}
-	
+
 	// 基于仓位风险执行控制措施
 	for _, risk := range positionRisks {
 		if risk.RiskLevel == "CRITICAL" || risk.RiskLevel == "HIGH" {
@@ -4097,7 +4077,7 @@ func (rs *RiskScheduler) executeRiskControlMeasures(ctx context.Context, marginR
 			// 调整仓位、设置止损等
 		}
 	}
-	
+
 	// 基于市场异常执行控制措施
 	for _, anomaly := range anomalies {
 		if anomaly.Severity == "HIGH" || anomaly.Severity == "CRITICAL" {
@@ -4105,10 +4085,11 @@ func (rs *RiskScheduler) executeRiskControlMeasures(ctx context.Context, marginR
 			// 暂停交易、调整参数等
 		}
 	}
-	
+
 	return nil
-}/
-/ 异常行情应对相关方法实现
+}
+
+// 异常行情应对相关方法实现
 
 // AbnormalMarketCondition 异常行情条件
 type AbnormalMarketCondition struct {
@@ -4123,25 +4104,25 @@ type AbnormalMarketCondition struct {
 // detectAbnormalMarketConditions 检测异常行情条件
 func (rs *RiskScheduler) detectAbnormalMarketConditions(ctx context.Context) ([]*AbnormalMarketCondition, error) {
 	var conditions []*AbnormalMarketCondition
-	
+
 	// 检测极端波动率
 	volatilityConditions, err := rs.detectVolatilityAnomalies(ctx)
 	if err == nil {
 		conditions = append(conditions, volatilityConditions...)
 	}
-	
+
 	// 检测流动性枯竭
 	liquidityConditions, err := rs.detectLiquidityAnomalies(ctx)
 	if err == nil {
 		conditions = append(conditions, liquidityConditions...)
 	}
-	
+
 	// 检测价格跳空
 	gapConditions, err := rs.detectPriceGaps(ctx)
 	if err == nil {
 		conditions = append(conditions, gapConditions...)
 	}
-	
+
 	return conditions, nil
 }
 
@@ -4184,19 +4165,19 @@ func (rs *RiskScheduler) detectPriceGaps(ctx context.Context) ([]*AbnormalMarket
 // triggerCircuitBreaker 触发熔断保护
 func (rs *RiskScheduler) triggerCircuitBreaker(ctx context.Context, condition *AbnormalMarketCondition) error {
 	log.Printf("Triggering circuit breaker for %s: %s", condition.Symbol, condition.Description)
-	
+
 	// 暂停该交易对的所有交易
 	query := `
 		UPDATE trading_pairs 
 		SET status = 'SUSPENDED', suspended_reason = $1, suspended_at = NOW()
 		WHERE symbol = $2
 	`
-	
+
 	_, err := rs.db.ExecContext(ctx, query, "CIRCUIT_BREAKER_"+condition.Type, condition.Symbol)
 	if err != nil {
 		log.Printf("Failed to suspend trading for %s: %v", condition.Symbol, err)
 	}
-	
+
 	return err
 }
 
@@ -4206,23 +4187,23 @@ func (rs *RiskScheduler) autoReduceLeverage(ctx context.Context, conditions []*A
 		if condition.Severity == "CRITICAL" || condition.Severity == "HIGH" {
 			// 降低该交易对的最大杠杆
 			newMaxLeverage := 5.0 // 降低到5倍杠杆
-			
+
 			query := `
 				UPDATE risk_parameters 
 				SET max_leverage = $1, updated_at = NOW()
 				WHERE symbol = $2
 			`
-			
+
 			_, err := rs.db.ExecContext(ctx, query, newMaxLeverage, condition.Symbol)
 			if err != nil {
 				log.Printf("Failed to reduce leverage for %s: %v", condition.Symbol, err)
 				continue
 			}
-			
+
 			log.Printf("Reduced max leverage to %.1fx for %s", newMaxLeverage, condition.Symbol)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -4237,29 +4218,29 @@ func (rs *RiskScheduler) emergencyPositionProtection(ctx context.Context, condit
 				WHERE symbol = $1 AND status = 'ACTIVE'
 				AND (unrealized_pnl / (position_size * entry_price)) < -0.1  -- 亏损超过10%
 			`
-			
+
 			rows, err := rs.db.QueryContext(ctx, query, condition.Symbol)
 			if err != nil {
 				log.Printf("Failed to query high-risk positions for %s: %v", condition.Symbol, err)
 				continue
 			}
-			
+
 			var closedPositions int
 			for rows.Next() {
 				var positionID, symbol string
 				var positionSize, unrealizedPnL float64
-				
+
 				if err := rows.Scan(&positionID, &symbol, &positionSize, &unrealizedPnL); err != nil {
 					continue
 				}
-				
+
 				// 执行紧急平仓
 				closeQuery := `
 					UPDATE positions 
 					SET status = 'EMERGENCY_CLOSED', closed_at = NOW(), close_reason = 'EMERGENCY_PROTECTION'
 					WHERE id = $1
 				`
-				
+
 				_, err := rs.db.ExecContext(ctx, closeQuery, positionID)
 				if err != nil {
 					log.Printf("Failed to emergency close position %s: %v", positionID, err)
@@ -4269,11 +4250,11 @@ func (rs *RiskScheduler) emergencyPositionProtection(ctx context.Context, condit
 				}
 			}
 			rows.Close()
-			
+
 			log.Printf("Emergency protection completed for %s: %d positions closed", condition.Symbol, closedPositions)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -4286,24 +4267,25 @@ func (rs *RiskScheduler) recordAbnormalMarketResponse(ctx context.Context, condi
 				description, response_actions, created_at
 			) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
 		`
-		
+
 		actions := []string{"CIRCUIT_BREAKER", "LEVERAGE_REDUCTION", "EMERGENCY_PROTECTION"}
 		actionsJSON, _ := json.Marshal(actions)
-		
+
 		_, err := rs.db.ExecContext(ctx, query,
 			condition.Symbol, condition.Type, condition.Severity,
 			condition.Value, condition.Threshold, condition.Description,
 			string(actionsJSON),
 		)
-		
+
 		if err != nil {
 			log.Printf("Failed to record abnormal market response for %s: %v", condition.Symbol, err)
 		}
 	}
-	
+
 	return nil
-}// 止损调
-整相关方法实现
+}
+
+// 止损调整相关方法实现
 
 // ATRStopLoss ATR止损
 type ATRStopLoss struct {
@@ -4353,7 +4335,7 @@ func (rs *RiskScheduler) calculateATRBasedStopLoss(ctx context.Context) ([]*ATRS
 		WHERE p.status = 'ACTIVE'
 		AND m.updated_at > NOW() - INTERVAL '5 minutes'
 	`
-	
+
 	rows, err := rs.db.QueryContext(ctx, query)
 	if err != nil {
 		// 返回模拟数据
@@ -4363,23 +4345,23 @@ func (rs *RiskScheduler) calculateATRBasedStopLoss(ctx context.Context) ([]*ATRS
 		}, nil
 	}
 	defer rows.Close()
-	
+
 	var stopLosses []*ATRStopLoss
 	for rows.Next() {
 		var positionID, symbol string
 		var entryPrice, positionSize, currentPrice float64
-		
+
 		if err := rows.Scan(&positionID, &symbol, &entryPrice, &positionSize, &currentPrice); err != nil {
 			continue
 		}
-		
+
 		// 计算ATR值（简化实现）
 		atrValue := rs.calculateATR(ctx, symbol, 14) // 14期ATR
-		
+
 		// ATR止损计算：当前价格 - (ATR * 倍数)
 		multiplier := 1.5 // 1.5倍ATR
 		stopLoss := currentPrice - (atrValue * multiplier)
-		
+
 		stopLosses = append(stopLosses, &ATRStopLoss{
 			Symbol:       symbol,
 			PositionID:   positionID,
@@ -4389,7 +4371,7 @@ func (rs *RiskScheduler) calculateATRBasedStopLoss(ctx context.Context) ([]*ATRS
 			Multiplier:   multiplier,
 		})
 	}
-	
+
 	return stopLosses, nil
 }
 
@@ -4402,7 +4384,7 @@ func (rs *RiskScheduler) calculateRVBasedStopLoss(ctx context.Context) ([]*RVSto
 		WHERE p.status = 'ACTIVE'
 		AND m.updated_at > NOW() - INTERVAL '5 minutes'
 	`
-	
+
 	rows, err := rs.db.QueryContext(ctx, query)
 	if err != nil {
 		// 返回模拟数据
@@ -4412,26 +4394,26 @@ func (rs *RiskScheduler) calculateRVBasedStopLoss(ctx context.Context) ([]*RVSto
 		}, nil
 	}
 	defer rows.Close()
-	
+
 	var stopLosses []*RVStopLoss
 	for rows.Next() {
 		var positionID, symbol string
 		var entryPrice, currentPrice float64
-		
+
 		if err := rows.Scan(&positionID, &symbol, &entryPrice, &currentPrice); err != nil {
 			continue
 		}
-		
+
 		// 计算RV值（已实现波动率）
 		rvValue := rs.calculateRealizedVolatility(ctx, symbol, 20) // 20期RV
-		
+
 		// RV止损计算：当前价格 * (1 - RV * 倍数)
 		multiplier := 2.0 // 2倍RV
 		stopLoss := currentPrice * (1 - rvValue*multiplier)
-		
+
 		// 计算置信度
 		confidence := rs.calculateRVConfidence(ctx, symbol, rvValue)
-		
+
 		stopLosses = append(stopLosses, &RVStopLoss{
 			Symbol:       symbol,
 			PositionID:   positionID,
@@ -4441,7 +4423,7 @@ func (rs *RiskScheduler) calculateRVBasedStopLoss(ctx context.Context) ([]*RVSto
 			Confidence:   confidence,
 		})
 	}
-	
+
 	return stopLosses, nil
 }
 
@@ -4453,7 +4435,7 @@ func (rs *RiskScheduler) analyzeMarketState(ctx context.Context) (*MarketState, 
 		FROM market_data
 		WHERE updated_at > NOW() - INTERVAL '1 hour'
 	`
-	
+
 	var avgVolatility, avgVolume, avgPriceChange float64
 	err := rs.db.QueryRowContext(ctx, query).Scan(&avgVolatility, &avgVolume, &avgPriceChange)
 	if err != nil {
@@ -4462,7 +4444,7 @@ func (rs *RiskScheduler) analyzeMarketState(ctx context.Context) (*MarketState, 
 		avgVolume = 1000000000
 		avgPriceChange = 0.02
 	}
-	
+
 	// 确定市场趋势
 	var trend string
 	if avgPriceChange > 0.05 {
@@ -4472,7 +4454,7 @@ func (rs *RiskScheduler) analyzeMarketState(ctx context.Context) (*MarketState, 
 	} else {
 		trend = "NEUTRAL"
 	}
-	
+
 	// 确定市场制度
 	var regime string
 	if avgVolatility > 0.3 {
@@ -4482,10 +4464,10 @@ func (rs *RiskScheduler) analyzeMarketState(ctx context.Context) (*MarketState, 
 	} else {
 		regime = "LOW_VOLATILITY"
 	}
-	
+
 	// 计算流动性指标
 	liquidity := math.Min(1.0, avgVolume/1000000000) // 标准化流动性
-	
+
 	return &MarketState{
 		Volatility: avgVolatility,
 		Trend:      trend,
@@ -4497,10 +4479,10 @@ func (rs *RiskScheduler) analyzeMarketState(ctx context.Context) (*MarketState, 
 // adjustStopLossForMarketState 根据市场状态调整止损
 func (rs *RiskScheduler) adjustStopLossForMarketState(atrStopLosses []*ATRStopLoss, rvStopLosses []*RVStopLoss, marketState *MarketState) []*AdjustedStopLoss {
 	var adjustedStopLosses []*AdjustedStopLoss
-	
+
 	// 计算市场调整因子
 	var marketFactor float64 = 1.0
-	
+
 	switch marketState.Regime {
 	case "HIGH_VOLATILITY":
 		marketFactor = 1.3 // 高波动时放宽止损
@@ -4509,7 +4491,7 @@ func (rs *RiskScheduler) adjustStopLossForMarketState(atrStopLosses []*ATRStopLo
 	default:
 		marketFactor = 1.0
 	}
-	
+
 	// 根据趋势调整
 	switch marketState.Trend {
 	case "BULLISH":
@@ -4517,7 +4499,7 @@ func (rs *RiskScheduler) adjustStopLossForMarketState(atrStopLosses []*ATRStopLo
 	case "BEARISH":
 		marketFactor *= 1.1 // 熊市时稍微放宽止损
 	}
-	
+
 	// 处理ATR止损
 	for _, atrSL := range atrStopLosses {
 		// 获取对应的RV止损
@@ -4528,12 +4510,12 @@ func (rs *RiskScheduler) adjustStopLossForMarketState(atrStopLosses []*ATRStopLo
 				break
 			}
 		}
-		
+
 		// 综合ATR和RV计算最终止损
 		var finalStopLoss float64
 		var method string
 		var confidence float64
-		
+
 		if rvSL != nil {
 			// 加权平均ATR和RV止损
 			atrWeight := 0.6
@@ -4547,7 +4529,7 @@ func (rs *RiskScheduler) adjustStopLossForMarketState(atrStopLosses []*ATRStopLo
 			method = "ATR_ONLY"
 			confidence = 0.7
 		}
-		
+
 		adjustedStopLosses = append(adjustedStopLosses, &AdjustedStopLoss{
 			Symbol:       atrSL.Symbol,
 			PositionID:   atrSL.PositionID,
@@ -4558,41 +4540,41 @@ func (rs *RiskScheduler) adjustStopLossForMarketState(atrStopLosses []*ATRStopLo
 			MarketFactor: marketFactor,
 		})
 	}
-	
+
 	return adjustedStopLosses
 }
 
 // applyNewStopLossSettings 应用新的止损设置
 func (rs *RiskScheduler) applyNewStopLossSettings(ctx context.Context, adjustedStopLosses []*AdjustedStopLoss) (int, error) {
 	appliedCount := 0
-	
+
 	for _, adj := range adjustedStopLosses {
 		// 只有当新止损与旧止损差异超过阈值时才更新
 		changePercent := math.Abs(adj.NewStopLoss-adj.OldStopLoss) / adj.OldStopLoss
 		if changePercent < 0.02 { // 变化小于2%则跳过
 			continue
 		}
-		
+
 		query := `
 			UPDATE positions 
 			SET stop_loss = $1, stop_loss_method = $2, stop_loss_confidence = $3, updated_at = NOW()
 			WHERE id = $4 AND status = 'ACTIVE'
 		`
-		
+
 		result, err := rs.db.ExecContext(ctx, query, adj.NewStopLoss, adj.Method, adj.Confidence, adj.PositionID)
 		if err != nil {
 			log.Printf("Failed to update stop loss for position %s: %v", adj.PositionID, err)
 			continue
 		}
-		
+
 		rowsAffected, _ := result.RowsAffected()
 		if rowsAffected > 0 {
 			appliedCount++
-			log.Printf("Updated stop loss for %s: %.2f -> %.2f (method: %s)", 
+			log.Printf("Updated stop loss for %s: %.2f -> %.2f (method: %s)",
 				adj.Symbol, adj.OldStopLoss, adj.NewStopLoss, adj.Method)
 		}
 	}
-	
+
 	return appliedCount, nil
 }
 
@@ -4606,23 +4588,23 @@ func (rs *RiskScheduler) calculateATR(ctx context.Context, symbol string, period
 		ORDER BY timestamp DESC
 		LIMIT $2
 	`
-	
+
 	rows, err := rs.db.QueryContext(ctx, query, symbol, period)
 	if err != nil {
 		// 返回默认ATR值
 		return 1000.0 // 默认ATR
 	}
 	defer rows.Close()
-	
+
 	var trueRanges []float64
 	var prevClose float64
-	
+
 	for rows.Next() {
 		var high, low, close float64
 		if err := rows.Scan(&high, &low, &close); err != nil {
 			continue
 		}
-		
+
 		if prevClose > 0 {
 			// 计算真实波幅
 			tr1 := high - low
@@ -4633,17 +4615,17 @@ func (rs *RiskScheduler) calculateATR(ctx context.Context, symbol string, period
 		}
 		prevClose = close
 	}
-	
+
 	if len(trueRanges) == 0 {
 		return 1000.0 // 默认值
 	}
-	
+
 	// 计算ATR（简单移动平均）
 	sum := 0.0
 	for _, tr := range trueRanges {
 		sum += tr
 	}
-	
+
 	return sum / float64(len(trueRanges))
 }
 
@@ -4657,13 +4639,13 @@ func (rs *RiskScheduler) calculateRealizedVolatility(ctx context.Context, symbol
 		ORDER BY timestamp DESC
 		LIMIT $2
 	`
-	
+
 	rows, err := rs.db.QueryContext(ctx, query, symbol, period+1)
 	if err != nil {
 		return 0.025 // 默认2.5%波动率
 	}
 	defer rows.Close()
-	
+
 	var prices []float64
 	for rows.Next() {
 		var price float64
@@ -4672,31 +4654,31 @@ func (rs *RiskScheduler) calculateRealizedVolatility(ctx context.Context, symbol
 		}
 		prices = append(prices, price)
 	}
-	
+
 	if len(prices) < 2 {
 		return 0.025
 	}
-	
+
 	// 计算对数收益率
 	var returns []float64
 	for i := 1; i < len(prices); i++ {
 		ret := math.Log(prices[i-1] / prices[i]) // 注意顺序，因为是DESC排序
 		returns = append(returns, ret)
 	}
-	
+
 	// 计算标准差
 	mean := 0.0
 	for _, ret := range returns {
 		mean += ret
 	}
 	mean /= float64(len(returns))
-	
+
 	variance := 0.0
 	for _, ret := range returns {
 		variance += math.Pow(ret-mean, 2)
 	}
 	variance /= float64(len(returns) - 1)
-	
+
 	// 年化波动率
 	return math.Sqrt(variance * 365)
 }
@@ -4714,35 +4696,36 @@ func (rs *RiskScheduler) calculateRVConfidence(ctx context.Context, symbol strin
 	} else {
 		return 0.75 // 低波动率
 	}
-}// 通知系统相关方法
-实现
+}
+
+// 通知系统相关方法实现
 
 // EmailConfig 邮件配置
 type EmailConfig struct {
-	Enabled    bool     `json:"enabled"`
-	SMTPHost   string   `json:"smtp_host"`
-	SMTPPort   int      `json:"smtp_port"`
-	Username   string   `json:"username"`
-	Password   string   `json:"password"`
-	FromEmail  string   `json:"from_email"`
-	ToEmails   []string `json:"to_emails"`
-	UseSSL     bool     `json:"use_ssl"`
+	Enabled   bool     `json:"enabled"`
+	SMTPHost  string   `json:"smtp_host"`
+	SMTPPort  int      `json:"smtp_port"`
+	Username  string   `json:"username"`
+	Password  string   `json:"password"`
+	FromEmail string   `json:"from_email"`
+	ToEmails  []string `json:"to_emails"`
+	UseSSL    bool     `json:"use_ssl"`
 }
 
 // SlackConfig Slack配置
 type SlackConfig struct {
-	Enabled     bool   `json:"enabled"`
-	WebhookURL  string `json:"webhook_url"`
-	Channel     string `json:"channel"`
-	Username    string `json:"username"`
-	IconEmoji   string `json:"icon_emoji"`
+	Enabled    bool   `json:"enabled"`
+	WebhookURL string `json:"webhook_url"`
+	Channel    string `json:"channel"`
+	Username   string `json:"username"`
+	IconEmoji  string `json:"icon_emoji"`
 }
 
 // WeChatConfig 企业微信配置
 type WeChatConfig struct {
-	Enabled     bool   `json:"enabled"`
-	WebhookURL  string `json:"webhook_url"`
-	MentionAll  bool   `json:"mention_all"`
+	Enabled     bool     `json:"enabled"`
+	WebhookURL  string   `json:"webhook_url"`
+	MentionAll  bool     `json:"mention_all"`
 	MentionList []string `json:"mention_list"`
 }
 
@@ -4789,16 +4772,16 @@ func (ds *DataScheduler) sendWebhookNotification(ctx context.Context, webhookURL
 		"recommendations": recommendations,
 		"source":          "QCAT_HOTLIST",
 	}
-	
+
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal webhook payload: %w", err)
 	}
-	
+
 	// 发送HTTP请求
 	// 这里应该使用实际的HTTP客户端发送请求
 	log.Printf("Webhook payload prepared for %s: %s", webhookURL, string(payloadJSON))
-	
+
 	// 模拟发送成功
 	return nil
 }
@@ -4807,7 +4790,7 @@ func (ds *DataScheduler) sendWebhookNotification(ctx context.Context, webhookURL
 func (ds *DataScheduler) sendEmailNotification(ctx context.Context, config *EmailConfig, message string, recommendations []*hotlist.EnhancedRecommendation) error {
 	// 构建邮件内容
 	subject := "🔥 QCAT热门币种推荐"
-	
+
 	htmlBody := fmt.Sprintf(`
 		<html>
 		<body>
@@ -4822,7 +4805,7 @@ func (ds *DataScheduler) sendEmailNotification(ctx context.Context, config *Emai
 					<th>推荐理由</th>
 				</tr>
 	`, subject, message)
-	
+
 	for _, rec := range recommendations {
 		htmlBody += fmt.Sprintf(`
 				<tr>
@@ -4834,17 +4817,17 @@ func (ds *DataScheduler) sendEmailNotification(ctx context.Context, config *Emai
 				</tr>
 		`, rec.Symbol, rec.Score, rec.RiskLevel, rec.Confidence*100, rec.Reason)
 	}
-	
+
 	htmlBody += `
 			</table>
 			<p><small>此邮件由QCAT系统自动发送</small></p>
 		</body>
 		</html>
 	`
-	
+
 	// 这里应该使用实际的SMTP客户端发送邮件
 	log.Printf("Email prepared: To=%v, Subject=%s", config.ToEmails, subject)
-	
+
 	// 模拟发送成功
 	return nil
 }
@@ -4853,10 +4836,10 @@ func (ds *DataScheduler) sendEmailNotification(ctx context.Context, config *Emai
 func (ds *DataScheduler) sendSlackNotification(ctx context.Context, config *SlackConfig, message string, recommendations []*hotlist.EnhancedRecommendation) error {
 	// 构建Slack消息
 	slackMessage := map[string]interface{}{
-		"channel":   config.Channel,
-		"username":  config.Username,
+		"channel":    config.Channel,
+		"username":   config.Username,
 		"icon_emoji": config.IconEmoji,
-		"text":      message,
+		"text":       message,
 		"attachments": []map[string]interface{}{
 			{
 				"color": "good",
@@ -4865,7 +4848,7 @@ func (ds *DataScheduler) sendSlackNotification(ctx context.Context, config *Slac
 					for _, rec := range recommendations {
 						fields = append(fields, map[string]interface{}{
 							"title": rec.Symbol,
-							"value": fmt.Sprintf("评分: %.1f | 风险: %s | 置信度: %.1f%%", 
+							"value": fmt.Sprintf("评分: %.1f | 风险: %s | 置信度: %.1f%%",
 								rec.Score, rec.RiskLevel, rec.Confidence*100),
 							"short": true,
 						})
@@ -4875,15 +4858,15 @@ func (ds *DataScheduler) sendSlackNotification(ctx context.Context, config *Slac
 			},
 		},
 	}
-	
+
 	payloadJSON, err := json.Marshal(slackMessage)
 	if err != nil {
 		return fmt.Errorf("failed to marshal slack message: %w", err)
 	}
-	
+
 	// 这里应该发送到Slack Webhook
 	log.Printf("Slack message prepared for %s: %s", config.WebhookURL, string(payloadJSON))
-	
+
 	// 模拟发送成功
 	return nil
 }
@@ -4893,31 +4876,31 @@ func (ds *DataScheduler) sendWeChatNotification(ctx context.Context, config *WeC
 	// 构建企业微信消息
 	content := message + "\n\n详细推荐：\n"
 	for _, rec := range recommendations {
-		content += fmt.Sprintf("• %s: %.1f分 (%s风险, %.1f%%置信度)\n", 
+		content += fmt.Sprintf("• %s: %.1f分 (%s风险, %.1f%%置信度)\n",
 			rec.Symbol, rec.Score, rec.RiskLevel, rec.Confidence*100)
 	}
-	
+
 	wechatMessage := map[string]interface{}{
 		"msgtype": "text",
 		"text": map[string]interface{}{
-			"content":             content,
-			"mentioned_list":      config.MentionList,
+			"content":               content,
+			"mentioned_list":        config.MentionList,
 			"mentioned_mobile_list": []string{},
 		},
 	}
-	
+
 	if config.MentionAll {
 		wechatMessage["text"].(map[string]interface{})["mentioned_list"] = []string{"@all"}
 	}
-	
+
 	payloadJSON, err := json.Marshal(wechatMessage)
 	if err != nil {
 		return fmt.Errorf("failed to marshal wechat message: %w", err)
 	}
-	
+
 	// 这里应该发送到企业微信Webhook
 	log.Printf("WeChat message prepared for %s: %s", config.WebhookURL, string(payloadJSON))
-	
+
 	// 模拟发送成功
 	return nil
 }
@@ -4930,29 +4913,30 @@ func (ds *DataScheduler) recordNotificationResults(ctx context.Context, message 
 		if err != nil {
 			errorMsg = err.Error()
 		}
-		
+
 		query := `
 			INSERT INTO notification_logs (
 				channel, message, success, error_message, created_at
 			) VALUES ($1, $2, $3, $4, NOW())
 		`
-		
+
 		_, dbErr := ds.db.ExecContext(ctx, query, channel, message, success, errorMsg)
 		if dbErr != nil {
 			log.Printf("Failed to record notification result for %s: %v", channel, dbErr)
 		}
 	}
-	
+
 	return nil
-}// 仓位调度器
-相关方法实现
+}
+
+// 仓位调度器相关方法实现
 
 // PositionInfo 仓位信息
 type PositionInfo struct {
-	Symbol       string  `json:"symbol"`
-	Size         float64 `json:"size"`
-	EntryPrice   float64 `json:"entry_price"`
-	CurrentPrice float64 `json:"current_price"`
+	Symbol        string  `json:"symbol"`
+	Size          float64 `json:"size"`
+	EntryPrice    float64 `json:"entry_price"`
+	CurrentPrice  float64 `json:"current_price"`
 	UnrealizedPnL float64 `json:"unrealized_pnl"`
 }
 
@@ -4966,10 +4950,10 @@ type OptimalPosition struct {
 
 // RebalanceInstruction 调仓指令
 type RebalanceInstruction struct {
-	Symbol     string  `json:"symbol"`
-	Action     string  `json:"action"` // BUY, SELL, HOLD
-	Size       float64 `json:"size"`
-	Priority   int     `json:"priority"`
+	Symbol   string  `json:"symbol"`
+	Action   string  `json:"action"` // BUY, SELL, HOLD
+	Size     float64 `json:"size"`
+	Priority int     `json:"priority"`
 }
 
 // ExecutionResult 执行结果
@@ -4988,7 +4972,7 @@ func (ps *PositionScheduler) getCurrentPositions(ctx context.Context) ([]*Positi
 		WHERE status = 'ACTIVE'
 		ORDER BY symbol
 	`
-	
+
 	rows, err := ps.db.QueryContext(ctx, query)
 	if err != nil {
 		// 返回模拟数据
@@ -4998,7 +4982,7 @@ func (ps *PositionScheduler) getCurrentPositions(ctx context.Context) ([]*Positi
 		}, nil
 	}
 	defer rows.Close()
-	
+
 	var positions []*PositionInfo
 	for rows.Next() {
 		var pos PositionInfo
@@ -5007,23 +4991,23 @@ func (ps *PositionScheduler) getCurrentPositions(ctx context.Context) ([]*Positi
 		}
 		positions = append(positions, &pos)
 	}
-	
+
 	return positions, nil
 }
 
 // calculateOptimalPositions 计算最优仓位
 func (ps *PositionScheduler) calculateOptimalPositions(ctx context.Context, currentPositions []*PositionInfo) ([]*OptimalPosition, error) {
 	var optimalPositions []*OptimalPosition
-	
+
 	for _, pos := range currentPositions {
 		// 简化的最优仓位计算
 		var targetSize float64
 		var confidence float64
 		var reason string
-		
+
 		// 基于当前盈亏调整仓位
 		pnlRatio := pos.UnrealizedPnL / (pos.Size * pos.EntryPrice)
-		
+
 		if pnlRatio > 0.1 { // 盈利超过10%
 			targetSize = pos.Size * 1.2 // 增加20%仓位
 			confidence = 0.8
@@ -5037,7 +5021,7 @@ func (ps *PositionScheduler) calculateOptimalPositions(ctx context.Context, curr
 			confidence = 0.6
 			reason = "Maintain current position"
 		}
-		
+
 		optimalPositions = append(optimalPositions, &OptimalPosition{
 			Symbol:     pos.Symbol,
 			TargetSize: targetSize,
@@ -5045,28 +5029,28 @@ func (ps *PositionScheduler) calculateOptimalPositions(ctx context.Context, curr
 			Reason:     reason,
 		})
 	}
-	
+
 	return optimalPositions, nil
 }
 
 // generateRebalanceInstructions 生成调仓指令
 func (ps *PositionScheduler) generateRebalanceInstructions(ctx context.Context, currentPositions []*PositionInfo, optimalPositions []*OptimalPosition) ([]*RebalanceInstruction, error) {
 	var instructions []*RebalanceInstruction
-	
+
 	// 创建当前仓位映射
 	currentMap := make(map[string]*PositionInfo)
 	for _, pos := range currentPositions {
 		currentMap[pos.Symbol] = pos
 	}
-	
+
 	for _, optimal := range optimalPositions {
 		current := currentMap[optimal.Symbol]
 		if current == nil {
 			continue
 		}
-		
+
 		sizeDiff := optimal.TargetSize - current.Size
-		
+
 		// 只有当差异超过阈值时才生成指令
 		if math.Abs(sizeDiff) > 0.01 { // 0.01的阈值
 			var action string
@@ -5076,10 +5060,10 @@ func (ps *PositionScheduler) generateRebalanceInstructions(ctx context.Context, 
 				action = "SELL"
 				sizeDiff = -sizeDiff
 			}
-			
+
 			// 计算优先级
 			priority := int(math.Abs(sizeDiff) * 100)
-			
+
 			instructions = append(instructions, &RebalanceInstruction{
 				Symbol:   optimal.Symbol,
 				Action:   action,
@@ -5088,25 +5072,25 @@ func (ps *PositionScheduler) generateRebalanceInstructions(ctx context.Context, 
 			})
 		}
 	}
-	
+
 	// 按优先级排序
 	sort.Slice(instructions, func(i, j int) bool {
 		return instructions[i].Priority > instructions[j].Priority
 	})
-	
+
 	return instructions, nil
 }
 
 // executePositionAdjustments 执行仓位调整
 func (ps *PositionScheduler) executePositionAdjustments(ctx context.Context, instructions []*RebalanceInstruction) ([]*ExecutionResult, error) {
 	var results []*ExecutionResult
-	
+
 	for _, instruction := range instructions {
 		result := &ExecutionResult{
 			Instruction: instruction,
 			ExecutedAt:  time.Now(),
 		}
-		
+
 		// 模拟执行
 		err := ps.simulateTradeExecution(ctx, instruction)
 		if err != nil {
@@ -5115,13 +5099,13 @@ func (ps *PositionScheduler) executePositionAdjustments(ctx context.Context, ins
 		} else {
 			result.Success = true
 		}
-		
+
 		results = append(results, result)
-		
+
 		// 添加执行延迟
 		time.Sleep(time.Millisecond * 100)
 	}
-	
+
 	return results, nil
 }
 
@@ -5131,7 +5115,7 @@ func (ps *PositionScheduler) simulateTradeExecution(ctx context.Context, instruc
 	if instruction.Size > 10.0 { // 大额交易
 		return fmt.Errorf("trade size too large: %.4f", instruction.Size)
 	}
-	
+
 	// 模拟成功执行
 	log.Printf("Executed %s %s: %.4f", instruction.Action, instruction.Symbol, instruction.Size)
 	return nil
@@ -5158,19 +5142,19 @@ type CleaningResult struct {
 // detectDataAnomalies 检测数据异常
 func (ds *DataScheduler) detectDataAnomalies(ctx context.Context) ([]*DataAnomaly, error) {
 	var anomalies []*DataAnomaly
-	
+
 	// 检测价格异常
 	priceAnomalies, err := ds.detectPriceAnomalies(ctx)
 	if err == nil {
 		anomalies = append(anomalies, priceAnomalies...)
 	}
-	
+
 	// 检测交易量异常
 	volumeAnomalies, err := ds.detectVolumeAnomalies(ctx)
 	if err == nil {
 		anomalies = append(anomalies, volumeAnomalies...)
 	}
-	
+
 	return anomalies, nil
 }
 
@@ -5205,7 +5189,7 @@ func (ds *DataScheduler) detectVolumeAnomalies(ctx context.Context) ([]*DataAnom
 // cleanInvalidData 清洗无效数据
 func (ds *DataScheduler) cleanInvalidData(ctx context.Context, anomalies []*DataAnomaly) (*CleaningResult, error) {
 	result := &CleaningResult{}
-	
+
 	for _, anomaly := range anomalies {
 		switch anomaly.AnomalyType {
 		case "NEGATIVE_PRICE":
@@ -5228,12 +5212,12 @@ func (ds *DataScheduler) cleanInvalidData(ctx context.Context, anomalies []*Data
 			}
 		}
 	}
-	
+
 	// 获取总记录数
 	var totalCount int
 	ds.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM market_data").Scan(&totalCount)
 	result.TotalRecords = totalCount
-	
+
 	return result, nil
 }
 
@@ -5249,8 +5233,8 @@ type SystemResourceUsage struct {
 
 // ServiceStatus 服务状态
 type ServiceStatus struct {
-	Name   string `json:"name"`
-	Status string `json:"status"`
+	Name   string        `json:"name"`
+	Status string        `json:"status"`
 	Uptime time.Duration `json:"uptime"`
 }
 
@@ -5273,8 +5257,9 @@ func (ss *SystemScheduler) monitorServiceStatus(ctx context.Context) ([]*Service
 		{Name: "exchange_api", Status: "HEALTHY", Uptime: time.Hour * 12},
 		{Name: "risk_monitor", Status: "DEGRADED", Uptime: time.Hour * 6},
 	}, nil
-}// A
-lert 告警结构
+}
+
+// Alert 告警结构
 type Alert struct {
 	ID        string                 `json:"id"`
 	Type      string                 `json:"type"`
@@ -5288,7 +5273,7 @@ type Alert struct {
 
 // AlertChannel 告警通道
 type AlertChannel struct {
-	Type     string                 `json:"type"`     // email, sms, webhook, slack, telegram
+	Type     string                 `json:"type"` // email, sms, webhook, slack, telegram
 	Config   map[string]interface{} `json:"config"`
 	Enabled  bool                   `json:"enabled"`
 	Priority int                    `json:"priority"` // 1-10, 1为最高优先级
@@ -5300,20 +5285,20 @@ func (rs *RiskScheduler) sendAlert(ctx context.Context, alert *Alert) error {
 	if err := rs.recordAlert(ctx, alert); err != nil {
 		log.Printf("Failed to record alert: %v", err)
 	}
-	
+
 	// 获取告警通道配置
 	channels, err := rs.getAlertChannels(ctx, alert.Type, alert.Level)
 	if err != nil {
 		return fmt.Errorf("failed to get alert channels: %w", err)
 	}
-	
+
 	// 并发发送到各个通道
 	var wg sync.WaitGroup
 	for _, channel := range channels {
 		if !channel.Enabled {
 			continue
 		}
-		
+
 		wg.Add(1)
 		go func(ch AlertChannel) {
 			defer wg.Done()
@@ -5322,7 +5307,7 @@ func (rs *RiskScheduler) sendAlert(ctx context.Context, alert *Alert) error {
 			}
 		}(channel)
 	}
-	
+
 	wg.Wait()
 	return nil
 }
@@ -5332,18 +5317,18 @@ func (rs *RiskScheduler) recordAlert(ctx context.Context, alert *Alert) error {
 	if rs.db == nil {
 		return fmt.Errorf("database not available")
 	}
-	
+
 	metadataJSON, _ := json.Marshal(alert.Metadata)
 	query := `
 		INSERT INTO alerts (id, type, level, title, message, source, metadata, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	
+
 	_, err := rs.db.ExecContext(ctx, query,
 		alert.ID, alert.Type, alert.Level, alert.Title,
 		alert.Message, alert.Source, string(metadataJSON), alert.Timestamp,
 	)
-	
+
 	return err
 }
 
@@ -5351,7 +5336,7 @@ func (rs *RiskScheduler) recordAlert(ctx context.Context, alert *Alert) error {
 func (rs *RiskScheduler) getAlertChannels(ctx context.Context, alertType, level string) ([]AlertChannel, error) {
 	// 从配置文件或数据库获取告警通道配置
 	channels := []AlertChannel{}
-	
+
 	// 根据告警级别确定通道
 	switch level {
 	case "CRITICAL":
@@ -5381,12 +5366,12 @@ func (rs *RiskScheduler) getAlertChannels(ctx context.Context, alertType, level 
 			AlertChannel{Type: "webhook", Enabled: true, Priority: 3},
 		)
 	}
-	
+
 	// 从配置中获取通道配置
 	for i := range channels {
 		channels[i].Config = rs.getChannelConfig(channels[i].Type)
 	}
-	
+
 	return channels, nil
 }
 
@@ -5395,16 +5380,16 @@ func (rs *RiskScheduler) getChannelConfig(channelType string) map[string]interfa
 	if rs.config == nil {
 		return map[string]interface{}{}
 	}
-	
+
 	switch channelType {
 	case "email":
 		return map[string]interface{}{
-			"smtp_host":     rs.config.GetString("alerts.email.smtp_host"),
-			"smtp_port":     rs.config.GetInt("alerts.email.smtp_port"),
-			"username":      rs.config.GetString("alerts.email.username"),
-			"password":      rs.config.GetString("alerts.email.password"),
-			"from":          rs.config.GetString("alerts.email.from"),
-			"to":            rs.config.GetString("alerts.email.to"),
+			"smtp_host": rs.config.GetString("alerts.email.smtp_host"),
+			"smtp_port": rs.config.GetInt("alerts.email.smtp_port"),
+			"username":  rs.config.GetString("alerts.email.username"),
+			"password":  rs.config.GetString("alerts.email.password"),
+			"from":      rs.config.GetString("alerts.email.from"),
+			"to":        rs.config.GetString("alerts.email.to"),
 		}
 	case "sms":
 		return map[string]interface{}{
@@ -5456,26 +5441,26 @@ func (rs *RiskScheduler) sendToChannel(ctx context.Context, alert *Alert, channe
 func (rs *RiskScheduler) sendEmailAlert(ctx context.Context, alert *Alert, config map[string]interface{}) error {
 	// 简化实现：记录日志
 	log.Printf("EMAIL ALERT: [%s] %s - %s", alert.Level, alert.Title, alert.Message)
-	
+
 	// 实际实现应该使用SMTP发送邮件
 	// 这里可以集成如 gomail 等邮件库
 	/*
-	m := gomail.NewMessage()
-	m.SetHeader("From", config["from"].(string))
-	m.SetHeader("To", config["to"].(string))
-	m.SetHeader("Subject", alert.Title)
-	m.SetBody("text/html", rs.formatEmailBody(alert))
-	
-	d := gomail.NewDialer(
-		config["smtp_host"].(string),
-		config["smtp_port"].(int),
-		config["username"].(string),
-		config["password"].(string),
-	)
-	
-	return d.DialAndSend(m)
+		m := gomail.NewMessage()
+		m.SetHeader("From", config["from"].(string))
+		m.SetHeader("To", config["to"].(string))
+		m.SetHeader("Subject", alert.Title)
+		m.SetBody("text/html", rs.formatEmailBody(alert))
+
+		d := gomail.NewDialer(
+			config["smtp_host"].(string),
+			config["smtp_port"].(int),
+			config["username"].(string),
+			config["password"].(string),
+		)
+
+		return d.DialAndSend(m)
 	*/
-	
+
 	return nil
 }
 
@@ -5483,10 +5468,10 @@ func (rs *RiskScheduler) sendEmailAlert(ctx context.Context, alert *Alert, confi
 func (rs *RiskScheduler) sendSMSAlert(ctx context.Context, alert *Alert, config map[string]interface{}) error {
 	// 简化实现：记录日志
 	log.Printf("SMS ALERT: [%s] %s", alert.Level, alert.Message)
-	
+
 	// 实际实现应该调用短信服务API
 	// 如阿里云短信、腾讯云短信等
-	
+
 	return nil
 }
 
@@ -5496,26 +5481,26 @@ func (rs *RiskScheduler) sendWebhookAlert(ctx context.Context, alert *Alert, con
 	if !ok || url == "" {
 		return fmt.Errorf("webhook URL not configured")
 	}
-	
+
 	// 构建请求体
 	payload := map[string]interface{}{
 		"alert":     alert,
 		"timestamp": time.Now().Unix(),
 	}
-	
+
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal webhook payload: %w", err)
 	}
-	
+
 	// 发送HTTP请求
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create webhook request: %w", err)
 	}
-	
+
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	// 添加自定义头部
 	if headers, ok := config["headers"].(map[string]interface{}); ok {
 		for key, value := range headers {
@@ -5524,18 +5509,18 @@ func (rs *RiskScheduler) sendWebhookAlert(ctx context.Context, alert *Alert, con
 			}
 		}
 	}
-	
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send webhook: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("webhook returned error status: %d", resp.StatusCode)
 	}
-	
+
 	log.Printf("WEBHOOK ALERT sent successfully: [%s] %s", alert.Level, alert.Title)
 	return nil
 }
@@ -5546,17 +5531,17 @@ func (rs *RiskScheduler) sendSlackAlert(ctx context.Context, alert *Alert, confi
 	if !ok || webhookURL == "" {
 		return fmt.Errorf("Slack webhook URL not configured")
 	}
-	
+
 	// 构建Slack消息
 	color := rs.getSlackColor(alert.Level)
 	payload := map[string]interface{}{
 		"attachments": []map[string]interface{}{
 			{
-				"color":      color,
-				"title":      alert.Title,
-				"text":       alert.Message,
-				"footer":     alert.Source,
-				"ts":         alert.Timestamp.Unix(),
+				"color":  color,
+				"title":  alert.Title,
+				"text":   alert.Message,
+				"footer": alert.Source,
+				"ts":     alert.Timestamp.Unix(),
 				"fields": []map[string]interface{}{
 					{
 						"title": "告警级别",
@@ -5572,7 +5557,7 @@ func (rs *RiskScheduler) sendSlackAlert(ctx context.Context, alert *Alert, confi
 			},
 		},
 	}
-	
+
 	// 添加元数据字段
 	if alert.Metadata != nil {
 		fields := payload["attachments"].([]map[string]interface{})[0]["fields"].([]map[string]interface{})
@@ -5585,31 +5570,31 @@ func (rs *RiskScheduler) sendSlackAlert(ctx context.Context, alert *Alert, confi
 		}
 		payload["attachments"].([]map[string]interface{})[0]["fields"] = fields
 	}
-	
+
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal Slack payload: %w", err)
 	}
-	
+
 	// 发送到Slack
 	req, err := http.NewRequestWithContext(ctx, "POST", webhookURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create Slack request: %w", err)
 	}
-	
+
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send Slack alert: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("Slack returned error status: %d", resp.StatusCode)
 	}
-	
+
 	log.Printf("SLACK ALERT sent successfully: [%s] %s", alert.Level, alert.Title)
 	return nil
 }
@@ -5620,12 +5605,12 @@ func (rs *RiskScheduler) sendTelegramAlert(ctx context.Context, alert *Alert, co
 	if !ok || botToken == "" {
 		return fmt.Errorf("Telegram bot token not configured")
 	}
-	
+
 	chatID, ok := config["chat_id"].(string)
 	if !ok || chatID == "" {
 		return fmt.Errorf("Telegram chat ID not configured")
 	}
-	
+
 	// 构建消息
 	message := fmt.Sprintf("🚨 *%s*\n\n*级别:* %s\n*类型:* %s\n*来源:* %s\n*时间:* %s\n\n%s",
 		alert.Title,
@@ -5635,7 +5620,7 @@ func (rs *RiskScheduler) sendTelegramAlert(ctx context.Context, alert *Alert, co
 		alert.Timestamp.Format("2006-01-02 15:04:05"),
 		alert.Message,
 	)
-	
+
 	// 构建请求
 	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
 	payload := map[string]interface{}{
@@ -5643,30 +5628,30 @@ func (rs *RiskScheduler) sendTelegramAlert(ctx context.Context, alert *Alert, co
 		"text":       message,
 		"parse_mode": "Markdown",
 	}
-	
+
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
 		return fmt.Errorf("failed to marshal Telegram payload: %w", err)
 	}
-	
+
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return fmt.Errorf("failed to create Telegram request: %w", err)
 	}
-	
+
 	req.Header.Set("Content-Type", "application/json")
-	
+
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send Telegram alert: %w", err)
 	}
 	defer resp.Body.Close()
-	
+
 	if resp.StatusCode >= 400 {
 		return fmt.Errorf("Telegram returned error status: %d", resp.StatusCode)
 	}
-	
+
 	log.Printf("TELEGRAM ALERT sent successfully: [%s] %s", alert.Level, alert.Title)
 	return nil
 }
@@ -5698,9 +5683,9 @@ func (rs *RiskScheduler) formatEmailBody(alert *Alert) string {
 	<p><strong>来源:</strong> %s</p>
 	<p><strong>时间:</strong> %s</p>
 	<p><strong>消息:</strong> %s</p>
-`, rs.getEmailColor(alert.Level), alert.Title, alert.Level, alert.Type, alert.Source, 
-	alert.Timestamp.Format("2006-01-02 15:04:05"), alert.Message)
-	
+`, rs.getEmailColor(alert.Level), alert.Title, alert.Level, alert.Type, alert.Source,
+		alert.Timestamp.Format("2006-01-02 15:04:05"), alert.Message)
+
 	// 添加元数据
 	if alert.Metadata != nil && len(alert.Metadata) > 0 {
 		html += "<h3>详细信息:</h3><ul>"
@@ -5709,7 +5694,7 @@ func (rs *RiskScheduler) formatEmailBody(alert *Alert) string {
 		}
 		html += "</ul>"
 	}
-	
+
 	html += "</body></html>"
 	return html
 }
@@ -5728,30 +5713,31 @@ func (rs *RiskScheduler) getEmailColor(level string) string {
 	default:
 		return "#6c757d"
 	}
-}// 
-analyzeHedgeEffectiveness 分析对冲效果
+}
+
+// analyzeHedgeEffectiveness 分析对冲效果
 func (ps *PositionScheduler) analyzeHedgeEffectiveness(ctx context.Context, operation *HedgeOperation) (*HedgeEffectivenessAnalysis, error) {
 	// 获取对冲操作的历史数据
 	hedgeHistory, err := ps.getHedgeHistory(ctx, operation.ID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get hedge history: %w", err)
 	}
-	
+
 	// 计算对冲效果指标
 	analysis := &HedgeEffectivenessAnalysis{
-		OperationID:        operation.ID,
-		AnalysisTime:       time.Now(),
+		OperationID:          operation.ID,
+		AnalysisTime:         time.Now(),
 		CorrelationStability: ps.calculateCorrelationStability(hedgeHistory),
-		RiskReduction:      ps.calculateRiskReduction(hedgeHistory),
-		CostEfficiency:     ps.calculateCostEfficiency(hedgeHistory),
-		OverallScore:       0.0,
+		RiskReduction:        ps.calculateRiskReduction(hedgeHistory),
+		CostEfficiency:       ps.calculateCostEfficiency(hedgeHistory),
+		OverallScore:         0.0,
 	}
-	
+
 	// 计算综合评分
-	analysis.OverallScore = (analysis.CorrelationStability*0.4 + 
-		analysis.RiskReduction*0.4 + 
+	analysis.OverallScore = (analysis.CorrelationStability*0.4 +
+		analysis.RiskReduction*0.4 +
 		analysis.CostEfficiency*0.2)
-	
+
 	log.Printf("Hedge effectiveness analysis for %s: score=%.4f", operation.ID, analysis.OverallScore)
 	return analysis, nil
 }
@@ -5761,26 +5747,26 @@ func (ps *PositionScheduler) shouldAdjustHedge(analysis *HedgeEffectivenessAnaly
 	// 设定调整阈值
 	minEffectivenessScore := 0.6 // 60%以下需要调整
 	maxCorrelationDrift := 0.3   // 相关性漂移超过30%需要调整
-	
+
 	// 检查综合评分
 	if analysis.OverallScore < minEffectivenessScore {
-		log.Printf("Hedge effectiveness below threshold: %.4f < %.4f", 
+		log.Printf("Hedge effectiveness below threshold: %.4f < %.4f",
 			analysis.OverallScore, minEffectivenessScore)
 		return true
 	}
-	
+
 	// 检查相关性稳定性
 	if analysis.CorrelationStability < (1.0 - maxCorrelationDrift) {
 		log.Printf("Correlation stability below threshold: %.4f", analysis.CorrelationStability)
 		return true
 	}
-	
+
 	// 检查风险降低效果
 	if analysis.RiskReduction < 0.5 {
 		log.Printf("Risk reduction below threshold: %.4f", analysis.RiskReduction)
 		return true
 	}
-	
+
 	return false
 }
 
@@ -5791,30 +5777,30 @@ func (ps *PositionScheduler) calculateOptimalHedgeRatio(ctx context.Context, ope
 	if err != nil {
 		return 0, fmt.Errorf("failed to get market data: %w", err)
 	}
-	
+
 	// 获取历史价格数据
 	historicalPrices, err := ps.getHistoricalPrices(ctx, operation.Symbol, 30) // 30天历史数据
 	if err != nil {
 		return 0, fmt.Errorf("failed to get historical prices: %w", err)
 	}
-	
+
 	// 计算波动率
 	volatility := ps.calculateVolatility(historicalPrices)
-	
+
 	// 计算相关性
 	correlation := ps.calculateCorrelationWithMarket(historicalPrices)
-	
+
 	// 使用最小方差对冲比率公式
 	// h* = Cov(S,F) / Var(F)
 	// 简化为基于相关性和波动率的计算
 	optimalRatio := correlation * (volatility / 0.02) // 基准波动率2%
-	
+
 	// 限制对冲比率在合理范围内
 	optimalRatio = math.Max(0.1, math.Min(1.0, optimalRatio))
-	
-	log.Printf("Calculated optimal hedge ratio for %s: %.4f (volatility=%.4f, correlation=%.4f)", 
+
+	log.Printf("Calculated optimal hedge ratio for %s: %.4f (volatility=%.4f, correlation=%.4f)",
 		operation.Symbol, optimalRatio, volatility, correlation)
-	
+
 	return optimalRatio, nil
 }
 
@@ -5824,10 +5810,10 @@ func (ps *PositionScheduler) executeHedgeAdjustment(ctx context.Context, operati
 	currentHedgeSize := operation.HedgeSize
 	targetHedgeSize := operation.PositionSize * newRatio
 	adjustmentSize := targetHedgeSize - currentHedgeSize
-	
-	log.Printf("Executing hedge adjustment: current=%.4f, target=%.4f, adjustment=%.4f", 
+
+	log.Printf("Executing hedge adjustment: current=%.4f, target=%.4f, adjustment=%.4f",
 		currentHedgeSize, targetHedgeSize, adjustmentSize)
-	
+
 	// 创建调整订单
 	adjustmentOrder := &HedgeAdjustmentOrder{
 		OperationID:    operation.ID,
@@ -5837,21 +5823,21 @@ func (ps *PositionScheduler) executeHedgeAdjustment(ctx context.Context, operati
 		OrderType:      "MARKET",
 		Timestamp:      time.Now(),
 	}
-	
+
 	// 执行订单
 	if err := ps.placeHedgeAdjustmentOrder(ctx, adjustmentOrder); err != nil {
 		return fmt.Errorf("failed to place hedge adjustment order: %w", err)
 	}
-	
+
 	// 更新操作记录
 	operation.HedgeSize = targetHedgeSize
 	operation.HedgeRatio = newRatio
 	operation.LastAdjustment = time.Now()
-	
+
 	if err := ps.updateHedgeOperation(ctx, operation); err != nil {
 		log.Printf("Failed to update hedge operation: %v", err)
 	}
-	
+
 	return nil
 }
 
@@ -5860,14 +5846,14 @@ func (ps *PositionScheduler) recordHedgeAdjustment(ctx context.Context, operatio
 	if ps.db == nil {
 		return fmt.Errorf("database not available")
 	}
-	
+
 	query := `
 		INSERT INTO hedge_adjustments 
 		(operation_id, symbol, old_ratio, new_ratio, effectiveness_score, 
 		 correlation_stability, risk_reduction, cost_efficiency, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-	
+
 	_, err := ps.db.ExecContext(ctx, query,
 		operation.ID,
 		operation.Symbol,
@@ -5879,11 +5865,11 @@ func (ps *PositionScheduler) recordHedgeAdjustment(ctx context.Context, operatio
 		analysis.CostEfficiency,
 		time.Now(),
 	)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to record hedge adjustment: %w", err)
 	}
-	
+
 	log.Printf("Recorded hedge adjustment for operation %s", operation.ID)
 	return nil
 }
@@ -5915,19 +5901,19 @@ func (ps *PositionScheduler) getHedgeHistory(ctx context.Context, operationID st
 	// 简化实现：返回模拟历史数据
 	history := []map[string]interface{}{
 		{
-			"timestamp":    time.Now().Add(-24 * time.Hour),
-			"hedge_ratio":  0.8,
+			"timestamp":     time.Now().Add(-24 * time.Hour),
+			"hedge_ratio":   0.8,
 			"effectiveness": 0.75,
-			"pnl":          1500.0,
+			"pnl":           1500.0,
 		},
 		{
-			"timestamp":    time.Now().Add(-12 * time.Hour),
-			"hedge_ratio":  0.82,
+			"timestamp":     time.Now().Add(-12 * time.Hour),
+			"hedge_ratio":   0.82,
 			"effectiveness": 0.72,
-			"pnl":          1200.0,
+			"pnl":           1200.0,
 		},
 	}
-	
+
 	return history, nil
 }
 
@@ -5936,7 +5922,7 @@ func (ps *PositionScheduler) calculateCorrelationStability(history []map[string]
 	if len(history) < 2 {
 		return 1.0
 	}
-	
+
 	// 简化计算：基于历史数据的方差
 	var correlations []float64
 	for _, record := range history {
@@ -5944,24 +5930,24 @@ func (ps *PositionScheduler) calculateCorrelationStability(history []map[string]
 			correlations = append(correlations, corr)
 		}
 	}
-	
+
 	if len(correlations) == 0 {
 		return 0.8 // 默认稳定性
 	}
-	
+
 	// 计算标准差
 	var sum, mean float64
 	for _, corr := range correlations {
 		sum += corr
 	}
 	mean = sum / float64(len(correlations))
-	
+
 	var variance float64
 	for _, corr := range correlations {
 		variance += (corr - mean) * (corr - mean)
 	}
 	variance /= float64(len(correlations))
-	
+
 	stability := 1.0 - math.Sqrt(variance)
 	return math.Max(0.0, math.Min(1.0, stability))
 }
@@ -5972,36 +5958,36 @@ func (ps *PositionScheduler) calculateRiskReduction(history []map[string]interfa
 	if len(history) < 2 {
 		return 0.7 // 默认风险降低效果
 	}
-	
+
 	var pnls []float64
 	for _, record := range history {
 		if pnl, ok := record["pnl"].(float64); ok {
 			pnls = append(pnls, pnl)
 		}
 	}
-	
+
 	if len(pnls) == 0 {
 		return 0.7
 	}
-	
+
 	// 计算PnL的标准差作为风险指标
 	var sum, mean float64
 	for _, pnl := range pnls {
 		sum += pnl
 	}
 	mean = sum / float64(len(pnls))
-	
+
 	var variance float64
 	for _, pnl := range pnls {
 		variance += (pnl - mean) * (pnl - mean)
 	}
 	variance /= float64(len(pnls))
-	
+
 	risk := math.Sqrt(variance)
 	// 风险降低效果 = 1 - (当前风险 / 基准风险)
 	baselineRisk := 2000.0 // 基准风险
 	riskReduction := 1.0 - (risk / baselineRisk)
-	
+
 	return math.Max(0.0, math.Min(1.0, riskReduction))
 }
 
@@ -6010,7 +5996,7 @@ func (ps *PositionScheduler) calculateCostEfficiency(history []map[string]interf
 	// 简化计算：基于交易成本和收益的比率
 	totalCost := 0.0
 	totalBenefit := 0.0
-	
+
 	for _, record := range history {
 		if cost, ok := record["cost"].(float64); ok {
 			totalCost += cost
@@ -6019,11 +6005,11 @@ func (ps *PositionScheduler) calculateCostEfficiency(history []map[string]interf
 			totalBenefit += benefit
 		}
 	}
-	
+
 	if totalCost == 0 {
 		return 0.8 // 默认成本效率
 	}
-	
+
 	efficiency := totalBenefit / totalCost
 	return math.Max(0.0, math.Min(1.0, efficiency/2.0)) // 归一化到0-1
 }
@@ -6037,7 +6023,7 @@ func (ps *PositionScheduler) getCurrentMarketData(ctx context.Context, symbol st
 		"volume":    1000000.0,
 		"timestamp": time.Now(),
 	}
-	
+
 	return marketData, nil
 }
 
@@ -6046,13 +6032,13 @@ func (ps *PositionScheduler) getHistoricalPrices(ctx context.Context, symbol str
 	// 简化实现：生成模拟历史价格
 	prices := make([]float64, days)
 	basePrice := 50000.0
-	
+
 	for i := 0; i < days; i++ {
 		// 模拟价格波动
 		change := (math.Sin(float64(i)*0.1) + math.Cos(float64(i)*0.05)) * 0.02
 		prices[i] = basePrice * (1 + change)
 	}
-	
+
 	return prices, nil
 }
 
@@ -6061,26 +6047,26 @@ func (ps *PositionScheduler) calculateVolatility(prices []float64) float64 {
 	if len(prices) < 2 {
 		return 0.02 // 默认2%波动率
 	}
-	
+
 	// 计算收益率
 	returns := make([]float64, len(prices)-1)
 	for i := 1; i < len(prices); i++ {
 		returns[i-1] = (prices[i] - prices[i-1]) / prices[i-1]
 	}
-	
+
 	// 计算标准差
 	var sum, mean float64
 	for _, ret := range returns {
 		sum += ret
 	}
 	mean = sum / float64(len(returns))
-	
+
 	var variance float64
 	for _, ret := range returns {
 		variance += (ret - mean) * (ret - mean)
 	}
 	variance /= float64(len(returns))
-	
+
 	return math.Sqrt(variance)
 }
 
@@ -6090,7 +6076,7 @@ func (ps *PositionScheduler) calculateCorrelationWithMarket(prices []float64) fl
 	if len(prices) < 2 {
 		return 0.7 // 默认相关性
 	}
-	
+
 	// 计算价格变化趋势
 	upCount := 0
 	for i := 1; i < len(prices); i++ {
@@ -6098,11 +6084,11 @@ func (ps *PositionScheduler) calculateCorrelationWithMarket(prices []float64) fl
 			upCount++
 		}
 	}
-	
+
 	// 基于上涨比例计算相关性
 	upRatio := float64(upCount) / float64(len(prices)-1)
 	correlation := 0.5 + (upRatio-0.5)*0.8 // 调整到合理范围
-	
+
 	return math.Max(0.1, math.Min(0.9, correlation))
 }
 
@@ -6110,10 +6096,10 @@ func (ps *PositionScheduler) calculateCorrelationWithMarket(prices []float64) fl
 func (ps *PositionScheduler) placeHedgeAdjustmentOrder(ctx context.Context, order *HedgeAdjustmentOrder) error {
 	// 简化实现：记录订单日志
 	log.Printf("Placing hedge adjustment order: %+v", order)
-	
+
 	// 实际实现应该调用交易所API
 	// return ps.exchangeClient.PlaceOrder(ctx, order)
-	
+
 	return nil
 }
 
@@ -6122,13 +6108,13 @@ func (ps *PositionScheduler) updateHedgeOperation(ctx context.Context, operation
 	if ps.db == nil {
 		return fmt.Errorf("database not available")
 	}
-	
+
 	query := `
 		UPDATE hedge_operations 
 		SET hedge_size = ?, hedge_ratio = ?, last_adjustment = ?, updated_at = ?
 		WHERE id = ?
 	`
-	
+
 	_, err := ps.db.ExecContext(ctx, query,
 		operation.HedgeSize,
 		operation.HedgeRatio,
@@ -6136,10 +6122,10 @@ func (ps *PositionScheduler) updateHedgeOperation(ctx context.Context, operation
 		time.Now(),
 		operation.ID,
 	)
-	
+
 	if err != nil {
 		return fmt.Errorf("failed to update hedge operation: %w", err)
 	}
-	
+
 	return nil
 }

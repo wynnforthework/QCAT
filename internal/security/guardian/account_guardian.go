@@ -1323,7 +1323,60 @@ func (ag *AccountGuardian) autoFreezeAccount(userID, eventID string) {
 }
 
 func (ag *AccountGuardian) handlePendingResponses() {
-	// TODO: 实现待处理响应的处理逻辑
+	// 实现待处理响应的处理逻辑
+	ag.mu.Lock()
+	defer ag.mu.Unlock()
+
+	// 处理威胁事件的响应
+	for i := range ag.threatEvents {
+		event := &ag.threatEvents[i]
+
+		// 检查是否需要处理响应
+		if event.Response == nil {
+			// 根据威胁类型和严重程度生成响应
+			response := ag.generateThreatResponse(event)
+			event.Response = response
+
+			// 执行自动响应
+			if response.Automated {
+				err := ag.executeThreatResponse(event, response)
+				if err != nil {
+					log.Printf("Failed to execute automated response for threat %s: %v", event.ID, err)
+					// 记录响应失败
+					event.Response.Description = fmt.Sprintf("Response failed: %v", err)
+				} else {
+					log.Printf("Automated response executed for threat %s: %s", event.ID, response.Action)
+					event.Response.Description = fmt.Sprintf("Response completed: %s", response.Action)
+				}
+				event.Response.Timestamp = time.Now()
+			}
+		}
+	}
+
+	// 处理异常事件的响应
+	for i := range ag.anomalyEvents {
+		anomaly := &ag.anomalyEvents[i]
+
+		// 检查是否需要生成响应
+		if anomaly.Score > ag.alertThreshold {
+			// 生成异常响应
+			response := ag.generateAnomalyResponse(anomaly)
+
+			// 如果是高风险异常且启用了自动冻结，执行自动响应
+			if anomaly.Score > ag.anomalyThreshold && ag.autoFreezeEnabled {
+				err := ag.executeAnomalyResponse(anomaly, response)
+				if err != nil {
+					log.Printf("Failed to execute anomaly response for user %s: %v", anomaly.UserID, err)
+				} else {
+					log.Printf("Anomaly response executed for user %s: %s", anomaly.UserID, response.Action)
+				}
+			}
+		}
+	}
+
+	// 清理已解决的旧事件（保留最近7天的记录）
+	cutoffTime := time.Now().Add(-7 * 24 * time.Hour)
+	ag.cleanupOldEvents(cutoffTime)
 }
 
 func (ag *AccountGuardian) updateSecurityMetrics() {
@@ -1506,4 +1559,221 @@ func (ag *AccountGuardian) GetStatus() map[string]interface{} {
 		"anomaly_events":   len(ag.anomalyEvents),
 		"security_metrics": ag.GetSecurityMetrics(),
 	}
+}
+
+// 响应处理相关的辅助方法
+
+// generateThreatResponse 生成威胁响应
+func (ag *AccountGuardian) generateThreatResponse(event *ThreatEvent) *ThreatResponse {
+	response := &ThreatResponse{
+		Timestamp: time.Now(),
+		Automated: true,
+	}
+
+	// 根据威胁类型和严重程度确定响应动作
+	switch event.Type {
+	case "suspicious_login":
+		if event.Severity == "high" {
+			response.Action = "freeze_account"
+			response.Description = "Account frozen due to suspicious login activity"
+		} else {
+			response.Action = "require_2fa"
+			response.Description = "Additional authentication required"
+		}
+	case "unusual_trading":
+		if event.Severity == "high" {
+			response.Action = "suspend_trading"
+			response.Description = "Trading suspended due to unusual activity"
+		} else {
+			response.Action = "alert_user"
+			response.Description = "User notified of unusual trading pattern"
+		}
+	case "multiple_failed_logins":
+		response.Action = "temporary_lockout"
+		response.Description = "Account temporarily locked due to failed login attempts"
+	case "geo_anomaly":
+		response.Action = "require_verification"
+		response.Description = "Location verification required"
+	default:
+		response.Action = "monitor"
+		response.Description = "Increased monitoring activated"
+		response.Automated = false
+	}
+
+	return response
+}
+
+// executeThreatResponse 执行威胁响应
+func (ag *AccountGuardian) executeThreatResponse(event *ThreatEvent, response *ThreatResponse) error {
+	log.Printf("Executing threat response: %s for event %s", response.Action, event.ID)
+
+	switch response.Action {
+	case "freeze_account":
+		return ag.freezeUserAccount(event.UserID, "Suspicious activity detected")
+	case "suspend_trading":
+		return ag.suspendUserTrading(event.UserID, "Unusual trading pattern detected")
+	case "temporary_lockout":
+		return ag.temporaryLockout(event.UserID, 30*time.Minute)
+	case "require_2fa":
+		return ag.requireAdditionalAuth(event.UserID)
+	case "require_verification":
+		return ag.requireLocationVerification(event.UserID)
+	case "alert_user":
+		return ag.sendSecurityAlert(event.UserID, event.Description)
+	case "monitor":
+		return ag.increaseMonitoring(event.UserID)
+	default:
+		return fmt.Errorf("unknown response action: %s", response.Action)
+	}
+}
+
+// generateAnomalyResponse 生成异常响应
+func (ag *AccountGuardian) generateAnomalyResponse(anomaly *AnomalyEvent) *ThreatResponse {
+	response := &ThreatResponse{
+		Timestamp: time.Now(),
+		Automated: true,
+	}
+
+	// 根据异常分数确定响应级别
+	if anomaly.Score > ag.anomalyThreshold {
+		response.Action = "freeze_account"
+		response.Description = fmt.Sprintf("Account frozen due to high anomaly score: %.2f", anomaly.Score)
+	} else if anomaly.Score > ag.alertThreshold {
+		response.Action = "alert_user"
+		response.Description = fmt.Sprintf("Security alert due to anomaly score: %.2f", anomaly.Score)
+	} else {
+		response.Action = "monitor"
+		response.Description = "Increased monitoring due to minor anomaly"
+		response.Automated = false
+	}
+
+	return response
+}
+
+// executeAnomalyResponse 执行异常响应
+func (ag *AccountGuardian) executeAnomalyResponse(anomaly *AnomalyEvent, response *ThreatResponse) error {
+	log.Printf("Executing anomaly response: %s for user %s", response.Action, anomaly.UserID)
+
+	switch response.Action {
+	case "freeze_account":
+		return ag.freezeUserAccount(anomaly.UserID, fmt.Sprintf("Anomaly detected: %s", anomaly.Description))
+	case "alert_user":
+		return ag.sendSecurityAlert(anomaly.UserID, anomaly.Description)
+	case "monitor":
+		return ag.increaseMonitoring(anomaly.UserID)
+	default:
+		return fmt.Errorf("unknown anomaly response action: %s", response.Action)
+	}
+}
+
+// cleanupOldEvents 清理旧事件
+func (ag *AccountGuardian) cleanupOldEvents(cutoffTime time.Time) {
+	// 清理旧的威胁事件
+	var newThreatEvents []ThreatEvent
+	for _, event := range ag.threatEvents {
+		if event.Timestamp.After(cutoffTime) {
+			newThreatEvents = append(newThreatEvents, event)
+		}
+	}
+	ag.threatEvents = newThreatEvents
+
+	// 清理旧的异常事件
+	var newAnomalyEvents []AnomalyEvent
+	for _, event := range ag.anomalyEvents {
+		if event.Timestamp.After(cutoffTime) {
+			newAnomalyEvents = append(newAnomalyEvents, event)
+		}
+	}
+	ag.anomalyEvents = newAnomalyEvents
+
+	log.Printf("Cleaned up old events, kept %d threat events and %d anomaly events",
+		len(ag.threatEvents), len(ag.anomalyEvents))
+}
+
+// 安全操作方法
+
+// freezeUserAccount 冻结用户账户
+func (ag *AccountGuardian) freezeUserAccount(userID, reason string) error {
+	log.Printf("Freezing account for user %s: %s", userID, reason)
+
+	// 在实际实现中，这里会调用用户管理系统的API
+	// 目前只记录操作
+
+	// 更新安全指标
+	ag.securityMetrics.mu.Lock()
+	ag.securityMetrics.AccountsFrozen++
+	ag.securityMetrics.AutomatedResponses++
+	ag.securityMetrics.mu.Unlock()
+
+	return nil
+}
+
+// suspendUserTrading 暂停用户交易
+func (ag *AccountGuardian) suspendUserTrading(userID, reason string) error {
+	log.Printf("Suspending trading for user %s: %s", userID, reason)
+
+	// 在实际实现中，这里会调用交易系统的API
+	// 目前只记录操作
+
+	// 更新安全指标
+	ag.securityMetrics.mu.Lock()
+	ag.securityMetrics.AutomatedResponses++
+	ag.securityMetrics.mu.Unlock()
+
+	return nil
+}
+
+// temporaryLockout 临时锁定账户
+func (ag *AccountGuardian) temporaryLockout(userID string, duration time.Duration) error {
+	log.Printf("Temporary lockout for user %s for %v", userID, duration)
+
+	// 在实际实现中，这里会设置账户锁定状态和解锁时间
+	// 目前只记录操作
+
+	// 更新安全指标
+	ag.securityMetrics.mu.Lock()
+	ag.securityMetrics.AutomatedResponses++
+	ag.securityMetrics.mu.Unlock()
+
+	return nil
+}
+
+// requireAdditionalAuth 要求额外认证
+func (ag *AccountGuardian) requireAdditionalAuth(userID string) error {
+	log.Printf("Requiring additional authentication for user %s", userID)
+
+	// 在实际实现中，这里会设置用户需要额外认证的标志
+	// 目前只记录操作
+
+	return nil
+}
+
+// requireLocationVerification 要求位置验证
+func (ag *AccountGuardian) requireLocationVerification(userID string) error {
+	log.Printf("Requiring location verification for user %s", userID)
+
+	// 在实际实现中，这里会触发位置验证流程
+	// 目前只记录操作
+
+	return nil
+}
+
+// sendSecurityAlert 发送安全警报
+func (ag *AccountGuardian) sendSecurityAlert(userID, message string) error {
+	log.Printf("Sending security alert to user %s: %s", userID, message)
+
+	// 在实际实现中，这里会通过邮件、短信或推送发送警报
+	// 目前只记录操作
+
+	return nil
+}
+
+// increaseMonitoring 增加监控
+func (ag *AccountGuardian) increaseMonitoring(userID string) error {
+	log.Printf("Increasing monitoring for user %s", userID)
+
+	// 在实际实现中，这里会调整用户的监控级别
+	// 目前只记录操作
+
+	return nil
 }

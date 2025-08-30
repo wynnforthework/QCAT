@@ -7,7 +7,7 @@ import (
 
 // HistoricalReturnsDAO defines the interface for historical returns data access
 type HistoricalReturnsDAO interface {
-	Insert(ctx context.Context, return *HistoricalReturn) error
+	Insert(ctx context.Context, historicalReturn *HistoricalReturn) error
 	GetByDateRange(ctx context.Context, startDate, endDate time.Time) ([]*HistoricalReturn, error)
 	GetLastNDays(ctx context.Context, days int) ([]*HistoricalReturn, error)
 	GetLatest(ctx context.Context) (*HistoricalReturn, error)
@@ -107,7 +107,7 @@ type DAOManager interface {
 	FundStatusSnapshots() FundStatusSnapshotsDAO
 	CircuitBreakerEvents() CircuitBreakerEventsDAO
 	ProtectionMetrics() ProtectionMetricsDAO
-	
+
 	// Transaction management
 	BeginTx(ctx context.Context) (TxManager, error)
 	Close() error
@@ -117,7 +117,7 @@ type DAOManager interface {
 type TxManager interface {
 	Commit() error
 	Rollback() error
-	
+
 	// Access to DAOs within transaction
 	HistoricalReturns() HistoricalReturnsDAO
 	HistoricalEquity() HistoricalEquityDAO

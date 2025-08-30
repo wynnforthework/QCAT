@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -61,7 +62,7 @@ func runDemo(ctx context.Context, system *workflow.MultiStrategyWorkflowSystem) 
 
 	// 创建不同类型的策略
 	strategies := []struct {
-		name string
+		name  string
 		type_ string
 	}{
 		{"动量策略A", "momentum"},
@@ -81,7 +82,7 @@ func runDemo(ctx context.Context, system *workflow.MultiStrategyWorkflowSystem) 
 		}
 
 		log.Printf("创建策略 %d: %s (%s)", i+1, strategy.name, strategy.type_)
-		
+
 		strategyID, err := system.CreateAndRunStrategy(strategy.name, strategy.type_)
 		if err != nil {
 			log.Printf("Failed to create strategy %s: %v", strategy.name, err)
@@ -99,7 +100,7 @@ func runDemo(ctx context.Context, system *workflow.MultiStrategyWorkflowSystem) 
 
 	// 让策略运行一段时间
 	log.Println("策略运行中，观察系统状态...")
-	
+
 	// 定期输出策略状态
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -132,10 +133,10 @@ func monitorSystem(ctx context.Context, system *workflow.MultiStrategyWorkflowSy
 // printSystemStats 打印系统统计信息
 func printSystemStats(system *workflow.MultiStrategyWorkflowSystem) {
 	stats := system.GetSystemStats()
-	
-	fmt.Println("\n" + "="*60)
+
+	fmt.Println("\n" + strings.Repeat("=", 60))
 	fmt.Println("系统状态报告")
-	fmt.Println("="*60)
+	fmt.Println(strings.Repeat("=", 60))
 	fmt.Printf("运行时间: %v\n", stats.Uptime)
 	fmt.Printf("组件状态: %d/%d 运行中\n", stats.ComponentsRunning, stats.ComponentsTotal)
 	fmt.Printf("策略统计:\n")
@@ -147,64 +148,64 @@ func printSystemStats(system *workflow.MultiStrategyWorkflowSystem) {
 	fmt.Printf("  - 总执行次数: %d\n", stats.TotalExecutions)
 	fmt.Printf("  - 成功执行: %d\n", stats.SuccessfulExecutions)
 	fmt.Printf("  - 失败执行: %d\n", stats.FailedExecutions)
-	
+
 	if stats.TotalExecutions > 0 {
 		successRate := float64(stats.SuccessfulExecutions) / float64(stats.TotalExecutions) * 100
 		fmt.Printf("  - 成功率: %.2f%%\n", successRate)
 	}
-	
+
 	fmt.Printf("最后更新: %v\n", stats.LastUpdateTime.Format("2006-01-02 15:04:05"))
-	fmt.Println("="*60)
+	fmt.Println(strings.Repeat("=", 60))
 }
 
 // printStrategyStatus 打印策略状态
 func printStrategyStatus(system *workflow.MultiStrategyWorkflowSystem) {
-	fmt.Println("\n" + "-"*50)
+	fmt.Println("\n" + strings.Repeat("-", 50))
 	fmt.Println("策略状态概览")
-	fmt.Println("-"*50)
-	
+	fmt.Println(strings.Repeat("-", 50))
+
 	// TODO 添加更详细的策略状态信息
 	// 由于我们的系统设计，需要通过多策略管理器获取详细信息
-	
+
 	stats := system.GetSystemStats()
 	fmt.Printf("当前时间: %s\n", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Printf("活跃策略数: %d\n", stats.ActiveStrategies)
 	fmt.Printf("启用策略数: %d\n", stats.EnabledStrategies)
-	
+
 	if stats.TotalExecutions > 0 {
-		fmt.Printf("最近执行状态: %d 成功, %d 失败\n", 
+		fmt.Printf("最近执行状态: %d 成功, %d 失败\n",
 			stats.SuccessfulExecutions, stats.FailedExecutions)
 	}
-	
-	fmt.Println("-"*50)
+
+	fmt.Println(strings.Repeat("-", 50))
 }
 
 // 演示配置
 func createDemoConfig() *workflow.SystemConfig {
 	config := workflow.GetDefaultSystemConfig()
-	
+
 	// 调整配置以适合演示
 	config.MultiStrategyManager.MaxConcurrentStrategies = 8
 	config.MultiStrategyManager.MaxConcurrentJobs = 20
 	config.MultiStrategyManager.SchedulingInterval = 15 * time.Second
 	config.MultiStrategyManager.EvaluationInterval = 2 * time.Minute
-	
+
 	config.StrategyWorkflow.MaxConcurrentJobs = 3
 	config.StrategyWorkflow.OnboardingTimeout = 20 * time.Second
 	config.StrategyWorkflow.BacktestTimeout = 30 * time.Second
 	config.StrategyWorkflow.OptimizationTimeout = 45 * time.Second
 	config.StrategyWorkflow.LearningTimeout = 60 * time.Second
 	config.StrategyWorkflow.ApplicationTimeout = 15 * time.Second
-	
+
 	config.EvolutionManager.EvaluationInterval = 3 * time.Minute
 	config.EvolutionManager.PopulationSize = 10
-	
+
 	config.TradingWorkflow.ExecutionInterval = 30 * time.Second
 	config.TradingWorkflow.StrategyCheckInterval = 15 * time.Second
-	
+
 	config.Monitoring.MetricsInterval = 15 * time.Second
 	config.Monitoring.HealthCheckInterval = 30 * time.Second
-	
+
 	return config
 }
 
@@ -217,7 +218,7 @@ func waitForUserInput() {
 // 演示特定功能
 func demonstrateFeatures(ctx context.Context, system *workflow.MultiStrategyWorkflowSystem) {
 	log.Println("演示系统特性...")
-	
+
 	// 1. 演示策略创建和生命周期
 	log.Println("1. 创建策略并观察生命周期...")
 	strategyID, err := system.CreateAndRunStrategy("演示策略", "demo")
@@ -225,10 +226,10 @@ func demonstrateFeatures(ctx context.Context, system *workflow.MultiStrategyWork
 		log.Printf("创建策略失败: %v", err)
 		return
 	}
-	
+
 	log.Printf("策略 %s 已创建，正在执行生命周期...", strategyID)
 	time.Sleep(30 * time.Second)
-	
+
 	// 2. 演示并发策略执行
 	log.Println("2. 创建多个并发策略...")
 	for i := 0; i < 3; i++ {
@@ -240,13 +241,13 @@ func demonstrateFeatures(ctx context.Context, system *workflow.MultiStrategyWork
 		}
 		time.Sleep(5 * time.Second)
 	}
-	
+
 	// 3. 观察系统状态
 	log.Println("3. 观察系统运行状态...")
 	for i := 0; i < 5; i++ {
 		printSystemStats(system)
 		time.Sleep(30 * time.Second)
 	}
-	
+
 	log.Println("特性演示完成")
 }

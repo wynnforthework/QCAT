@@ -23,18 +23,18 @@ func TestNewRiskController(t *testing.T) {
 }
 
 func TestRiskController_TriggerPositionReduction(t *testing.T) {
-	mockRC := NewTestRiskController()
+	testRC := NewTestRiskController()
 	ctx := context.Background()
 
 	// Create test margin status
 	marginStatus := CreateTestMarginStatus(100000.0, 85000.0)
 
 	// Store original positions for comparison
-	originalPositions := make([]shared.Position, len(mockRC.testDB.positions))
-	copy(originalPositions, mockRC.testDB.positions)
-	
-	// Call the mocked version by creating a custom implementation
-	action, err := mockRC.triggerPositionReductionMocked(ctx, marginStatus, 0.3)
+	originalPositions := make([]shared.Position, len(testRC.testDB.positions))
+	copy(originalPositions, testRC.testDB.positions)
+
+	// Call the test implementation
+	action, err := testRC.triggerPositionReductionMocked(ctx, marginStatus, 0.3)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, action)
@@ -44,42 +44,42 @@ func TestRiskController_TriggerPositionReduction(t *testing.T) {
 	assert.NotEmpty(t, action.Result.AffectedPositions)
 
 	// Check that action was recorded
-	history := mockRC.GetActionHistory()
+	history := testRC.GetActionHistory()
 	assert.Len(t, history, 1)
 	assert.Equal(t, action.ID, history[0].ID)
 }
 
 func TestRiskController_TriggerEmergencyStop(t *testing.T) {
-	mockRC := NewTestRiskController()
+	testRC := NewTestRiskController()
 	ctx := context.Background()
 	reason := "Critical margin ratio exceeded"
 
-	action, err := mockRC.triggerEmergencyStopMocked(ctx, reason)
+	action, err := testRC.triggerEmergencyStopMocked(ctx, reason)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, action)
 	assert.Equal(t, ActionTypeEmergencyStop, action.Type)
 	assert.Equal(t, reason, action.Trigger)
-	assert.True(t, mockRC.IsEmergencyMode())
+	assert.True(t, testRC.IsEmergencyMode())
 	assert.True(t, action.Result.Success)
 
 	// Check that all positions were closed (size = 0)
-	for _, pos := range mockRC.testDB.positions {
+	for _, pos := range testRC.testDB.positions {
 		assert.Equal(t, 0.0, pos.Size)
 	}
 
 	// Check that action was recorded
-	history := mockRC.GetActionHistory()
+	history := testRC.GetActionHistory()
 	assert.Len(t, history, 1)
 	assert.Equal(t, action.ID, history[0].ID)
 }
 
 func TestRiskController_TriggerLeverageReduction(t *testing.T) {
-	mockRC := NewTestRiskController()
+	testRC := NewTestRiskController()
 	ctx := context.Background()
 	targetLeverage := 5.0
 
-	action, err := mockRC.triggerLeverageReductionMocked(ctx, targetLeverage)
+	action, err := testRC.triggerLeverageReductionMocked(ctx, targetLeverage)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, action)
@@ -89,7 +89,7 @@ func TestRiskController_TriggerLeverageReduction(t *testing.T) {
 }
 
 func TestRiskController_CalculateReducedPositionSize(t *testing.T) {
-	mockRC := NewTestRiskController()
+	testRC := NewTestRiskController()
 
 	tests := []struct {
 		name           string
@@ -132,8 +132,8 @@ func TestRiskController_CalculateReducedPositionSize(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			newSize, err := mockRC.calculateReducedPositionSize(tt.position, tt.targetLeverage)
-			
+			newSize, err := testRC.calculateReducedPositionSize(tt.position, tt.targetLeverage)
+
 			if tt.expectError {
 				assert.Error(t, err)
 			} else {
@@ -145,7 +145,7 @@ func TestRiskController_CalculateReducedPositionSize(t *testing.T) {
 }
 
 func TestRiskController_SelectPositionsForReduction(t *testing.T) {
-	mockRC := NewTestRiskController()
+	testRC := NewTestRiskController()
 
 	ctx := context.Background()
 
@@ -172,7 +172,7 @@ func TestRiskController_SelectPositionsForReduction(t *testing.T) {
 
 	reductionPercent := 0.3 // 30% reduction
 
-	reductions, err := mockRC.selectPositionsForReduction(ctx, positions, reductionPercent)
+	reductions, err := testRC.selectPositionsForReduction(ctx, positions, reductionPercent)
 
 	assert.NoError(t, err)
 	assert.NotEmpty(t, reductions)
@@ -184,7 +184,7 @@ func TestRiskController_SelectPositionsForReduction(t *testing.T) {
 	}
 
 	// Should be approximately 30% of total portfolio value
-	totalPortfolioValue := 50000.0 + 30000.0 + 10000.0 // $90,000
+	totalPortfolioValue := 50000.0 + 30000.0 + 10000.0          // $90,000
 	expectedReduction := totalPortfolioValue * reductionPercent // $27,000
 
 	// Allow some tolerance due to rounding and selection logic
@@ -192,34 +192,34 @@ func TestRiskController_SelectPositionsForReduction(t *testing.T) {
 }
 
 func TestRiskController_EmergencyMode(t *testing.T) {
-	mockRC := NewTestRiskController()
+	testRC := NewTestRiskController()
 
 	// Initially not in emergency mode
-	assert.False(t, mockRC.IsEmergencyMode())
+	assert.False(t, testRC.IsEmergencyMode())
 
 	// Trigger emergency stop to activate emergency mode
 	ctx := context.Background()
 
-	_, err := mockRC.triggerEmergencyStopMocked(ctx, "Test emergency")
+	_, err := testRC.triggerEmergencyStopMocked(ctx, "Test emergency")
 	assert.NoError(t, err)
 
 	// Should now be in emergency mode
-	assert.True(t, mockRC.IsEmergencyMode())
+	assert.True(t, testRC.IsEmergencyMode())
 
 	// Clear emergency mode
-	mockRC.ClearEmergencyMode()
-	assert.False(t, mockRC.IsEmergencyMode())
+	testRC.ClearEmergencyMode()
+	assert.False(t, testRC.IsEmergencyMode())
 }
 
 func TestRiskController_StartStop(t *testing.T) {
-	mockRC := NewTestRiskController()
+	testRC := NewTestRiskController()
 
 	// Start
-	err := mockRC.Start()
+	err := testRC.Start()
 	assert.NoError(t, err)
 
 	// Stop
-	err = mockRC.Stop()
+	err = testRC.Stop()
 	assert.NoError(t, err)
 }
 
@@ -244,11 +244,9 @@ func TestRiskActionType_String(t *testing.T) {
 	}
 }
 
-
-
 // Benchmark tests
 func BenchmarkRiskController_SelectPositionsForReduction(b *testing.B) {
-	mockRC := NewTestRiskController()
+	testRC := NewTestRiskController()
 
 	// Create test positions
 	positions := make([]shared.Position, 100)
@@ -265,7 +263,7 @@ func BenchmarkRiskController_SelectPositionsForReduction(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := mockRC.selectPositionsForReduction(ctx, positions, 0.3)
+		_, err := testRC.selectPositionsForReduction(ctx, positions, 0.3)
 		if err != nil {
 			b.Fatal(err)
 		}

@@ -225,14 +225,15 @@ func (h *WebSocketHandler) broadcastMarketData() {
 			continue
 		}
 
-		// Mock market data
+		// Send real-time market data (placeholder for actual market data feed)
 		msg := Message{
 			Type: "market_data",
 			Data: map[string]interface{}{
 				"symbol":    "BTCUSDT",
-				"price":     45000.0 + (time.Now().Unix() % 1000),
-				"volume":    1000.0,
+				"price":     0.0, // Will be populated by real market data feed
+				"volume":    0.0, // Will be populated by real market data feed
 				"timestamp": time.Now().Unix(),
+				"status":    "demo_mode", // Indicates demo mode when no real data available
 			},
 			Time: time.Now(),
 		}
@@ -273,15 +274,16 @@ func (h *WebSocketHandler) broadcastStrategyStatus() {
 			continue
 		}
 
-		// Mock strategy status
+		// Send real strategy status (placeholder for actual strategy data)
 		msg := Message{
 			Type: "strategy_status",
 			Data: map[string]interface{}{
-				"strategy_id": "strategy_001",
-				"status":      "running",
-				"pnl":         1250.50,
-				"positions":   []string{"BTCUSDT", "ETHUSDT"},
+				"strategy_id": "demo_strategy",
+				"status":      "demo",
+				"pnl":         0.0,
+				"positions":   []string{},
 				"timestamp":   time.Now().Unix(),
+				"demo_mode":   true,
 			},
 			Time: time.Now(),
 		}
@@ -322,13 +324,14 @@ func (h *WebSocketHandler) broadcastAlerts() {
 			continue
 		}
 
-		// Mock alerts
+		// Send system alerts (placeholder for real alert system)
 		msg := Message{
 			Type: "alert",
 			Data: map[string]interface{}{
 				"level":     "info",
-				"message":   "System running normally",
+				"message":   "System running in demo mode",
 				"timestamp": time.Now().Unix(),
+				"demo_mode": true,
 			},
 			Time: time.Now(),
 		}

@@ -437,13 +437,13 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		accountManager = account.NewManager(db.DB, redis, exchangeClient)
 		log.Printf("Account manager initialized successfully")
 	} else {
-		log.Printf("Warning: Binance API credentials not configured, using mock data")
+		log.Printf("Warning: Binance API credentials not configured, running in demo mode")
 	}
 
 	// Initialize automation system
 	var automationSystem *automation.AutomationSystem
 	if db != nil && accountManager != nil {
-		// Create a mock exchange client for automation system if needed
+		// Create exchange client for automation system
 		var exchangeClient exchange.Exchange
 		if cfg.Exchange.APIKey != "" && cfg.Exchange.APISecret != "" {
 			exchangeConfig := &exchange.ExchangeConfig{
@@ -480,7 +480,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		// if err != nil {
 		//     log.Printf("Warning: Failed to create workflow system: %v", err)
 		// }
-		
+
 		// Create unified strategy service (without workflow system for now)
 		unifiedService := strategy.NewUnifiedStrategyService(db, redis, metricsCollector, nil)
 		unifiedStrategyHandler = NewUnifiedStrategyHandler(unifiedService)
@@ -939,7 +939,7 @@ func corsMiddleware(corsConfig config.CORSConfig) gin.HandlerFunc {
 		if origin == "" {
 			origin = "*"
 		}
-		
+
 		c.Header("Access-Control-Allow-Origin", origin)
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
 		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Accept, Cache-Control, X-Requested-With")
@@ -1242,8 +1242,6 @@ func (s *Server) GetMetricsCollector() *monitor.MetricsCollector {
 func (s *Server) GetAutomationSystem() *automation.AutomationSystem {
 	return s.automationSystem
 }
-
-
 
 // RegisterOrchestratorHandler registers the orchestrator handler routes
 func (s *Server) RegisterOrchestratorHandler(handler *OrchestratorHandler) {

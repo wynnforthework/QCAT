@@ -6,11 +6,26 @@ import (
 	"testing"
 
 	"qcat/internal/automation/scheduler/shared"
+	"qcat/internal/config"
+	"qcat/internal/database"
+	"qcat/internal/exchange/account"
 
 	"github.com/stretchr/testify/assert"
 )
 
+// NewTestRiskMonitor creates a test risk monitor instance
+func NewTestRiskMonitor() *RiskMonitor {
+	// Create minimal test configuration
+	cfg := &config.Config{}
 
+	// Create test database (nil for now, should be replaced with proper test DB)
+	var db *database.DB
+
+	// Create test account manager (nil for now, should be replaced with proper test manager)
+	var accountManager *account.Manager
+
+	return NewRiskMonitor(cfg, db, accountManager)
+}
 
 func TestNewRiskMonitor(t *testing.T) {
 	rm := NewTestRiskMonitor()
@@ -112,7 +127,7 @@ func TestRiskMonitor_GenerateMarginRecommendations(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			recommendations := rm.generateMarginRecommendations(tt.marginRatio, tt.riskLevel)
 			assert.NotEmpty(t, recommendations)
-			
+
 			if tt.expectUrgent {
 				found := false
 				for _, rec := range recommendations {
@@ -210,8 +225,8 @@ func TestRiskMonitor_DetectVolatilitySpike(t *testing.T) {
 	rm := NewTestRiskMonitor()
 
 	tests := []struct {
-		name       string
-		marketData []MarketData
+		name        string
+		marketData  []MarketData
 		expectSpike bool
 	}{
 		{
@@ -262,8 +277,8 @@ func TestRiskMonitor_DetectLiquidityDrop(t *testing.T) {
 		expectDrop bool
 	}{
 		{
-			name:        "No data",
-			marketData:  []MarketData{},
+			name:       "No data",
+			marketData: []MarketData{},
 			expectDrop: false,
 		},
 		{
@@ -339,48 +354,6 @@ func TestRiskMonitor_GetMetrics(t *testing.T) {
 	internalMetrics := rm.GetMetrics()
 	_, exists := internalMetrics["new_metric"]
 	assert.False(t, exists)
-}
-
-func TestRiskMonitor_GenerateMockPrices(t *testing.T) {
-	rm := NewTestRiskMonitor()
-
-	startPrice := 50000.0
-	count := 100
-	volatility := 0.02
-
-	prices := rm.generateMockPrices(startPrice, count, volatility)
-
-	assert.Len(t, prices, count)
-	assert.Equal(t, startPrice, prices[0])
-
-	// Check that prices are reasonable (within expected range)
-	for i, price := range prices {
-		assert.Greater(t, price, 0.0, "Price %d should be positive", i)
-		if i > 0 {
-			// Price change should be reasonable
-			change := (price - prices[i-1]) / prices[i-1]
-			assert.Less(t, change, 0.5, "Price change too large at index %d", i) // Max 50% change
-			assert.Greater(t, change, -0.5, "Price change too large at index %d", i) // Max 50% drop
-		}
-	}
-}
-
-func TestRiskMonitor_GenerateMockMarketData(t *testing.T) {
-	rm := NewTestRiskMonitor()
-
-	marketData := rm.generateMockMarketData()
-
-	assert.NotEmpty(t, marketData)
-	
-	for _, data := range marketData {
-		assert.NotEmpty(t, data.Symbol)
-		assert.Greater(t, data.Price, 0.0)
-		assert.Greater(t, data.Volume, 0.0)
-		assert.GreaterOrEqual(t, data.Volatility, 0.0)
-		assert.GreaterOrEqual(t, data.Liquidity, 0.0)
-		assert.LessOrEqual(t, data.Liquidity, 1.0)
-		assert.False(t, data.Timestamp.IsZero())
-	}
 }
 
 // Benchmark tests

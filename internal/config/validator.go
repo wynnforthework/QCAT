@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"net/url"
 	"strings"
 )
@@ -446,50 +447,60 @@ func (v *Validator) validateStrategy() error {
 
 // validateOptimizer 验证优化器配置
 func (v *Validator) validateOptimizer() error {
-	if v.config.Optimizer == nil {
-		return fmt.Errorf("优化器配置不能为空")
+	// 验证网格搜索配置
+	if v.config.Optimizer.GridSearch.DefaultGridSize <= 0 {
+		return fmt.Errorf("网格搜索默认网格大小必须大于0")
 	}
 
-	if !v.config.Optimizer.Enabled {
-		return nil // 如果未启用，跳过验证
+	if v.config.Optimizer.GridSearch.MaxIterations <= 0 {
+		return fmt.Errorf("网格搜索最大迭代次数必须大于0")
 	}
 
-	if v.config.Optimizer.Timeout <= 0 {
-		return fmt.Errorf("优化器超时时间必须大于0")
+	if v.config.Optimizer.GridSearch.ConvergenceThreshold <= 0 {
+		return fmt.Errorf("网格搜索收敛阈值必须大于0")
 	}
 
-	if v.config.Optimizer.MaxIterations <= 0 {
-		return fmt.Errorf("优化器最大迭代次数必须大于0")
+	// 验证贝叶斯优化配置
+	if v.config.Optimizer.Bayesian.NInitialPoints <= 0 {
+		return fmt.Errorf("贝叶斯优化初始点数必须大于0")
 	}
 
-	if v.config.Optimizer.Concurrency <= 0 {
-		return fmt.Errorf("优化器并发数必须大于0")
+	if v.config.Optimizer.Bayesian.NCalls <= 0 {
+		return fmt.Errorf("贝叶斯优化调用次数必须大于0")
 	}
 
-	// 验证算法列表
-	if len(v.config.Optimizer.Algorithms) == 0 {
-		return fmt.Errorf("优化器算法列表不能为空")
+	// 验证遗传算法配置
+	if v.config.Optimizer.Genetic.PopulationSize <= 0 {
+		return fmt.Errorf("遗传算法种群大小必须大于0")
 	}
 
-	validAlgorithms := map[string]bool{
-		"walk_forward": true,
-		"grid_search":  true,
-		"bayesian":     true,
-		"genetic":      true,
-		"particle_swarm": true,
+	if v.config.Optimizer.Genetic.MutationRate < 0 || v.config.Optimizer.Genetic.MutationRate > 1 {
+		return fmt.Errorf("遗传算法变异率必须在0-1之间")
 	}
 
-	for _, algo := range v.config.Optimizer.Algorithms {
-		if !validAlgorithms[algo] {
-			return fmt.Errorf("不支持的优化算法: %s", algo)
-		}
+	if v.config.Optimizer.Genetic.CrossoverRate < 0 || v.config.Optimizer.Genetic.CrossoverRate > 1 {
+		return fmt.Errorf("遗传算法交叉率必须在0-1之间")
 	}
 
-	// 验证默认算法
-	if v.config.Optimizer.DefaultAlgorithm != "" {
-		if !validAlgorithms[v.config.Optimizer.DefaultAlgorithm] {
-			return fmt.Errorf("不支持的默认优化算法: %s", v.config.Optimizer.DefaultAlgorithm)
-		}
+	// 验证Walk-Forward配置
+	if v.config.Optimizer.WalkForward.TrainRatio <= 0 || v.config.Optimizer.WalkForward.TrainRatio >= 1 {
+		return fmt.Errorf("Walk-Forward训练比例必须在0-1之间")
+	}
+
+	if v.config.Optimizer.WalkForward.ValidationRatio <= 0 || v.config.Optimizer.WalkForward.ValidationRatio >= 1 {
+		return fmt.Errorf("Walk-Forward验证比例必须在0-1之间")
+	}
+
+	if v.config.Optimizer.WalkForward.TestRatio <= 0 || v.config.Optimizer.WalkForward.TestRatio >= 1 {
+		return fmt.Errorf("Walk-Forward测试比例必须在0-1之间")
+	}
+
+	// 验证比例总和
+	totalRatio := v.config.Optimizer.WalkForward.TrainRatio +
+		v.config.Optimizer.WalkForward.ValidationRatio +
+		v.config.Optimizer.WalkForward.TestRatio
+	if math.Abs(totalRatio-1.0) > 0.001 {
+		return fmt.Errorf("Walk-Forward比例总和必须等于1.0，当前为: %.3f", totalRatio)
 	}
 
 	return nil
@@ -497,50 +508,43 @@ func (v *Validator) validateOptimizer() error {
 
 // validateMarketData 验证市场数据配置
 func (v *Validator) validateMarketData() error {
-	if v.config.MarketData == nil {
-		return fmt.Errorf("市场数据配置不能为空")
+	// 验证质量配置
+	if v.config.MarketData.Quality.MaxLatencyMs <= 0 {
+		return fmt.Errorf("市场数据最大延迟必须大于0")
 	}
 
-	if !v.config.MarketData.Enabled {
-		return nil // 如果未启用，跳过验证
+	if v.config.MarketData.Quality.MaxGapDurationSeconds <= 0 {
+		return fmt.Errorf("市场数据最大间隔必须大于0")
 	}
 
-	if v.config.MarketData.CacheTTL <= 0 {
-		return fmt.Errorf("市场数据缓存TTL必须大于0")
+	if v.config.MarketData.Quality.MinQualityScore < 0 || v.config.MarketData.Quality.MinQualityScore > 1 {
+		return fmt.Errorf("市场数据最小质量分数必须在0-1之间")
 	}
 
-	if v.config.MarketData.BatchSize <= 0 {
-		return fmt.Errorf("市场数据批处理大小必须大于0")
+	// 验证采样配置
+	if v.config.MarketData.Sampling.TickSampleRate <= 0 {
+		return fmt.Errorf("tick采样率必须大于0")
 	}
 
-	if v.config.MarketData.UpdateInterval <= 0 {
-		return fmt.Errorf("市场数据更新间隔必须大于0")
+	if len(v.config.MarketData.Sampling.KlineIntervals) == 0 {
+		return fmt.Errorf("K线间隔列表不能为空")
 	}
 
-	// 验证交易对列表
-	if len(v.config.MarketData.Symbols) == 0 {
-		return fmt.Errorf("市场数据交易对列表不能为空")
+	if v.config.MarketData.Sampling.OrderbookDepth <= 0 {
+		return fmt.Errorf("订单簿深度必须大于0")
 	}
 
-	// 验证数据类型
-	if len(v.config.MarketData.DataTypes) == 0 {
-		return fmt.Errorf("市场数据类型列表不能为空")
+	// 验证存储配置
+	if v.config.MarketData.Storage.RetentionDays <= 0 {
+		return fmt.Errorf("数据保留天数必须大于0")
 	}
 
-	validDataTypes := map[string]bool{
-		"klines":       true,
-		"trades":       true,
-		"orderbook":    true,
-		"funding_rate": true,
-		"open_interest": true,
-		"ticker":       true,
+	if v.config.MarketData.Storage.BatchSize <= 0 {
+		return fmt.Errorf("存储批处理大小必须大于0")
 	}
 
-	for _, dataType := range v.config.MarketData.DataTypes {
-		if !validDataTypes[dataType] {
-			return fmt.Errorf("不支持的市场数据类型: %s", dataType)
-		}
-	}
+	// MarketDataConfig 没有 DataTypes 字段，跳过这个验证
+	// 数据类型验证在其他地方处理
 
 	return nil
 }

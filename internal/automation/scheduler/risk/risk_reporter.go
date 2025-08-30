@@ -26,18 +26,18 @@ type RiskReporter struct {
 
 // RiskReport represents a comprehensive risk report
 type RiskReport struct {
-	ID                string                 `json:"id"`
-	Type              ReportType             `json:"type"`
-	GeneratedAt       time.Time              `json:"generated_at"`
-	Period            *shared.TimePeriod     `json:"period"`
-	MarginStatus      *MarginStatus          `json:"margin_status"`
-	PositionRisk      *PositionRiskReport    `json:"position_risk"`
-	MarketAnomalies   []*MarketAnomalyReport `json:"market_anomalies"`
-	RiskActions       []RiskAction           `json:"risk_actions"`
-	Summary           *RiskSummary           `json:"summary"`
-	Recommendations   []string               `json:"recommendations"`
-	Metrics           map[string]interface{} `json:"metrics"`
-	Alerts            []RiskAlert            `json:"alerts"`
+	ID              string                 `json:"id"`
+	Type            ReportType             `json:"type"`
+	GeneratedAt     time.Time              `json:"generated_at"`
+	Period          *shared.TimePeriod     `json:"period"`
+	MarginStatus    *MarginStatus          `json:"margin_status"`
+	PositionRisk    *PositionRiskReport    `json:"position_risk"`
+	MarketAnomalies []*MarketAnomalyReport `json:"market_anomalies"`
+	RiskActions     []RiskAction           `json:"risk_actions"`
+	Summary         *RiskSummary           `json:"summary"`
+	Recommendations []string               `json:"recommendations"`
+	Metrics         map[string]interface{} `json:"metrics"`
+	Alerts          []RiskAlert            `json:"alerts"`
 }
 
 // ReportType defines types of risk reports
@@ -74,31 +74,31 @@ func (rt ReportType) String() string {
 
 // RiskSummary provides a high-level summary of risk metrics
 type RiskSummary struct {
-	OverallRiskLevel    shared.RiskLevel `json:"overall_risk_level"`
-	TotalExposure       float64          `json:"total_exposure"`
-	MarginUtilization   float64          `json:"margin_utilization"`
-	PortfolioVaR        float64          `json:"portfolio_var"`
-	MaxDrawdown         float64          `json:"max_drawdown"`
-	ActivePositions     int              `json:"active_positions"`
-	RiskActionsToday    int              `json:"risk_actions_today"`
-	AnomaliesDetected   int              `json:"anomalies_detected"`
-	ComplianceStatus    string           `json:"compliance_status"`
-	LastUpdated         time.Time        `json:"last_updated"`
+	OverallRiskLevel  shared.RiskLevel `json:"overall_risk_level"`
+	TotalExposure     float64          `json:"total_exposure"`
+	MarginUtilization float64          `json:"margin_utilization"`
+	PortfolioVaR      float64          `json:"portfolio_var"`
+	MaxDrawdown       float64          `json:"max_drawdown"`
+	ActivePositions   int              `json:"active_positions"`
+	RiskActionsToday  int              `json:"risk_actions_today"`
+	AnomaliesDetected int              `json:"anomalies_detected"`
+	ComplianceStatus  string           `json:"compliance_status"`
+	LastUpdated       time.Time        `json:"last_updated"`
 }
 
 // RiskAlert represents a risk alert
 type RiskAlert struct {
-	ID          string                 `json:"id"`
-	Type        AlertType              `json:"type"`
-	Severity    shared.Severity        `json:"severity"`
-	Title       string                 `json:"title"`
-	Message     string                 `json:"message"`
-	Metrics     map[string]interface{} `json:"metrics"`
-	Threshold   float64                `json:"threshold"`
-	CurrentValue float64               `json:"current_value"`
-	CreatedAt   time.Time              `json:"created_at"`
-	AcknowledgedAt *time.Time          `json:"acknowledged_at,omitempty"`
-	ResolvedAt  *time.Time             `json:"resolved_at,omitempty"`
+	ID             string                 `json:"id"`
+	Type           AlertType              `json:"type"`
+	Severity       shared.Severity        `json:"severity"`
+	Title          string                 `json:"title"`
+	Message        string                 `json:"message"`
+	Metrics        map[string]interface{} `json:"metrics"`
+	Threshold      float64                `json:"threshold"`
+	CurrentValue   float64                `json:"current_value"`
+	CreatedAt      time.Time              `json:"created_at"`
+	AcknowledgedAt *time.Time             `json:"acknowledged_at,omitempty"`
+	ResolvedAt     *time.Time             `json:"resolved_at,omitempty"`
 }
 
 // AlertType defines types of risk alerts
@@ -357,16 +357,16 @@ func (rr *RiskReporter) GenerateIncidentReport(ctx context.Context, incidentID s
 // generateRiskSummary generates a risk summary for real-time reports
 func (rr *RiskReporter) generateRiskSummary(report *RiskReport) *RiskSummary {
 	summary := &RiskSummary{
-		OverallRiskLevel:  shared.RiskLevelLow,
-		ComplianceStatus:  "COMPLIANT",
-		LastUpdated:       time.Now(),
+		OverallRiskLevel: shared.RiskLevelLow,
+		ComplianceStatus: "COMPLIANT",
+		LastUpdated:      time.Now(),
 	}
 
 	// Determine overall risk level
 	if report.MarginStatus != nil {
 		summary.MarginUtilization = report.MarginStatus.MarginRatio
 		summary.TotalExposure = report.MarginStatus.TotalEquity
-		
+
 		if report.MarginStatus.RiskLevel > summary.OverallRiskLevel {
 			summary.OverallRiskLevel = report.MarginStatus.RiskLevel
 		}
@@ -411,9 +411,9 @@ func (rr *RiskReporter) generateAlerts(ctx context.Context, report *RiskReport) 
 				CurrentValue: report.MarginStatus.MarginRatio,
 				CreatedAt:    time.Now(),
 				Metrics: map[string]interface{}{
-					"margin_ratio":     report.MarginStatus.MarginRatio,
-					"total_equity":     report.MarginStatus.TotalEquity,
-					"used_margin":      report.MarginStatus.UsedMargin,
+					"margin_ratio": report.MarginStatus.MarginRatio,
+					"total_equity": report.MarginStatus.TotalEquity,
+					"used_margin":  report.MarginStatus.UsedMargin,
 				},
 			}
 			alerts = append(alerts, alert)
@@ -472,9 +472,9 @@ func (rr *RiskReporter) generateAlerts(ctx context.Context, report *RiskReport) 
 			Message:   anomaly.Description,
 			CreatedAt: time.Now(),
 			Metrics: map[string]interface{}{
-				"anomaly_type":      anomaly.AnomalyType.String(),
-				"affected_symbols":  len(anomaly.AffectedSymbols),
-				"confidence":        anomaly.Confidence,
+				"anomaly_type":     anomaly.AnomalyType.String(),
+				"affected_symbols": len(anomaly.AffectedSymbols),
+				"confidence":       anomaly.Confidence,
 			},
 		}
 		alerts = append(alerts, alert)
@@ -535,7 +535,7 @@ func (rr *RiskReporter) getRecentRiskActions(ctx context.Context, duration time.
 		ORDER BY executed_at DESC
 		LIMIT 100
 	`
-	
+
 	since := time.Now().Add(-duration)
 	rows, err := rr.db.QueryContext(ctx, query, since)
 	if err != nil {
@@ -547,7 +547,7 @@ func (rr *RiskReporter) getRecentRiskActions(ctx context.Context, duration time.
 	for rows.Next() {
 		var action RiskAction
 		var durationMs int64
-		
+
 		err := rows.Scan(
 			&action.ID, &action.Type, &action.Trigger, &action.Description,
 			&action.Result.Success, &action.Result.AmountReduced,
@@ -556,7 +556,7 @@ func (rr *RiskReporter) getRecentRiskActions(ctx context.Context, duration time.
 		if err != nil {
 			continue
 		}
-		
+
 		action.Duration = time.Duration(durationMs) * time.Millisecond
 		actions = append(actions, action)
 	}
@@ -566,7 +566,7 @@ func (rr *RiskReporter) getRecentRiskActions(ctx context.Context, duration time.
 
 func (rr *RiskReporter) storeReport(report RiskReport) {
 	rr.reports = append(rr.reports, report)
-	
+
 	// Keep only the most recent reports
 	if len(rr.reports) > rr.maxReports {
 		rr.reports = rr.reports[1:]
@@ -653,37 +653,322 @@ func (rr *RiskReporter) alertTypeFromAnomalyType(anomalyType shared.AnomalyType)
 func (rr *RiskReporter) removeDuplicateRecommendations(recommendations []string) []string {
 	seen := make(map[string]bool)
 	var result []string
-	
+
 	for _, rec := range recommendations {
 		if !seen[rec] {
 			seen[rec] = true
 			result = append(result, rec)
 		}
 	}
-	
+
 	return result
 }
 
 // getDailyMetrics gets daily metrics for a time period
 func (rr *RiskReporter) getDailyMetrics(ctx context.Context, start, end time.Time) (map[string]interface{}, error) {
 	metrics := make(map[string]interface{})
-	
-	// This would query the database for daily metrics
-	// For now, return mock data
-	metrics["avg_margin_ratio"] = 0.65
-	metrics["max_margin_ratio"] = 0.85
-	metrics["min_margin_ratio"] = 0.45
-	metrics["avg_portfolio_var"] = 0.03
-	metrics["max_drawdown"] = 0.02
-	
+
+	if rr.db == nil {
+		log.Printf("Database not available, returning empty metrics")
+		return metrics, nil
+	}
+
+	// Query margin ratio metrics
+	marginMetrics, err := rr.getMarginMetrics(ctx, start, end)
+	if err != nil {
+		log.Printf("Failed to get margin metrics: %v", err)
+	} else {
+		for k, v := range marginMetrics {
+			metrics[k] = v
+		}
+	}
+
+	// Query portfolio risk metrics
+	portfolioMetrics, err := rr.getPortfolioRiskMetrics(ctx, start, end)
+	if err != nil {
+		log.Printf("Failed to get portfolio risk metrics: %v", err)
+	} else {
+		for k, v := range portfolioMetrics {
+			metrics[k] = v
+		}
+	}
+
+	// Query drawdown metrics
+	drawdownMetrics, err := rr.getDrawdownMetrics(ctx, start, end)
+	if err != nil {
+		log.Printf("Failed to get drawdown metrics: %v", err)
+	} else {
+		for k, v := range drawdownMetrics {
+			metrics[k] = v
+		}
+	}
+
+	// Query volatility metrics
+	volatilityMetrics, err := rr.getVolatilityMetrics(ctx, start, end)
+	if err != nil {
+		log.Printf("Failed to get volatility metrics: %v", err)
+	} else {
+		for k, v := range volatilityMetrics {
+			metrics[k] = v
+		}
+	}
+
+	log.Printf("Retrieved daily metrics for period %s to %s: %d metrics",
+		start.Format("2006-01-02"), end.Format("2006-01-02"), len(metrics))
+
+	return metrics, nil
+}
+
+// getMarginMetrics queries margin ratio metrics from the database
+func (rr *RiskReporter) getMarginMetrics(ctx context.Context, start, end time.Time) (map[string]interface{}, error) {
+	metrics := make(map[string]interface{})
+
+	query := `
+		SELECT
+			AVG(margin_ratio) as avg_margin_ratio,
+			MAX(margin_ratio) as max_margin_ratio,
+			MIN(margin_ratio) as min_margin_ratio,
+			COUNT(*) as margin_samples
+		FROM margin_status
+		WHERE created_at BETWEEN $1 AND $2
+	`
+
+	var avgMarginRatio, maxMarginRatio, minMarginRatio float64
+	var marginSamples int
+
+	err := rr.db.QueryRowContext(ctx, query, start, end).Scan(
+		&avgMarginRatio, &maxMarginRatio, &minMarginRatio, &marginSamples)
+
+	if err != nil {
+		// If no data found, return default values
+		if err.Error() == "sql: no rows in result set" {
+			metrics["avg_margin_ratio"] = 0.0
+			metrics["max_margin_ratio"] = 0.0
+			metrics["min_margin_ratio"] = 0.0
+			metrics["margin_samples"] = 0
+			return metrics, nil
+		}
+		return nil, fmt.Errorf("failed to query margin metrics: %w", err)
+	}
+
+	metrics["avg_margin_ratio"] = avgMarginRatio
+	metrics["max_margin_ratio"] = maxMarginRatio
+	metrics["min_margin_ratio"] = minMarginRatio
+	metrics["margin_samples"] = marginSamples
+
+	return metrics, nil
+}
+
+// getPortfolioRiskMetrics queries portfolio risk metrics from the database
+func (rr *RiskReporter) getPortfolioRiskMetrics(ctx context.Context, start, end time.Time) (map[string]interface{}, error) {
+	metrics := make(map[string]interface{})
+
+	query := `
+		SELECT
+			AVG(portfolio_var) as avg_portfolio_var,
+			MAX(portfolio_var) as max_portfolio_var,
+			AVG(total_exposure) as avg_total_exposure,
+			MAX(total_exposure) as max_total_exposure,
+			AVG(leverage_ratio) as avg_leverage_ratio,
+			MAX(leverage_ratio) as max_leverage_ratio
+		FROM portfolio_risk_metrics
+		WHERE created_at BETWEEN $1 AND $2
+	`
+
+	var avgVar, maxVar, avgExposure, maxExposure, avgLeverage, maxLeverage float64
+
+	err := rr.db.QueryRowContext(ctx, query, start, end).Scan(
+		&avgVar, &maxVar, &avgExposure, &maxExposure, &avgLeverage, &maxLeverage)
+
+	if err != nil {
+		// If no data found, return default values
+		if err.Error() == "sql: no rows in result set" {
+			metrics["avg_portfolio_var"] = 0.0
+			metrics["max_portfolio_var"] = 0.0
+			metrics["avg_total_exposure"] = 0.0
+			metrics["max_total_exposure"] = 0.0
+			metrics["avg_leverage_ratio"] = 0.0
+			metrics["max_leverage_ratio"] = 0.0
+			return metrics, nil
+		}
+		return nil, fmt.Errorf("failed to query portfolio risk metrics: %w", err)
+	}
+
+	metrics["avg_portfolio_var"] = avgVar
+	metrics["max_portfolio_var"] = maxVar
+	metrics["avg_total_exposure"] = avgExposure
+	metrics["max_total_exposure"] = maxExposure
+	metrics["avg_leverage_ratio"] = avgLeverage
+	metrics["max_leverage_ratio"] = maxLeverage
+
+	return metrics, nil
+}
+
+// getDrawdownMetrics queries drawdown metrics from the database
+func (rr *RiskReporter) getDrawdownMetrics(ctx context.Context, start, end time.Time) (map[string]interface{}, error) {
+	metrics := make(map[string]interface{})
+
+	query := `
+		SELECT
+			MAX(drawdown_pct) as max_drawdown,
+			AVG(drawdown_pct) as avg_drawdown,
+			MAX(drawdown_duration_hours) as max_drawdown_duration,
+			COUNT(*) as drawdown_events
+		FROM drawdown_history
+		WHERE created_at BETWEEN $1 AND $2
+	`
+
+	var maxDrawdown, avgDrawdown float64
+	var maxDrawdownDuration int
+	var drawdownEvents int
+
+	err := rr.db.QueryRowContext(ctx, query, start, end).Scan(
+		&maxDrawdown, &avgDrawdown, &maxDrawdownDuration, &drawdownEvents)
+
+	if err != nil {
+		// If no data found, return default values
+		if err.Error() == "sql: no rows in result set" {
+			metrics["max_drawdown"] = 0.0
+			metrics["avg_drawdown"] = 0.0
+			metrics["max_drawdown_duration"] = 0
+			metrics["drawdown_events"] = 0
+			return metrics, nil
+		}
+		return nil, fmt.Errorf("failed to query drawdown metrics: %w", err)
+	}
+
+	metrics["max_drawdown"] = maxDrawdown
+	metrics["avg_drawdown"] = avgDrawdown
+	metrics["max_drawdown_duration"] = maxDrawdownDuration
+	metrics["drawdown_events"] = drawdownEvents
+
+	return metrics, nil
+}
+
+// getVolatilityMetrics queries volatility metrics from the database
+func (rr *RiskReporter) getVolatilityMetrics(ctx context.Context, start, end time.Time) (map[string]interface{}, error) {
+	metrics := make(map[string]interface{})
+
+	query := `
+		SELECT
+			AVG(portfolio_volatility) as avg_portfolio_volatility,
+			MAX(portfolio_volatility) as max_portfolio_volatility,
+			AVG(realized_volatility) as avg_realized_volatility,
+			MAX(realized_volatility) as max_realized_volatility,
+			AVG(implied_volatility) as avg_implied_volatility,
+			MAX(implied_volatility) as max_implied_volatility
+		FROM volatility_metrics
+		WHERE created_at BETWEEN $1 AND $2
+	`
+
+	var avgPortfolioVol, maxPortfolioVol, avgRealizedVol, maxRealizedVol, avgImpliedVol, maxImpliedVol float64
+
+	err := rr.db.QueryRowContext(ctx, query, start, end).Scan(
+		&avgPortfolioVol, &maxPortfolioVol, &avgRealizedVol, &maxRealizedVol, &avgImpliedVol, &maxImpliedVol)
+
+	if err != nil {
+		// If no data found, return default values
+		if err.Error() == "sql: no rows in result set" {
+			metrics["avg_portfolio_volatility"] = 0.0
+			metrics["max_portfolio_volatility"] = 0.0
+			metrics["avg_realized_volatility"] = 0.0
+			metrics["max_realized_volatility"] = 0.0
+			metrics["avg_implied_volatility"] = 0.0
+			metrics["max_implied_volatility"] = 0.0
+			return metrics, nil
+		}
+		return nil, fmt.Errorf("failed to query volatility metrics: %w", err)
+	}
+
+	metrics["avg_portfolio_volatility"] = avgPortfolioVol
+	metrics["max_portfolio_volatility"] = maxPortfolioVol
+	metrics["avg_realized_volatility"] = avgRealizedVol
+	metrics["max_realized_volatility"] = maxRealizedVol
+	metrics["avg_implied_volatility"] = avgImpliedVol
+	metrics["max_implied_volatility"] = maxImpliedVol
+
 	return metrics, nil
 }
 
 // getRiskActionsForPeriod gets risk actions for a time period
 func (rr *RiskReporter) getRiskActionsForPeriod(ctx context.Context, start, end time.Time) ([]RiskAction, error) {
-	// This would query the database for risk actions in the period
-	// For now, return empty slice
-	return []RiskAction{}, nil
+	if rr.db == nil {
+		log.Printf("Database not available, returning empty risk actions")
+		return []RiskAction{}, nil
+	}
+
+	query := `
+		SELECT
+			id, type, trigger_reason, timestamp, parameters,
+			result_success, result_details, result_execution_time,
+			result_affected_positions
+		FROM risk_actions
+		WHERE timestamp BETWEEN $1 AND $2
+		ORDER BY timestamp DESC
+	`
+
+	rows, err := rr.db.QueryContext(ctx, query, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query risk actions: %w", err)
+	}
+	defer rows.Close()
+
+	var actions []RiskAction
+	for rows.Next() {
+		var action RiskAction
+		var parametersJSON, affectedPositionsJSON string
+		var executionTimeMs int64
+
+		err := rows.Scan(
+			&action.ID,
+			&action.Type,
+			&action.Trigger,
+			&action.ExecutedAt,
+			&parametersJSON,
+			&action.Result.Success,
+			&action.Result.Error,
+			&executionTimeMs,
+			&affectedPositionsJSON,
+		)
+		if err != nil {
+			log.Printf("Failed to scan risk action: %v", err)
+			continue
+		}
+
+		// Parse parameters JSON
+		if parametersJSON != "" {
+			if err := json.Unmarshal([]byte(parametersJSON), &action.Parameters); err != nil {
+				log.Printf("Failed to unmarshal parameters: %v", err)
+				action.Parameters = make(map[string]interface{})
+			}
+		} else {
+			action.Parameters = make(map[string]interface{})
+		}
+
+		// Parse affected positions JSON
+		if affectedPositionsJSON != "" {
+			if err := json.Unmarshal([]byte(affectedPositionsJSON), &action.Result.AffectedPositions); err != nil {
+				log.Printf("Failed to unmarshal affected positions: %v", err)
+				action.Result.AffectedPositions = []string{}
+			}
+		} else {
+			action.Result.AffectedPositions = []string{}
+		}
+
+		// Convert execution time from milliseconds to duration
+		action.Duration = time.Duration(executionTimeMs) * time.Millisecond
+
+		actions = append(actions, action)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating risk actions: %w", err)
+	}
+
+	log.Printf("Retrieved %d risk actions for period %s to %s",
+		len(actions), start.Format("2006-01-02"), end.Format("2006-01-02"))
+
+	return actions, nil
 }
 
 // getAlertsForPeriod gets alerts for a time period
@@ -696,11 +981,11 @@ func (rr *RiskReporter) getAlertsForPeriod(ctx context.Context, start, end time.
 // generateDailySummary generates a summary for daily reports
 func (rr *RiskReporter) generateDailySummary(report *RiskReport, dailyMetrics map[string]interface{}) *RiskSummary {
 	summary := &RiskSummary{
-		OverallRiskLevel:  shared.RiskLevelLow,
-		ComplianceStatus:  "COMPLIANT",
-		LastUpdated:       time.Now(),
+		OverallRiskLevel: shared.RiskLevelLow,
+		ComplianceStatus: "COMPLIANT",
+		LastUpdated:      time.Now(),
 	}
-	
+
 	// Extract metrics from dailyMetrics
 	if avgMargin, ok := dailyMetrics["avg_margin_ratio"].(float64); ok {
 		summary.MarginUtilization = avgMargin
@@ -711,17 +996,17 @@ func (rr *RiskReporter) generateDailySummary(report *RiskReport, dailyMetrics ma
 	if maxDrawdown, ok := dailyMetrics["max_drawdown"].(float64); ok {
 		summary.MaxDrawdown = maxDrawdown
 	}
-	
+
 	summary.RiskActionsToday = len(report.RiskActions)
 	summary.AnomaliesDetected = len(report.MarketAnomalies)
-	
+
 	return summary
 }
 
 // generateDailyRecommendations generates recommendations for daily reports
 func (rr *RiskReporter) generateDailyRecommendations(report *RiskReport) []string {
 	var recommendations []string
-	
+
 	if report.Summary != nil {
 		if report.Summary.MarginUtilization > 0.8 {
 			recommendations = append(recommendations, "Daily average margin utilization is high - consider reducing overall exposure")
@@ -733,56 +1018,56 @@ func (rr *RiskReporter) generateDailyRecommendations(report *RiskReport) []strin
 			recommendations = append(recommendations, "Multiple risk actions triggered today - review trading strategies")
 		}
 	}
-	
+
 	if len(recommendations) == 0 {
 		recommendations = append(recommendations, "Daily risk metrics within acceptable ranges")
 	}
-	
+
 	return recommendations
 }
 
 // generateIncidentSummary generates a summary for incident reports
 func (rr *RiskReporter) generateIncidentSummary(report *RiskReport, incidentID, description string) *RiskSummary {
 	summary := &RiskSummary{
-		OverallRiskLevel:  shared.RiskLevelHigh, // Incidents are typically high risk
-		ComplianceStatus:  "INCIDENT",
-		LastUpdated:       time.Now(),
+		OverallRiskLevel: shared.RiskLevelHigh, // Incidents are typically high risk
+		ComplianceStatus: "INCIDENT",
+		LastUpdated:      time.Now(),
 	}
-	
+
 	if report.MarginStatus != nil {
 		summary.MarginUtilization = report.MarginStatus.MarginRatio
 		summary.TotalExposure = report.MarginStatus.TotalEquity
 	}
-	
+
 	if report.PositionRisk != nil {
 		summary.PortfolioVaR = report.PositionRisk.VaR
 		summary.MaxDrawdown = report.PositionRisk.MaxDrawdown
 		summary.ActivePositions = len(report.PositionRisk.Positions)
 	}
-	
+
 	summary.RiskActionsToday = len(report.RiskActions)
 	summary.AnomaliesDetected = len(report.MarketAnomalies)
-	
+
 	return summary
 }
 
 // generateIncidentRecommendations generates recommendations for incident reports
 func (rr *RiskReporter) generateIncidentRecommendations(report *RiskReport) []string {
 	var recommendations []string
-	
+
 	recommendations = append(recommendations, "INCIDENT: Immediate review required")
 	recommendations = append(recommendations, "Investigate root cause of incident")
 	recommendations = append(recommendations, "Review and update risk management procedures")
 	recommendations = append(recommendations, "Consider additional safeguards to prevent recurrence")
-	
+
 	if report.MarginStatus != nil && report.MarginStatus.RiskLevel >= shared.RiskLevelHigh {
 		recommendations = append(recommendations, "High margin risk detected - consider emergency position reduction")
 	}
-	
+
 	if report.PositionRisk != nil && report.PositionRisk.VaR > 0.1 {
 		recommendations = append(recommendations, "Elevated portfolio VaR - implement immediate risk reduction measures")
 	}
-	
+
 	return recommendations
 }
 
@@ -791,7 +1076,7 @@ func (rr *RiskReporter) updateReportMetrics(report *RiskReport) {
 	report.Metrics["report_size"] = len(fmt.Sprintf("%+v", report))
 	report.Metrics["alert_count"] = len(report.Alerts)
 	report.Metrics["recommendation_count"] = len(report.Recommendations)
-	
+
 	if report.MarginStatus != nil {
 		report.Metrics["margin_status_available"] = true
 	}
@@ -804,16 +1089,16 @@ func (rr *RiskReporter) updateReportMetrics(report *RiskReport) {
 func (rr *RiskReporter) GetReports(limit int) []RiskReport {
 	rr.mu.RLock()
 	defer rr.mu.RUnlock()
-	
+
 	if limit <= 0 || limit > len(rr.reports) {
 		limit = len(rr.reports)
 	}
-	
+
 	// Return the most recent reports
 	start := len(rr.reports) - limit
 	reports := make([]RiskReport, limit)
 	copy(reports, rr.reports[start:])
-	
+
 	return reports
 }
 
@@ -821,7 +1106,7 @@ func (rr *RiskReporter) GetReports(limit int) []RiskReport {
 func (rr *RiskReporter) Start() error {
 	rr.mu.Lock()
 	defer rr.mu.Unlock()
-	
+
 	rr.isRunning = true
 	log.Printf("Risk reporter started")
 	return nil
@@ -831,7 +1116,7 @@ func (rr *RiskReporter) Start() error {
 func (rr *RiskReporter) Stop() error {
 	rr.mu.Lock()
 	defer rr.mu.Unlock()
-	
+
 	rr.isRunning = false
 	log.Printf("Risk reporter stopped")
 	return nil

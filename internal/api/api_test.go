@@ -75,10 +75,24 @@ func TestStrategyAPI(t *testing.T) {
 	httpHelper := testutils.NewHTTPTestHelper(suite)
 	setupTestRoutes(httpHelper.Router, suite)
 
-	mockData := testutils.NewMockData()
-
 	t.Run("create strategy", func(t *testing.T) {
-		strategy := mockData.GenerateStrategy()
+		// Create test strategy data directly instead of using mock generator
+		strategy := map[string]interface{}{
+			"name":        "Test Trend Strategy",
+			"version":     "1.0.0",
+			"description": "Test strategy for trend following",
+			"mode":        "paper",
+			"symbol":      "BTCUSDT",
+			"exchange":    "binance",
+			"params": map[string]interface{}{
+				"ma_short":      20,
+				"ma_long":       50,
+				"stop_loss":     0.02,
+				"take_profit":   0.05,
+				"leverage":      2,
+				"position_size": 1000.0,
+			},
+		}
 
 		resp := httpHelper.POST("/api/v1/strategy", strategy, map[string]string{
 			"Authorization": "Bearer test-token",
