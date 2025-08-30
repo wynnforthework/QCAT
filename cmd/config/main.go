@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"qcat/internal/config"
 )
@@ -12,9 +13,7 @@ import (
 func main() {
 	var (
 		configPath = flag.String("config", "configs/config.yaml", "配置文件路径")
-		envPath    = flag.String("env", ".env", "环境变量文件路径")
 		validate   = flag.Bool("validate", false, "验证配置")
-		generate   = flag.Bool("generate", false, "生成环境变量模板")
 		encrypt    = flag.String("encrypt", "", "加密字符串")
 		decrypt    = flag.String("decrypt", "", "解密字符串")
 		help       = flag.Bool("help", false, "显示帮助信息")
@@ -114,9 +113,9 @@ func showConfigSummary(cfg *config.Config) {
 	fmt.Printf("  Redis: %s (启用: %t)\n", cfg.Redis.Addr, cfg.Redis.Enabled)
 	fmt.Printf("  交易所: %s (测试网: %t)\n", cfg.Exchange.Name, cfg.Exchange.TestNet)
 	fmt.Printf("  策略模式: %s\n", cfg.Strategy.DefaultMode)
-	fmt.Printf("  优化器: %s (启用: %t)\n", cfg.Optimizer.DefaultAlgorithm, cfg.Optimizer.Enabled)
+	fmt.Printf("  优化器: 网格搜索最大迭代: %d\n", cfg.Optimizer.GridSearch.MaxIterations)
 	fmt.Printf("  风险管理: %t\n", cfg.Risk.Enabled)
-	fmt.Printf("  市场数据: %t\n", cfg.MarketData.Enabled)
+	fmt.Printf("  市场数据: 质量阈值: %.2f\n", cfg.MarketData.Quality.MinQualityScore)
 }
 
 func encryptString(text string) {
@@ -130,13 +129,16 @@ func encryptString(text string) {
 	envManager := config.NewEnvManager(encryptionKey, "")
 
 	// 加密字符串
-	encrypted, err := envManager.SetEncryptedString("TEMP", text)
+	err := envManager.SetEncryptedString("TEMP", text)
 	if err != nil {
 		log.Fatalf("加密失败: %v", err)
 	}
 
-	// 提取加密后的值（去掉前缀）
-	encryptedValue := encrypted[4:] // 去掉 "TEMP=" 前缀
+	// 获取加密后的值
+	encryptedValue := envManager.GetString("TEMP", "")
+	if strings.HasPrefix(encryptedValue, "ENC:") {
+		encryptedValue = strings.TrimPrefix(encryptedValue, "ENC:")
+	}
 
 	fmt.Printf("原文: %s\n", text)
 	fmt.Printf("加密后: ENC:%s\n", encryptedValue)

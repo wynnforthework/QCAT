@@ -29,7 +29,7 @@ func main() {
 	flag.Parse()
 
 	// 加载配置
-	cfg, err := config.LoadConfig(*configPath)
+	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
