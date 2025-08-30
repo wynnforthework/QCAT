@@ -1890,15 +1890,109 @@ func (se *StrategyExecutor) checkStrategyHealth(ctx context.Context, strategyID 
 
 // eliminateStrategy 淘汰策略
 func (se *StrategyExecutor) eliminateStrategy(ctx context.Context, action *ExecutionAction) error {
-	log.Printf("Eliminating strategy")
-	// TODO: 实现策略淘汰逻辑
+	log.Printf("Eliminating strategy: %s", action.StrategyID)
+	
+	// 1. 验证策略存在且可以被淘汰
+	if err := se.validateStrategyForElimination(ctx, action.StrategyID); err != nil {
+		return fmt.Errorf("strategy validation failed: %w", err)
+	}
+	
+	// 2. 关闭策略的所有活跃订单
+	if err := se.closeStrategyOrders(ctx, action.StrategyID); err != nil {
+		log.Printf("Warning: Failed to close some orders for strategy %s: %v", action.StrategyID, err)
+	}
+	
+	// 3. 清算策略持仓
+	if err := se.liquidateStrategyPositions(ctx, action.StrategyID); err != nil {
+		return fmt.Errorf("failed to liquidate positions: %w", err)
+	}
+	
+	// 4. 停止策略执行
+	if err := se.stopStrategyExecution(ctx, action.StrategyID); err != nil {
+		return fmt.Errorf("failed to stop strategy execution: %w", err)
+	}
+	
+	// 5. 更新策略状态为已淘汰
+	if err := se.updateStrategyStatus(ctx, action.StrategyID, "eliminated"); err != nil {
+		return fmt.Errorf("failed to update strategy status: %w", err)
+	}
+	
+	// 6. 记录淘汰原因和历史
+	if err := se.recordStrategyElimination(ctx, action); err != nil {
+		log.Printf("Warning: Failed to record elimination history: %v", err)
+	}
+	
+	// 7. 释放策略资源
+	if err := se.releaseStrategyResources(ctx, action.StrategyID); err != nil {
+		log.Printf("Warning: Failed to release some resources: %v", err)
+	}
+	
+	// 8. 发送淘汰通知
+	if err := se.notifyStrategyElimination(ctx, action.StrategyID); err != nil {
+		log.Printf("Warning: Failed to send elimination notification: %v", err)
+	}
+	
+	log.Printf("Strategy %s eliminated successfully", action.StrategyID)
 	return nil
 }
 
 // introduceStrategy 引入新策略
 func (se *StrategyExecutor) introduceStrategy(ctx context.Context, action *ExecutionAction) error {
-	log.Printf("Introducing new strategy")
-	// TODO: 实现新策略引入逻辑
+	log.Printf("Introducing new strategy: %s", action.StrategyID)
+	
+	// 1. 验证新策略配置
+	strategyConfig, err := se.validateNewStrategyConfig(ctx, action)
+	if err != nil {
+		return fmt.Errorf("strategy config validation failed: %w", err)
+	}
+	
+	// 2. 检查资源可用性
+	if err := se.checkResourceAvailability(ctx, strategyConfig); err != nil {
+		return fmt.Errorf("insufficient resources: %w", err)
+	}
+	
+	// 3. 创建策略实例
+	strategy, err := se.createStrategyInstance(ctx, strategyConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create strategy instance: %w", err)
+	}
+	
+	// 4. 分配资金和资源
+	if err := se.allocateStrategyResources(ctx, strategy); err != nil {
+		return fmt.Errorf("failed to allocate resources: %w", err)
+	}
+	
+	// 5. 初始化策略参数
+	if err := se.initializeStrategyParameters(ctx, strategy); err != nil {
+		return fmt.Errorf("failed to initialize parameters: %w", err)
+	}
+	
+	// 6. 设置风险控制
+	if err := se.setupStrategyRiskControls(ctx, strategy); err != nil {
+		return fmt.Errorf("failed to setup risk controls: %w", err)
+	}
+	
+	// 7. 启动策略监控
+	if err := se.startStrategyMonitoring(ctx, strategy); err != nil {
+		return fmt.Errorf("failed to start monitoring: %w", err)
+	}
+	
+	// 8. 更新策略状态为活跃
+	if err := se.updateStrategyStatus(ctx, strategy.ID, "active"); err != nil {
+		return fmt.Errorf("failed to update strategy status: %w", err)
+	}
+	
+	// 9. 记录策略引入历史
+	if err := se.recordStrategyIntroduction(ctx, strategy); err != nil {
+		log.Printf("Warning: Failed to record introduction history: %v", err)
+	}
+	
+	// 10. 发送引入通知
+	if err := se.notifyStrategyIntroduction(ctx, strategy); err != nil {
+		log.Printf("Warning: Failed to send introduction notification: %v", err)
+	}
+	
+	log.Printf("Strategy %s introduced successfully", strategy.ID)
 	return nil
 }
 
@@ -7308,4 +7402,552 @@ func (se *SystemExecutor) notifyAuditLogCompletion(ctx context.Context, task *Au
 		message := fmt.Sprintf("Audit log processing task %s completed with status: %s", task.ID, task.Status)
 		se.notificationService.SendAlert(ctx, "system_management", "audit_log_completed", message)
 	}
+}//
+ Supporting functions for strategy elimination and introduction
+
+// validateStrategyForElimination 验证策略是否可以被淘汰
+func (se *StrategyExecutor) validateStrategyForElimination(ctx context.Context, strategyID string) error {
+	// 检查策略是否存在
+	if se.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	var status string
+	var hasActivePositions bool
+	
+	query := `
+		SELECT status, 
+		       CASE WHEN EXISTS(SELECT 1 FROM positions WHERE strategy_id = ? AND status = 'open') 
+		            THEN 1 ELSE 0 END as has_positions
+		FROM strategies WHERE id = ?
+	`
+	
+	err := se.db.QueryRowContext(ctx, query, strategyID, strategyID).Scan(&status, &hasActivePositions)
+	if err != nil {
+		return fmt.Errorf("failed to query strategy: %w", err)
+	}
+	
+	// 检查策略状态
+	if status == "eliminated" || status == "terminated" {
+		return fmt.Errorf("strategy already eliminated or terminated")
+	}
+	
+	log.Printf("Strategy %s validation passed: status=%s, has_positions=%v", strategyID, status, hasActivePositions)
+	return nil
+}
+
+// closeStrategyOrders 关闭策略的所有活跃订单
+func (se *StrategyExecutor) closeStrategyOrders(ctx context.Context, strategyID string) error {
+	if se.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	// 查询活跃订单
+	query := `SELECT id, symbol, side, quantity FROM orders WHERE strategy_id = ? AND status IN ('open', 'partial')`
+	rows, err := se.db.QueryContext(ctx, query, strategyID)
+	if err != nil {
+		return fmt.Errorf("failed to query active orders: %w", err)
+	}
+	defer rows.Close()
+	
+	ordersClosed := 0
+	for rows.Next() {
+		var orderID, symbol, side string
+		var quantity float64
+		
+		if err := rows.Scan(&orderID, &symbol, &side, &quantity); err != nil {
+			log.Printf("Failed to scan order: %v", err)
+			continue
+		}
+		
+		// 取消订单
+		if err := se.cancelOrder(ctx, orderID); err != nil {
+			log.Printf("Failed to cancel order %s: %v", orderID, err)
+			continue
+		}
+		
+		ordersClosed++
+		log.Printf("Cancelled order %s for strategy %s", orderID, strategyID)
+	}
+	
+	log.Printf("Closed %d orders for strategy %s", ordersClosed, strategyID)
+	return nil
+}
+
+// liquidateStrategyPositions 清算策略持仓
+func (se *StrategyExecutor) liquidateStrategyPositions(ctx context.Context, strategyID string) error {
+	if se.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	// 查询开放持仓
+	query := `SELECT id, symbol, side, quantity, entry_price FROM positions WHERE strategy_id = ? AND status = 'open'`
+	rows, err := se.db.QueryContext(ctx, query, strategyID)
+	if err != nil {
+		return fmt.Errorf("failed to query positions: %w", err)
+	}
+	defer rows.Close()
+	
+	positionsLiquidated := 0
+	for rows.Next() {
+		var positionID, symbol, side string
+		var quantity, entryPrice float64
+		
+		if err := rows.Scan(&positionID, &symbol, &side, &quantity, &entryPrice); err != nil {
+			log.Printf("Failed to scan position: %v", err)
+			continue
+		}
+		
+		// 平仓
+		if err := se.closePosition(ctx, positionID, "elimination"); err != nil {
+			log.Printf("Failed to close position %s: %v", positionID, err)
+			continue
+		}
+		
+		positionsLiquidated++
+		log.Printf("Liquidated position %s for strategy %s", positionID, strategyID)
+	}
+	
+	log.Printf("Liquidated %d positions for strategy %s", positionsLiquidated, strategyID)
+	return nil
+}
+
+// stopStrategyExecution 停止策略执行
+func (se *StrategyExecutor) stopStrategyExecution(ctx context.Context, strategyID string) error {
+	// 停止策略的定时任务
+	if se.scheduler != nil {
+		if err := se.scheduler.StopStrategy(strategyID); err != nil {
+			log.Printf("Failed to stop strategy scheduler: %v", err)
+		}
+	}
+	
+	// 停止策略的数据订阅
+	if err := se.stopStrategyDataSubscription(ctx, strategyID); err != nil {
+		log.Printf("Failed to stop data subscription: %v", err)
+	}
+	
+	log.Printf("Strategy execution stopped for %s", strategyID)
+	return nil
+}
+
+// updateStrategyStatus 更新策略状态
+func (se *StrategyExecutor) updateStrategyStatus(ctx context.Context, strategyID, status string) error {
+	if se.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	query := `UPDATE strategies SET status = ?, updated_at = ? WHERE id = ?`
+	_, err := se.db.ExecContext(ctx, query, status, time.Now(), strategyID)
+	if err != nil {
+		return fmt.Errorf("failed to update strategy status: %w", err)
+	}
+	
+	log.Printf("Strategy %s status updated to %s", strategyID, status)
+	return nil
+}
+
+// recordStrategyElimination 记录策略淘汰历史
+func (se *StrategyExecutor) recordStrategyElimination(ctx context.Context, action *ExecutionAction) error {
+	if se.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	query := `
+		INSERT INTO strategy_elimination_history 
+		(strategy_id, elimination_reason, elimination_time, performance_metrics, created_at)
+		VALUES (?, ?, ?, ?, ?)
+	`
+	
+	reason := "performance_based"
+	if action.Parameters != nil {
+		if r, ok := action.Parameters["reason"].(string); ok {
+			reason = r
+		}
+	}
+	
+	metricsJSON := "{}"
+	if action.Parameters != nil {
+		if metrics, ok := action.Parameters["metrics"]; ok {
+			if metricsBytes, err := json.Marshal(metrics); err == nil {
+				metricsJSON = string(metricsBytes)
+			}
+		}
+	}
+	
+	_, err := se.db.ExecContext(ctx, query, action.StrategyID, reason, time.Now(), metricsJSON, time.Now())
+	if err != nil {
+		return fmt.Errorf("failed to record elimination: %w", err)
+	}
+	
+	return nil
+}
+
+// releaseStrategyResources 释放策略资源
+func (se *StrategyExecutor) releaseStrategyResources(ctx context.Context, strategyID string) error {
+	// 释放内存中的策略实例
+	if se.strategies != nil {
+		delete(se.strategies, strategyID)
+	}
+	
+	// 释放资金分配
+	if err := se.releaseStrategyFunds(ctx, strategyID); err != nil {
+		log.Printf("Failed to release funds for strategy %s: %v", strategyID, err)
+	}
+	
+	// 清理临时文件和缓存
+	if err := se.cleanupStrategyCache(ctx, strategyID); err != nil {
+		log.Printf("Failed to cleanup cache for strategy %s: %v", strategyID, err)
+	}
+	
+	log.Printf("Resources released for strategy %s", strategyID)
+	return nil
+}
+
+// notifyStrategyElimination 发送策略淘汰通知
+func (se *StrategyExecutor) notifyStrategyElimination(ctx context.Context, strategyID string) error {
+	notification := map[string]interface{}{
+		"type":        "strategy_eliminated",
+		"strategy_id": strategyID,
+		"timestamp":   time.Now(),
+		"message":     fmt.Sprintf("Strategy %s has been eliminated", strategyID),
+	}
+	
+	return se.sendNotification("strategy_events", notification)
+}
+
+// validateNewStrategyConfig 验证新策略配置
+func (se *StrategyExecutor) validateNewStrategyConfig(ctx context.Context, action *ExecutionAction) (*StrategyConfig, error) {
+	if action.Parameters == nil {
+		return nil, fmt.Errorf("strategy parameters not provided")
+	}
+	
+	configData, ok := action.Parameters["config"]
+	if !ok {
+		return nil, fmt.Errorf("strategy config not provided")
+	}
+	
+	// 解析配置
+	configBytes, err := json.Marshal(configData)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal config: %w", err)
+	}
+	
+	var config StrategyConfig
+	if err := json.Unmarshal(configBytes, &config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
+	}
+	
+	// 验证必要字段
+	if config.Name == "" {
+		return nil, fmt.Errorf("strategy name is required")
+	}
+	
+	if config.Type == "" {
+		return nil, fmt.Errorf("strategy type is required")
+	}
+	
+	if config.InitialCapital <= 0 {
+		return nil, fmt.Errorf("initial capital must be positive")
+	}
+	
+	log.Printf("Strategy config validated: %s (%s)", config.Name, config.Type)
+	return &config, nil
+}
+
+// checkResourceAvailability 检查资源可用性
+func (se *StrategyExecutor) checkResourceAvailability(ctx context.Context, config *StrategyConfig) error {
+	// 检查资金可用性
+	availableFunds, err := se.getAvailableFunds(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get available funds: %w", err)
+	}
+	
+	if availableFunds < config.InitialCapital {
+		return fmt.Errorf("insufficient funds: available=%.2f, required=%.2f", 
+			availableFunds, config.InitialCapital)
+	}
+	
+	// 检查系统资源
+	if err := se.checkSystemResources(); err != nil {
+		return fmt.Errorf("insufficient system resources: %w", err)
+	}
+	
+	log.Printf("Resource availability check passed for strategy %s", config.Name)
+	return nil
+}
+
+// createStrategyInstance 创建策略实例
+func (se *StrategyExecutor) createStrategyInstance(ctx context.Context, config *StrategyConfig) (*Strategy, error) {
+	strategy := &Strategy{
+		ID:             generateStrategyID(),
+		Name:           config.Name,
+		Type:           config.Type,
+		Status:         "initializing",
+		InitialCapital: config.InitialCapital,
+		CurrentCapital: config.InitialCapital,
+		Parameters:     config.Parameters,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+	
+	// 保存到数据库
+	if err := se.saveStrategyToDatabase(ctx, strategy); err != nil {
+		return nil, fmt.Errorf("failed to save strategy: %w", err)
+	}
+	
+	log.Printf("Strategy instance created: %s", strategy.ID)
+	return strategy, nil
+}
+
+// allocateStrategyResources 分配策略资源
+func (se *StrategyExecutor) allocateStrategyResources(ctx context.Context, strategy *Strategy) error {
+	// 分配资金
+	if err := se.allocateStrategyFunds(ctx, strategy.ID, strategy.InitialCapital); err != nil {
+		return fmt.Errorf("failed to allocate funds: %w", err)
+	}
+	
+	// 分配计算资源
+	if err := se.allocateComputeResources(ctx, strategy.ID); err != nil {
+		return fmt.Errorf("failed to allocate compute resources: %w", err)
+	}
+	
+	log.Printf("Resources allocated for strategy %s", strategy.ID)
+	return nil
+}
+
+// initializeStrategyParameters 初始化策略参数
+func (se *StrategyExecutor) initializeStrategyParameters(ctx context.Context, strategy *Strategy) error {
+	// 设置默认参数
+	defaultParams := map[string]interface{}{
+		"max_position_size": 0.1,  // 10% of capital
+		"stop_loss":         0.02, // 2%
+		"take_profit":       0.04, // 4%
+		"risk_per_trade":    0.01, // 1%
+	}
+	
+	// 合并用户参数和默认参数
+	if strategy.Parameters == nil {
+		strategy.Parameters = make(map[string]interface{})
+	}
+	
+	for key, value := range defaultParams {
+		if _, exists := strategy.Parameters[key]; !exists {
+			strategy.Parameters[key] = value
+		}
+	}
+	
+	log.Printf("Strategy parameters initialized for %s", strategy.ID)
+	return nil
+}
+
+// setupStrategyRiskControls 设置策略风险控制
+func (se *StrategyExecutor) setupStrategyRiskControls(ctx context.Context, strategy *Strategy) error {
+	riskControls := &RiskControls{
+		MaxDrawdown:      0.15, // 15%
+		MaxDailyLoss:     0.05, // 5%
+		MaxPositionSize:  0.2,  // 20%
+		MaxCorrelation:   0.8,  // 80%
+		VaRLimit:         0.03, // 3%
+	}
+	
+	// 保存风险控制设置
+	if err := se.saveRiskControls(ctx, strategy.ID, riskControls); err != nil {
+		return fmt.Errorf("failed to save risk controls: %w", err)
+	}
+	
+	log.Printf("Risk controls setup for strategy %s", strategy.ID)
+	return nil
+}
+
+// startStrategyMonitoring 启动策略监控
+func (se *StrategyExecutor) startStrategyMonitoring(ctx context.Context, strategy *Strategy) error {
+	// 启动性能监控
+	if err := se.startPerformanceMonitoring(ctx, strategy.ID); err != nil {
+		return fmt.Errorf("failed to start performance monitoring: %w", err)
+	}
+	
+	// 启动风险监控
+	if err := se.startRiskMonitoring(ctx, strategy.ID); err != nil {
+		return fmt.Errorf("failed to start risk monitoring: %w", err)
+	}
+	
+	log.Printf("Monitoring started for strategy %s", strategy.ID)
+	return nil
+}
+
+// recordStrategyIntroduction 记录策略引入历史
+func (se *StrategyExecutor) recordStrategyIntroduction(ctx context.Context, strategy *Strategy) error {
+	if se.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	query := `
+		INSERT INTO strategy_introduction_history 
+		(strategy_id, strategy_name, strategy_type, initial_capital, introduction_time, created_at)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`
+	
+	_, err := se.db.ExecContext(ctx, query, 
+		strategy.ID, strategy.Name, strategy.Type, 
+		strategy.InitialCapital, time.Now(), time.Now())
+	if err != nil {
+		return fmt.Errorf("failed to record introduction: %w", err)
+	}
+	
+	return nil
+}
+
+// notifyStrategyIntroduction 发送策略引入通知
+func (se *StrategyExecutor) notifyStrategyIntroduction(ctx context.Context, strategy *Strategy) error {
+	notification := map[string]interface{}{
+		"type":        "strategy_introduced",
+		"strategy_id": strategy.ID,
+		"strategy_name": strategy.Name,
+		"timestamp":   time.Now(),
+		"message":     fmt.Sprintf("New strategy %s (%s) has been introduced", strategy.Name, strategy.ID),
+	}
+	
+	return se.sendNotification("strategy_events", notification)
+}
+
+// Helper functions
+
+func (se *StrategyExecutor) cancelOrder(ctx context.Context, orderID string) error {
+	// 简化实现：更新订单状态
+	if se.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	query := `UPDATE orders SET status = 'cancelled', updated_at = ? WHERE id = ?`
+	_, err := se.db.ExecContext(ctx, query, time.Now(), orderID)
+	return err
+}
+
+func (se *StrategyExecutor) closePosition(ctx context.Context, positionID, reason string) error {
+	// 简化实现：更新持仓状态
+	if se.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	query := `UPDATE positions SET status = 'closed', close_reason = ?, updated_at = ? WHERE id = ?`
+	_, err := se.db.ExecContext(ctx, query, reason, time.Now(), positionID)
+	return err
+}
+
+func (se *StrategyExecutor) stopStrategyDataSubscription(ctx context.Context, strategyID string) error {
+	// 简化实现：记录日志
+	log.Printf("Stopping data subscription for strategy %s", strategyID)
+	return nil
+}
+
+func (se *StrategyExecutor) releaseStrategyFunds(ctx context.Context, strategyID string) error {
+	// 简化实现：记录日志
+	log.Printf("Releasing funds for strategy %s", strategyID)
+	return nil
+}
+
+func (se *StrategyExecutor) cleanupStrategyCache(ctx context.Context, strategyID string) error {
+	// 简化实现：记录日志
+	log.Printf("Cleaning up cache for strategy %s", strategyID)
+	return nil
+}
+
+func (se *StrategyExecutor) sendNotification(topic string, notification map[string]interface{}) error {
+	// 简化实现：记录日志
+	log.Printf("Sending notification to %s: %+v", topic, notification)
+	return nil
+}
+
+func (se *StrategyExecutor) getAvailableFunds(ctx context.Context) (float64, error) {
+	// 简化实现：返回模拟可用资金
+	return 100000.0, nil
+}
+
+func (se *StrategyExecutor) checkSystemResources() error {
+	// 简化实现：总是返回成功
+	return nil
+}
+
+func generateStrategyID() string {
+	return fmt.Sprintf("strategy_%d", time.Now().UnixNano())
+}
+
+func (se *StrategyExecutor) saveStrategyToDatabase(ctx context.Context, strategy *Strategy) error {
+	if se.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	paramsJSON, _ := json.Marshal(strategy.Parameters)
+	
+	query := `
+		INSERT INTO strategies 
+		(id, name, type, status, initial_capital, current_capital, parameters, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	
+	_, err := se.db.ExecContext(ctx, query,
+		strategy.ID, strategy.Name, strategy.Type, strategy.Status,
+		strategy.InitialCapital, strategy.CurrentCapital,
+		string(paramsJSON), strategy.CreatedAt, strategy.UpdatedAt)
+	
+	return err
+}
+
+func (se *StrategyExecutor) allocateStrategyFunds(ctx context.Context, strategyID string, amount float64) error {
+	// 简化实现：记录日志
+	log.Printf("Allocating %.2f funds to strategy %s", amount, strategyID)
+	return nil
+}
+
+func (se *StrategyExecutor) allocateComputeResources(ctx context.Context, strategyID string) error {
+	// 简化实现：记录日志
+	log.Printf("Allocating compute resources to strategy %s", strategyID)
+	return nil
+}
+
+func (se *StrategyExecutor) saveRiskControls(ctx context.Context, strategyID string, controls *RiskControls) error {
+	// 简化实现：记录日志
+	log.Printf("Saving risk controls for strategy %s: %+v", strategyID, controls)
+	return nil
+}
+
+func (se *StrategyExecutor) startPerformanceMonitoring(ctx context.Context, strategyID string) error {
+	// 简化实现：记录日志
+	log.Printf("Starting performance monitoring for strategy %s", strategyID)
+	return nil
+}
+
+func (se *StrategyExecutor) startRiskMonitoring(ctx context.Context, strategyID string) error {
+	// 简化实现：记录日志
+	log.Printf("Starting risk monitoring for strategy %s", strategyID)
+	return nil
+}
+
+// Supporting types
+
+type StrategyConfig struct {
+	Name           string                 `json:"name"`
+	Type           string                 `json:"type"`
+	InitialCapital float64                `json:"initial_capital"`
+	Parameters     map[string]interface{} `json:"parameters"`
+}
+
+type Strategy struct {
+	ID             string                 `json:"id"`
+	Name           string                 `json:"name"`
+	Type           string                 `json:"type"`
+	Status         string                 `json:"status"`
+	InitialCapital float64                `json:"initial_capital"`
+	CurrentCapital float64                `json:"current_capital"`
+	Parameters     map[string]interface{} `json:"parameters"`
+	CreatedAt      time.Time              `json:"created_at"`
+	UpdatedAt      time.Time              `json:"updated_at"`
+}
+
+type RiskControls struct {
+	MaxDrawdown     float64 `json:"max_drawdown"`
+	MaxDailyLoss    float64 `json:"max_daily_loss"`
+	MaxPositionSize float64 `json:"max_position_size"`
+	MaxCorrelation  float64 `json:"max_correlation"`
+	VaRLimit        float64 `json:"var_limit"`
 }

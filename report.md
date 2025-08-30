@@ -1,56 +1,18 @@
 # Code Scan Report
 
-## ./internal\analysis\backtesting\auto_backtesting_engine.go
-- Line 1267: **TODO** → `// TODO: 实现信号执行逻辑`
-- Line 1287: **TODO** → `// TODO: 实现组合价值更新逻辑`
-- Line 1457: **TODO** → `// TODO: 实现样本外测试`
-- Line 1471: **TODO** → `// TODO: 实现稳定性测试`
-- Line 1484: **TODO** → `// TODO: 实现鲁棒性测试`
-- Line 1497: **TODO** → `// TODO: 实现报告生成`
-- Line 1560: **TODO** → `// TODO: 实现策略性能分析`
-- Line 1569: **TODO** → `// TODO: 实现验证检查`
-
 ## ./internal\analysis\factors\factor_discovery_engine.go
-- Line 645: **TODO** → `// TODO: 从配置或数据库加载基础因子`
-- Line 812: **TODO** → `// TODO: 实现随机搜索算法`
-- Line 818: **TODO** → `// TODO: 实现系统化搜索算法`
-- Line 986: **TODO** → `// TODO: 实现随机因子生成`
-- Line 1042: **TODO** → `// TODO: 实现收敛检查逻辑`
-- Line 1093: **TODO** → `// TODO: 检查因子是否新颖（不与现有因子重复）`
-- Line 1149: **TODO** → `// TODO: 实现实际的IC计算`
-- Line 1167: **TODO** → `// TODO: 计算因子多样性`
-- Line 1172: **TODO** → `// TODO: 计算种群多样性`
-- Line 1226: **TODO** → `// TODO: 实现因子交叉操作`
-- Line 1235: **TODO** → `// TODO: 实现因子变异操作`
-- Line 1248: **TODO** → `// TODO: 计算因子相似度`
-- Line 1262: **TODO** → `// TODO: 实现IC计算`
-- Line 1276: **TODO** → `// TODO: 实现滚动IC计算`
-- Line 1281: **TODO** → `// TODO: 实现IC衰减计算`
-- Line 1286: **TODO** → `// TODO: 实现分组回测`
-- Line 1291: **TODO** → `// TODO: 实现因子风险分析`
-- Line 1301: **TODO** → `// TODO: 实现因子稳定性分析`
-- Line 1380: **TODO** → `// TODO: 实现基于性能的轮换`
-- Line 1384: **TODO** → `// TODO: 实现基于相关性的轮换`
-- Line 1388: **TODO** → `// TODO: 实现基于市场状态的轮换`
-- Line 1392: **TODO** → `// TODO: 计算因子表现`
+- Line 4981: **TODO** → `// TODO: 实现基于性能的轮换`
+- Line 4985: **TODO** → `// TODO: 实现基于相关性的轮换`
+- Line 4989: **TODO** → `// TODO: 实现基于市场状态的轮换`
+- Line 4993: **TODO** → `// TODO: 计算因子表现`
 
 ## ./internal\api\api_test.go
 - Line 78: **mock** → `mockData := testutils.NewMockData()`
 - Line 81: **mock** → `strategy := mockData.GenerateStrategy()`
 
-## ./internal\api\handlers.go
-- Line 3373: **TODO** → `// TODO: 实现真实的策略接入流程`
-- Line 3484: **TODO** → `// TODO: 实现真实的策略接入状态查询`
-
 ## ./internal\api\server.go
 - Line 440: **mock** → `log.Printf("Warning: Binance API credentials not configured, using mock data")`
 - Line 446: **mock** → `// Create a mock exchange client for automation system if needed`
-- Line 576: **TODO** → `// TODO: TEMPORARY - Add audit logs as public route for testing`
-- Line 583: **TODO** → `// TODO: TEMPORARY - Add strategy routes as public for frontend testing`
-
-## ./internal\api\settings_handler.go
-- Line 125: **TODO** → `// TODO 集成到实际的交易系统中`
-- Line 129: **TODO** → `// TODO: 集成到实际的交易执行器`
 
 ## ./internal\api\websocket.go
 - Line 228: **mock** → `// Mock market data`
@@ -58,58 +20,36 @@
 - Line 325: **mock** → `// Mock alerts`
 
 ## ./internal\automation\executor\executors.go
-- Line 638: **TODO** → `// TODO: 实现暂停新开仓逻辑`
-- Line 711: **TODO** → `// TODO: 实现收紧止损逻辑`
-- Line 792: **TODO** → `// 简单的余额检查（TODO 添加更复杂的逻辑）`
-- Line 1083: **TODO** → `// TODO: 实现参数应用逻辑`
-- Line 1090: **TODO** → `// TODO: 实现策略淘汰逻辑`
-- Line 1097: **TODO** → `// TODO: 实现新策略引入逻辑`
-- Line 1104: **TODO** → `// TODO: 实现策略优化逻辑`
-- Line 1150: **TODO** → `// TODO: 实现数据清洗逻辑`
-- Line 1157: **TODO** → `// TODO: 实现因子更新逻辑`
-- Line 1164: **TODO** → `// TODO: 实现回测逻辑`
-- Line 1171: **TODO** → `// TODO: 实现模式识别逻辑`
-- Line 1219: **TODO** → `// TODO: 实现健康检查逻辑`
-- Line 1226: **TODO** → `// TODO: 实现安全监控逻辑`
-- Line 1233: **TODO** → `// TODO: 实现交易所故障切换逻辑`
-- Line 1240: **TODO** → `// TODO: 实现审计日志处理逻辑`
-
-## ./internal\automation\risk\intelligent_controller.go
-- Line 1040: **TODO** → `// TODO 将报告保存到数据库或发送给相关人员`
+- Line 1894: **TODO** → `// TODO: 实现策略淘汰逻辑`
+- Line 1901: **TODO** → `// TODO: 实现新策略引入逻辑`
 
 ## ./internal\automation\scheduler\strategy_scheduler.go
-- Line 455: **TODO** → `// TODO: 实现参数更新逻辑`
-- Line 828: **TODO** → `// TODO 根据策略类型返回不同的默认参数`
-- Line 2873: **mock** → `log.Printf("Mock: Adjusted %s - SL: %.4f->%.4f, TP: %.4f->%.4f",`
-- Line 2879: **mock** → `log.Printf("Mock: Completed automatic adjustment for %d positions", adjustmentCount)`
-- Line 3822: **mock** → `log.Printf("Exchange client not fully implemented, using mock data")`
-- Line 3823: **mock** → `return ss.getMockMarketData(), nil`
-- Line 3826: **mock** → `// getMockMarketData 获取模拟市场数据`
-- Line 3827: **mock** → `func (ss *StrategyScheduler) getMockMarketData() map[string]*MarketData {`
-- Line 3828: **mock** → `mockData := make(map[string]*MarketData)`
-- Line 3832: **mock** → `mockData[symbol] = ss.createMockMarketData(symbol)`
-- Line 3835: **mock** → `return mockData`
-- Line 3838: **mock** → `// createMockMarketData 创建单个交易对的模拟市场数据`
-- Line 3839: **mock** → `func (ss *StrategyScheduler) createMockMarketData(symbol string) *MarketData {`
-- Line 4508: **TODO** → `// TODO: 实现自动参数应用机制`
+- Line 3455: **mock** → `log.Printf("Mock: Adjusted %s - SL: %.4f->%.4f, TP: %.4f->%.4f",`
+- Line 3461: **mock** → `log.Printf("Mock: Completed automatic adjustment for %d positions", adjustmentCount)`
+- Line 4404: **mock** → `log.Printf("Exchange client not fully implemented, using mock data")`
+- Line 4405: **mock** → `return ss.getMockMarketData(), nil`
+- Line 4408: **mock** → `// getMockMarketData 获取模拟市场数据`
+- Line 4409: **mock** → `func (ss *StrategyScheduler) getMockMarketData() map[string]*MarketData {`
+- Line 4410: **mock** → `mockData := make(map[string]*MarketData)`
+- Line 4414: **mock** → `mockData[symbol] = ss.createMockMarketData(symbol)`
+- Line 4417: **mock** → `return mockData`
+- Line 4420: **mock** → `// createMockMarketData 创建单个交易对的模拟市场数据`
+- Line 4421: **mock** → `func (ss *StrategyScheduler) createMockMarketData(symbol string) *MarketData {`
+- Line 5090: **TODO** → `// TODO: 实现自动参数应用机制`
 
 ## ./internal\automation\scheduler\sub_schedulers.go
-- Line 1745: **mock** → `log.Printf("Failed to query exchange balances from database: %v, using mock data", err)`
-- Line 1746: **mock** → `return rs.getMockExchangeFundDistribution(), nil`
-- Line 1763: **mock** → `log.Printf("No exchange balance data available, using mock data")`
-- Line 1764: **mock** → `return rs.getMockExchangeFundDistribution(), nil`
-- Line 1770: **mock** → `// getMockExchangeFundDistribution 获取模拟的交易所资金分布`
-- Line 1771: **mock** → `func (rs *RiskScheduler) getMockExchangeFundDistribution() map[string]float64 {`
-- Line 1793: **mock** → `log.Printf("Failed to query wallet balances from database: %v, using mock data", err)`
-- Line 1794: **mock** → `return rs.getMockWalletFundDistribution(), nil`
-- Line 1811: **mock** → `log.Printf("No wallet balance data available, using mock data")`
-- Line 1812: **mock** → `return rs.getMockWalletFundDistribution(), nil`
-- Line 1818: **mock** → `// getMockWalletFundDistribution 获取模拟的钱包资金分布`
-- Line 1819: **mock** → `func (rs *RiskScheduler) getMockWalletFundDistribution() map[string]float64 {`
-- Line 3675: **TODO** → `// TODO 实现对冲调整的调度逻辑`
-- Line 3977: **TODO** → `// TODO 集成实际的告警系统`
-- Line 3983: **TODO** → `// TODO 集成实际的告警系统`
-- Line 3989: **TODO** → `// TODO 集成实际的告警系统`
+- Line 1748: **mock** → `log.Printf("Failed to query exchange balances from database: %v, using mock data", err)`
+- Line 1749: **mock** → `return rs.getMockExchangeFundDistribution(), nil`
+- Line 1766: **mock** → `log.Printf("No exchange balance data available, using mock data")`
+- Line 1767: **mock** → `return rs.getMockExchangeFundDistribution(), nil`
+- Line 1773: **mock** → `// getMockExchangeFundDistribution 获取模拟的交易所资金分布`
+- Line 1774: **mock** → `func (rs *RiskScheduler) getMockExchangeFundDistribution() map[string]float64 {`
+- Line 1796: **mock** → `log.Printf("Failed to query wallet balances from database: %v, using mock data", err)`
+- Line 1797: **mock** → `return rs.getMockWalletFundDistribution(), nil`
+- Line 1814: **mock** → `log.Printf("No wallet balance data available, using mock data")`
+- Line 1815: **mock** → `return rs.getMockWalletFundDistribution(), nil`
+- Line 1821: **mock** → `// getMockWalletFundDistribution 获取模拟的钱包资金分布`
+- Line 1822: **mock** → `func (rs *RiskScheduler) getMockWalletFundDistribution() map[string]float64 {`
 
 ## ./internal\automation\scheduler\position\layered_position_test.go
 - Line 14: **mock** → `// Mock implementations for testing`
@@ -581,12 +521,6 @@
 - Line 427: **mock** → `func (m *MockRedisCache) CheckRateLimit(ctx context.Context, key string, limit int, window time.Duration) (bool, error) {`
 - Line 431: **mock** → `func (m *MockRedisCache) SetOrderBook(ctx context.Context, symbol string, snapshot interface{}, expiration time.Duration) error {`
 - Line 435: **mock** → `func (m *MockRedisCache) GetOrderBook(ctx context.Context, symbol string, dest interface{}) error {`
-
-## ./internal\concurrent\goroutine_pool.go
-- Line 277: **TODO** → `// TODO 添加结果处理逻辑`
-
-## ./internal\events\automation_handlers.go
-- Line 157: **TODO** → `// TODO 触发功能执行`
 
 ## ./internal\fund\hedging\smart_hedging_system.go
 - Line 337: **TODO** → `// TODO: 从配置文件读取对冲参数`

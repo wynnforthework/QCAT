@@ -573,23 +573,7 @@ func (s *Server) setupRoutes() {
 			auth.POST("/refresh", s.handlers.Auth.RefreshToken)
 		}
 
-		// TODO: TEMPORARY - Add audit logs as public route for testing
-		// This should be moved back to protected routes in production
-		auditPublic := v1.Group("/audit")
-		{
-			auditPublic.GET("/logs", s.handlers.Audit.GetLogs)
-		}
-
-		// TODO: TEMPORARY - Add strategy routes as public for frontend testing
-		// This should be moved back to protected routes in production
-		if s.handlers.UnifiedStrategy != nil {
-			v1.GET("/strategy", s.handlers.UnifiedStrategy.ListStrategies)
-			v1.GET("/strategy/:id", s.handlers.UnifiedStrategy.GetStrategy)
-			v1.GET("/strategy/pool/overview", s.handlers.UnifiedStrategy.GetPoolOverview)
-			v1.GET("/strategy/execution/overview", s.handlers.UnifiedStrategy.GetExecutionOverview)
-			v1.GET("/strategy/execution/realtime", s.handlers.UnifiedStrategy.GetRealtimeStatus)
-			v1.GET("/strategy/workflow/status", s.handlers.UnifiedStrategy.GetWorkflowStatus)
-		}
+		// Note: Audit logs and strategy read routes moved to protected section for security
 
 		// Settings routes (public for frontend access)
 		if s.handlers.Settings != nil {
@@ -763,7 +747,24 @@ func (s *Server) setupRoutes() {
 				shutdown.POST("/force", s.forceShutdown)
 			}
 
-			// Audit routes (logs moved to public for testing)
+			// Audit routes (moved back to protected for security)
+			audit := protected.Group("/audit")
+			{
+				audit.GET("/logs", s.handlers.Audit.GetLogs)
+			}
+
+			// Unified Strategy routes (moved back to protected for security)
+			if s.handlers.UnifiedStrategy != nil {
+				unifiedStrategy := protected.Group("/strategy")
+				{
+					unifiedStrategy.GET("", s.handlers.UnifiedStrategy.ListStrategies)
+					unifiedStrategy.GET("/:id", s.handlers.UnifiedStrategy.GetStrategy)
+					unifiedStrategy.GET("/pool/overview", s.handlers.UnifiedStrategy.GetPoolOverview)
+					unifiedStrategy.GET("/execution/overview", s.handlers.UnifiedStrategy.GetExecutionOverview)
+					unifiedStrategy.GET("/execution/realtime", s.handlers.UnifiedStrategy.GetRealtimeStatus)
+					unifiedStrategy.GET("/workflow/status", s.handlers.UnifiedStrategy.GetWorkflowStatus)
+				}
+			}
 			audit := protected.Group("/audit")
 			{
 				// audit.GET("/logs", s.handlers.Audit.GetLogs) // MOVED TO PUBLIC FOR TESTING

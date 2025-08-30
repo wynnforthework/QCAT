@@ -5083,11 +5083,414 @@ func (ss *StrategyScheduler) HandleBestParameterApplication(ctx context.Context,
 
 	// 实现最佳参数应用逻辑
 	// 1. 获取优化完成的策略参数
-	// 2. 验证参数有效性
-	// 3. 应用最佳参数到生产环境
-	// 4. 监控应用效果
+	pendingOptimizations, err := ss.getPendingOptimizationResults(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get pending optimization results: %w", err)
+	}
 
-	// TODO: 实现自动参数应用机制
-	log.Printf("Best parameter application logic executed")
+	if len(pendingOptimizations) == 0 {
+		log.Printf("No pending optimization results to apply")
+		return nil
+	}
+
+	// 2. 验证参数有效性并应用最佳参数
+	for _, optimization := range pendingOptimizations {
+		// 验证参数有效性
+		if err := ss.validateOptimizationForApplication(ctx, optimization); err != nil {
+			log.Printf("Optimization %s failed validation: %v", optimization.ID, err)
+			continue
+		}
+
+		// 3. 应用最佳参数到生产环境
+		if err := ss.applyOptimizationToProduction(ctx, optimization); err != nil {
+			log.Printf("Failed to apply optimization %s: %v", optimization.ID, err)
+			continue
+		}
+
+		// 4. 监控应用效果
+		if err := ss.scheduleParameterMonitoring(ctx, optimization); err != nil {
+			log.Printf("Failed to schedule monitoring for optimization %s: %v", optimization.ID, err)
+		}
+
+		log.Printf("Successfully applied optimization %s for strategy %s", optimization.ID, optimization.StrategyID)
+	}
+
+	log.Printf("Best parameter application logic executed for %d optimizations", len(pendingOptimizations))
+	return nil
+}
+// getPendingOptimizationResults 获取待应用的优化结果
+func (ss *StrategyScheduler) getPendingOptimizationResults(ctx context.Context) ([]*OptimizationResult, error) {
+	if ss.db == nil {
+		return nil, fmt.Errorf("database not available")
+	}
+
+	query := `
+		SELECT id, strategy_id, optimization_score, optimized_parameters, 
+		       created_at, status
+		FROM optimization_history 
+		WHERE status = 'completed' AND applied = false
+		ORDER BY optimization_score DESC
+		LIMIT 10
+	`
+
+	rows, err := ss.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query optimization results: %w", err)
+	}
+	defer rows.Close()
+
+	var results []*OptimizationResult
+	for rows.Next() {
+		var result OptimizationResult
+		var paramsJSON string
+		var createdAt time.Time
+
+		err := rows.Scan(
+			&result.ID,
+			&result.StrategyID,
+			&result.Score,
+			&paramsJSON,
+			&createdAt,
+			&result.Status,
+		)
+		if err != nil {
+			log.Printf("Failed to scan optimization result: %v", err)
+			continue
+		}
+
+		// 解析优化参数
+		if err := json.Unmarshal([]byte(paramsJSON), &result.OptimizedParameters); err != nil {
+			log.Printf("Failed to unmarshal optimization parameters: %v", err)
+			continue
+		}
+
+		result.Timestamp = createdAt
+		results = append(results, &result)
+	}
+
+	return results, nil
+}
+
+// validateOptimizationForApplication 验证优化结果是否可以应用
+func (ss *StrategyScheduler) validateOptimizationForApplication(ctx context.Context, optimization *OptimizationResult) error {
+	// 1. 检查优化分数阈值
+	minScore := 0.1
+	if optimization.Score < minScore {
+		return fmt.Errorf("optimization score %.4f below minimum threshold %.4f", optimization.Score, minScore)
+	}
+
+	// 2. 检查策略当前状态
+	if err := ss.validateStrategyStateForParameterUpdate(ctx, optimization.StrategyID); err != nil {
+		return fmt.Errorf("strategy state validation failed: %w", err)
+	}
+
+	// 3. 检查参数合理性
+	for paramName, value := range optimization.OptimizedParameters {
+		if err := ss.validateParameterValue(paramName, value); err != nil {
+			return fmt.Errorf("parameter %s validation failed: %w", paramName, err)
+		}
+	}
+
+	// 4. 检查是否有冲突的优化正在进行
+	if ss.hasConflictingOptimization(ctx, optimization.StrategyID) {
+		return fmt.Errorf("conflicting optimization in progress for strategy %s", optimization.StrategyID)
+	}
+
+	return nil
+}
+
+// validateStrategyStateForParameterUpdate 验证策略状态是否适合参数更新
+func (ss *StrategyScheduler) validateStrategyStateForParameterUpdate(ctx context.Context, strategyID string) error {
+	if ss.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	var status string
+	var lastUpdate time.Time
+	query := `SELECT status, updated_at FROM strategies WHERE id = ?`
+	
+	err := ss.db.QueryRowContext(ctx, query, strategyID).Scan(&status, &lastUpdate)
+	if err != nil {
+		return fmt.Errorf("failed to query strategy status: %w", err)
+	}
+
+	// 检查策略状态
+	if status != "active" && status != "running" {
+		return fmt.Errorf("strategy status '%s' not suitable for parameter update", status)
+	}
+
+	// 检查最近更新时间（避免频繁更新）
+	if time.Since(lastUpdate) < 30*time.Minute {
+		return fmt.Errorf("strategy updated too recently: %v ago", time.Since(lastUpdate))
+	}
+
+	return nil
+}
+
+// validateParameterValue 验证参数值的合理性
+func (ss *StrategyScheduler) validateParameterValue(paramName string, value interface{}) error {
+	// 定义参数的合理范围
+	paramRanges := map[string]struct {
+		min, max float64
+	}{
+		"stop_loss":     {0.001, 0.1},   // 0.1%-10%
+		"take_profit":   {0.005, 0.2},   // 0.5%-20%
+		"position_size": {0.01, 1.0},    // 1%-100%
+		"risk_ratio":    {0.001, 0.1},   // 0.1%-10%
+		"leverage":      {1.0, 10.0},    // 1x-10x
+	}
+
+	paramRange, exists := paramRanges[paramName]
+	if !exists {
+		return nil // 未定义范围的参数跳过验证
+	}
+
+	// 转换值为float64
+	var floatValue float64
+	switch v := value.(type) {
+	case float64:
+		floatValue = v
+	case string:
+		var err error
+		floatValue, err = strconv.ParseFloat(v, 64)
+		if err != nil {
+			return fmt.Errorf("invalid parameter value format: %s", v)
+		}
+	default:
+		return fmt.Errorf("unsupported parameter value type: %T", value)
+	}
+
+	// 检查范围
+	if floatValue < paramRange.min || floatValue > paramRange.max {
+		return fmt.Errorf("value %.4f outside valid range [%.4f, %.4f]", 
+			floatValue, paramRange.min, paramRange.max)
+	}
+
+	return nil
+}
+
+// hasConflictingOptimization 检查是否有冲突的优化正在进行
+func (ss *StrategyScheduler) hasConflictingOptimization(ctx context.Context, strategyID string) bool {
+	if ss.db == nil {
+		return false
+	}
+
+	var count int
+	query := `
+		SELECT COUNT(*) 
+		FROM optimization_history 
+		WHERE strategy_id = ? AND status IN ('running', 'applying') 
+		AND created_at > ?
+	`
+	
+	cutoffTime := time.Now().Add(-1 * time.Hour)
+	err := ss.db.QueryRowContext(ctx, query, strategyID, cutoffTime).Scan(&count)
+	if err != nil {
+		log.Printf("Failed to check conflicting optimizations: %v", err)
+		return true // 保守处理，有错误时认为有冲突
+	}
+
+	return count > 0
+}
+
+// applyOptimizationToProduction 将优化结果应用到生产环境
+func (ss *StrategyScheduler) applyOptimizationToProduction(ctx context.Context, optimization *OptimizationResult) error {
+	// 开始事务
+	tx, err := ss.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback()
+
+	// 1. 更新策略配置
+	if err := ss.updateStrategyParametersInTransaction(ctx, tx, optimization); err != nil {
+		return fmt.Errorf("failed to update strategy parameters: %w", err)
+	}
+
+	// 2. 记录参数应用历史
+	if err := ss.recordParameterApplicationInTransaction(ctx, tx, optimization); err != nil {
+		return fmt.Errorf("failed to record parameter application: %w", err)
+	}
+
+	// 3. 标记优化结果为已应用
+	if err := ss.markOptimizationAsAppliedInTransaction(ctx, tx, optimization.ID); err != nil {
+		return fmt.Errorf("failed to mark optimization as applied: %w", err)
+	}
+
+	// 4. 提交事务
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	// 5. 通知相关系统
+	if err := ss.notifyParameterApplicationCompleted(ctx, optimization); err != nil {
+		log.Printf("Failed to notify parameter application: %v", err)
+	}
+
+	return nil
+}
+
+// updateStrategyParametersInTransaction 在事务中更新策略参数
+func (ss *StrategyScheduler) updateStrategyParametersInTransaction(ctx context.Context, tx *sql.Tx, optimization *OptimizationResult) error {
+	// 获取当前策略配置
+	var currentConfigJSON string
+	query := `SELECT config FROM strategies WHERE id = ?`
+	err := tx.QueryRowContext(ctx, query, optimization.StrategyID).Scan(&currentConfigJSON)
+	if err != nil {
+		return fmt.Errorf("failed to get current strategy config: %w", err)
+	}
+
+	// 解析当前配置
+	var config map[string]interface{}
+	if err := json.Unmarshal([]byte(currentConfigJSON), &config); err != nil {
+		return fmt.Errorf("failed to unmarshal current config: %w", err)
+	}
+
+	// 应用优化参数
+	for paramName, value := range optimization.OptimizedParameters {
+		config[paramName] = value
+		log.Printf("Updated parameter %s: %v", paramName, value)
+	}
+
+	// 序列化更新后的配置
+	updatedConfigJSON, err := json.Marshal(config)
+	if err != nil {
+		return fmt.Errorf("failed to marshal updated config: %w", err)
+	}
+
+	// 更新数据库
+	updateQuery := `
+		UPDATE strategies 
+		SET config = ?, updated_at = ?, optimization_applied_at = ?
+		WHERE id = ?
+	`
+	_, err = tx.ExecContext(ctx, updateQuery, 
+		string(updatedConfigJSON), 
+		time.Now(), 
+		time.Now(),
+		optimization.StrategyID)
+	if err != nil {
+		return fmt.Errorf("failed to update strategy config: %w", err)
+	}
+
+	return nil
+}
+
+// recordParameterApplicationInTransaction 在事务中记录参数应用历史
+func (ss *StrategyScheduler) recordParameterApplicationInTransaction(ctx context.Context, tx *sql.Tx, optimization *OptimizationResult) error {
+	query := `
+		INSERT INTO parameter_application_history 
+		(optimization_id, strategy_id, applied_parameters, optimization_score, applied_at, applied_by)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`
+	
+	paramsJSON, _ := json.Marshal(optimization.OptimizedParameters)
+	_, err := tx.ExecContext(ctx, query,
+		optimization.ID,
+		optimization.StrategyID,
+		string(paramsJSON),
+		optimization.Score,
+		time.Now(),
+		"system_auto",
+	)
+	
+	if err != nil {
+		return fmt.Errorf("failed to record parameter application history: %w", err)
+	}
+
+	return nil
+}
+
+// markOptimizationAsAppliedInTransaction 在事务中标记优化结果为已应用
+func (ss *StrategyScheduler) markOptimizationAsAppliedInTransaction(ctx context.Context, tx *sql.Tx, optimizationID string) error {
+	query := `
+		UPDATE optimization_history 
+		SET applied = true, applied_at = ?, status = 'applied'
+		WHERE id = ?
+	`
+	
+	_, err := tx.ExecContext(ctx, query, time.Now(), optimizationID)
+	if err != nil {
+		return fmt.Errorf("failed to mark optimization as applied: %w", err)
+	}
+
+	return nil
+}
+
+// notifyParameterApplicationCompleted 通知参数应用完成
+func (ss *StrategyScheduler) notifyParameterApplicationCompleted(ctx context.Context, optimization *OptimizationResult) error {
+	notification := map[string]interface{}{
+		"type":           "parameter_application_completed",
+		"optimization_id": optimization.ID,
+		"strategy_id":    optimization.StrategyID,
+		"score":          optimization.Score,
+		"parameters":     optimization.OptimizedParameters,
+		"timestamp":      time.Now(),
+	}
+
+	// 发布通知
+	if err := ss.publishNotification("parameter_applications", notification); err != nil {
+		return fmt.Errorf("failed to publish notification: %w", err)
+	}
+
+	return nil
+}
+
+// scheduleParameterMonitoring 安排参数监控
+func (ss *StrategyScheduler) scheduleParameterMonitoring(ctx context.Context, optimization *OptimizationResult) error {
+	// 创建监控任务
+	monitoringTask := &ScheduledTask{
+		ID:          fmt.Sprintf("param_monitor_%s_%d", optimization.StrategyID, time.Now().Unix()),
+		Name:        fmt.Sprintf("Parameter Monitoring for %s", optimization.StrategyID),
+		Type:        "parameter_monitoring",
+		StrategyID:  optimization.StrategyID,
+		ScheduledAt: time.Now().Add(1 * time.Hour), // 1小时后开始监控
+		Status:      "scheduled",
+		Config: map[string]interface{}{
+			"optimization_id": optimization.ID,
+			"monitor_duration": "24h",
+			"check_interval": "1h",
+		},
+		CreatedAt: time.Now(),
+	}
+
+	// 保存监控任务
+	if err := ss.saveScheduledTask(ctx, monitoringTask); err != nil {
+		return fmt.Errorf("failed to save monitoring task: %w", err)
+	}
+
+	log.Printf("Scheduled parameter monitoring task %s for strategy %s", 
+		monitoringTask.ID, optimization.StrategyID)
+	return nil
+}
+
+// saveScheduledTask 保存计划任务
+func (ss *StrategyScheduler) saveScheduledTask(ctx context.Context, task *ScheduledTask) error {
+	if ss.db == nil {
+		return fmt.Errorf("database not available")
+	}
+
+	configJSON, _ := json.Marshal(task.Config)
+	query := `
+		INSERT INTO scheduled_tasks 
+		(id, name, type, strategy_id, scheduled_at, status, config, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	_, err := ss.db.ExecContext(ctx, query,
+		task.ID,
+		task.Name,
+		task.Type,
+		task.StrategyID,
+		task.ScheduledAt,
+		task.Status,
+		string(configJSON),
+		task.CreatedAt,
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed to insert scheduled task: %w", err)
+	}
+
 	return nil
 }

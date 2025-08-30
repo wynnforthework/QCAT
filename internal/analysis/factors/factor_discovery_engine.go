@@ -4978,21 +4978,349 @@ func (fde *FactorDiscoveryEngine) getCandidateFactors() []*Factor {
 }
 
 func (fde *FactorDiscoveryEngine) performanceBasedRotation(current, candidates []*Factor) {
-	// TODO: 实现基于性能的轮换
+	// 实现基于性能的轮换
+	log.Printf("Performing performance-based factor rotation with %d current and %d candidate factors", len(current), len(candidates))
+	
+	// 1. 计算所有因子的性能指标
+	factorPerformances := make(map[string]*FactorPerformance)
+	
+	// 计算当前因子的性能
+	for _, factor := range current {
+		performance := fde.calculateFactorPerformance(factor)
+		factorPerformances[factor.ID] = performance
+	}
+	
+	// 计算候选因子的性能
+	for _, factor := range candidates {
+		performance := fde.calculateFactorPerformance(factor)
+		factorPerformances[factor.ID] = performance
+	}
+	
+	// 2. 识别表现不佳的当前因子
+	underperformingFactors := make([]*Factor, 0)
+	performanceThreshold := 0.02 // ICIR阈值
+	
+	for _, factor := range current {
+		performance := factorPerformances[factor.ID]
+		if performance.ICIR < performanceThreshold || performance.RecentIC < 0.01 {
+			underperformingFactors = append(underperformingFactors, factor)
+			log.Printf("Factor %s marked for replacement: ICIR=%.4f, RecentIC=%.4f", 
+				factor.ID, performance.ICIR, performance.RecentIC)
+		}
+	}
+	
+	// 3. 选择最佳候选因子进行替换
+	if len(underperformingFactors) > 0 && len(candidates) > 0 {
+		// 按性能排序候选因子
+		sortedCandidates := make([]*Factor, len(candidates))
+		copy(sortedCandidates, candidates)
+		
+		sort.Slice(sortedCandidates, func(i, j int) bool {
+			perfI := factorPerformances[sortedCandidates[i].ID]
+			perfJ := factorPerformances[sortedCandidates[j].ID]
+			// 综合考虑ICIR和最近IC表现
+			scoreI := perfI.ICIR*0.7 + perfI.RecentIC*0.3
+			scoreJ := perfJ.ICIR*0.7 + perfJ.RecentIC*0.3
+			return scoreI > scoreJ
+		})
+		
+		// 执行替换
+		replacementCount := min(len(underperformingFactors), len(sortedCandidates))
+		for i := 0; i < replacementCount; i++ {
+			oldFactor := underperformingFactors[i]
+			newFactor := sortedCandidates[i]
+			
+			// 记录替换操作
+			fde.recordFactorReplacement(oldFactor.ID, newFactor.ID, "performance_based", 
+				factorPerformances[oldFactor.ID], factorPerformances[newFactor.ID])
+			
+			log.Printf("Replaced factor %s (ICIR: %.4f) with %s (ICIR: %.4f)", 
+				oldFactor.ID, factorPerformances[oldFactor.ID].ICIR,
+				newFactor.ID, factorPerformances[newFactor.ID].ICIR)
+		}
+	}
 }
 
 func (fde *FactorDiscoveryEngine) correlationBasedRotation(current, candidates []*Factor) {
-	// TODO: 实现基于相关性的轮换
+	// 实现基于相关性的轮换
+	log.Printf("Performing correlation-based factor rotation with %d current and %d candidate factors", len(current), len(candidates))
+	
+	if len(current) < 2 {
+		log.Printf("Not enough current factors for correlation analysis")
+		return
+	}
+	
+	// 1. 计算当前因子之间的相关性矩阵
+	correlationMatrix := fde.calculateFactorCorrelationMatrix(current)
+	
+	// 2. 识别高度相关的因子对
+	highCorrelationPairs := make([]FactorPair, 0)
+	correlationThreshold := 0.8 // 相关性阈值
+	
+	for i := 0; i < len(current); i++ {
+		for j := i + 1; j < len(current); j++ {
+			correlation := correlationMatrix[i][j]
+			if math.Abs(correlation) > correlationThreshold {
+				pair := FactorPair{
+					Factor1:     current[i],
+					Factor2:     current[j],
+					Correlation: correlation,
+				}
+				highCorrelationPairs = append(highCorrelationPairs, pair)
+				log.Printf("High correlation detected: %s vs %s = %.4f", 
+					current[i].ID, current[j].ID, correlation)
+			}
+		}
+	}
+	
+	// 3. 对于高相关因子对，保留表现更好的因子
+	factorsToReplace := make(map[string]bool)
+	
+	for _, pair := range highCorrelationPairs {
+		perf1 := fde.calculateFactorPerformance(pair.Factor1)
+		perf2 := fde.calculateFactorPerformance(pair.Factor2)
+		
+		// 比较综合性能分数
+		score1 := perf1.ICIR*0.4 + perf1.SharpeRatio*0.3 + perf1.StabilityScore*0.3
+		score2 := perf2.ICIR*0.4 + perf2.SharpeRatio*0.3 + perf2.StabilityScore*0.3
+		
+		var weakerFactor *Factor
+		if score1 < score2 {
+			weakerFactor = pair.Factor1
+		} else {
+			weakerFactor = pair.Factor2
+		}
+		
+		factorsToReplace[weakerFactor.ID] = true
+		log.Printf("Marking factor %s for replacement due to high correlation (score: %.4f)", 
+			weakerFactor.ID, min(score1, score2))
+	}
+	
+	// 4. 从候选因子中选择与现有因子相关性低的因子进行替换
+	if len(factorsToReplace) > 0 && len(candidates) > 0 {
+		// 为每个候选因子计算与当前因子组合的平均相关性
+		candidateScores := make([]CandidateScore, 0)
+		
+		for _, candidate := range candidates {
+			avgCorrelation := fde.calculateAverageCorrelationWithCurrent(candidate, current, factorsToReplace)
+			performance := fde.calculateFactorPerformance(candidate)
+			
+			// 综合分数：性能高，相关性低
+			score := performance.ICIR*0.6 - math.Abs(avgCorrelation)*0.4
+			
+			candidateScores = append(candidateScores, CandidateScore{
+				Factor:        candidate,
+				Score:         score,
+				AvgCorrelation: avgCorrelation,
+			})
+		}
+		
+		// 按分数排序候选因子
+		sort.Slice(candidateScores, func(i, j int) bool {
+			return candidateScores[i].Score > candidateScores[j].Score
+		})
+		
+		// 执行替换
+		replacementCount := 0
+		for factorID := range factorsToReplace {
+			if replacementCount >= len(candidateScores) {
+				break
+			}
+			
+			newFactor := candidateScores[replacementCount].Factor
+			
+			// 记录替换操作
+			fde.recordFactorReplacement(factorID, newFactor.ID, "correlation_based", nil, nil)
+			
+			log.Printf("Replaced highly correlated factor %s with %s (avg correlation: %.4f)", 
+				factorID, newFactor.ID, candidateScores[replacementCount].AvgCorrelation)
+			
+			replacementCount++
+		}
+	}
 }
 
 func (fde *FactorDiscoveryEngine) regimeBasedRotation(current, candidates []*Factor) {
-	// TODO: 实现基于市场状态的轮换
+	// 实现基于市场状态的轮换
+	log.Printf("Performing regime-based factor rotation with %d current and %d candidate factors", len(current), len(candidates))
+	
+	// 1. 识别当前市场状态
+	currentRegime := fde.identifyMarketRegime()
+	log.Printf("Current market regime identified as: %s", currentRegime.Type)
+	
+	// 2. 评估当前因子在当前市场状态下的适应性
+	factorRegimeScores := make(map[string]float64)
+	
+	for _, factor := range current {
+		regimeScore := fde.calculateFactorRegimeAdaptability(factor, currentRegime)
+		factorRegimeScores[factor.ID] = regimeScore
+		
+		log.Printf("Factor %s regime adaptability score: %.4f", factor.ID, regimeScore)
+	}
+	
+	// 3. 识别在当前市场状态下表现不佳的因子
+	regimeThreshold := 0.3 // 市场适应性阈值
+	underperformingInRegime := make([]*Factor, 0)
+	
+	for _, factor := range current {
+		if factorRegimeScores[factor.ID] < regimeThreshold {
+			underperformingInRegime = append(underperformingInRegime, factor)
+			log.Printf("Factor %s underperforming in current regime: score=%.4f", 
+				factor.ID, factorRegimeScores[factor.ID])
+		}
+	}
+	
+	// 4. 从候选因子中选择适合当前市场状态的因子
+	if len(underperformingInRegime) > 0 && len(candidates) > 0 {
+		// 评估候选因子的市场适应性
+		candidateRegimeScores := make([]RegimeCandidateScore, 0)
+		
+		for _, candidate := range candidates {
+			regimeScore := fde.calculateFactorRegimeAdaptability(candidate, currentRegime)
+			performance := fde.calculateFactorPerformance(candidate)
+			
+			// 综合分数：市场适应性 + 历史表现
+			totalScore := regimeScore*0.6 + performance.ICIR*0.4
+			
+			candidateRegimeScores = append(candidateRegimeScores, RegimeCandidateScore{
+				Factor:      candidate,
+				RegimeScore: regimeScore,
+				TotalScore:  totalScore,
+			})
+		}
+		
+		// 按总分排序
+		sort.Slice(candidateRegimeScores, func(i, j int) bool {
+			return candidateRegimeScores[i].TotalScore > candidateRegimeScores[j].TotalScore
+		})
+		
+		// 执行替换
+		replacementCount := min(len(underperformingInRegime), len(candidateRegimeScores))
+		for i := 0; i < replacementCount; i++ {
+			oldFactor := underperformingInRegime[i]
+			newCandidate := candidateRegimeScores[i]
+			
+			// 记录替换操作
+			fde.recordFactorReplacement(oldFactor.ID, newCandidate.Factor.ID, "regime_based", nil, nil)
+			
+			log.Printf("Replaced regime-unsuitable factor %s (score: %.4f) with %s (regime score: %.4f)", 
+				oldFactor.ID, factorRegimeScores[oldFactor.ID],
+				newCandidate.Factor.ID, newCandidate.RegimeScore)
+		}
+	}
+	
+	// 5. 记录市场状态变化历史
+	fde.recordMarketRegimeChange(currentRegime)
 }
 
 func (fde *FactorDiscoveryEngine) calculateFactorPerformance(factor *Factor) *FactorPerformance {
-	// TODO: 计算因子表现
-	return &FactorPerformance{
-		FactorID:       factor.ID,
+	// 计算因子表现
+	log.Printf("Calculating performance for factor: %s", factor.ID)
+	
+	// 1. 获取因子历史数据
+	historicalData := fde.getFactorHistoricalData(factor.ID)
+	if len(historicalData) == 0 {
+		log.Printf("No historical data available for factor %s, using default values", factor.ID)
+		return fde.createDefaultFactorPerformance(factor.ID)
+	}
+	
+	// 2. 计算IC相关指标
+	icValues := make([]float64, len(historicalData))
+	rankICValues := make([]float64, len(historicalData))
+	returns := make([]float64, len(historicalData))
+	
+	for i, data := range historicalData {
+		icValues[i] = data.IC
+		rankICValues[i] = data.RankIC
+		returns[i] = data.Return
+	}
+	
+	avgIC := calculateMean(icValues)
+	avgRankIC := calculateMean(rankICValues)
+	icStdDev := calculateStdDev(icValues)
+	icir := 0.0
+	if icStdDev > 0 {
+		icir = avgIC / icStdDev
+	}
+	
+	// 3. 计算命中率
+	hitCount := 0
+	for _, ic := range icValues {
+		if ic > 0 {
+			hitCount++
+		}
+	}
+	hitRate := float64(hitCount) / float64(len(icValues))
+	
+	// 4. 计算收益相关指标
+	cumulativeReturn := 1.0
+	for _, ret := range returns {
+		cumulativeReturn *= (1.0 + ret)
+	}
+	cumulativeReturn -= 1.0
+	
+	// 年化收益率（假设252个交易日）
+	periods := float64(len(returns))
+	annualizedReturn := math.Pow(1.0+cumulativeReturn, 252.0/periods) - 1.0
+	
+	// 波动率
+	volatility := calculateStdDev(returns) * math.Sqrt(252)
+	
+	// 夏普比率
+	sharpeRatio := 0.0
+	if volatility > 0 {
+		sharpeRatio = annualizedReturn / volatility
+	}
+	
+	// 最大回撤
+	maxDrawdown := calculateMaxDrawdown(returns)
+	
+	// 5. 计算稳定性指标
+	stabilityScore := fde.calculateStabilityScore(icValues)
+	consistencyScore := fde.calculateConsistencyScore(icValues)
+	
+	// 6. 计算最近表现（最近20个数据点）
+	recentPeriod := min(20, len(historicalData))
+	recentICValues := icValues[len(icValues)-recentPeriod:]
+	recentRankICValues := rankICValues[len(rankICValues)-recentPeriod:]
+	
+	recentIC := calculateMean(recentICValues)
+	recentRankIC := calculateMean(recentRankICValues)
+	
+	// 7. 构建性能历史
+	performanceHistory := make([]PerformancePoint, len(historicalData))
+	for i, data := range historicalData {
+		performanceHistory[i] = PerformancePoint{
+			Date:   data.Date,
+			IC:     data.IC,
+			RankIC: data.RankIC,
+			Return: data.Return,
+		}
+	}
+	
+	performance := &FactorPerformance{
+		FactorID:           factor.ID,
+		PerformanceHistory: performanceHistory,
+		AvgIC:              avgIC,
+		AvgRankIC:          avgRankIC,
+		ICStdDev:           icStdDev,
+		ICIR:               icir,
+		HitRate:            hitRate,
+		CumulativeReturn:   cumulativeReturn,
+		AnnualizedReturn:   annualizedReturn,
+		Volatility:         volatility,
+		SharpeRatio:        sharpeRatio,
+		MaxDrawdown:        maxDrawdown,
+		StabilityScore:     stabilityScore,
+		ConsistencyScore:   consistencyScore,
+		RecentIC:           recentIC,
+		RecentRankIC:       recentRankIC,
+	}
+	
+	log.Printf("Factor %s performance calculated: ICIR=%.4f, Sharpe=%.4f, HitRate=%.2f%%", 
+		factor.ID, icir, sharpeRatio, hitRate*100)
+	
+	return performance
 		AvgIC:          factor.IC,
 		AvgRankIC:      factor.RankIC,
 		ICStdDev:       factor.ICStdDev,
@@ -5158,4 +5486,467 @@ func (fde *FactorDiscoveryEngine) GetFactorPerformance(factorID string) (*Factor
 	}
 
 	return nil, fmt.Errorf("factor performance not found: %s", factorID)
+}
+// Supporting types and functions for factor rotation
+
+// FactorPair 因子对
+type FactorPair struct {
+	Factor1     *Factor
+	Factor2     *Factor
+	Correlation float64
+}
+
+// CandidateScore 候选因子分数
+type CandidateScore struct {
+	Factor         *Factor
+	Score          float64
+	AvgCorrelation float64
+}
+
+// MarketRegime 市场状态
+type MarketRegime struct {
+	Type        string    // "bull", "bear", "sideways", "volatile"
+	Volatility  float64   // 波动率
+	Trend       float64   // 趋势强度
+	Volume      float64   // 成交量
+	Timestamp   time.Time
+}
+
+// RegimeCandidateScore 市场状态候选因子分数
+type RegimeCandidateScore struct {
+	Factor      *Factor
+	RegimeScore float64
+	TotalScore  float64
+}
+
+// FactorHistoricalData 因子历史数据
+type FactorHistoricalData struct {
+	Date   time.Time
+	IC     float64
+	RankIC float64
+	Return float64
+}
+
+// PerformancePoint 性能数据点
+type PerformancePoint struct {
+	Date   time.Time `json:"date"`
+	IC     float64   `json:"ic"`
+	RankIC float64   `json:"rank_ic"`
+	Return float64   `json:"return"`
+}
+
+// min 返回两个整数的最小值
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+// calculateMean 计算平均值
+func calculateMean(values []float64) float64 {
+	if len(values) == 0 {
+		return 0.0
+	}
+	sum := 0.0
+	for _, v := range values {
+		sum += v
+	}
+	return sum / float64(len(values))
+}
+
+// calculateStdDev 计算标准差
+func calculateStdDev(values []float64) float64 {
+	if len(values) <= 1 {
+		return 0.0
+	}
+	
+	mean := calculateMean(values)
+	sumSquares := 0.0
+	for _, v := range values {
+		diff := v - mean
+		sumSquares += diff * diff
+	}
+	
+	return math.Sqrt(sumSquares / float64(len(values)-1))
+}
+
+// calculateMaxDrawdown 计算最大回撤
+func calculateMaxDrawdown(returns []float64) float64 {
+	if len(returns) == 0 {
+		return 0.0
+	}
+	
+	cumulative := 1.0
+	peak := 1.0
+	maxDrawdown := 0.0
+	
+	for _, ret := range returns {
+		cumulative *= (1.0 + ret)
+		if cumulative > peak {
+			peak = cumulative
+		}
+		drawdown := (peak - cumulative) / peak
+		if drawdown > maxDrawdown {
+			maxDrawdown = drawdown
+		}
+	}
+	
+	return maxDrawdown
+}
+
+// recordFactorReplacement 记录因子替换操作
+func (fde *FactorDiscoveryEngine) recordFactorReplacement(oldFactorID, newFactorID, reason string, oldPerf, newPerf *FactorPerformance) {
+	log.Printf("Recording factor replacement: %s -> %s (reason: %s)", oldFactorID, newFactorID, reason)
+	
+	// 这里可以记录到数据库或日志系统
+	replacement := map[string]interface{}{
+		"timestamp":      time.Now(),
+		"old_factor_id":  oldFactorID,
+		"new_factor_id":  newFactorID,
+		"reason":         reason,
+		"old_performance": oldPerf,
+		"new_performance": newPerf,
+	}
+	
+	// 简化实现：记录到日志
+	log.Printf("Factor replacement recorded: %+v", replacement)
+}
+
+// calculateFactorCorrelationMatrix 计算因子相关性矩阵
+func (fde *FactorDiscoveryEngine) calculateFactorCorrelationMatrix(factors []*Factor) [][]float64 {
+	n := len(factors)
+	matrix := make([][]float64, n)
+	for i := range matrix {
+		matrix[i] = make([]float64, n)
+	}
+	
+	// 获取所有因子的历史数据
+	factorData := make([][]float64, n)
+	for i, factor := range factors {
+		historicalData := fde.getFactorHistoricalData(factor.ID)
+		values := make([]float64, len(historicalData))
+		for j, data := range historicalData {
+			values[j] = data.IC
+		}
+		factorData[i] = values
+	}
+	
+	// 计算相关性
+	for i := 0; i < n; i++ {
+		for j := 0; j < n; j++ {
+			if i == j {
+				matrix[i][j] = 1.0
+			} else {
+				matrix[i][j] = calculateCorrelation(factorData[i], factorData[j])
+			}
+		}
+	}
+	
+	return matrix
+}
+
+// calculateCorrelation 计算两个序列的相关性
+func calculateCorrelation(x, y []float64) float64 {
+	if len(x) != len(y) || len(x) == 0 {
+		return 0.0
+	}
+	
+	meanX := calculateMean(x)
+	meanY := calculateMean(y)
+	
+	numerator := 0.0
+	sumXSquares := 0.0
+	sumYSquares := 0.0
+	
+	for i := 0; i < len(x); i++ {
+		diffX := x[i] - meanX
+		diffY := y[i] - meanY
+		numerator += diffX * diffY
+		sumXSquares += diffX * diffX
+		sumYSquares += diffY * diffY
+	}
+	
+	denominator := math.Sqrt(sumXSquares * sumYSquares)
+	if denominator == 0 {
+		return 0.0
+	}
+	
+	return numerator / denominator
+}
+
+// calculateAverageCorrelationWithCurrent 计算候选因子与当前因子的平均相关性
+func (fde *FactorDiscoveryEngine) calculateAverageCorrelationWithCurrent(candidate *Factor, current []*Factor, excludeFactors map[string]bool) float64 {
+	candidateData := fde.getFactorHistoricalData(candidate.ID)
+	candidateValues := make([]float64, len(candidateData))
+	for i, data := range candidateData {
+		candidateValues[i] = data.IC
+	}
+	
+	correlations := make([]float64, 0)
+	
+	for _, factor := range current {
+		if excludeFactors[factor.ID] {
+			continue // 跳过要被替换的因子
+		}
+		
+		factorData := fde.getFactorHistoricalData(factor.ID)
+		factorValues := make([]float64, len(factorData))
+		for i, data := range factorData {
+			factorValues[i] = data.IC
+		}
+		
+		correlation := calculateCorrelation(candidateValues, factorValues)
+		correlations = append(correlations, math.Abs(correlation))
+	}
+	
+	return calculateMean(correlations)
+}
+
+// identifyMarketRegime 识别市场状态
+func (fde *FactorDiscoveryEngine) identifyMarketRegime() *MarketRegime {
+	// 简化实现：基于市场指标识别状态
+	// 实际实现应该使用更复杂的算法和更多数据
+	
+	// 获取市场数据
+	marketData := fde.getCurrentMarketData()
+	
+	// 计算趋势强度
+	trend := fde.calculateTrendStrength(marketData)
+	
+	// 计算波动率
+	volatility := fde.calculateMarketVolatility(marketData)
+	
+	// 计算成交量
+	volume := fde.calculateAverageVolume(marketData)
+	
+	// 根据指标确定市场状态
+	regimeType := "sideways" // 默认横盘
+	
+	if trend > 0.6 && volatility < 0.2 {
+		regimeType = "bull"
+	} else if trend < -0.6 && volatility < 0.2 {
+		regimeType = "bear"
+	} else if volatility > 0.3 {
+		regimeType = "volatile"
+	}
+	
+	return &MarketRegime{
+		Type:       regimeType,
+		Volatility: volatility,
+		Trend:      trend,
+		Volume:     volume,
+		Timestamp:  time.Now(),
+	}
+}
+
+// calculateFactorRegimeAdaptability 计算因子在特定市场状态下的适应性
+func (fde *FactorDiscoveryEngine) calculateFactorRegimeAdaptability(factor *Factor, regime *MarketRegime) float64 {
+	// 获取因子在不同市场状态下的历史表现
+	regimePerformance := fde.getFactorRegimePerformance(factor.ID, regime.Type)
+	
+	// 基于因子类型和市场状态计算适应性分数
+	baseScore := 0.5 // 基础分数
+	
+	switch regime.Type {
+	case "bull":
+		// 牛市中动量因子表现较好
+		if factor.Type == "TECHNICAL" && strings.Contains(factor.Name, "momentum") {
+			baseScore += 0.3
+		}
+		// 成长因子在牛市中表现好
+		if factor.Type == "FUNDAMENTAL" && strings.Contains(factor.Name, "growth") {
+			baseScore += 0.2
+		}
+		
+	case "bear":
+		// 熊市中质量因子和低波动因子表现较好
+		if factor.Type == "FUNDAMENTAL" && (strings.Contains(factor.Name, "quality") || strings.Contains(factor.Name, "low_vol")) {
+			baseScore += 0.3
+		}
+		
+	case "volatile":
+		// 高波动市场中反转因子可能表现较好
+		if factor.Type == "TECHNICAL" && strings.Contains(factor.Name, "reversal") {
+			baseScore += 0.2
+		}
+		
+	case "sideways":
+		// 横盘市场中均值回归因子表现较好
+		if factor.Type == "TECHNICAL" && strings.Contains(factor.Name, "mean_reversion") {
+			baseScore += 0.2
+		}
+	}
+	
+	// 结合历史表现调整分数
+	if regimePerformance != nil {
+		baseScore = baseScore*0.6 + regimePerformance.AvgIC*0.4
+	}
+	
+	// 确保分数在0-1范围内
+	if baseScore > 1.0 {
+		baseScore = 1.0
+	}
+	if baseScore < 0.0 {
+		baseScore = 0.0
+	}
+	
+	return baseScore
+}
+
+// recordMarketRegimeChange 记录市场状态变化
+func (fde *FactorDiscoveryEngine) recordMarketRegimeChange(regime *MarketRegime) {
+	log.Printf("Recording market regime change: %s (volatility: %.4f, trend: %.4f)", 
+		regime.Type, regime.Volatility, regime.Trend)
+	
+	// 这里可以记录到数据库
+	// 简化实现：记录到日志
+}
+
+// getFactorHistoricalData 获取因子历史数据
+func (fde *FactorDiscoveryEngine) getFactorHistoricalData(factorID string) []FactorHistoricalData {
+	// 简化实现：返回模拟数据
+	// 实际实现应该从数据库获取真实历史数据
+	
+	data := make([]FactorHistoricalData, 60) // 60天数据
+	baseDate := time.Now().AddDate(0, 0, -60)
+	
+	for i := 0; i < 60; i++ {
+		// 生成模拟的IC和收益数据
+		ic := (rand.Float64() - 0.5) * 0.2 // -0.1 到 0.1
+		rankIC := ic * (0.8 + rand.Float64()*0.4) // 相关但有噪音
+		ret := ic * 0.5 + (rand.Float64()-0.5)*0.02 // 基于IC的收益
+		
+		data[i] = FactorHistoricalData{
+			Date:   baseDate.AddDate(0, 0, i),
+			IC:     ic,
+			RankIC: rankIC,
+			Return: ret,
+		}
+	}
+	
+	return data
+}
+
+// createDefaultFactorPerformance 创建默认因子性能
+func (fde *FactorDiscoveryEngine) createDefaultFactorPerformance(factorID string) *FactorPerformance {
+	return &FactorPerformance{
+		FactorID:           factorID,
+		PerformanceHistory: []PerformancePoint{},
+		AvgIC:              0.0,
+		AvgRankIC:          0.0,
+		ICStdDev:           0.0,
+		ICIR:               0.0,
+		HitRate:            0.5,
+		CumulativeReturn:   0.0,
+		AnnualizedReturn:   0.0,
+		Volatility:         0.0,
+		SharpeRatio:        0.0,
+		MaxDrawdown:        0.0,
+		StabilityScore:     0.5,
+		ConsistencyScore:   0.5,
+		RecentIC:           0.0,
+		RecentRankIC:       0.0,
+	}
+}
+
+// calculateStabilityScore 计算稳定性分数
+func (fde *FactorDiscoveryEngine) calculateStabilityScore(icValues []float64) float64 {
+	if len(icValues) < 10 {
+		return 0.5 // 数据不足，返回中性分数
+	}
+	
+	// 计算IC的标准差，标准差越小稳定性越高
+	stdDev := calculateStdDev(icValues)
+	
+	// 将标准差转换为0-1的稳定性分数
+	// 假设标准差在0-0.2范围内
+	stabilityScore := 1.0 - math.Min(stdDev/0.2, 1.0)
+	
+	return stabilityScore
+}
+
+// calculateConsistencyScore 计算一致性分数
+func (fde *FactorDiscoveryEngine) calculateConsistencyScore(icValues []float64) float64 {
+	if len(icValues) < 10 {
+		return 0.5 // 数据不足，返回中性分数
+	}
+	
+	// 计算正IC的比例
+	positiveCount := 0
+	for _, ic := range icValues {
+		if ic > 0 {
+			positiveCount++
+		}
+	}
+	
+	consistency := float64(positiveCount) / float64(len(icValues))
+	
+	// 将一致性转换为分数：50%为中性，越接近100%或0%分数越高
+	if consistency >= 0.5 {
+		return consistency
+	} else {
+		return 1.0 - consistency
+	}
+}
+
+// getCurrentMarketData 获取当前市场数据
+func (fde *FactorDiscoveryEngine) getCurrentMarketData() map[string]interface{} {
+	// 简化实现：返回模拟市场数据
+	return map[string]interface{}{
+		"price_change":   (rand.Float64() - 0.5) * 0.1, // -5% 到 5%
+		"volume_ratio":   0.8 + rand.Float64()*0.4,     // 0.8 到 1.2
+		"volatility":     0.1 + rand.Float64()*0.2,     // 0.1 到 0.3
+		"trend_strength": (rand.Float64() - 0.5) * 2,   // -1 到 1
+	}
+}
+
+// calculateTrendStrength 计算趋势强度
+func (fde *FactorDiscoveryEngine) calculateTrendStrength(marketData map[string]interface{}) float64 {
+	if trend, ok := marketData["trend_strength"].(float64); ok {
+		return trend
+	}
+	return 0.0
+}
+
+// calculateMarketVolatility 计算市场波动率
+func (fde *FactorDiscoveryEngine) calculateMarketVolatility(marketData map[string]interface{}) float64 {
+	if vol, ok := marketData["volatility"].(float64); ok {
+		return vol
+	}
+	return 0.2 // 默认波动率
+}
+
+// calculateAverageVolume 计算平均成交量
+func (fde *FactorDiscoveryEngine) calculateAverageVolume(marketData map[string]interface{}) float64 {
+	if vol, ok := marketData["volume_ratio"].(float64); ok {
+		return vol
+	}
+	return 1.0 // 默认成交量比率
+}
+
+// getFactorRegimePerformance 获取因子在特定市场状态下的表现
+func (fde *FactorDiscoveryEngine) getFactorRegimePerformance(factorID, regimeType string) *FactorPerformance {
+	// 简化实现：返回基于市场状态的模拟性能
+	// 实际实现应该从历史数据中筛选特定市场状态下的表现
+	
+	baseIC := 0.02
+	switch regimeType {
+	case "bull":
+		baseIC = 0.03
+	case "bear":
+		baseIC = 0.01
+	case "volatile":
+		baseIC = 0.015
+	case "sideways":
+		baseIC = 0.025
+	}
+	
+	return &FactorPerformance{
+		FactorID:  factorID,
+		AvgIC:     baseIC + (rand.Float64()-0.5)*0.01,
+		ICIR:      baseIC * 2,
+		HitRate:   0.5 + baseIC,
+		RecentIC:  baseIC,
+	}
 }

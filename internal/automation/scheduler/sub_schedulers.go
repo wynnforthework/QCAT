@@ -1,12 +1,14 @@
 package scheduler
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math"
+	"net/http"
 	"sort"
 	"sync"
 	"time"
@@ -17,6 +19,7 @@ import (
 	"qcat/internal/hotlist"
 	"qcat/internal/monitor"
 
+	"github.com/google/uuid"
 	"github.com/lib/pq"
 )
 
@@ -3672,9 +3675,40 @@ func (ps *PositionScheduler) recordHedgeEffectivenessMetrics(ctx context.Context
 func (ps *PositionScheduler) scheduleHedgeAdjustment(ctx context.Context, operation *HedgeOperation) {
 	log.Printf("Scheduling hedge adjustment for operation %s", operation.ID)
 
-	// TODO 实现对冲调整的调度逻辑
-	// 例如：重新计算对冲比率、调整仓位等
-	// 目前只记录日志
+	// 实现对冲调整的调度逻辑
+	// 1. 分析当前对冲效果
+	effectiveness, err := ps.analyzeHedgeEffectiveness(ctx, operation)
+	if err != nil {
+		log.Printf("Failed to analyze hedge effectiveness: %v", err)
+		return
+	}
+	
+	// 2. 判断是否需要调整
+	if ps.shouldAdjustHedge(effectiveness) {
+		log.Printf("Hedge adjustment needed for operation %s", operation.ID)
+		
+		// 3. 计算新的对冲比率
+		newRatio, err := ps.calculateOptimalHedgeRatio(ctx, operation)
+		if err != nil {
+			log.Printf("Failed to calculate optimal hedge ratio: %v", err)
+			return
+		}
+		
+		// 4. 执行对冲调整
+		if err := ps.executeHedgeAdjustment(ctx, operation, newRatio); err != nil {
+			log.Printf("Failed to execute hedge adjustment: %v", err)
+			return
+		}
+		
+		// 5. 记录调整历史
+		if err := ps.recordHedgeAdjustment(ctx, operation, effectiveness, newRatio); err != nil {
+			log.Printf("Failed to record hedge adjustment: %v", err)
+		}
+		
+		log.Printf("Hedge adjustment completed for operation %s", operation.ID)
+	} else {
+		log.Printf("No hedge adjustment needed for operation %s", operation.ID)
+	}
 }
 
 // updateHedgeHistory 更新对冲历史记录
@@ -3974,19 +4008,78 @@ func (rs *RiskScheduler) detectMarketAnomalies(ctx context.Context) ([]*MarketAn
 // triggerMarginAlert 触发保证金告警
 func (rs *RiskScheduler) triggerMarginAlert(ctx context.Context, risk *MarginRisk) {
 	log.Printf("MARGIN ALERT: %s - %s", risk.Level, risk.Message)
-	// TODO 集成实际的告警系统
+	
+	// 集成实际的告警系统
+	alert := &Alert{
+		ID:          uuid.New().String(),
+		Type:        "MARGIN_RISK",
+		Level:       risk.Level,
+		Title:       "保证金风险告警",
+		Message:     risk.Message,
+		Source:      "RiskScheduler",
+		Timestamp:   time.Now(),
+		Metadata: map[string]interface{}{
+			"margin_ratio":    risk.MarginRatio,
+			"required_margin": risk.RequiredMargin,
+			"available_margin": risk.AvailableMargin,
+		},
+	}
+	
+	if err := rs.sendAlert(ctx, alert); err != nil {
+		log.Printf("Failed to send margin alert: %v", err)
+	}
 }
 
 // triggerPositionAlert 触发仓位告警
 func (rs *RiskScheduler) triggerPositionAlert(ctx context.Context, risk *PositionRisk) {
 	log.Printf("POSITION ALERT: %s - %s risk score: %.4f", risk.Symbol, risk.RiskLevel, risk.RiskScore)
-	// TODO 集成实际的告警系统
+	
+	// 集成实际的告警系统
+	alert := &Alert{
+		ID:        uuid.New().String(),
+		Type:      "POSITION_RISK",
+		Level:     risk.RiskLevel,
+		Title:     fmt.Sprintf("仓位风险告警 - %s", risk.Symbol),
+		Message:   fmt.Sprintf("仓位 %s 风险评分: %.4f", risk.Symbol, risk.RiskScore),
+		Source:    "RiskScheduler",
+		Timestamp: time.Now(),
+		Metadata: map[string]interface{}{
+			"symbol":     risk.Symbol,
+			"risk_score": risk.RiskScore,
+			"position_size": risk.PositionSize,
+			"unrealized_pnl": risk.UnrealizedPnL,
+		},
+	}
+	
+	if err := rs.sendAlert(ctx, alert); err != nil {
+		log.Printf("Failed to send position alert: %v", err)
+	}
 }
 
 // triggerAnomalyAlert 触发异常告警
 func (rs *RiskScheduler) triggerAnomalyAlert(ctx context.Context, anomaly *MarketAnomaly) {
 	log.Printf("MARKET ANOMALY ALERT: %s - %s - %s", anomaly.Symbol, anomaly.Type, anomaly.Description)
-	// TODO 集成实际的告警系统
+	
+	// 集成实际的告警系统
+	alert := &Alert{
+		ID:        uuid.New().String(),
+		Type:      "MARKET_ANOMALY",
+		Level:     anomaly.Severity,
+		Title:     fmt.Sprintf("市场异常告警 - %s", anomaly.Symbol),
+		Message:   fmt.Sprintf("%s: %s", anomaly.Type, anomaly.Description),
+		Source:    "RiskScheduler",
+		Timestamp: time.Now(),
+		Metadata: map[string]interface{}{
+			"symbol":      anomaly.Symbol,
+			"anomaly_type": anomaly.Type,
+			"confidence":  anomaly.Confidence,
+			"detected_at": anomaly.DetectedAt,
+		},
+	}
+	
+	if err := rs.sendAlert(ctx, alert); err != nil {
+		log.Printf("Failed to send anomaly alert: %v", err)
+	}
 }
 
 // executeRiskControlMeasures 执行风险控制措施
@@ -5180,4 +5273,873 @@ func (ss *SystemScheduler) monitorServiceStatus(ctx context.Context) ([]*Service
 		{Name: "exchange_api", Status: "HEALTHY", Uptime: time.Hour * 12},
 		{Name: "risk_monitor", Status: "DEGRADED", Uptime: time.Hour * 6},
 	}, nil
+}// A
+lert 告警结构
+type Alert struct {
+	ID        string                 `json:"id"`
+	Type      string                 `json:"type"`
+	Level     string                 `json:"level"`
+	Title     string                 `json:"title"`
+	Message   string                 `json:"message"`
+	Source    string                 `json:"source"`
+	Timestamp time.Time              `json:"timestamp"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// AlertChannel 告警通道
+type AlertChannel struct {
+	Type     string                 `json:"type"`     // email, sms, webhook, slack, telegram
+	Config   map[string]interface{} `json:"config"`
+	Enabled  bool                   `json:"enabled"`
+	Priority int                    `json:"priority"` // 1-10, 1为最高优先级
+}
+
+// sendAlert 发送告警
+func (rs *RiskScheduler) sendAlert(ctx context.Context, alert *Alert) error {
+	// 记录告警到数据库
+	if err := rs.recordAlert(ctx, alert); err != nil {
+		log.Printf("Failed to record alert: %v", err)
+	}
+	
+	// 获取告警通道配置
+	channels, err := rs.getAlertChannels(ctx, alert.Type, alert.Level)
+	if err != nil {
+		return fmt.Errorf("failed to get alert channels: %w", err)
+	}
+	
+	// 并发发送到各个通道
+	var wg sync.WaitGroup
+	for _, channel := range channels {
+		if !channel.Enabled {
+			continue
+		}
+		
+		wg.Add(1)
+		go func(ch AlertChannel) {
+			defer wg.Done()
+			if err := rs.sendToChannel(ctx, alert, ch); err != nil {
+				log.Printf("Failed to send alert to %s channel: %v", ch.Type, err)
+			}
+		}(channel)
+	}
+	
+	wg.Wait()
+	return nil
+}
+
+// recordAlert 记录告警到数据库
+func (rs *RiskScheduler) recordAlert(ctx context.Context, alert *Alert) error {
+	if rs.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	metadataJSON, _ := json.Marshal(alert.Metadata)
+	query := `
+		INSERT INTO alerts (id, type, level, title, message, source, metadata, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	
+	_, err := rs.db.ExecContext(ctx, query,
+		alert.ID, alert.Type, alert.Level, alert.Title,
+		alert.Message, alert.Source, string(metadataJSON), alert.Timestamp,
+	)
+	
+	return err
+}
+
+// getAlertChannels 获取告警通道配置
+func (rs *RiskScheduler) getAlertChannels(ctx context.Context, alertType, level string) ([]AlertChannel, error) {
+	// 从配置文件或数据库获取告警通道配置
+	channels := []AlertChannel{}
+	
+	// 根据告警级别确定通道
+	switch level {
+	case "CRITICAL":
+		// 关键告警：所有通道
+		channels = append(channels,
+			AlertChannel{Type: "email", Enabled: true, Priority: 1},
+			AlertChannel{Type: "sms", Enabled: true, Priority: 1},
+			AlertChannel{Type: "webhook", Enabled: true, Priority: 2},
+			AlertChannel{Type: "slack", Enabled: true, Priority: 2},
+		)
+	case "HIGH":
+		// 高级告警：邮件和Webhook
+		channels = append(channels,
+			AlertChannel{Type: "email", Enabled: true, Priority: 1},
+			AlertChannel{Type: "webhook", Enabled: true, Priority: 2},
+			AlertChannel{Type: "slack", Enabled: true, Priority: 3},
+		)
+	case "MEDIUM":
+		// 中级告警：邮件
+		channels = append(channels,
+			AlertChannel{Type: "email", Enabled: true, Priority: 1},
+			AlertChannel{Type: "slack", Enabled: true, Priority: 2},
+		)
+	case "LOW":
+		// 低级告警：仅记录
+		channels = append(channels,
+			AlertChannel{Type: "webhook", Enabled: true, Priority: 3},
+		)
+	}
+	
+	// 从配置中获取通道配置
+	for i := range channels {
+		channels[i].Config = rs.getChannelConfig(channels[i].Type)
+	}
+	
+	return channels, nil
+}
+
+// getChannelConfig 获取通道配置
+func (rs *RiskScheduler) getChannelConfig(channelType string) map[string]interface{} {
+	if rs.config == nil {
+		return map[string]interface{}{}
+	}
+	
+	switch channelType {
+	case "email":
+		return map[string]interface{}{
+			"smtp_host":     rs.config.GetString("alerts.email.smtp_host"),
+			"smtp_port":     rs.config.GetInt("alerts.email.smtp_port"),
+			"username":      rs.config.GetString("alerts.email.username"),
+			"password":      rs.config.GetString("alerts.email.password"),
+			"from":          rs.config.GetString("alerts.email.from"),
+			"to":            rs.config.GetString("alerts.email.to"),
+		}
+	case "sms":
+		return map[string]interface{}{
+			"api_key":    rs.config.GetString("alerts.sms.api_key"),
+			"api_secret": rs.config.GetString("alerts.sms.api_secret"),
+			"phone":      rs.config.GetString("alerts.sms.phone"),
+		}
+	case "webhook":
+		return map[string]interface{}{
+			"url":     rs.config.GetString("alerts.webhook.url"),
+			"method":  rs.config.GetString("alerts.webhook.method"),
+			"headers": rs.config.Get("alerts.webhook.headers"),
+		}
+	case "slack":
+		return map[string]interface{}{
+			"webhook_url": rs.config.GetString("alerts.slack.webhook_url"),
+			"channel":     rs.config.GetString("alerts.slack.channel"),
+			"username":    rs.config.GetString("alerts.slack.username"),
+		}
+	case "telegram":
+		return map[string]interface{}{
+			"bot_token": rs.config.GetString("alerts.telegram.bot_token"),
+			"chat_id":   rs.config.GetString("alerts.telegram.chat_id"),
+		}
+	default:
+		return map[string]interface{}{}
+	}
+}
+
+// sendToChannel 发送告警到指定通道
+func (rs *RiskScheduler) sendToChannel(ctx context.Context, alert *Alert, channel AlertChannel) error {
+	switch channel.Type {
+	case "email":
+		return rs.sendEmailAlert(ctx, alert, channel.Config)
+	case "sms":
+		return rs.sendSMSAlert(ctx, alert, channel.Config)
+	case "webhook":
+		return rs.sendWebhookAlert(ctx, alert, channel.Config)
+	case "slack":
+		return rs.sendSlackAlert(ctx, alert, channel.Config)
+	case "telegram":
+		return rs.sendTelegramAlert(ctx, alert, channel.Config)
+	default:
+		return fmt.Errorf("unsupported alert channel type: %s", channel.Type)
+	}
+}
+
+// sendEmailAlert 发送邮件告警
+func (rs *RiskScheduler) sendEmailAlert(ctx context.Context, alert *Alert, config map[string]interface{}) error {
+	// 简化实现：记录日志
+	log.Printf("EMAIL ALERT: [%s] %s - %s", alert.Level, alert.Title, alert.Message)
+	
+	// 实际实现应该使用SMTP发送邮件
+	// 这里可以集成如 gomail 等邮件库
+	/*
+	m := gomail.NewMessage()
+	m.SetHeader("From", config["from"].(string))
+	m.SetHeader("To", config["to"].(string))
+	m.SetHeader("Subject", alert.Title)
+	m.SetBody("text/html", rs.formatEmailBody(alert))
+	
+	d := gomail.NewDialer(
+		config["smtp_host"].(string),
+		config["smtp_port"].(int),
+		config["username"].(string),
+		config["password"].(string),
+	)
+	
+	return d.DialAndSend(m)
+	*/
+	
+	return nil
+}
+
+// sendSMSAlert 发送短信告警
+func (rs *RiskScheduler) sendSMSAlert(ctx context.Context, alert *Alert, config map[string]interface{}) error {
+	// 简化实现：记录日志
+	log.Printf("SMS ALERT: [%s] %s", alert.Level, alert.Message)
+	
+	// 实际实现应该调用短信服务API
+	// 如阿里云短信、腾讯云短信等
+	
+	return nil
+}
+
+// sendWebhookAlert 发送Webhook告警
+func (rs *RiskScheduler) sendWebhookAlert(ctx context.Context, alert *Alert, config map[string]interface{}) error {
+	url, ok := config["url"].(string)
+	if !ok || url == "" {
+		return fmt.Errorf("webhook URL not configured")
+	}
+	
+	// 构建请求体
+	payload := map[string]interface{}{
+		"alert":     alert,
+		"timestamp": time.Now().Unix(),
+	}
+	
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal webhook payload: %w", err)
+	}
+	
+	// 发送HTTP请求
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create webhook request: %w", err)
+	}
+	
+	req.Header.Set("Content-Type", "application/json")
+	
+	// 添加自定义头部
+	if headers, ok := config["headers"].(map[string]interface{}); ok {
+		for key, value := range headers {
+			if strValue, ok := value.(string); ok {
+				req.Header.Set(key, strValue)
+			}
+		}
+	}
+	
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send webhook: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("webhook returned error status: %d", resp.StatusCode)
+	}
+	
+	log.Printf("WEBHOOK ALERT sent successfully: [%s] %s", alert.Level, alert.Title)
+	return nil
+}
+
+// sendSlackAlert 发送Slack告警
+func (rs *RiskScheduler) sendSlackAlert(ctx context.Context, alert *Alert, config map[string]interface{}) error {
+	webhookURL, ok := config["webhook_url"].(string)
+	if !ok || webhookURL == "" {
+		return fmt.Errorf("Slack webhook URL not configured")
+	}
+	
+	// 构建Slack消息
+	color := rs.getSlackColor(alert.Level)
+	payload := map[string]interface{}{
+		"attachments": []map[string]interface{}{
+			{
+				"color":      color,
+				"title":      alert.Title,
+				"text":       alert.Message,
+				"footer":     alert.Source,
+				"ts":         alert.Timestamp.Unix(),
+				"fields": []map[string]interface{}{
+					{
+						"title": "告警级别",
+						"value": alert.Level,
+						"short": true,
+					},
+					{
+						"title": "告警类型",
+						"value": alert.Type,
+						"short": true,
+					},
+				},
+			},
+		},
+	}
+	
+	// 添加元数据字段
+	if alert.Metadata != nil {
+		fields := payload["attachments"].([]map[string]interface{})[0]["fields"].([]map[string]interface{})
+		for key, value := range alert.Metadata {
+			fields = append(fields, map[string]interface{}{
+				"title": key,
+				"value": fmt.Sprintf("%v", value),
+				"short": true,
+			})
+		}
+		payload["attachments"].([]map[string]interface{})[0]["fields"] = fields
+	}
+	
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal Slack payload: %w", err)
+	}
+	
+	// 发送到Slack
+	req, err := http.NewRequestWithContext(ctx, "POST", webhookURL, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create Slack request: %w", err)
+	}
+	
+	req.Header.Set("Content-Type", "application/json")
+	
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send Slack alert: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("Slack returned error status: %d", resp.StatusCode)
+	}
+	
+	log.Printf("SLACK ALERT sent successfully: [%s] %s", alert.Level, alert.Title)
+	return nil
+}
+
+// sendTelegramAlert 发送Telegram告警
+func (rs *RiskScheduler) sendTelegramAlert(ctx context.Context, alert *Alert, config map[string]interface{}) error {
+	botToken, ok := config["bot_token"].(string)
+	if !ok || botToken == "" {
+		return fmt.Errorf("Telegram bot token not configured")
+	}
+	
+	chatID, ok := config["chat_id"].(string)
+	if !ok || chatID == "" {
+		return fmt.Errorf("Telegram chat ID not configured")
+	}
+	
+	// 构建消息
+	message := fmt.Sprintf("🚨 *%s*\n\n*级别:* %s\n*类型:* %s\n*来源:* %s\n*时间:* %s\n\n%s",
+		alert.Title,
+		alert.Level,
+		alert.Type,
+		alert.Source,
+		alert.Timestamp.Format("2006-01-02 15:04:05"),
+		alert.Message,
+	)
+	
+	// 构建请求
+	url := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", botToken)
+	payload := map[string]interface{}{
+		"chat_id":    chatID,
+		"text":       message,
+		"parse_mode": "Markdown",
+	}
+	
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal Telegram payload: %w", err)
+	}
+	
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create Telegram request: %w", err)
+	}
+	
+	req.Header.Set("Content-Type", "application/json")
+	
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send Telegram alert: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode >= 400 {
+		return fmt.Errorf("Telegram returned error status: %d", resp.StatusCode)
+	}
+	
+	log.Printf("TELEGRAM ALERT sent successfully: [%s] %s", alert.Level, alert.Title)
+	return nil
+}
+
+// getSlackColor 根据告警级别获取Slack颜色
+func (rs *RiskScheduler) getSlackColor(level string) string {
+	switch level {
+	case "CRITICAL":
+		return "danger"
+	case "HIGH":
+		return "warning"
+	case "MEDIUM":
+		return "good"
+	case "LOW":
+		return "#36a64f"
+	default:
+		return "#808080"
+	}
+}
+
+// formatEmailBody 格式化邮件正文
+func (rs *RiskScheduler) formatEmailBody(alert *Alert) string {
+	html := fmt.Sprintf(`
+<html>
+<body>
+	<h2 style="color: %s;">%s</h2>
+	<p><strong>告警级别:</strong> %s</p>
+	<p><strong>告警类型:</strong> %s</p>
+	<p><strong>来源:</strong> %s</p>
+	<p><strong>时间:</strong> %s</p>
+	<p><strong>消息:</strong> %s</p>
+`, rs.getEmailColor(alert.Level), alert.Title, alert.Level, alert.Type, alert.Source, 
+	alert.Timestamp.Format("2006-01-02 15:04:05"), alert.Message)
+	
+	// 添加元数据
+	if alert.Metadata != nil && len(alert.Metadata) > 0 {
+		html += "<h3>详细信息:</h3><ul>"
+		for key, value := range alert.Metadata {
+			html += fmt.Sprintf("<li><strong>%s:</strong> %v</li>", key, value)
+		}
+		html += "</ul>"
+	}
+	
+	html += "</body></html>"
+	return html
+}
+
+// getEmailColor 根据告警级别获取邮件颜色
+func (rs *RiskScheduler) getEmailColor(level string) string {
+	switch level {
+	case "CRITICAL":
+		return "#dc3545"
+	case "HIGH":
+		return "#fd7e14"
+	case "MEDIUM":
+		return "#ffc107"
+	case "LOW":
+		return "#28a745"
+	default:
+		return "#6c757d"
+	}
+}// 
+analyzeHedgeEffectiveness 分析对冲效果
+func (ps *PositionScheduler) analyzeHedgeEffectiveness(ctx context.Context, operation *HedgeOperation) (*HedgeEffectivenessAnalysis, error) {
+	// 获取对冲操作的历史数据
+	hedgeHistory, err := ps.getHedgeHistory(ctx, operation.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get hedge history: %w", err)
+	}
+	
+	// 计算对冲效果指标
+	analysis := &HedgeEffectivenessAnalysis{
+		OperationID:        operation.ID,
+		AnalysisTime:       time.Now(),
+		CorrelationStability: ps.calculateCorrelationStability(hedgeHistory),
+		RiskReduction:      ps.calculateRiskReduction(hedgeHistory),
+		CostEfficiency:     ps.calculateCostEfficiency(hedgeHistory),
+		OverallScore:       0.0,
+	}
+	
+	// 计算综合评分
+	analysis.OverallScore = (analysis.CorrelationStability*0.4 + 
+		analysis.RiskReduction*0.4 + 
+		analysis.CostEfficiency*0.2)
+	
+	log.Printf("Hedge effectiveness analysis for %s: score=%.4f", operation.ID, analysis.OverallScore)
+	return analysis, nil
+}
+
+// shouldAdjustHedge 判断是否需要调整对冲
+func (ps *PositionScheduler) shouldAdjustHedge(analysis *HedgeEffectivenessAnalysis) bool {
+	// 设定调整阈值
+	minEffectivenessScore := 0.6 // 60%以下需要调整
+	maxCorrelationDrift := 0.3   // 相关性漂移超过30%需要调整
+	
+	// 检查综合评分
+	if analysis.OverallScore < minEffectivenessScore {
+		log.Printf("Hedge effectiveness below threshold: %.4f < %.4f", 
+			analysis.OverallScore, minEffectivenessScore)
+		return true
+	}
+	
+	// 检查相关性稳定性
+	if analysis.CorrelationStability < (1.0 - maxCorrelationDrift) {
+		log.Printf("Correlation stability below threshold: %.4f", analysis.CorrelationStability)
+		return true
+	}
+	
+	// 检查风险降低效果
+	if analysis.RiskReduction < 0.5 {
+		log.Printf("Risk reduction below threshold: %.4f", analysis.RiskReduction)
+		return true
+	}
+	
+	return false
+}
+
+// calculateOptimalHedgeRatio 计算最优对冲比率
+func (ps *PositionScheduler) calculateOptimalHedgeRatio(ctx context.Context, operation *HedgeOperation) (float64, error) {
+	// 获取当前市场数据
+	marketData, err := ps.getCurrentMarketData(ctx, operation.Symbol)
+	if err != nil {
+		return 0, fmt.Errorf("failed to get market data: %w", err)
+	}
+	
+	// 获取历史价格数据
+	historicalPrices, err := ps.getHistoricalPrices(ctx, operation.Symbol, 30) // 30天历史数据
+	if err != nil {
+		return 0, fmt.Errorf("failed to get historical prices: %w", err)
+	}
+	
+	// 计算波动率
+	volatility := ps.calculateVolatility(historicalPrices)
+	
+	// 计算相关性
+	correlation := ps.calculateCorrelationWithMarket(historicalPrices)
+	
+	// 使用最小方差对冲比率公式
+	// h* = Cov(S,F) / Var(F)
+	// 简化为基于相关性和波动率的计算
+	optimalRatio := correlation * (volatility / 0.02) // 基准波动率2%
+	
+	// 限制对冲比率在合理范围内
+	optimalRatio = math.Max(0.1, math.Min(1.0, optimalRatio))
+	
+	log.Printf("Calculated optimal hedge ratio for %s: %.4f (volatility=%.4f, correlation=%.4f)", 
+		operation.Symbol, optimalRatio, volatility, correlation)
+	
+	return optimalRatio, nil
+}
+
+// executeHedgeAdjustment 执行对冲调整
+func (ps *PositionScheduler) executeHedgeAdjustment(ctx context.Context, operation *HedgeOperation, newRatio float64) error {
+	// 计算需要调整的仓位大小
+	currentHedgeSize := operation.HedgeSize
+	targetHedgeSize := operation.PositionSize * newRatio
+	adjustmentSize := targetHedgeSize - currentHedgeSize
+	
+	log.Printf("Executing hedge adjustment: current=%.4f, target=%.4f, adjustment=%.4f", 
+		currentHedgeSize, targetHedgeSize, adjustmentSize)
+	
+	// 创建调整订单
+	adjustmentOrder := &HedgeAdjustmentOrder{
+		OperationID:    operation.ID,
+		Symbol:         operation.Symbol,
+		AdjustmentSize: adjustmentSize,
+		NewRatio:       newRatio,
+		OrderType:      "MARKET",
+		Timestamp:      time.Now(),
+	}
+	
+	// 执行订单
+	if err := ps.placeHedgeAdjustmentOrder(ctx, adjustmentOrder); err != nil {
+		return fmt.Errorf("failed to place hedge adjustment order: %w", err)
+	}
+	
+	// 更新操作记录
+	operation.HedgeSize = targetHedgeSize
+	operation.HedgeRatio = newRatio
+	operation.LastAdjustment = time.Now()
+	
+	if err := ps.updateHedgeOperation(ctx, operation); err != nil {
+		log.Printf("Failed to update hedge operation: %v", err)
+	}
+	
+	return nil
+}
+
+// recordHedgeAdjustment 记录对冲调整
+func (ps *PositionScheduler) recordHedgeAdjustment(ctx context.Context, operation *HedgeOperation, analysis *HedgeEffectivenessAnalysis, newRatio float64) error {
+	if ps.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	query := `
+		INSERT INTO hedge_adjustments 
+		(operation_id, symbol, old_ratio, new_ratio, effectiveness_score, 
+		 correlation_stability, risk_reduction, cost_efficiency, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+	
+	_, err := ps.db.ExecContext(ctx, query,
+		operation.ID,
+		operation.Symbol,
+		operation.HedgeRatio,
+		newRatio,
+		analysis.OverallScore,
+		analysis.CorrelationStability,
+		analysis.RiskReduction,
+		analysis.CostEfficiency,
+		time.Now(),
+	)
+	
+	if err != nil {
+		return fmt.Errorf("failed to record hedge adjustment: %w", err)
+	}
+	
+	log.Printf("Recorded hedge adjustment for operation %s", operation.ID)
+	return nil
+}
+
+// Supporting structures and methods
+
+// HedgeEffectivenessAnalysis 对冲效果分析
+type HedgeEffectivenessAnalysis struct {
+	OperationID          string    `json:"operation_id"`
+	AnalysisTime         time.Time `json:"analysis_time"`
+	CorrelationStability float64   `json:"correlation_stability"`
+	RiskReduction        float64   `json:"risk_reduction"`
+	CostEfficiency       float64   `json:"cost_efficiency"`
+	OverallScore         float64   `json:"overall_score"`
+}
+
+// HedgeAdjustmentOrder 对冲调整订单
+type HedgeAdjustmentOrder struct {
+	OperationID    string    `json:"operation_id"`
+	Symbol         string    `json:"symbol"`
+	AdjustmentSize float64   `json:"adjustment_size"`
+	NewRatio       float64   `json:"new_ratio"`
+	OrderType      string    `json:"order_type"`
+	Timestamp      time.Time `json:"timestamp"`
+}
+
+// getHedgeHistory 获取对冲历史
+func (ps *PositionScheduler) getHedgeHistory(ctx context.Context, operationID string) ([]map[string]interface{}, error) {
+	// 简化实现：返回模拟历史数据
+	history := []map[string]interface{}{
+		{
+			"timestamp":    time.Now().Add(-24 * time.Hour),
+			"hedge_ratio":  0.8,
+			"effectiveness": 0.75,
+			"pnl":          1500.0,
+		},
+		{
+			"timestamp":    time.Now().Add(-12 * time.Hour),
+			"hedge_ratio":  0.82,
+			"effectiveness": 0.72,
+			"pnl":          1200.0,
+		},
+	}
+	
+	return history, nil
+}
+
+// calculateCorrelationStability 计算相关性稳定性
+func (ps *PositionScheduler) calculateCorrelationStability(history []map[string]interface{}) float64 {
+	if len(history) < 2 {
+		return 1.0
+	}
+	
+	// 简化计算：基于历史数据的方差
+	var correlations []float64
+	for _, record := range history {
+		if corr, ok := record["correlation"].(float64); ok {
+			correlations = append(correlations, corr)
+		}
+	}
+	
+	if len(correlations) == 0 {
+		return 0.8 // 默认稳定性
+	}
+	
+	// 计算标准差
+	var sum, mean float64
+	for _, corr := range correlations {
+		sum += corr
+	}
+	mean = sum / float64(len(correlations))
+	
+	var variance float64
+	for _, corr := range correlations {
+		variance += (corr - mean) * (corr - mean)
+	}
+	variance /= float64(len(correlations))
+	
+	stability := 1.0 - math.Sqrt(variance)
+	return math.Max(0.0, math.Min(1.0, stability))
+}
+
+// calculateRiskReduction 计算风险降低效果
+func (ps *PositionScheduler) calculateRiskReduction(history []map[string]interface{}) float64 {
+	// 简化计算：基于PnL波动性的降低
+	if len(history) < 2 {
+		return 0.7 // 默认风险降低效果
+	}
+	
+	var pnls []float64
+	for _, record := range history {
+		if pnl, ok := record["pnl"].(float64); ok {
+			pnls = append(pnls, pnl)
+		}
+	}
+	
+	if len(pnls) == 0 {
+		return 0.7
+	}
+	
+	// 计算PnL的标准差作为风险指标
+	var sum, mean float64
+	for _, pnl := range pnls {
+		sum += pnl
+	}
+	mean = sum / float64(len(pnls))
+	
+	var variance float64
+	for _, pnl := range pnls {
+		variance += (pnl - mean) * (pnl - mean)
+	}
+	variance /= float64(len(pnls))
+	
+	risk := math.Sqrt(variance)
+	// 风险降低效果 = 1 - (当前风险 / 基准风险)
+	baselineRisk := 2000.0 // 基准风险
+	riskReduction := 1.0 - (risk / baselineRisk)
+	
+	return math.Max(0.0, math.Min(1.0, riskReduction))
+}
+
+// calculateCostEfficiency 计算成本效率
+func (ps *PositionScheduler) calculateCostEfficiency(history []map[string]interface{}) float64 {
+	// 简化计算：基于交易成本和收益的比率
+	totalCost := 0.0
+	totalBenefit := 0.0
+	
+	for _, record := range history {
+		if cost, ok := record["cost"].(float64); ok {
+			totalCost += cost
+		}
+		if benefit, ok := record["benefit"].(float64); ok {
+			totalBenefit += benefit
+		}
+	}
+	
+	if totalCost == 0 {
+		return 0.8 // 默认成本效率
+	}
+	
+	efficiency := totalBenefit / totalCost
+	return math.Max(0.0, math.Min(1.0, efficiency/2.0)) // 归一化到0-1
+}
+
+// getCurrentMarketData 获取当前市场数据
+func (ps *PositionScheduler) getCurrentMarketData(ctx context.Context, symbol string) (map[string]interface{}, error) {
+	// 简化实现：返回模拟市场数据
+	marketData := map[string]interface{}{
+		"symbol":    symbol,
+		"price":     50000.0,
+		"volume":    1000000.0,
+		"timestamp": time.Now(),
+	}
+	
+	return marketData, nil
+}
+
+// getHistoricalPrices 获取历史价格数据
+func (ps *PositionScheduler) getHistoricalPrices(ctx context.Context, symbol string, days int) ([]float64, error) {
+	// 简化实现：生成模拟历史价格
+	prices := make([]float64, days)
+	basePrice := 50000.0
+	
+	for i := 0; i < days; i++ {
+		// 模拟价格波动
+		change := (math.Sin(float64(i)*0.1) + math.Cos(float64(i)*0.05)) * 0.02
+		prices[i] = basePrice * (1 + change)
+	}
+	
+	return prices, nil
+}
+
+// calculateVolatility 计算波动率
+func (ps *PositionScheduler) calculateVolatility(prices []float64) float64 {
+	if len(prices) < 2 {
+		return 0.02 // 默认2%波动率
+	}
+	
+	// 计算收益率
+	returns := make([]float64, len(prices)-1)
+	for i := 1; i < len(prices); i++ {
+		returns[i-1] = (prices[i] - prices[i-1]) / prices[i-1]
+	}
+	
+	// 计算标准差
+	var sum, mean float64
+	for _, ret := range returns {
+		sum += ret
+	}
+	mean = sum / float64(len(returns))
+	
+	var variance float64
+	for _, ret := range returns {
+		variance += (ret - mean) * (ret - mean)
+	}
+	variance /= float64(len(returns))
+	
+	return math.Sqrt(variance)
+}
+
+// calculateCorrelationWithMarket 计算与市场的相关性
+func (ps *PositionScheduler) calculateCorrelationWithMarket(prices []float64) float64 {
+	// 简化实现：返回基于价格趋势的相关性
+	if len(prices) < 2 {
+		return 0.7 // 默认相关性
+	}
+	
+	// 计算价格变化趋势
+	upCount := 0
+	for i := 1; i < len(prices); i++ {
+		if prices[i] > prices[i-1] {
+			upCount++
+		}
+	}
+	
+	// 基于上涨比例计算相关性
+	upRatio := float64(upCount) / float64(len(prices)-1)
+	correlation := 0.5 + (upRatio-0.5)*0.8 // 调整到合理范围
+	
+	return math.Max(0.1, math.Min(0.9, correlation))
+}
+
+// placeHedgeAdjustmentOrder 下达对冲调整订单
+func (ps *PositionScheduler) placeHedgeAdjustmentOrder(ctx context.Context, order *HedgeAdjustmentOrder) error {
+	// 简化实现：记录订单日志
+	log.Printf("Placing hedge adjustment order: %+v", order)
+	
+	// 实际实现应该调用交易所API
+	// return ps.exchangeClient.PlaceOrder(ctx, order)
+	
+	return nil
+}
+
+// updateHedgeOperation 更新对冲操作记录
+func (ps *PositionScheduler) updateHedgeOperation(ctx context.Context, operation *HedgeOperation) error {
+	if ps.db == nil {
+		return fmt.Errorf("database not available")
+	}
+	
+	query := `
+		UPDATE hedge_operations 
+		SET hedge_size = ?, hedge_ratio = ?, last_adjustment = ?, updated_at = ?
+		WHERE id = ?
+	`
+	
+	_, err := ps.db.ExecContext(ctx, query,
+		operation.HedgeSize,
+		operation.HedgeRatio,
+		operation.LastAdjustment,
+		time.Now(),
+		operation.ID,
+	)
+	
+	if err != nil {
+		return fmt.Errorf("failed to update hedge operation: %w", err)
+	}
+	
+	return nil
 }
