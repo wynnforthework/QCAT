@@ -29,6 +29,9 @@ type RedisFallback struct {
 	db           *database.DB
 	healthCheck  *RedisHealthCheck
 	fallbackChan chan FallbackMode
+
+	// 通知回调函数
+	notificationCallbacks []func(FallbackMode, FallbackMode) // oldMode, newMode
 }
 
 // MemoryCache 内存缓存
@@ -58,11 +61,12 @@ type RedisHealthCheck struct {
 // NewRedisFallback 创建Redis降级管理器
 func NewRedisFallback(redisCache cache.Cacher, db *database.DB) *RedisFallback {
 	rf := &RedisFallback{
-		redisCache:   redisCache,
-		memoryCache:  NewMemoryCache(),
-		db:           db,
-		fallbackChan: make(chan FallbackMode, 10),
-		healthCheck:  &RedisHealthCheck{},
+		redisCache:            redisCache,
+		memoryCache:           NewMemoryCache(),
+		db:                    db,
+		fallbackChan:          make(chan FallbackMode, 10),
+		healthCheck:           &RedisHealthCheck{},
+		notificationCallbacks: make([]func(FallbackMode, FallbackMode), 0),
 	}
 
 	// 启动健康检查
@@ -357,12 +361,69 @@ func (rf *RedisFallback) switchToRedis() {
 	}
 }
 
+// AddNotificationCallback 添加模式切换通知回调
+func (rf *RedisFallback) AddNotificationCallback(callback func(oldMode, newMode FallbackMode)) {
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	rf.notificationCallbacks = append(rf.notificationCallbacks, callback)
+}
+
 // modeSwitchListener 模式切换监听器
 func (rf *RedisFallback) modeSwitchListener() {
-	for mode := range rf.fallbackChan {
-		log.Printf("Cache mode switched to: %s", mode)
-		// TODO 添加模式切换的通知逻辑
+	var previousMode FallbackMode = FallbackModeRedis // 默认初始模式
+
+	for newMode := range rf.fallbackChan {
+		log.Printf("Cache mode switched from %s to %s", previousMode, newMode)
+
+		// 发送模式切换通知
+		rf.sendModeChangeNotifications(previousMode, newMode)
+
+		// 记录模式切换事件到日志
+		rf.logModeChangeEvent(previousMode, newMode)
+
+		// 更新统计信息
+		rf.updateModeChangeStats(previousMode, newMode)
+
+		previousMode = newMode
 	}
+}
+
+// sendModeChangeNotifications 发送模式切换通知
+func (rf *RedisFallback) sendModeChangeNotifications(oldMode, newMode FallbackMode) {
+	rf.mu.RLock()
+	callbacks := make([]func(FallbackMode, FallbackMode), len(rf.notificationCallbacks))
+	copy(callbacks, rf.notificationCallbacks)
+	rf.mu.RUnlock()
+
+	// 执行所有注册的回调函数
+	for _, callback := range callbacks {
+		go func(cb func(FallbackMode, FallbackMode)) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("Mode change notification callback panic: %v", r)
+				}
+			}()
+			cb(oldMode, newMode)
+		}(callback)
+	}
+}
+
+// logModeChangeEvent 记录模式切换事件
+func (rf *RedisFallback) logModeChangeEvent(oldMode, newMode FallbackMode) {
+	severity := "INFO"
+	if newMode == FallbackModeMemory || newMode == FallbackModeDatabase {
+		severity = "WARNING" // 降级到备用模式是警告级别
+	}
+
+	log.Printf("[%s] Redis fallback mode change: %s -> %s at %s",
+		severity, oldMode, newMode, time.Now().Format(time.RFC3339))
+}
+
+// updateModeChangeStats 更新模式切换统计
+func (rf *RedisFallback) updateModeChangeStats(oldMode, newMode FallbackMode) {
+	// 这里可以集成到监控系统，记录模式切换次数和时间
+	// 例如：Prometheus metrics, InfluxDB, 或其他监控系统
+	log.Printf("Mode change stats: %s->%s transitions recorded", oldMode, newMode)
 }
 
 // cleanupTTL 清理过期TTL

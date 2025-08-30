@@ -3,7 +3,10 @@ package strategy
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"log"
+	"strings"
 	"time"
 
 	"qcat/internal/cache"
@@ -15,11 +18,11 @@ import (
 // UnifiedStrategyService 统一策略服务
 // 整合策略管理、策略池、执行监控等功能
 type UnifiedStrategyService struct {
-	db               *database.DB
-	cache            cache.Cacher
-	metrics          *monitor.MetricsCollector
-	workflowSystem   *workflow.MultiStrategyWorkflowSystem
-	strategyPool     *workflow.TradingStrategyPool
+	db             *database.DB
+	cache          cache.Cacher
+	metrics        *monitor.MetricsCollector
+	workflowSystem *workflow.MultiStrategyWorkflowSystem
+	strategyPool   *workflow.TradingStrategyPool
 }
 
 // NewUnifiedStrategyService 创建统一策略服务
@@ -72,51 +75,51 @@ type UnifiedStrategy struct {
 
 // LifecycleInfo 生命周期信息
 type LifecycleInfo struct {
-	Stage       string `json:"stage"`       // draft, testing, production, deprecated
-	Status      string `json:"status"`      // active, inactive, paused, error
-	IsEnabled   bool   `json:"isEnabled"`
-	CanStart    bool   `json:"canStart"`
-	CanStop     bool   `json:"canStop"`
-	CanEdit     bool   `json:"canEdit"`
-	CanDelete   bool   `json:"canDelete"`
+	Stage     string `json:"stage"`  // draft, testing, production, deprecated
+	Status    string `json:"status"` // active, inactive, paused, error
+	IsEnabled bool   `json:"isEnabled"`
+	CanStart  bool   `json:"canStart"`
+	CanStop   bool   `json:"canStop"`
+	CanEdit   bool   `json:"canEdit"`
+	CanDelete bool   `json:"canDelete"`
 }
 
 // ExecutionInfo 执行信息
 type ExecutionInfo struct {
-	IsRunning        bool      `json:"isRunning"`
-	LastExecution    time.Time `json:"lastExecution"`
-	NextExecution    time.Time `json:"nextExecution"`
-	ExecutionCount   int       `json:"executionCount"`
-	SuccessCount     int       `json:"successCount"`
-	ErrorCount       int       `json:"errorCount"`
-	SuccessRate      float64   `json:"successRate"`
-	AvgLatency       float64   `json:"avgLatency"`
-	LastError        string    `json:"lastError,omitempty"`
+	IsRunning      bool      `json:"isRunning"`
+	LastExecution  time.Time `json:"lastExecution"`
+	NextExecution  time.Time `json:"nextExecution"`
+	ExecutionCount int       `json:"executionCount"`
+	SuccessCount   int       `json:"successCount"`
+	ErrorCount     int       `json:"errorCount"`
+	SuccessRate    float64   `json:"successRate"`
+	AvgLatency     float64   `json:"avgLatency"`
+	LastError      string    `json:"lastError,omitempty"`
 }
 
 // PerformanceInfo 性能信息
 type PerformanceInfo struct {
-	PNL           float64 `json:"pnl"`
-	TotalReturn   float64 `json:"totalReturn"`
-	SharpeRatio   float64 `json:"sharpeRatio"`
-	MaxDrawdown   float64 `json:"maxDrawdown"`
-	WinRate       float64 `json:"winRate"`
-	ProfitFactor  float64 `json:"profitFactor"`
-	Volatility    float64 `json:"volatility"`
-	TradeCount    int     `json:"tradeCount"`
-	AvgTrade      float64 `json:"avgTrade"`
-	BestTrade     float64 `json:"bestTrade"`
-	WorstTrade    float64 `json:"worstTrade"`
+	PNL          float64 `json:"pnl"`
+	TotalReturn  float64 `json:"totalReturn"`
+	SharpeRatio  float64 `json:"sharpeRatio"`
+	MaxDrawdown  float64 `json:"maxDrawdown"`
+	WinRate      float64 `json:"winRate"`
+	ProfitFactor float64 `json:"profitFactor"`
+	Volatility   float64 `json:"volatility"`
+	TradeCount   int     `json:"tradeCount"`
+	AvgTrade     float64 `json:"avgTrade"`
+	BestTrade    float64 `json:"bestTrade"`
+	WorstTrade   float64 `json:"worstTrade"`
 }
 
 // PoolInfo 策略池信息
 type PoolInfo struct {
-	PoolStatus        string                 `json:"poolStatus"`        // enabled, disabled, testing, pending
-	Priority          string                 `json:"priority"`          // high, medium, low
-	ResourceAllocation ResourceAllocation    `json:"resourceAllocation"`
-	PoolMetrics       PoolMetrics           `json:"poolMetrics"`
-	LastSync          time.Time             `json:"lastSync"`
-	SyncStatus        string                `json:"syncStatus"`
+	PoolStatus         string             `json:"poolStatus"` // enabled, disabled, testing, pending
+	Priority           string             `json:"priority"`   // high, medium, low
+	ResourceAllocation ResourceAllocation `json:"resourceAllocation"`
+	PoolMetrics        PoolMetrics        `json:"poolMetrics"`
+	LastSync           time.Time          `json:"lastSync"`
+	SyncStatus         string             `json:"syncStatus"`
 }
 
 // ResourceAllocation 资源分配
@@ -128,10 +131,10 @@ type ResourceAllocation struct {
 
 // PoolMetrics 池指标
 type PoolMetrics struct {
-	QueuePosition    int     `json:"queuePosition"`
-	ExecutionWeight  float64 `json:"executionWeight"`
-	ResourceUsage    float64 `json:"resourceUsage"`
-	ConflictCount    int     `json:"conflictCount"`
+	QueuePosition   int     `json:"queuePosition"`
+	ExecutionWeight float64 `json:"executionWeight"`
+	ResourceUsage   float64 `json:"resourceUsage"`
+	ConflictCount   int     `json:"conflictCount"`
 }
 
 // StrategyListOptions 策略列表选项
@@ -141,15 +144,15 @@ type StrategyListOptions struct {
 	Type       []string `json:"type,omitempty"`
 	Stage      []string `json:"stage,omitempty"`
 	PoolStatus []string `json:"poolStatus,omitempty"`
-	
+
 	// 排序选项
 	SortBy    string `json:"sortBy,omitempty"`    // name, performance, created_at, updated_at
 	SortOrder string `json:"sortOrder,omitempty"` // asc, desc
-	
+
 	// 分页选项
 	Page     int `json:"page,omitempty"`
 	PageSize int `json:"pageSize,omitempty"`
-	
+
 	// 视图选项
 	View string `json:"view,omitempty"` // list, pool, execution, performance
 }
@@ -166,25 +169,25 @@ type StrategyListResponse struct {
 // StrategySummary 策略摘要
 type StrategySummary struct {
 	Total struct {
-		Count       int `json:"count"`
-		Active      int `json:"active"`
-		Inactive    int `json:"inactive"`
-		Testing     int `json:"testing"`
-		Production  int `json:"production"`
+		Count      int `json:"count"`
+		Active     int `json:"active"`
+		Inactive   int `json:"inactive"`
+		Testing    int `json:"testing"`
+		Production int `json:"production"`
 	} `json:"total"`
-	
+
 	Pool struct {
 		Enabled  int `json:"enabled"`
 		Disabled int `json:"disabled"`
 		Pending  int `json:"pending"`
 		Testing  int `json:"testing"`
 	} `json:"pool"`
-	
+
 	Performance struct {
-		AvgReturn     float64 `json:"avgReturn"`
-		AvgSharpe     float64 `json:"avgSharpe"`
-		TotalPNL      float64 `json:"totalPnl"`
-		WinningCount  int     `json:"winningCount"`
+		AvgReturn    float64 `json:"avgReturn"`
+		AvgSharpe    float64 `json:"avgSharpe"`
+		TotalPNL     float64 `json:"totalPnl"`
+		WinningCount int     `json:"winningCount"`
 	} `json:"performance"`
 }
 
@@ -298,7 +301,7 @@ func (s *UnifiedStrategyService) getStrategiesFromDB(ctx context.Context, option
 		for rows.Next() {
 			var strategy BasicStrategy
 			var configJSON sql.NullString
-			
+
 			err := rows.Scan(
 				&strategy.ID, &strategy.Name, &strategy.Type, &strategy.Description,
 				&strategy.Version, &strategy.Status, &strategy.Stage,
@@ -310,8 +313,14 @@ func (s *UnifiedStrategyService) getStrategiesFromDB(ctx context.Context, option
 
 			// 解析配置JSON
 			if configJSON.Valid {
-				// TODO: 解析JSON配置
-				strategy.Config = make(map[string]interface{})
+				// 解析JSON配置
+				var config map[string]interface{}
+				if err := json.Unmarshal([]byte(configJSON.String), &config); err != nil {
+					log.Printf("Failed to parse strategy config JSON: %v", err)
+					strategy.Config = make(map[string]interface{})
+				} else {
+					strategy.Config = config
+				}
 			}
 
 			strategies = append(strategies, strategy)
@@ -319,8 +328,39 @@ func (s *UnifiedStrategyService) getStrategiesFromDB(ctx context.Context, option
 
 		// 获取总数
 		countQuery := "SELECT COUNT(*) FROM strategies WHERE 1=1"
-		// TODO: 添加相同的过滤条件
-		s.db.DB.QueryRowContext(ctx, countQuery).Scan(&total)
+		// 添加相同的过滤条件
+		countArgs := make([]interface{}, 0)
+		argIndex := 1
+
+		if len(options.Status) > 0 {
+			placeholders := make([]string, len(options.Status))
+			for i, status := range options.Status {
+				placeholders[i] = fmt.Sprintf("$%d", argIndex)
+				countArgs = append(countArgs, status)
+				argIndex++
+			}
+			countQuery += fmt.Sprintf(" AND status IN (%s)", strings.Join(placeholders, ","))
+		}
+		if len(options.Type) > 0 {
+			placeholders := make([]string, len(options.Type))
+			for i, typeVal := range options.Type {
+				placeholders[i] = fmt.Sprintf("$%d", argIndex)
+				countArgs = append(countArgs, typeVal)
+				argIndex++
+			}
+			countQuery += fmt.Sprintf(" AND type IN (%s)", strings.Join(placeholders, ","))
+		}
+		if len(options.Stage) > 0 {
+			placeholders := make([]string, len(options.Stage))
+			for i, stage := range options.Stage {
+				placeholders[i] = fmt.Sprintf("$%d", argIndex)
+				countArgs = append(countArgs, stage)
+				argIndex++
+			}
+			countQuery += fmt.Sprintf(" AND stage IN (%s)", strings.Join(placeholders, ","))
+		}
+
+		s.db.DB.QueryRowContext(ctx, countQuery, countArgs...).Scan(&total)
 	} else {
 		// 返回模拟数据用于测试
 		strategies = s.getMockStrategies()
@@ -347,7 +387,7 @@ type BasicStrategy struct {
 // getStrategyFromDB 从数据库获取单个策略
 func (s *UnifiedStrategyService) getStrategyFromDB(ctx context.Context, strategyID string) (BasicStrategy, error) {
 	var strategy BasicStrategy
-	
+
 	if s.db != nil && s.db.DB != nil {
 		query := `
 			SELECT id, name, type, description, version, status, stage,
@@ -355,14 +395,14 @@ func (s *UnifiedStrategyService) getStrategyFromDB(ctx context.Context, strategy
 			FROM strategies 
 			WHERE id = $1
 		`
-		
+
 		var configJSON sql.NullString
 		err := s.db.DB.QueryRowContext(ctx, query, strategyID).Scan(
 			&strategy.ID, &strategy.Name, &strategy.Type, &strategy.Description,
 			&strategy.Version, &strategy.Status, &strategy.Stage,
 			&strategy.CreatedAt, &strategy.UpdatedAt, &configJSON,
 		)
-		
+
 		if err != nil {
 			return strategy, err
 		}
@@ -451,7 +491,7 @@ func (s *UnifiedStrategyService) createBasicUnifiedStrategy(basic BasicStrategy)
 		CreatedAt:   basic.CreatedAt,
 		UpdatedAt:   basic.UpdatedAt,
 		Config:      basic.Config,
-		
+
 		Lifecycle: LifecycleInfo{
 			Stage:     basic.Stage,
 			Status:    basic.Status,
@@ -467,12 +507,12 @@ func (s *UnifiedStrategyService) createBasicUnifiedStrategy(basic BasicStrategy)
 // generateSummary 生成摘要信息
 func (s *UnifiedStrategyService) generateSummary(strategies []UnifiedStrategy) StrategySummary {
 	summary := StrategySummary{}
-	
+
 	summary.Total.Count = len(strategies)
-	
+
 	var totalReturn, totalSharpe, totalPNL float64
 	winningCount := 0
-	
+
 	for _, strategy := range strategies {
 		// 统计状态
 		switch strategy.Lifecycle.Status {
@@ -481,7 +521,7 @@ func (s *UnifiedStrategyService) generateSummary(strategies []UnifiedStrategy) S
 		case "inactive":
 			summary.Total.Inactive++
 		}
-		
+
 		// 统计阶段
 		switch strategy.Lifecycle.Stage {
 		case "testing":
@@ -489,7 +529,7 @@ func (s *UnifiedStrategyService) generateSummary(strategies []UnifiedStrategy) S
 		case "production":
 			summary.Total.Production++
 		}
-		
+
 		// 统计池状态
 		switch strategy.Pool.PoolStatus {
 		case "enabled":
@@ -501,17 +541,17 @@ func (s *UnifiedStrategyService) generateSummary(strategies []UnifiedStrategy) S
 		case "testing":
 			summary.Pool.Testing++
 		}
-		
+
 		// 统计性能
 		totalReturn += strategy.Performance.TotalReturn
 		totalSharpe += strategy.Performance.SharpeRatio
 		totalPNL += strategy.Performance.PNL
-		
+
 		if strategy.Performance.TotalReturn > 0 {
 			winningCount++
 		}
 	}
-	
+
 	// 计算平均值
 	if len(strategies) > 0 {
 		summary.Performance.AvgReturn = totalReturn / float64(len(strategies))
@@ -519,7 +559,7 @@ func (s *UnifiedStrategyService) generateSummary(strategies []UnifiedStrategy) S
 	}
 	summary.Performance.TotalPNL = totalPNL
 	summary.Performance.WinningCount = winningCount
-	
+
 	return summary
 }
 

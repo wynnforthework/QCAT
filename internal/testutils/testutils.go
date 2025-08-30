@@ -7,12 +7,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -120,9 +122,37 @@ func (s *TestSuite) TearDown() {
 
 // setupRealDB 设置真实数据库
 func (s *TestSuite) setupRealDB() {
-	// TODO 连接到测试数据库
-	// 暂时使用内存数据库
-	s.setupMockDB()
+	// 连接到测试数据库
+	// 使用环境变量或配置文件中的测试数据库连接信息
+	testDBURL := os.Getenv("TEST_DATABASE_URL")
+	if testDBURL == "" {
+		// 如果没有配置测试数据库，回退到内存数据库
+		log.Printf("No TEST_DATABASE_URL configured, falling back to in-memory database")
+		s.setupMockDB()
+		return
+	}
+
+	db, err := sql.Open("postgres", testDBURL)
+	if err != nil {
+		log.Printf("Failed to connect to test database: %v, falling back to in-memory database", err)
+		s.setupMockDB()
+		return
+	}
+
+	// 测试连接
+	if err := db.Ping(); err != nil {
+		log.Printf("Failed to ping test database: %v, falling back to in-memory database", err)
+		db.Close()
+		s.setupMockDB()
+		return
+	}
+
+	s.DB = &database.DB{DB: db}
+	s.AddCleanup(func() {
+		if s.DB != nil && s.DB.DB != nil {
+			s.DB.DB.Close()
+		}
+	})
 }
 
 // setupMockDB 设置模拟数据库
@@ -141,9 +171,51 @@ func (s *TestSuite) setupMockDB() {
 
 // setupRealCache 设置真实缓存
 func (s *TestSuite) setupRealCache() {
-	// TODO 连接到测试Redis
-	// 暂时使用内存缓存
-	s.setupMockCache()
+	// 连接到测试Redis
+	// 使用环境变量或配置文件中的测试Redis连接信息
+	testRedisAddr := os.Getenv("TEST_REDIS_ADDR")
+	if testRedisAddr == "" {
+		testRedisAddr = "localhost:6379" // 默认Redis地址
+	}
+
+	testRedisPassword := os.Getenv("TEST_REDIS_PASSWORD")
+	testRedisDB := 0
+	if dbStr := os.Getenv("TEST_REDIS_DB"); dbStr != "" {
+		if db, err := strconv.Atoi(dbStr); err == nil {
+			testRedisDB = db
+		}
+	}
+
+	// 创建Redis配置
+	redisConfig := &cache.Config{
+		Addr:     testRedisAddr,
+		Password: testRedisPassword,
+		DB:       testRedisDB,
+		PoolSize: 10,
+	}
+
+	// 尝试连接到Redis
+	redisCache, err := cache.NewRedisCache(redisConfig)
+	if err != nil {
+		log.Printf("Failed to connect to test Redis at %s: %v, falling back to memory cache", testRedisAddr, err)
+		s.setupMockCache()
+		return
+	}
+
+	// 测试Redis连接
+	ctx := context.Background()
+	if err := redisCache.Set(ctx, "test_connection", "ok", time.Minute); err != nil {
+		log.Printf("Failed to test Redis connection: %v, falling back to memory cache", err)
+		s.setupMockCache()
+		return
+	}
+
+	s.Cache = redisCache
+	s.AddCleanup(func() {
+		if s.Cache != nil {
+			s.Cache.Close()
+		}
+	})
 }
 
 // setupMockCache 设置模拟缓存
@@ -560,7 +632,7 @@ func IsPortAvailable(port int) bool {
 	if err != nil {
 		return false // 端口被占用或其他错误
 	}
-	
+
 	// 立即关闭监听器
 	listener.Close()
 	return true

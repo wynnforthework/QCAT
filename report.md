@@ -633,58 +633,8 @@
 - Line 2030: **TODO** → `// TODO: 从监控系统获取内存使用率`
 - Line 2033: **TODO** → `// TODO: 从监控系统获取磁盘使用率`
 
-## ./internal\operations\routing\smart_exchange_router.go
-- Line 504: **TODO** → `// TODO: 从配置文件读取路由参数`
-- Line 1081: **TODO** → `// TODO: 实现实际的ping测试`
-- Line 1090: **TODO** → `// TODO: 实现实际的API测试`
-- Line 1099: **TODO** → `// TODO: 实现实际的WebSocket测试`
-- Line 1108: **TODO** → `// TODO: 实现实际的订单簿测试`
-- Line 1564: **TODO** → `// TODO: 实现实际的订单路由执行`
-- Line 1596: **TODO** → `// TODO: 实现可用性统计更新`
-- Line 1608: **TODO** → `// TODO: 基于容量和权重计算理想负载分布`
-- Line 1618: **TODO** → `// TODO: 实现恢复逻辑`
-- Line 1643: **TODO** → `// TODO: 实现实际的故障转移逻辑`
-- Line 1649: **TODO** → `// TODO: 计算当前优化指标`
-- Line 1654: **TODO** → `// TODO: 计算最优路由分布`
-- Line 1659: **TODO** → `// TODO: 应用优化结果`
-- Line 1663: **TODO** → `// TODO: 计算系统负载`
-- Line 1668: **TODO** → `// TODO: 计算订单成功率`
-- Line 1673: **TODO** → `// TODO: 计算路由质量`
-- Line 1704: **TODO** → `// TODO: 计算优化效率`
-- Line 1709: **TODO** → `// TODO: 实现条件评估逻辑`
-
-## ./internal\orchestrator\orchestrator.go
-- Line 306: **TODO** → `// TODO: Process optimization results`
-- Line 313: **TODO** → `// TODO: Handle process exits`
-- Line 320: **TODO** → `// TODO: Forward trade signals to trading service`
-- Line 327: **TODO** → `// TODO: Process market data updates`
-
-## ./internal\orchestrator\process_manager.go
-- Line 306: **TODO** → `// TODO: 这里需要与策略守门员集成，检查策略是否在黑名单中`
-
-## ./internal\performance\cache.go
-- Line 531: **TODO** → `// TODO 添加清理逻辑`
-
-## ./internal\risk\realtime_monitor.go
-- Line 379: **TODO** → `// TODO: 实现进程停止逻辑`
-- Line 413: **TODO** → `// TODO: 实现订单取消逻辑`
-- Line 421: **TODO** → `// TODO: 实现缓存清理逻辑`
-
-## ./internal\scheduler\task_scheduler.go
-- Line 525: **TODO** → `// TODO 订阅一些通用事件`
-
 ## ./internal\security\guardian\account_guardian.go
-- Line 273: **TODO** → `// TODO: 从配置文件读取安全参数`
-- Line 617: **TODO** → `// TODO: 实现异常登录检测逻辑`
-- Line 622: **TODO** → `// TODO: 实现异常交易检测逻辑`
-- Line 627: **TODO** → `// TODO: 实现设备异常检测逻辑`
-- Line 638: **TODO** → `// TODO: 实现IP地理位置查询`
-- Line 654: **TODO** → `// TODO: 实现设备信息解析`
-- Line 740: **TODO** → `// TODO: 实现具体的行为异常检测逻辑`
-- Line 778: **TODO** → `// TODO: 实现异常升级逻辑`
-- Line 787: **TODO** → `// TODO: 实现账户冻结逻辑`
-- Line 799: **TODO** → `// TODO: 实现待处理响应的处理逻辑`
-- Line 851: **TODO** → `// TODO: 实现基线更新逻辑`
+- Line 1326: **TODO** → `// TODO: 实现待处理响应的处理逻辑`
 
 ## ./internal\security\protector\exchange_provider.go
 - Line 499: **mock** → `// MockExchangeProvider 模拟交易所数据提供者（用于测试）`
@@ -759,9 +709,6 @@
 - Line 391: **mock** → `func (m *MockNotificationService) GetSlackSent() []SlackRecord {`
 - Line 396: **mock** → `func (m *MockNotificationService) Reset() {`
 
-## ./internal\security\protector\trading_operations.go
-- Line 57: **TODO** → `// TODO 将事件记录到数据库或发送到监控系统`
-
 ## ./internal\security\protector\wallet_service.go
 - Line 351: **mock** → `// MockWalletService 模拟钱包服务（用于测试）`
 - Line 352: **mock** → `type MockWalletService struct {`
@@ -782,38 +729,25 @@
 - Line 463: **mock** → `func (m *MockWalletService) SetFailureRate(rate float64) {`
 - Line 468: **mock** → `func (m *MockWalletService) GetTransfers() map[string]*TransferStatus {`
 
-## ./internal\stability\connection_pool.go
-- Line 313: **TODO** → `// TODO 添加重启连接池的逻辑`
-
-## ./internal\stability\process_manager.go
-- Line 432: **TODO** → `// TODO 实现一个简单的价格缓存机制`
-- Line 533: **TODO** → `// TODO 启动定时器、初始化指标等`
-- Line 543: **TODO** → `// TODO 停止定时器、清理资源等`
-
-## ./internal\stability\redis_fallback.go
-- Line 364: **TODO** → `// TODO 添加模式切换的通知逻辑`
-
 ## ./internal\strategy\unified_service.go
-- Line 313: **TODO** → `// TODO: 解析JSON配置`
-- Line 322: **TODO** → `// TODO: 添加相同的过滤条件`
-- Line 326: **mock** → `strategies = s.getMockStrategies()`
-- Line 372: **TODO** → `// TODO: 解析JSON配置`
-- Line 377: **mock** → `mockStrategies := s.getMockStrategies()`
-- Line 378: **mock** → `for _, mock := range mockStrategies {`
-- Line 379: **mock** → `if mock.ID == strategyID {`
-- Line 380: **mock** → `strategy = mock`
-- Line 402: **TODO** → `ExecutionCount: 100, // TODO: 从实际数据获取`
-- Line 435: **mock** → `unified.Execution = s.getMockExecutionInfo()`
-- Line 436: **mock** → `unified.Performance = s.getMockPerformanceInfo()`
-- Line 437: **mock** → `unified.Pool = s.getMockPoolInfo()`
-- Line 526: **mock** → `// getMockStrategies 获取模拟策略数据`
-- Line 527: **mock** → `func (s *UnifiedStrategyService) getMockStrategies() []BasicStrategy {`
-- Line 568: **mock** → `// getMockExecutionInfo 获取模拟执行信息`
-- Line 569: **mock** → `func (s *UnifiedStrategyService) getMockExecutionInfo() ExecutionInfo {`
-- Line 582: **mock** → `// getMockPerformanceInfo 获取模拟性能信息`
-- Line 583: **mock** → `func (s *UnifiedStrategyService) getMockPerformanceInfo() PerformanceInfo {`
-- Line 599: **mock** → `// getMockPoolInfo 获取模拟池信息`
-- Line 600: **mock** → `func (s *UnifiedStrategyService) getMockPoolInfo() PoolInfo {`
+- Line 366: **mock** → `strategies = s.getMockStrategies()`
+- Line 412: **TODO** → `// TODO: 解析JSON配置`
+- Line 417: **mock** → `mockStrategies := s.getMockStrategies()`
+- Line 418: **mock** → `for _, mock := range mockStrategies {`
+- Line 419: **mock** → `if mock.ID == strategyID {`
+- Line 420: **mock** → `strategy = mock`
+- Line 442: **TODO** → `ExecutionCount: 100, // TODO: 从实际数据获取`
+- Line 475: **mock** → `unified.Execution = s.getMockExecutionInfo()`
+- Line 476: **mock** → `unified.Performance = s.getMockPerformanceInfo()`
+- Line 477: **mock** → `unified.Pool = s.getMockPoolInfo()`
+- Line 566: **mock** → `// getMockStrategies 获取模拟策略数据`
+- Line 567: **mock** → `func (s *UnifiedStrategyService) getMockStrategies() []BasicStrategy {`
+- Line 608: **mock** → `// getMockExecutionInfo 获取模拟执行信息`
+- Line 609: **mock** → `func (s *UnifiedStrategyService) getMockExecutionInfo() ExecutionInfo {`
+- Line 622: **mock** → `// getMockPerformanceInfo 获取模拟性能信息`
+- Line 623: **mock** → `func (s *UnifiedStrategyService) getMockPerformanceInfo() PerformanceInfo {`
+- Line 639: **mock** → `// getMockPoolInfo 获取模拟池信息`
+- Line 640: **mock** → `func (s *UnifiedStrategyService) getMockPoolInfo() PoolInfo {`
 
 ## ./internal\strategy\unified_service_simple.go
 - Line 45: **mock** → `strategies := s.getMockStrategies()`
@@ -838,9 +772,6 @@
 - Line 69: **mock** → `func TestMarketAnalyzer_GenerateMockPriceData(t *testing.T) {`
 - Line 77: **mock** → `priceData := analyzer.generateMockPriceData(symbol, timeRange, startTime, endTime)`
 
-## ./internal\strategy\optimizer\dynamic_stoploss.go
-- Line 771: **mock** → `log.Printf("Mock: Updating orders on exchange for %s_%s: SL=%.4f, TP=%.4f",`
-
 ## ./internal\strategy\optimizer\optimizer_test.go
 - Line 16: **mock** → `mockData := testutils.NewMockData()`
 - Line 51: **mock** → `historicalData := generateMockHistoricalData(1000)`
@@ -861,36 +792,35 @@
 - Line 143: **mock** → `// Create a mock orchestrator without database connection`
 
 ## ./internal\strategy\sandbox\automation.go
-- Line 153: **mock** → `mockExchange := s.createMockExchange(testConfig)`
-- Line 164: **mock** → `sandbox := NewSandbox(strategyInstance, strategyConfig.Params, mockExchange)`
-- Line 463: **mock** → `// createMockExchange 创建模拟交易所`
-- Line 464: **mock** → `func (s *AutomatedSandboxService) createMockExchange(config *TestConfiguration) exchange.Exchange {`
-- Line 466: **mock** → `// 为了演示，返回nil，实际应该实现MockExchange`
-- Line 467: **mock** → `log.Printf("Creating mock exchange for %s on %s", config.Symbol, config.Exchange)`
+- Line 154: **mock** → `mockExchange := s.createMockExchange(testConfig)`
+- Line 165: **mock** → `sandbox := NewSandbox(strategyInstance, strategyConfig.Params, mockExchange)`
+- Line 464: **mock** → `// createMockExchange 创建模拟交易所`
+- Line 465: **mock** → `func (s *AutomatedSandboxService) createMockExchange(config *TestConfiguration) exchange.Exchange {`
 
 ## ./internal\testutils\testutils.go
-- Line 96: **mock** → `suite.setupMockDB()`
-- Line 103: **mock** → `suite.setupMockCache()`
-- Line 123: **TODO** → `// TODO 连接到测试数据库`
-- Line 125: **mock** → `s.setupMockDB()`
-- Line 128: **mock** → `// setupMockDB 设置模拟数据库`
-- Line 129: **mock** → `func (s *TestSuite) setupMockDB() {`
-- Line 144: **TODO** → `// TODO 连接到测试Redis`
-- Line 146: **mock** → `s.setupMockCache()`
-- Line 149: **mock** → `// setupMockCache 设置模拟缓存`
-- Line 150: **mock** → `func (s *TestSuite) setupMockCache() {`
-- Line 277: **mock** → `// MockData 模拟数据生成器`
-- Line 278: **mock** → `type MockData struct {`
-- Line 282: **mock** → `// NewMockData 创建模拟数据生成器`
-- Line 283: **mock** → `func NewMockData() *MockData {`
-- Line 284: **mock** → `return &MockData{`
-- Line 290: **mock** → `func (m *MockData) RandomString(length int) string {`
-- Line 300: **mock** → `func (m *MockData) RandomInt(min, max int) int {`
-- Line 305: **mock** → `func (m *MockData) RandomFloat(min, max float64) float64 {`
-- Line 310: **mock** → `func (m *MockData) RandomBool() bool {`
-- Line 315: **mock** → `func (m *MockData) RandomChoice(choices []string) string {`
-- Line 320: **mock** → `func (m *MockData) GenerateStrategy() map[string]interface{} {`
-- Line 347: **mock** → `func (m *MockData) GenerateOrder() map[string]interface{} {`
+- Line 98: **mock** → `suite.setupMockDB()`
+- Line 105: **mock** → `suite.setupMockCache()`
+- Line 131: **mock** → `s.setupMockDB()`
+- Line 138: **mock** → `s.setupMockDB()`
+- Line 146: **mock** → `s.setupMockDB()`
+- Line 158: **mock** → `// setupMockDB 设置模拟数据库`
+- Line 159: **mock** → `func (s *TestSuite) setupMockDB() {`
+- Line 201: **mock** → `s.setupMockCache()`
+- Line 209: **mock** → `s.setupMockCache()`
+- Line 221: **mock** → `// setupMockCache 设置模拟缓存`
+- Line 222: **mock** → `func (s *TestSuite) setupMockCache() {`
+- Line 349: **mock** → `// MockData 模拟数据生成器`
+- Line 350: **mock** → `type MockData struct {`
+- Line 354: **mock** → `// NewMockData 创建模拟数据生成器`
+- Line 355: **mock** → `func NewMockData() *MockData {`
+- Line 356: **mock** → `return &MockData{`
+- Line 362: **mock** → `func (m *MockData) RandomString(length int) string {`
+- Line 372: **mock** → `func (m *MockData) RandomInt(min, max int) int {`
+- Line 377: **mock** → `func (m *MockData) RandomFloat(min, max float64) float64 {`
+- Line 382: **mock** → `func (m *MockData) RandomBool() bool {`
+- Line 387: **mock** → `func (m *MockData) RandomChoice(choices []string) string {`
+- Line 392: **mock** → `func (m *MockData) GenerateStrategy() map[string]interface{} {`
+- Line 419: **mock** → `func (m *MockData) GenerateOrder() map[string]interface{} {`
 
 ## ./internal\trading\dryrun\simulator_test.go
 - Line 11: **mock** → `// MockMarketDataProvider 模拟市场数据提供者`

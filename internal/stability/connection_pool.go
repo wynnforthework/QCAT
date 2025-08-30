@@ -26,6 +26,7 @@ type PoolConfig struct {
 type ConnectionPool struct {
 	mu     sync.RWMutex
 	db     *sql.DB
+	dsn    string // 数据源名称，用于重启连接池
 	config *PoolConfig
 	stats  *PoolStats
 	health *PoolHealth
@@ -84,6 +85,7 @@ func NewConnectionPool(dsn string, config *PoolConfig) (*ConnectionPool, error) 
 
 	cp := &ConnectionPool{
 		db:     db,
+		dsn:    dsn,
 		config: config,
 		stats:  &PoolStats{},
 		health: &PoolHealth{},
@@ -309,8 +311,12 @@ func (cp *ConnectionPool) checkHealth() {
 		cp.mu.RUnlock()
 
 		if consecutiveFailures >= 5 {
-			log.Printf("Too many consecutive failures (%d), considering pool restart", consecutiveFailures)
-			// TODO 添加重启连接池的逻辑
+			log.Printf("Too many consecutive failures (%d), restarting connection pool", consecutiveFailures)
+			if err := cp.restartPool(); err != nil {
+				log.Printf("Failed to restart connection pool: %v", err)
+			} else {
+				log.Printf("Connection pool restarted successfully")
+			}
 		}
 	}
 }
@@ -372,6 +378,51 @@ func (cp *ConnectionPool) GetHealth() *PoolHealth {
 
 	health := *cp.health
 	return &health
+}
+
+// restartPool 重启连接池
+func (cp *ConnectionPool) restartPool() error {
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+
+	log.Printf("Restarting connection pool...")
+
+	// 1. 关闭现有连接
+	if err := cp.db.Close(); err != nil {
+		log.Printf("Warning: Failed to close existing database connections: %v", err)
+	}
+
+	// 2. 重新创建数据库连接
+	db, err := sql.Open("postgres", cp.dsn)
+	if err != nil {
+		return fmt.Errorf("failed to reopen database: %w", err)
+	}
+
+	// 3. 重新配置连接池
+	db.SetMaxOpenConns(cp.config.MaxOpenConns)
+	db.SetMaxIdleConns(cp.config.MaxIdleConns)
+	db.SetConnMaxLifetime(cp.config.ConnMaxLifetime)
+	db.SetConnMaxIdleTime(cp.config.ConnMaxIdleTime)
+
+	// 4. 测试新连接
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		db.Close()
+		return fmt.Errorf("failed to ping database after restart: %w", err)
+	}
+
+	// 5. 更新连接池状态
+	cp.db = db
+	cp.health.ConsecutiveFailures = 0
+	cp.health.FailedChecks = 0
+	cp.health.IsHealthy = true
+	cp.health.LastCheck = time.Now()
+	cp.health.Error = nil
+
+	log.Printf("Connection pool restarted successfully")
+	return nil
 }
 
 // Close 关闭连接池

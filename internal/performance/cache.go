@@ -20,44 +20,44 @@ type CacheOptimizer struct {
 // CacheMetrics 缓存性能指标
 type CacheMetrics struct {
 	// 命中率指标
-	Hits        int64   `json:"hits"`
-	Misses      int64   `json:"misses"`
-	HitRatio    float64 `json:"hit_ratio"`
-	
+	Hits     int64   `json:"hits"`
+	Misses   int64   `json:"misses"`
+	HitRatio float64 `json:"hit_ratio"`
+
 	// 操作指标
-	Gets        int64   `json:"gets"`
-	Sets        int64   `json:"sets"`
-	Deletes     int64   `json:"deletes"`
-	Evictions   int64   `json:"evictions"`
-	
+	Gets      int64 `json:"gets"`
+	Sets      int64 `json:"sets"`
+	Deletes   int64 `json:"deletes"`
+	Evictions int64 `json:"evictions"`
+
 	// 性能指标
-	AvgGetTime  time.Duration `json:"avg_get_time"`
-	AvgSetTime  time.Duration `json:"avg_set_time"`
-	MaxGetTime  time.Duration `json:"max_get_time"`
-	MaxSetTime  time.Duration `json:"max_set_time"`
-	
+	AvgGetTime time.Duration `json:"avg_get_time"`
+	AvgSetTime time.Duration `json:"avg_set_time"`
+	MaxGetTime time.Duration `json:"max_get_time"`
+	MaxSetTime time.Duration `json:"max_set_time"`
+
 	// 内存指标
 	MemoryUsed  int64   `json:"memory_used"`
 	MemoryLimit int64   `json:"memory_limit"`
 	MemoryRatio float64 `json:"memory_ratio"`
-	
+
 	// 连接指标
 	Connections     int `json:"connections"`
 	MaxConnections  int `json:"max_connections"`
 	IdleConnections int `json:"idle_connections"`
-	
+
 	// 错误指标
 	ConnectionErrors int64 `json:"connection_errors"`
-	TimeoutErrors   int64 `json:"timeout_errors"`
-	OtherErrors     int64 `json:"other_errors"`
-	
+	TimeoutErrors    int64 `json:"timeout_errors"`
+	OtherErrors      int64 `json:"other_errors"`
+
 	// 时间戳
 	Timestamp time.Time `json:"timestamp"`
 }
 
 // CacheOperation 缓存操作记录
 type CacheOperation struct {
-	Type      string        `json:"type"`      // GET, SET, DELETE
+	Type      string        `json:"type"` // GET, SET, DELETE
 	Key       string        `json:"key"`
 	Duration  time.Duration `json:"duration"`
 	Success   bool          `json:"success"`
@@ -67,9 +67,9 @@ type CacheOperation struct {
 
 // HotKey 热点Key统计
 type HotKey struct {
-	Key         string    `json:"key"`
-	AccessCount int64     `json:"access_count"`
-	LastAccess  time.Time `json:"last_access"`
+	Key         string        `json:"key"`
+	AccessCount int64         `json:"access_count"`
+	LastAccess  time.Time     `json:"last_access"`
 	AvgDuration time.Duration `json:"avg_duration"`
 }
 
@@ -85,7 +85,7 @@ func NewCacheOptimizer(logger logger.Logger) *CacheOptimizer {
 func (c *CacheOptimizer) RecordOperation(op CacheOperation) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	// 更新操作计数
 	switch op.Type {
 	case "GET":
@@ -95,26 +95,26 @@ func (c *CacheOptimizer) RecordOperation(op CacheOperation) {
 		} else {
 			atomic.AddInt64(&c.metrics.Misses, 1)
 		}
-		
+
 		// 更新GET性能指标
 		if op.Duration > c.metrics.MaxGetTime {
 			c.metrics.MaxGetTime = op.Duration
 		}
 		c.updateAvgGetTime(op.Duration)
-		
+
 	case "SET":
 		atomic.AddInt64(&c.metrics.Sets, 1)
-		
+
 		// 更新SET性能指标
 		if op.Duration > c.metrics.MaxSetTime {
 			c.metrics.MaxSetTime = op.Duration
 		}
 		c.updateAvgSetTime(op.Duration)
-		
+
 	case "DELETE":
 		atomic.AddInt64(&c.metrics.Deletes, 1)
 	}
-	
+
 	// 更新错误计数
 	if !op.Success {
 		switch {
@@ -126,10 +126,10 @@ func (c *CacheOptimizer) RecordOperation(op CacheOperation) {
 			atomic.AddInt64(&c.metrics.OtherErrors, 1)
 		}
 	}
-	
+
 	// 更新命中率
 	c.updateHitRatio()
-	
+
 	// 检查性能问题
 	c.checkPerformanceIssues(op)
 }
@@ -161,7 +161,7 @@ func (c *CacheOptimizer) updateHitRatio() {
 	hits := atomic.LoadInt64(&c.metrics.Hits)
 	misses := atomic.LoadInt64(&c.metrics.Misses)
 	total := hits + misses
-	
+
 	if total > 0 {
 		c.metrics.HitRatio = float64(hits) / float64(total)
 	}
@@ -177,7 +177,7 @@ func (c *CacheOptimizer) checkPerformanceIssues(op CacheOperation) {
 			"duration", op.Duration,
 		)
 	}
-	
+
 	// 检查命中率
 	if c.metrics.HitRatio < 0.8 && c.metrics.Gets > 100 {
 		c.logger.Warn("Low cache hit ratio detected",
@@ -186,7 +186,7 @@ func (c *CacheOptimizer) checkPerformanceIssues(op CacheOperation) {
 			"misses", c.metrics.Misses,
 		)
 	}
-	
+
 	// 检查错误率
 	totalOps := c.metrics.Gets + c.metrics.Sets + c.metrics.Deletes
 	totalErrors := c.metrics.ConnectionErrors + c.metrics.TimeoutErrors + c.metrics.OtherErrors
@@ -204,11 +204,11 @@ func (c *CacheOptimizer) checkPerformanceIssues(op CacheOperation) {
 
 // contains 检查字符串是否包含子串
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || 
-		(len(s) > len(substr) && 
-			(s[:len(substr)] == substr || 
-			 s[len(s)-len(substr):] == substr ||
-			 containsMiddle(s, substr))))
+	return len(s) >= len(substr) && (s == substr ||
+		(len(s) > len(substr) &&
+			(s[:len(substr)] == substr ||
+				s[len(s)-len(substr):] == substr ||
+				containsMiddle(s, substr))))
 }
 
 // containsMiddle 检查字符串中间是否包含子串
@@ -225,24 +225,60 @@ func containsMiddle(s, substr string) bool {
 func (c *CacheOptimizer) GetMetrics() *CacheMetrics {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	// 创建副本
 	metrics := *c.metrics
 	metrics.Timestamp = time.Now()
 	return &metrics
 }
 
+// ResetStatistics 重置缓存统计信息
+func (c *CacheOptimizer) ResetStatistics() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.logger.Info("Resetting cache statistics")
+
+	// 重置操作计数
+	atomic.StoreInt64(&c.metrics.Gets, 0)
+	atomic.StoreInt64(&c.metrics.Sets, 0)
+	atomic.StoreInt64(&c.metrics.Deletes, 0)
+	atomic.StoreInt64(&c.metrics.Hits, 0)
+	atomic.StoreInt64(&c.metrics.Misses, 0)
+
+	// 重置错误计数
+	atomic.StoreInt64(&c.metrics.ConnectionErrors, 0)
+	atomic.StoreInt64(&c.metrics.TimeoutErrors, 0)
+	atomic.StoreInt64(&c.metrics.OtherErrors, 0)
+
+	// 重置性能指标
+	c.metrics.HitRatio = 0.0
+	c.metrics.AvgGetTime = 0
+	c.metrics.AvgSetTime = 0
+	c.metrics.MaxGetTime = 0
+	c.metrics.MaxSetTime = 0
+
+	// 保留内存和连接统计，因为这些是当前状态而不是累积统计
+	// c.metrics.MemoryUsed, c.metrics.MemoryLimit, c.metrics.MemoryRatio 保持不变
+	// c.metrics.Connections, c.metrics.MaxConnections, c.metrics.IdleConnections 保持不变
+
+	// 更新时间戳
+	c.metrics.Timestamp = time.Now()
+
+	c.logger.Info("Cache statistics reset completed")
+}
+
 // UpdateMemoryStats 更新内存统计
 func (c *CacheOptimizer) UpdateMemoryStats(used, limit int64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.metrics.MemoryUsed = used
 	c.metrics.MemoryLimit = limit
-	
+
 	if limit > 0 {
 		c.metrics.MemoryRatio = float64(used) / float64(limit)
-		
+
 		// 检查内存使用率
 		if c.metrics.MemoryRatio > 0.9 {
 			c.logger.Warn("High cache memory usage detected",
@@ -258,11 +294,11 @@ func (c *CacheOptimizer) UpdateMemoryStats(used, limit int64) {
 func (c *CacheOptimizer) UpdateConnectionStats(current, max, idle int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	
+
 	c.metrics.Connections = current
 	c.metrics.MaxConnections = max
 	c.metrics.IdleConnections = idle
-	
+
 	// 检查连接使用率
 	if max > 0 {
 		connectionRatio := float64(current) / float64(max)
@@ -297,14 +333,14 @@ func NewHotKeyTracker(maxKeys int, logger logger.Logger) *HotKeyTracker {
 func (h *HotKeyTracker) RecordAccess(key string, duration time.Duration) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	hotKey, exists := h.hotKeys[key]
 	if !exists {
 		// 检查是否超过最大Key数量
 		if len(h.hotKeys) >= h.maxKeys {
 			h.evictLeastUsedKey()
 		}
-		
+
 		hotKey = &HotKey{
 			Key:         key,
 			AccessCount: 0,
@@ -312,11 +348,11 @@ func (h *HotKeyTracker) RecordAccess(key string, duration time.Duration) {
 		}
 		h.hotKeys[key] = hotKey
 	}
-	
+
 	// 更新统计
 	hotKey.AccessCount++
 	hotKey.LastAccess = time.Now()
-	
+
 	// 更新平均持续时间
 	if hotKey.AccessCount > 1 {
 		currentAvg := int64(hotKey.AvgDuration)
@@ -325,7 +361,7 @@ func (h *HotKeyTracker) RecordAccess(key string, duration time.Duration) {
 	} else {
 		hotKey.AvgDuration = duration
 	}
-	
+
 	// 检查是否为热点Key
 	if hotKey.AccessCount > 100 && hotKey.AccessCount%100 == 0 {
 		h.logger.Info("Hot key detected",
@@ -341,17 +377,17 @@ func (h *HotKeyTracker) evictLeastUsedKey() {
 	var leastUsedKey string
 	var leastAccessCount int64 = -1
 	var oldestAccess time.Time
-	
+
 	for key, hotKey := range h.hotKeys {
-		if leastAccessCount == -1 || 
-		   hotKey.AccessCount < leastAccessCount ||
-		   (hotKey.AccessCount == leastAccessCount && hotKey.LastAccess.Before(oldestAccess)) {
+		if leastAccessCount == -1 ||
+			hotKey.AccessCount < leastAccessCount ||
+			(hotKey.AccessCount == leastAccessCount && hotKey.LastAccess.Before(oldestAccess)) {
 			leastUsedKey = key
 			leastAccessCount = hotKey.AccessCount
 			oldestAccess = hotKey.LastAccess
 		}
 	}
-	
+
 	if leastUsedKey != "" {
 		delete(h.hotKeys, leastUsedKey)
 	}
@@ -361,14 +397,14 @@ func (h *HotKeyTracker) evictLeastUsedKey() {
 func (h *HotKeyTracker) GetHotKeys(limit int) []*HotKey {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
-	
+
 	// 收集所有热点Key
 	var hotKeys []*HotKey
 	for _, hotKey := range h.hotKeys {
 		hotKeyCopy := *hotKey
 		hotKeys = append(hotKeys, &hotKeyCopy)
 	}
-	
+
 	// 按访问次数排序
 	for i := 0; i < len(hotKeys)-1; i++ {
 		for j := i + 1; j < len(hotKeys); j++ {
@@ -377,12 +413,12 @@ func (h *HotKeyTracker) GetHotKeys(limit int) []*HotKey {
 			}
 		}
 	}
-	
+
 	// 返回前N个
 	if limit > len(hotKeys) {
 		limit = len(hotKeys)
 	}
-	
+
 	return hotKeys[:limit]
 }
 
@@ -390,16 +426,40 @@ func (h *HotKeyTracker) GetHotKeys(limit int) []*HotKey {
 func (h *HotKeyTracker) ClearHotKeys() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	
+
 	h.hotKeys = make(map[string]*HotKey)
+}
+
+// ClearOldKeys 清理指定时间之前的热点Key记录
+func (h *HotKeyTracker) ClearOldKeys(maxAge time.Duration) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	cutoffTime := time.Now().Add(-maxAge)
+	clearedCount := 0
+
+	for key, hotKey := range h.hotKeys {
+		if hotKey.LastAccess.Before(cutoffTime) {
+			delete(h.hotKeys, key)
+			clearedCount++
+		}
+	}
+
+	if clearedCount > 0 {
+		h.logger.Info("Cleared old hot key records",
+			"cleared_count", clearedCount,
+			"cutoff_time", cutoffTime,
+			"remaining_keys", len(h.hotKeys),
+		)
+	}
 	h.logger.Info("Hot key statistics cleared")
 }
 
 // CacheOptimizationStrategy 缓存优化策略
 type CacheOptimizationStrategy struct {
-	optimizer   *CacheOptimizer
-	hotTracker  *HotKeyTracker
-	logger      logger.Logger
+	optimizer  *CacheOptimizer
+	hotTracker *HotKeyTracker
+	logger     logger.Logger
 }
 
 // NewCacheOptimizationStrategy 创建缓存优化策略
@@ -415,18 +475,18 @@ func NewCacheOptimizationStrategy(optimizer *CacheOptimizer, hotTracker *HotKeyT
 func (s *CacheOptimizationStrategy) AnalyzePerformance() map[string]interface{} {
 	metrics := s.optimizer.GetMetrics()
 	hotKeys := s.hotTracker.GetHotKeys(10)
-	
+
 	analysis := map[string]interface{}{
-		"hit_ratio":           metrics.HitRatio,
-		"avg_get_time_ms":     float64(metrics.AvgGetTime) / float64(time.Millisecond),
-		"avg_set_time_ms":     float64(metrics.AvgSetTime) / float64(time.Millisecond),
-		"memory_usage_ratio":  metrics.MemoryRatio,
-		"connection_usage":    float64(metrics.Connections) / float64(metrics.MaxConnections),
-		"error_rate":          s.calculateErrorRate(metrics),
-		"hot_keys_count":      len(hotKeys),
-		"total_operations":    metrics.Gets + metrics.Sets + metrics.Deletes,
+		"hit_ratio":          metrics.HitRatio,
+		"avg_get_time_ms":    float64(metrics.AvgGetTime) / float64(time.Millisecond),
+		"avg_set_time_ms":    float64(metrics.AvgSetTime) / float64(time.Millisecond),
+		"memory_usage_ratio": metrics.MemoryRatio,
+		"connection_usage":   float64(metrics.Connections) / float64(metrics.MaxConnections),
+		"error_rate":         s.calculateErrorRate(metrics),
+		"hot_keys_count":     len(hotKeys),
+		"total_operations":   metrics.Gets + metrics.Sets + metrics.Deletes,
 	}
-	
+
 	return analysis
 }
 
@@ -434,7 +494,7 @@ func (s *CacheOptimizationStrategy) AnalyzePerformance() map[string]interface{} 
 func (s *CacheOptimizationStrategy) calculateErrorRate(metrics *CacheMetrics) float64 {
 	totalOps := metrics.Gets + metrics.Sets + metrics.Deletes
 	totalErrors := metrics.ConnectionErrors + metrics.TimeoutErrors + metrics.OtherErrors
-	
+
 	if totalOps > 0 {
 		return float64(totalErrors) / float64(totalOps)
 	}
@@ -445,7 +505,7 @@ func (s *CacheOptimizationStrategy) calculateErrorRate(metrics *CacheMetrics) fl
 func (s *CacheOptimizationStrategy) GenerateOptimizationSuggestions() []string {
 	metrics := s.optimizer.GetMetrics()
 	var suggestions []string
-	
+
 	// 命中率优化建议
 	if metrics.HitRatio < 0.8 {
 		suggestions = append(suggestions, "缓存命中率较低，建议：")
@@ -454,7 +514,7 @@ func (s *CacheOptimizationStrategy) GenerateOptimizationSuggestions() []string {
 		suggestions = append(suggestions, "3. 调整缓存过期策略")
 		suggestions = append(suggestions, "4. 预热热点数据")
 	}
-	
+
 	// 性能优化建议
 	avgGetTimeMs := float64(metrics.AvgGetTime) / float64(time.Millisecond)
 	if avgGetTimeMs > 10 {
@@ -463,7 +523,7 @@ func (s *CacheOptimizationStrategy) GenerateOptimizationSuggestions() []string {
 		suggestions = append(suggestions, "2. 优化序列化/反序列化")
 		suggestions = append(suggestions, "3. 考虑使用本地缓存")
 	}
-	
+
 	// 内存优化建议
 	if metrics.MemoryRatio > 0.8 {
 		suggestions = append(suggestions, "缓存内存使用率较高，建议：")
@@ -471,7 +531,7 @@ func (s *CacheOptimizationStrategy) GenerateOptimizationSuggestions() []string {
 		suggestions = append(suggestions, "2. 优化数据结构")
 		suggestions = append(suggestions, "3. 实施更积极的淘汰策略")
 	}
-	
+
 	// 连接优化建议
 	if metrics.MaxConnections > 0 {
 		connectionRatio := float64(metrics.Connections) / float64(metrics.MaxConnections)
@@ -482,7 +542,7 @@ func (s *CacheOptimizationStrategy) GenerateOptimizationSuggestions() []string {
 			suggestions = append(suggestions, "3. 实施连接复用")
 		}
 	}
-	
+
 	// 错误率优化建议
 	errorRate := s.calculateErrorRate(metrics)
 	if errorRate > 0.05 {
@@ -491,7 +551,7 @@ func (s *CacheOptimizationStrategy) GenerateOptimizationSuggestions() []string {
 		suggestions = append(suggestions, "2. 增加重试机制")
 		suggestions = append(suggestions, "3. 实施熔断器模式")
 	}
-	
+
 	// 热点Key优化建议
 	hotKeys := s.hotTracker.GetHotKeys(5)
 	if len(hotKeys) > 0 {
@@ -500,37 +560,46 @@ func (s *CacheOptimizationStrategy) GenerateOptimizationSuggestions() []string {
 		suggestions = append(suggestions, "2. 考虑Key分片策略")
 		suggestions = append(suggestions, "3. 增加热点Key的TTL")
 	}
-	
+
 	if len(suggestions) == 0 {
 		suggestions = append(suggestions, "缓存性能良好，无需特别优化")
 	}
-	
+
 	return suggestions
 }
 
 // OptimizeCache 执行缓存优化
 func (s *CacheOptimizationStrategy) OptimizeCache(ctx context.Context) error {
 	s.logger.Info("Starting cache optimization")
-	
+
 	// 分析当前性能
 	analysis := s.AnalyzePerformance()
 	s.logger.Info("Cache performance analysis completed", "analysis", analysis)
-	
+
 	// 生成优化建议
 	suggestions := s.GenerateOptimizationSuggestions()
 	for i, suggestion := range suggestions {
 		s.logger.Info("Cache optimization suggestion", "index", i+1, "suggestion", suggestion)
 	}
-	
+
 	// 执行自动优化（如果适用）
 	metrics := s.optimizer.GetMetrics()
-	
+
 	// 自动清理过期统计
 	if metrics.Gets+metrics.Sets+metrics.Deletes > 1000000 {
 		s.logger.Info("Clearing cache statistics due to high operation count")
-		// TODO 添加清理逻辑
+		// 添加清理逻辑
+		s.optimizer.ResetStatistics()
+
+		// 同时清理热点Key追踪器的统计
+		if s.hotTracker != nil {
+			s.hotTracker.ClearOldKeys(time.Hour * 24) // 清理24小时前的热点Key记录
+			s.logger.Info("Cleared old hot key records")
+		}
+
+		s.logger.Info("Cache statistics cleared successfully")
 	}
-	
+
 	s.logger.Info("Cache optimization completed")
 	return nil
 }

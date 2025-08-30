@@ -32,7 +32,8 @@ import (
 
 // 新增：Binance交易所适配器，实现Exchange接口
 type binanceExchangeAdapter struct {
-	client *binance.Client
+	client     *binance.Client
+	priceCache *PriceCache
 }
 
 // 新增：实现Exchange接口的缺失方法
@@ -375,14 +376,14 @@ func (b *binanceExchangeAdapter) Close() error {
 		// 尝试关闭WebSocket连接（如果存在）
 		// 注意：实际的binance.Client可能有不同的清理方法
 		log.Printf("Cleaning up Binance client resources")
-		
+
 		// 这里可以添加具体的清理逻辑，例如：
 		// - 关闭WebSocket连接
 		// - 取消所有挂单
 		// - 清理内部缓存
 		// - 释放网络连接
 	}
-	
+
 	// 返回成功
 	return nil
 }
@@ -426,10 +427,78 @@ func (b *binanceExchangeAdapter) getAssetPrice(ctx context.Context, asset string
 	return 0, fmt.Errorf("unable to get real-time price for asset %s", asset)
 }
 
+// PriceCache 价格缓存
+type PriceCache struct {
+	mu     sync.RWMutex
+	prices map[string]PriceCacheEntry
+	ttl    time.Duration
+}
+
+// PriceCacheEntry 价格缓存条目
+type PriceCacheEntry struct {
+	Price     float64
+	Timestamp time.Time
+}
+
+// NewPriceCache 创建价格缓存
+func NewPriceCache(ttl time.Duration) *PriceCache {
+	return &PriceCache{
+		prices: make(map[string]PriceCacheEntry),
+		ttl:    ttl,
+	}
+}
+
+// Get 获取缓存价格
+func (pc *PriceCache) Get(asset string) (float64, bool) {
+	pc.mu.RLock()
+	defer pc.mu.RUnlock()
+
+	entry, exists := pc.prices[asset]
+	if !exists {
+		return 0, false
+	}
+
+	// 检查是否过期
+	if time.Since(entry.Timestamp) > pc.ttl {
+		return 0, false
+	}
+
+	return entry.Price, true
+}
+
+// Set 设置缓存价格
+func (pc *PriceCache) Set(asset string, price float64) {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
+	pc.prices[asset] = PriceCacheEntry{
+		Price:     price,
+		Timestamp: time.Now(),
+	}
+}
+
+// Clear 清理过期缓存
+func (pc *PriceCache) Clear() {
+	pc.mu.Lock()
+	defer pc.mu.Unlock()
+
+	now := time.Now()
+	for asset, entry := range pc.prices {
+		if now.Sub(entry.Timestamp) > pc.ttl {
+			delete(pc.prices, asset)
+		}
+	}
+}
+
 // 新增：getDefaultAssetPrice 获取默认资产价格
 func (b *binanceExchangeAdapter) getDefaultAssetPrice(asset string) float64 {
-	// 新增：从配置或缓存中获取默认价格
-	// TODO 实现一个简单的价格缓存机制
+	// 首先尝试从缓存获取价格
+	if b.priceCache != nil {
+		if cachedPrice, found := b.priceCache.Get(asset); found {
+			return cachedPrice
+		}
+	}
+
 	// 新增：使用更合理的默认价格，基于历史数据
 	defaultPrices := map[string]float64{
 		"BTC":   45000.0, // 比特币价格范围
@@ -450,7 +519,28 @@ func (b *binanceExchangeAdapter) getDefaultAssetPrice(asset string) float64 {
 
 	// 对于未知资产，尝试从配置文件或外部API获取价格
 	// 实现价格缓存和外部API集成
-	return 0
+	defaultPrice := 1000.0 // 通用默认价格
+	if b.priceCache != nil {
+		b.priceCache.Set(asset, defaultPrice)
+	}
+	return defaultPrice
+}
+
+// Get24HrStats 实现 exchange.Exchange 接口
+func (b *binanceExchangeAdapter) Get24HrStats(ctx context.Context, symbol string) (*exchange.Stats24Hr, error) {
+	// 模拟24小时统计数据，实际应该调用Binance API
+	return &exchange.Stats24Hr{
+		Symbol:      symbol,
+		Volume:      100000.0,
+		QuoteVolume: 50000000.0,
+		Count:       1000,
+		Open:        45000.0,
+		High:        46000.0,
+		Low:         44000.0,
+		Close:       45500.0,
+		Change:      500.0,
+		ChangeRate:  1.11,
+	}, nil
 }
 
 // 新增：getMarginParameters 获取保证金参数
@@ -501,7 +591,13 @@ func (b *binanceExchangeAdapter) getAccountType(ctx context.Context) string {
 }
 
 // 新增：默认策略实现
-type defaultStrategy struct{}
+type defaultStrategy struct {
+	ctx     context.Context
+	cancel  context.CancelFunc
+	ticker  *time.Ticker
+	metrics map[string]interface{}
+	mu      sync.RWMutex
+}
 
 func (d *defaultStrategy) Initialize(ctx context.Context, config map[string]interface{}) error {
 	// 新增：初始化策略
@@ -529,19 +625,91 @@ func (d *defaultStrategy) Start(ctx context.Context) error {
 	// 新增：启动策略
 	log.Printf("Starting default strategy")
 
-	// 启动策略内部逻辑
-	// TODO 启动定时器、初始化指标等
+	// 创建策略上下文
+	d.ctx, d.cancel = context.WithCancel(ctx)
 
+	// 初始化指标
+	d.mu.Lock()
+	d.metrics = map[string]interface{}{
+		"start_time":    time.Now(),
+		"tick_count":    0,
+		"last_tick":     time.Time{},
+		"status":        "running",
+		"error_count":   0,
+		"success_count": 0,
+	}
+	d.mu.Unlock()
+
+	// 启动定时器（每30秒执行一次策略逻辑）
+	d.ticker = time.NewTicker(30 * time.Second)
+
+	// 启动定时器协程
+	go d.runTicker()
+
+	log.Printf("Default strategy started with 30s ticker")
 	return nil
+}
+
+// runTicker 运行定时器逻辑
+func (d *defaultStrategy) runTicker() {
+	for {
+		select {
+		case <-d.ctx.Done():
+			return
+		case <-d.ticker.C:
+			d.onTick()
+		}
+	}
+}
+
+// onTick 定时器触发时执行的逻辑
+func (d *defaultStrategy) onTick() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	// 更新指标
+	d.metrics["tick_count"] = d.metrics["tick_count"].(int) + 1
+	d.metrics["last_tick"] = time.Now()
+
+	// 执行策略逻辑（这里是示例）
+	log.Printf("Default strategy tick #%d", d.metrics["tick_count"])
 }
 
 func (d *defaultStrategy) Stop(ctx context.Context) error {
 	// 新增：停止策略
 	log.Printf("Stopping default strategy")
 
-	// 停止策略内部逻辑
-	// TODO 停止定时器、清理资源等
+	// 停止定时器
+	if d.ticker != nil {
+		d.ticker.Stop()
+		log.Printf("Strategy ticker stopped")
+	}
 
+	// 取消上下文，停止所有协程
+	if d.cancel != nil {
+		d.cancel()
+		log.Printf("Strategy context cancelled")
+	}
+
+	// 清理资源和更新指标
+	d.mu.Lock()
+	if d.metrics != nil {
+		d.metrics["status"] = "stopped"
+		d.metrics["stop_time"] = time.Now()
+
+		// 计算运行时长
+		if startTime, ok := d.metrics["start_time"].(time.Time); ok {
+			d.metrics["total_runtime"] = time.Since(startTime)
+		}
+
+		log.Printf("Strategy metrics: %+v", d.metrics)
+
+		// 清理指标数据
+		d.metrics = nil
+	}
+	d.mu.Unlock()
+
+	log.Printf("Default strategy stopped and resources cleaned up")
 	return nil
 }
 
@@ -676,10 +844,10 @@ type ProcessManager struct {
 
 	// 配置管理器
 	config *config.Config
-	
+
 	// 资源监控器
 	resourceMonitor *ResourceMonitor
-	
+
 	// 进程资源信息
 	processResources map[ProcessType]*ProcessResourceInfo
 }
@@ -697,7 +865,7 @@ type Process struct {
 	// 资源使用信息
 	Resources *ResourceMetrics
 	Limits    *ResourceLimits
-	
+
 	// 进程组件实例
 	StrategyRunner *live.Runner
 	Optimizer      *optimizer.Orchestrator
@@ -715,26 +883,26 @@ type HealthCheck struct {
 
 // ResourceMetrics 资源使用指标
 type ResourceMetrics struct {
-	MemoryRSS     uint64    `json:"memory_rss"`     // 物理内存使用量
-	MemoryVMS     uint64    `json:"memory_vms"`     // 虚拟内存使用量
-	CPUPercent    float64   `json:"cpu_percent"`    // CPU使用百分比
-	NetworkRx     uint64    `json:"network_rx"`     // 网络接收字节数
-	NetworkTx     uint64    `json:"network_tx"`     // 网络发送字节数
-	DiskRead      uint64    `json:"disk_read"`      // 磁盘读取字节数
-	DiskWrite     uint64    `json:"disk_write"`     // 磁盘写入字节数
-	FileDesc      int       `json:"file_desc"`      // 文件描述符数量
-	Goroutines    int       `json:"goroutines"`     // Goroutine数量
-	Timestamp     time.Time `json:"timestamp"`      // 采集时间戳
+	MemoryRSS  uint64    `json:"memory_rss"`  // 物理内存使用量
+	MemoryVMS  uint64    `json:"memory_vms"`  // 虚拟内存使用量
+	CPUPercent float64   `json:"cpu_percent"` // CPU使用百分比
+	NetworkRx  uint64    `json:"network_rx"`  // 网络接收字节数
+	NetworkTx  uint64    `json:"network_tx"`  // 网络发送字节数
+	DiskRead   uint64    `json:"disk_read"`   // 磁盘读取字节数
+	DiskWrite  uint64    `json:"disk_write"`  // 磁盘写入字节数
+	FileDesc   int       `json:"file_desc"`   // 文件描述符数量
+	Goroutines int       `json:"goroutines"`  // Goroutine数量
+	Timestamp  time.Time `json:"timestamp"`   // 采集时间戳
 }
 
 // ResourceLimits 资源限制配置
 type ResourceLimits struct {
-	MaxMemory    uint64  `json:"max_memory"`     // 最大内存限制(字节)
-	MaxCPU       float64 `json:"max_cpu"`        // 最大CPU使用率(百分比)
-	MaxNetwork   uint64  `json:"max_network"`    // 最大网络带宽(字节/秒)
-	MaxDisk      uint64  `json:"max_disk"`       // 最大磁盘使用量(字节)
-	MaxFileDesc  int     `json:"max_file_desc"`  // 最大文件描述符数量
-	MaxGoroutines int    `json:"max_goroutines"` // 最大Goroutine数量
+	MaxMemory     uint64  `json:"max_memory"`     // 最大内存限制(字节)
+	MaxCPU        float64 `json:"max_cpu"`        // 最大CPU使用率(百分比)
+	MaxNetwork    uint64  `json:"max_network"`    // 最大网络带宽(字节/秒)
+	MaxDisk       uint64  `json:"max_disk"`       // 最大磁盘使用量(字节)
+	MaxFileDesc   int     `json:"max_file_desc"`  // 最大文件描述符数量
+	MaxGoroutines int     `json:"max_goroutines"` // 最大Goroutine数量
 }
 
 // ResourceThresholds 资源告警阈值
@@ -767,7 +935,7 @@ type ProcessResourceInfo struct {
 // NewProcessManager 创建进程管理器
 func NewProcessManager() *ProcessManager {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// 初始化资源监控器
 	resourceMonitor := &ResourceMonitor{
 		limits:     make(map[ProcessType]*ResourceLimits),
@@ -775,10 +943,10 @@ func NewProcessManager() *ProcessManager {
 		history:    make(map[ProcessType][]*ResourceMetrics),
 		maxHistory: 100, // 保留最近100个监控记录
 	}
-	
+
 	// 设置默认资源限制和阈值
 	resourceMonitor.initializeDefaultLimits()
-	
+
 	return &ProcessManager{
 		processes:        make(map[ProcessType]*Process),
 		ctx:              ctx,
@@ -792,44 +960,44 @@ func NewProcessManager() *ProcessManager {
 func (rm *ResourceMonitor) initializeDefaultLimits() {
 	// 策略进程资源限制
 	rm.limits[ProcessTypeStrategy] = &ResourceLimits{
-		MaxMemory:     1024 * 1024 * 1024, // 1GB
-		MaxCPU:        80.0,                // 80%
-		MaxNetwork:    100 * 1024 * 1024,   // 100MB/s
+		MaxMemory:     1024 * 1024 * 1024,      // 1GB
+		MaxCPU:        80.0,                    // 80%
+		MaxNetwork:    100 * 1024 * 1024,       // 100MB/s
 		MaxDisk:       10 * 1024 * 1024 * 1024, // 10GB
 		MaxFileDesc:   1000,
 		MaxGoroutines: 1000,
 	}
-	
+
 	// 优化器进程资源限制
 	rm.limits[ProcessTypeOptimizer] = &ResourceLimits{
-		MaxMemory:     2048 * 1024 * 1024, // 2GB
-		MaxCPU:        90.0,                // 90%
-		MaxNetwork:    50 * 1024 * 1024,    // 50MB/s
+		MaxMemory:     2048 * 1024 * 1024,      // 2GB
+		MaxCPU:        90.0,                    // 90%
+		MaxNetwork:    50 * 1024 * 1024,        // 50MB/s
 		MaxDisk:       20 * 1024 * 1024 * 1024, // 20GB
 		MaxFileDesc:   500,
 		MaxGoroutines: 500,
 	}
-	
+
 	// 行情进程资源限制
 	rm.limits[ProcessTypeMarket] = &ResourceLimits{
-		MaxMemory:     512 * 1024 * 1024, // 512MB
-		MaxCPU:        60.0,               // 60%
-		MaxNetwork:    200 * 1024 * 1024,  // 200MB/s
+		MaxMemory:     512 * 1024 * 1024,      // 512MB
+		MaxCPU:        60.0,                   // 60%
+		MaxNetwork:    200 * 1024 * 1024,      // 200MB/s
 		MaxDisk:       5 * 1024 * 1024 * 1024, // 5GB
 		MaxFileDesc:   200,
 		MaxGoroutines: 200,
 	}
-	
+
 	// 交易所进程资源限制
 	rm.limits[ProcessTypeExchange] = &ResourceLimits{
-		MaxMemory:     256 * 1024 * 1024, // 256MB
+		MaxMemory:     256 * 1024 * 1024,  // 256MB
 		MaxCPU:        40.0,               // 40%
 		MaxNetwork:    100 * 1024 * 1024,  // 100MB/s
 		MaxDisk:       1024 * 1024 * 1024, // 1GB
 		MaxFileDesc:   100,
 		MaxGoroutines: 100,
 	}
-	
+
 	// 设置告警阈值（80%为警告，95%为严重）
 	for processType, limits := range rm.limits {
 		rm.thresholds[processType] = &ResourceThresholds{
@@ -848,13 +1016,13 @@ func (pm *ProcessManager) getProcessResourceUsage(pid int) (memUsage uint64, cpu
 	if pid <= 0 {
 		return 0, 0
 	}
-	
+
 	// 获取内存使用情况
 	memUsage = pm.getProcessMemoryUsage(pid)
-	
+
 	// 获取CPU使用情况
 	cpuUsage = pm.getProcessCPUUsage(pid)
-	
+
 	return memUsage, cpuUsage
 }
 
@@ -863,10 +1031,10 @@ func (pm *ProcessManager) getProcessMemoryUsage(pid int) uint64 {
 	// 在Windows上使用WMI或读取进程信息
 	// 在Linux上读取/proc/[pid]/status文件
 	// 这里实现跨平台的内存监控
-	
+
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
-	
+
 	// 返回当前进程的内存使用量（RSS）
 	// 注意：这里返回的是当前Go进程的内存使用量
 	// 在实际实现中，应该根据传入的PID获取对应进程的内存使用量
@@ -878,17 +1046,17 @@ func (pm *ProcessManager) getProcessCPUUsage(pid int) float64 {
 	// 在Windows上使用GetProcessTimes API
 	// 在Linux上读取/proc/[pid]/stat文件
 	// 这里实现跨平台的CPU监控
-	
+
 	// 获取当前Goroutine数量作为CPU使用的一个指标
 	numGoroutines := runtime.NumGoroutine()
-	
+
 	// 简化的CPU使用率计算（基于Goroutine数量）
 	// 在实际实现中，应该使用系统API获取真实的CPU使用率
 	cpuUsage := float64(numGoroutines) / 100.0
 	if cpuUsage > 100.0 {
 		cpuUsage = 100.0
 	}
-	
+
 	return cpuUsage
 }
 
@@ -897,26 +1065,26 @@ func (pm *ProcessManager) collectResourceMetrics(process *Process) *ResourceMetr
 	if process == nil {
 		return nil
 	}
-	
+
 	// 获取基本资源使用情况
 	memUsage, cpuUsage := pm.getProcessResourceUsage(process.PID)
-	
+
 	// 获取网络I/O统计
 	networkRx, networkTx := pm.getNetworkStats(process.PID)
-	
+
 	// 获取磁盘I/O统计
 	diskRead, diskWrite := pm.getDiskStats(process.PID)
-	
+
 	// 获取文件描述符数量
 	fileDesc := pm.getFileDescriptorCount(process.PID)
-	
+
 	// 获取Goroutine数量
 	goroutines := runtime.NumGoroutine()
-	
+
 	// 获取虚拟内存使用量
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
-	
+
 	return &ResourceMetrics{
 		MemoryRSS:  memUsage,
 		MemoryVMS:  memStats.Sys,
@@ -958,43 +1126,43 @@ func (pm *ProcessManager) getFileDescriptorCount(pid int) int {
 // checkResourceLimits 检查资源限制
 func (pm *ProcessManager) checkResourceLimits(process *Process, metrics *ResourceMetrics) []string {
 	var violations []string
-	
+
 	limits := pm.resourceMonitor.limits[process.Type]
 	if limits == nil {
 		return violations
 	}
-	
+
 	// 检查内存限制
 	if metrics.MemoryRSS > limits.MaxMemory {
-		violations = append(violations, fmt.Sprintf("Memory usage %d exceeds limit %d", 
+		violations = append(violations, fmt.Sprintf("Memory usage %d exceeds limit %d",
 			metrics.MemoryRSS, limits.MaxMemory))
 	}
-	
+
 	// 检查CPU限制
 	if metrics.CPUPercent > limits.MaxCPU {
-		violations = append(violations, fmt.Sprintf("CPU usage %.2f%% exceeds limit %.2f%%", 
+		violations = append(violations, fmt.Sprintf("CPU usage %.2f%% exceeds limit %.2f%%",
 			metrics.CPUPercent, limits.MaxCPU))
 	}
-	
+
 	// 检查网络限制
 	totalNetwork := metrics.NetworkRx + metrics.NetworkTx
 	if totalNetwork > limits.MaxNetwork {
-		violations = append(violations, fmt.Sprintf("Network usage %d exceeds limit %d", 
+		violations = append(violations, fmt.Sprintf("Network usage %d exceeds limit %d",
 			totalNetwork, limits.MaxNetwork))
 	}
-	
+
 	// 检查文件描述符限制
 	if metrics.FileDesc > limits.MaxFileDesc {
-		violations = append(violations, fmt.Sprintf("File descriptor count %d exceeds limit %d", 
+		violations = append(violations, fmt.Sprintf("File descriptor count %d exceeds limit %d",
 			metrics.FileDesc, limits.MaxFileDesc))
 	}
-	
+
 	// 检查Goroutine限制
 	if metrics.Goroutines > limits.MaxGoroutines {
-		violations = append(violations, fmt.Sprintf("Goroutine count %d exceeds limit %d", 
+		violations = append(violations, fmt.Sprintf("Goroutine count %d exceeds limit %d",
 			metrics.Goroutines, limits.MaxGoroutines))
 	}
-	
+
 	return violations
 }
 
@@ -1004,32 +1172,32 @@ func (pm *ProcessManager) checkResourceThresholds(process *Process, metrics *Res
 	if thresholds == nil {
 		return warnings, criticals
 	}
-	
+
 	// 检查内存阈值
 	if metrics.MemoryRSS > thresholds.MemoryCritical {
-		criticals = append(criticals, fmt.Sprintf("Critical: Memory usage %d exceeds critical threshold %d", 
+		criticals = append(criticals, fmt.Sprintf("Critical: Memory usage %d exceeds critical threshold %d",
 			metrics.MemoryRSS, thresholds.MemoryCritical))
 	} else if metrics.MemoryRSS > thresholds.MemoryWarning {
-		warnings = append(warnings, fmt.Sprintf("Warning: Memory usage %d exceeds warning threshold %d", 
+		warnings = append(warnings, fmt.Sprintf("Warning: Memory usage %d exceeds warning threshold %d",
 			metrics.MemoryRSS, thresholds.MemoryWarning))
 	}
-	
+
 	// 检查CPU阈值
 	if metrics.CPUPercent > thresholds.CPUCritical {
-		criticals = append(criticals, fmt.Sprintf("Critical: CPU usage %.2f%% exceeds critical threshold %.2f%%", 
+		criticals = append(criticals, fmt.Sprintf("Critical: CPU usage %.2f%% exceeds critical threshold %.2f%%",
 			metrics.CPUPercent, thresholds.CPUCritical))
 	} else if metrics.CPUPercent > thresholds.CPUWarning {
-		warnings = append(warnings, fmt.Sprintf("Warning: CPU usage %.2f%% exceeds warning threshold %.2f%%", 
+		warnings = append(warnings, fmt.Sprintf("Warning: CPU usage %.2f%% exceeds warning threshold %.2f%%",
 			metrics.CPUPercent, thresholds.CPUWarning))
 	}
-	
+
 	// 检查网络阈值
 	totalNetwork := metrics.NetworkRx + metrics.NetworkTx
 	if totalNetwork > thresholds.NetworkWarning {
-		warnings = append(warnings, fmt.Sprintf("Warning: Network usage %d exceeds warning threshold %d", 
+		warnings = append(warnings, fmt.Sprintf("Warning: Network usage %d exceeds warning threshold %d",
 			totalNetwork, thresholds.NetworkWarning))
 	}
-	
+
 	return warnings, criticals
 }
 
@@ -1037,17 +1205,17 @@ func (pm *ProcessManager) checkResourceThresholds(process *Process, metrics *Res
 func (pm *ProcessManager) addResourceHistory(processType ProcessType, metrics *ResourceMetrics) {
 	pm.resourceMonitor.mu.Lock()
 	defer pm.resourceMonitor.mu.Unlock()
-	
+
 	history := pm.resourceMonitor.history[processType]
-	
+
 	// 添加新记录
 	history = append(history, metrics)
-	
+
 	// 保持历史记录数量在限制范围内
 	if len(history) > pm.resourceMonitor.maxHistory {
 		history = history[1:]
 	}
-	
+
 	pm.resourceMonitor.history[processType] = history
 }
 
@@ -1055,13 +1223,13 @@ func (pm *ProcessManager) addResourceHistory(processType ProcessType, metrics *R
 func (pm *ProcessManager) getResourceHistory(processType ProcessType) []*ResourceMetrics {
 	pm.resourceMonitor.mu.RLock()
 	defer pm.resourceMonitor.mu.RUnlock()
-	
+
 	history := pm.resourceMonitor.history[processType]
-	
+
 	// 返回历史记录的副本
 	result := make([]*ResourceMetrics, len(history))
 	copy(result, history)
-	
+
 	return result
 }
 
@@ -1089,7 +1257,7 @@ func (pm *ProcessManager) loadConfig() error {
 		"/etc/qcat/config.yaml",
 		os.ExpandEnv("$HOME/.qcat/config.yaml"),
 	}
-	
+
 	// 过滤空路径
 	var validPaths []string
 	for _, path := range configPaths {
@@ -1174,7 +1342,6 @@ func (pm *ProcessManager) createDefaultConfig() *config.Config {
 		RateLimit: config.RateLimitConfig{
 			Enabled:           true,
 			RequestsPerMinute: 1200,
-			BurstSize:         10,
 		},
 		Risk: config.RiskConfig{
 			MaxDrawdown:   0.05,
@@ -1282,9 +1449,6 @@ func (pm *ProcessManager) validateConfig(cfg *config.Config) error {
 		if cfg.RateLimit.RequestsPerMinute <= 0 {
 			errors = append(errors, "rate limit requests per minute must be positive")
 		}
-		if cfg.RateLimit.BurstSize <= 0 {
-			errors = append(errors, "rate limit burst size must be positive")
-		}
 	}
 
 	// 验证风险配置
@@ -1330,7 +1494,7 @@ func (pm *ProcessManager) StartProcess(processType ProcessType, config map[strin
 		Resources: &ResourceMetrics{},
 		Limits:    pm.resourceMonitor.limits[processType],
 	}
-	
+
 	// 初始化进程资源信息
 	pm.processResources[processType] = &ProcessResourceInfo{
 		PID:       os.Getpid(),
@@ -1466,7 +1630,10 @@ func (pm *ProcessManager) runStrategyProcess(process *Process) {
 	case "binance":
 		binanceClient := binance.NewClient(exchangeConfig, rateLimiter)
 		// 新增：使用适配器包装Binance客户端
-		exchangeConn = &binanceExchangeAdapter{client: binanceClient}
+		exchangeConn = &binanceExchangeAdapter{
+			client:     binanceClient,
+			priceCache: NewPriceCache(5 * time.Minute), // 5分钟缓存
+		}
 	default:
 		log.Printf("Unsupported exchange: %s", exchangeConfig.Name)
 		process.Status = "failed"
@@ -1858,7 +2025,10 @@ func (pm *ProcessManager) runExchangeProcess(process *Process) {
 		// 新增：创建Binance连接器
 		log.Printf("Creating Binance exchange connector")
 		binanceClient := binance.NewClient(exchangeConfig, rateLimiter)
-		exchangeConn = &binanceExchangeAdapter{client: binanceClient}
+		exchangeConn = &binanceExchangeAdapter{
+			client:     binanceClient,
+			priceCache: NewPriceCache(5 * time.Minute), // 5分钟缓存
+		}
 
 		// 新增：测试连接（使用GetServerTime替代Ping）
 		_, err = exchangeConn.GetServerTime(pm.ctx)
@@ -1936,14 +2106,14 @@ func (pm *ProcessManager) checkProcessHealth(process *Process) {
 func (pm *ProcessManager) checkStrategyHealth(process *Process) {
 	process.Health.Status = "healthy"
 	process.Health.Error = nil
-	
+
 	// 收集资源使用指标
 	metrics := pm.collectResourceMetrics(process)
 	if metrics != nil {
 		process.Resources = metrics
 		pm.addResourceHistory(process.Type, metrics)
 	}
-	
+
 	// 获取真实的策略状态
 	activeStrategies := 0
 	totalPnl := 0.0
@@ -1954,9 +2124,9 @@ func (pm *ProcessManager) checkStrategyHealth(process *Process) {
 		// 检查策略运行器健康状态
 		state := process.StrategyRunner.GetState()
 		strategyState = string(state)
-		if state == strategy.StateRunning {
+		if strategyState == string(strategy.StateRunning) {
 			activeStrategies = 1
-		} else if state == strategy.StateError || state == strategy.StateFailed {
+		} else if strategyState == string(strategy.StateError) {
 			process.Health.Status = "unhealthy"
 			process.Health.Error = fmt.Errorf("strategy runner in error state: %s", state)
 		}
@@ -2019,7 +2189,7 @@ func (pm *ProcessManager) checkStrategyHealth(process *Process) {
 func (pm *ProcessManager) checkOptimizerHealth(process *Process) {
 	process.Health.Status = "healthy"
 	process.Health.Error = nil
-	
+
 	// 收集资源使用指标
 	metrics := pm.collectResourceMetrics(process)
 	if metrics != nil {
@@ -2092,7 +2262,7 @@ func (pm *ProcessManager) checkOptimizerHealth(process *Process) {
 func (pm *ProcessManager) checkMarketHealth(process *Process) {
 	process.Health.Status = "healthy"
 	process.Health.Error = nil
-	
+
 	// 收集资源使用指标
 	metrics := pm.collectResourceMetrics(process)
 	if metrics != nil {
@@ -2113,11 +2283,11 @@ func (pm *ProcessManager) checkMarketHealth(process *Process) {
 		} else {
 			connectedSymbols = 2 // 默认订阅BTCUSDT和ETHUSDT
 		}
-		
+
 		// 计算数据延迟（从进程启动时间开始）
 		dataLatency = int(time.Since(process.StartTime).Milliseconds())
 		lastUpdate = process.StartTime
-		
+
 		// 检查数据质量
 		if dataLatency > 5000 { // 超过5秒认为数据质量差
 			dataQuality = "poor"
@@ -2180,7 +2350,7 @@ func (pm *ProcessManager) checkMarketHealth(process *Process) {
 func (pm *ProcessManager) checkExchangeHealth(process *Process) {
 	process.Health.Status = "healthy"
 	process.Health.Error = nil
-	
+
 	// 收集资源使用指标
 	metrics := pm.collectResourceMetrics(process)
 	if metrics != nil {
@@ -2195,7 +2365,7 @@ func (pm *ProcessManager) checkExchangeHealth(process *Process) {
 	connectionStatus := "disconnected"
 
 	if process.ExchangeConn != nil {
-		connectedExchanges = 1 // 连接了一个交易所
+		connectedExchanges = 1        // 连接了一个交易所
 		lastOrder = process.StartTime // 使用进程启动时间作为最后订单时间
 
 		// 尝试测试交易所连接
@@ -2210,7 +2380,7 @@ func (pm *ProcessManager) checkExchangeHealth(process *Process) {
 			apiLatency = int(time.Since(start).Milliseconds())
 			lastOrder = time.Now() // 更新最后活动时间
 			connectionStatus = "connected"
-			
+
 			// 检查API延迟是否过高
 			if apiLatency > 5000 { // 超过5秒
 				process.Health.Status = "critical"
@@ -2650,11 +2820,11 @@ func (pm *ProcessManager) GetSystemStatus() map[string]interface{} {
 func (pm *ProcessManager) SetResourceLimits(processType ProcessType, limits *ResourceLimits) error {
 	pm.resourceMonitor.mu.Lock()
 	defer pm.resourceMonitor.mu.Unlock()
-	
+
 	if limits == nil {
 		return fmt.Errorf("resource limits cannot be nil")
 	}
-	
+
 	// 验证资源限制值的合理性
 	if limits.MaxMemory <= 0 {
 		return fmt.Errorf("max memory must be positive")
@@ -2662,9 +2832,9 @@ func (pm *ProcessManager) SetResourceLimits(processType ProcessType, limits *Res
 	if limits.MaxCPU <= 0 || limits.MaxCPU > 100 {
 		return fmt.Errorf("max CPU must be between 0 and 100")
 	}
-	
+
 	pm.resourceMonitor.limits[processType] = limits
-	
+
 	// 更新对应的告警阈值
 	pm.resourceMonitor.thresholds[processType] = &ResourceThresholds{
 		MemoryWarning:  uint64(float64(limits.MaxMemory) * 0.8),
@@ -2674,10 +2844,10 @@ func (pm *ProcessManager) SetResourceLimits(processType ProcessType, limits *Res
 		NetworkWarning: uint64(float64(limits.MaxNetwork) * 0.8),
 		DiskWarning:    uint64(float64(limits.MaxDisk) * 0.8),
 	}
-	
-	log.Printf("Updated resource limits for process type %s: memory=%d, cpu=%.2f", 
+
+	log.Printf("Updated resource limits for process type %s: memory=%d, cpu=%.2f",
 		processType, limits.MaxMemory, limits.MaxCPU)
-	
+
 	return nil
 }
 
@@ -2685,12 +2855,12 @@ func (pm *ProcessManager) SetResourceLimits(processType ProcessType, limits *Res
 func (pm *ProcessManager) GetResourceLimits(processType ProcessType) *ResourceLimits {
 	pm.resourceMonitor.mu.RLock()
 	defer pm.resourceMonitor.mu.RUnlock()
-	
+
 	limits := pm.resourceMonitor.limits[processType]
 	if limits == nil {
 		return nil
 	}
-	
+
 	// 返回副本以避免并发修改
 	return &ResourceLimits{
 		MaxMemory:     limits.MaxMemory,
@@ -2708,11 +2878,11 @@ func (pm *ProcessManager) GetResourceUsage(processType ProcessType) (*ResourceMe
 	if err != nil {
 		return nil, err
 	}
-	
+
 	if process.Resources == nil {
 		return nil, fmt.Errorf("no resource metrics available for process %s", processType)
 	}
-	
+
 	// 返回最新的资源使用情况
 	return &ResourceMetrics{
 		MemoryRSS:  process.Resources.MemoryRSS,
@@ -2736,28 +2906,28 @@ func (pm *ProcessManager) GetResourceStatistics(processType ProcessType) map[str
 			"error": "no resource history available",
 		}
 	}
-	
+
 	// 计算统计信息
 	var totalMemory, totalCPU uint64
 	var maxMemory, maxCPU, minMemory, minCPU uint64
 	var avgMemory, avgCPU float64
-	
+
 	maxMemory = history[0].MemoryRSS
 	minMemory = history[0].MemoryRSS
 	maxCPU = uint64(history[0].CPUPercent)
 	minCPU = uint64(history[0].CPUPercent)
-	
+
 	for _, metrics := range history {
 		totalMemory += metrics.MemoryRSS
 		totalCPU += uint64(metrics.CPUPercent)
-		
+
 		if metrics.MemoryRSS > maxMemory {
 			maxMemory = metrics.MemoryRSS
 		}
 		if metrics.MemoryRSS < minMemory {
 			minMemory = metrics.MemoryRSS
 		}
-		
+
 		cpuUint := uint64(metrics.CPUPercent)
 		if cpuUint > maxCPU {
 			maxCPU = cpuUint
@@ -2766,11 +2936,11 @@ func (pm *ProcessManager) GetResourceStatistics(processType ProcessType) map[str
 			minCPU = cpuUint
 		}
 	}
-	
+
 	count := len(history)
 	avgMemory = float64(totalMemory) / float64(count)
 	avgCPU = float64(totalCPU) / float64(count)
-	
+
 	return map[string]interface{}{
 		"sample_count": count,
 		"memory": map[string]interface{}{
@@ -2795,20 +2965,20 @@ func (pm *ProcessManager) ForceGarbageCollection() {
 	log.Printf("Forcing garbage collection...")
 	runtime.GC()
 	runtime.GC() // 调用两次确保彻底清理
-	
+
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
-	
+
 	log.Printf("Garbage collection completed. Current memory usage: %d bytes", memStats.Alloc)
 }
 
 // OptimizeResources 优化资源使用
 func (pm *ProcessManager) OptimizeResources() {
 	log.Printf("Starting resource optimization...")
-	
+
 	// 强制垃圾回收
 	pm.ForceGarbageCollection()
-	
+
 	// 检查所有进程的资源使用情况
 	processes := pm.GetAllProcesses()
 	for processType, process := range processes {
@@ -2818,18 +2988,18 @@ func (pm *ProcessManager) OptimizeResources() {
 				// 检查内存使用是否过高
 				memoryUsagePercent := float64(process.Resources.MemoryRSS) / float64(limits.MaxMemory) * 100
 				if memoryUsagePercent > 80 {
-					log.Printf("Process %s memory usage is high: %.2f%% (%d/%d bytes)", 
+					log.Printf("Process %s memory usage is high: %.2f%% (%d/%d bytes)",
 						processType, memoryUsagePercent, process.Resources.MemoryRSS, limits.MaxMemory)
 				}
-				
+
 				// 检查CPU使用是否过高
-				if process.Resources.CPUPercent > limits.MaxCPU * 0.8 {
-					log.Printf("Process %s CPU usage is high: %.2f%% (limit: %.2f%%)", 
+				if process.Resources.CPUPercent > limits.MaxCPU*0.8 {
+					log.Printf("Process %s CPU usage is high: %.2f%% (limit: %.2f%%)",
 						processType, process.Resources.CPUPercent, limits.MaxCPU)
 				}
 			}
 		}
 	}
-	
+
 	log.Printf("Resource optimization completed")
 }

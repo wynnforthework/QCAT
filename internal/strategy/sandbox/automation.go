@@ -11,6 +11,7 @@ import (
 	"qcat/internal/exchange"
 	"qcat/internal/strategy"
 	"qcat/internal/strategy/generator"
+	"qcat/internal/strategy/paper"
 )
 
 // AutomatedSandboxService 自动化沙盒测试服务
@@ -462,10 +463,20 @@ func (s *AutomatedSandboxService) generateRecommendation(result *TestResult) str
 
 // createMockExchange 创建模拟交易所
 func (s *AutomatedSandboxService) createMockExchange(config *TestConfiguration) exchange.Exchange {
-	// 这里应该创建一个模拟交易所实例
-	// 为了演示，返回nil，实际应该实现MockExchange
-	log.Printf("Creating mock exchange for %s on %s", config.Symbol, config.Exchange)
-	return nil
+	// 创建初始余额
+	initialBalance := map[string]float64{
+		"USDT": 100000.0, // 10万USDT用于测试
+		"BTC":  0.0,
+		"ETH":  0.0,
+	}
+
+	// 创建 paper exchange 实例
+	paperExchange := paper.NewExchange(nil, initialBalance)
+
+	log.Printf("Created paper exchange for %s on %s with initial balance: %.2f USDT",
+		config.Symbol, config.Exchange, initialBalance["USDT"])
+
+	return paperExchange
 }
 
 // createStrategyInstance 创建策略实例

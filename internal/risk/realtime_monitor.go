@@ -11,10 +11,42 @@ import (
 	"qcat/internal/strategy/validation"
 )
 
+// ProcessManager 进程管理器接口
+type ProcessManager interface {
+	StopProcess(ctx context.Context, processID string) error
+	GetProcessesByStrategy(strategyID string) ([]string, error)
+}
+
+// ExchangeAPI 交易所API接口
+type ExchangeAPI interface {
+	CancelAllOrders(ctx context.Context, strategyID string) error
+	GetOpenOrders(ctx context.Context, strategyID string) ([]Order, error)
+}
+
+// CacheManager 缓存管理器接口
+type CacheManager interface {
+	DeleteByPattern(ctx context.Context, pattern string) error
+	Clear(ctx context.Context) error
+}
+
+// Order 订单结构
+type Order struct {
+	ID         string  `json:"id"`
+	StrategyID string  `json:"strategy_id"`
+	Symbol     string  `json:"symbol"`
+	Side       string  `json:"side"`
+	Quantity   float64 `json:"quantity"`
+	Price      float64 `json:"price"`
+	Status     string  `json:"status"`
+}
+
 // RealtimeRiskMonitor 实时风险监控器
 type RealtimeRiskMonitor struct {
 	db               *sql.DB
 	gatekeeper       *validation.StrategyGatekeeper
+	processManager   ProcessManager
+	exchangeAPI      ExchangeAPI
+	cacheManager     CacheManager
 	monitorInterval  time.Duration
 	emergencyActions map[string]EmergencyAction
 	riskThresholds   *RiskThresholds
@@ -58,10 +90,13 @@ const (
 )
 
 // NewRealtimeRiskMonitor 创建实时风险监控器
-func NewRealtimeRiskMonitor(db *sql.DB) *RealtimeRiskMonitor {
+func NewRealtimeRiskMonitor(db *sql.DB, processManager ProcessManager, exchangeAPI ExchangeAPI, cacheManager CacheManager) *RealtimeRiskMonitor {
 	return &RealtimeRiskMonitor{
 		db:               db,
 		gatekeeper:       validation.NewStrategyGatekeeper(),
+		processManager:   processManager,
+		exchangeAPI:      exchangeAPI,
+		cacheManager:     cacheManager,
 		monitorInterval:  30 * time.Second, // 每30秒检查一次
 		emergencyActions: make(map[string]EmergencyAction),
 		riskThresholds: &RiskThresholds{
@@ -376,12 +411,43 @@ func (rm *RealtimeRiskMonitor) GetRiskStatus() map[string]*StrategyRiskState {
 func (rm *RealtimeRiskMonitor) forceStopStrategyProcesses(ctx context.Context, strategyID string) error {
 	log.Printf("强制停止策略 %s 的相关进程", strategyID)
 
-	// TODO: 实现进程停止逻辑
-	// 这里需要与进程管理器集成，停止策略相关的所有进程
-	// 包括策略执行进程、数据采集进程等
+	// 实现进程停止逻辑
+	if rm.processManager == nil {
+		log.Printf("警告: 进程管理器未初始化，无法停止策略 %s 的进程", strategyID)
+		return fmt.Errorf("process manager not initialized")
+	}
 
-	// 暂时只记录日志
-	log.Printf("策略 %s 的进程停止操作已执行", strategyID)
+	// 获取策略相关的所有进程
+	processIDs, err := rm.processManager.GetProcessesByStrategy(strategyID)
+	if err != nil {
+		log.Printf("获取策略 %s 的进程列表失败: %v", strategyID, err)
+		return fmt.Errorf("failed to get processes for strategy %s: %w", strategyID, err)
+	}
+
+	if len(processIDs) == 0 {
+		log.Printf("策略 %s 没有运行中的进程", strategyID)
+		return nil
+	}
+
+	// 逐个停止进程
+	var stopErrors []error
+	for _, processID := range processIDs {
+		log.Printf("停止策略 %s 的进程: %s", strategyID, processID)
+
+		if err := rm.processManager.StopProcess(ctx, processID); err != nil {
+			log.Printf("停止进程 %s 失败: %v", processID, err)
+			stopErrors = append(stopErrors, fmt.Errorf("failed to stop process %s: %w", processID, err))
+		} else {
+			log.Printf("成功停止进程: %s", processID)
+		}
+	}
+
+	// 如果有停止失败的进程，返回错误
+	if len(stopErrors) > 0 {
+		return fmt.Errorf("failed to stop %d processes: %v", len(stopErrors), stopErrors)
+	}
+
+	log.Printf("策略 %s 的所有进程已成功停止 (共 %d 个)", strategyID, len(processIDs))
 	return nil
 }
 
@@ -410,16 +476,90 @@ func (rm *RealtimeRiskMonitor) cleanupStrategyResources(ctx context.Context, str
 
 // cancelPendingOrders 取消待处理订单
 func (rm *RealtimeRiskMonitor) cancelPendingOrders(ctx context.Context, strategyID string) error {
-	// TODO: 实现订单取消逻辑
-	// 这里需要与交易所API集成，取消策略的所有待处理订单
+	// 实现订单取消逻辑
 	log.Printf("取消策略 %s 的待处理订单", strategyID)
+
+	if rm.exchangeAPI == nil {
+		log.Printf("警告: 交易所API未初始化，无法取消策略 %s 的订单", strategyID)
+		return fmt.Errorf("exchange API not initialized")
+	}
+
+	// 首先获取策略的所有开放订单
+	openOrders, err := rm.exchangeAPI.GetOpenOrders(ctx, strategyID)
+	if err != nil {
+		log.Printf("获取策略 %s 的开放订单失败: %v", strategyID, err)
+		return fmt.Errorf("failed to get open orders for strategy %s: %w", strategyID, err)
+	}
+
+	if len(openOrders) == 0 {
+		log.Printf("策略 %s 没有待处理的订单", strategyID)
+		return nil
+	}
+
+	log.Printf("策略 %s 有 %d 个待处理订单，开始取消", strategyID, len(openOrders))
+
+	// 取消所有开放订单
+	if err := rm.exchangeAPI.CancelAllOrders(ctx, strategyID); err != nil {
+		log.Printf("批量取消策略 %s 的订单失败: %v", strategyID, err)
+		return fmt.Errorf("failed to cancel orders for strategy %s: %w", strategyID, err)
+	}
+
+	// 记录取消的订单详情
+	for _, order := range openOrders {
+		log.Printf("已取消订单: ID=%s, Symbol=%s, Side=%s, Quantity=%.4f, Price=%.4f",
+			order.ID, order.Symbol, order.Side, order.Quantity, order.Price)
+	}
+
+	log.Printf("策略 %s 的所有待处理订单已成功取消 (共 %d 个)", strategyID, len(openOrders))
 	return nil
 }
 
 // clearStrategyCache 清理策略缓存
 func (rm *RealtimeRiskMonitor) clearStrategyCache(ctx context.Context, strategyID string) error {
-	// TODO: 实现缓存清理逻辑
-	// 这里需要清理Redis或其他缓存中的策略相关数据
+	// 实现缓存清理逻辑
 	log.Printf("清理策略 %s 的缓存数据", strategyID)
+
+	if rm.cacheManager == nil {
+		log.Printf("警告: 缓存管理器未初始化，无法清理策略 %s 的缓存", strategyID)
+		return fmt.Errorf("cache manager not initialized")
+	}
+
+	// 定义需要清理的缓存键模式
+	cachePatterns := []string{
+		fmt.Sprintf("strategy:%s:*", strategyID),    // 策略相关的所有缓存
+		fmt.Sprintf("positions:%s:*", strategyID),   // 持仓缓存
+		fmt.Sprintf("orders:%s:*", strategyID),      // 订单缓存
+		fmt.Sprintf("signals:%s:*", strategyID),     // 信号缓存
+		fmt.Sprintf("metrics:%s:*", strategyID),     // 指标缓存
+		fmt.Sprintf("market_data:%s:*", strategyID), // 市场数据缓存
+		fmt.Sprintf("risk_state:%s", strategyID),    // 风险状态缓存
+		fmt.Sprintf("performance:%s:*", strategyID), // 性能数据缓存
+	}
+
+	var clearErrors []error
+	totalCleared := 0
+
+	// 逐个清理缓存模式
+	for _, pattern := range cachePatterns {
+		log.Printf("清理缓存模式: %s", pattern)
+
+		if err := rm.cacheManager.DeleteByPattern(ctx, pattern); err != nil {
+			log.Printf("清理缓存模式 %s 失败: %v", pattern, err)
+			clearErrors = append(clearErrors, fmt.Errorf("failed to clear pattern %s: %w", pattern, err))
+		} else {
+			log.Printf("成功清理缓存模式: %s", pattern)
+			totalCleared++
+		}
+	}
+
+	// 如果有清理失败的模式，记录错误但不返回失败
+	if len(clearErrors) > 0 {
+		log.Printf("策略 %s 的缓存清理部分失败: %d/%d 个模式清理失败",
+			strategyID, len(clearErrors), len(cachePatterns))
+		// 不返回错误，因为部分清理失败不应该阻止整个紧急停止流程
+	}
+
+	log.Printf("策略 %s 的缓存清理完成: 成功清理 %d/%d 个缓存模式",
+		strategyID, totalCleared, len(cachePatterns))
 	return nil
 }

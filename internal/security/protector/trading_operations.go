@@ -42,7 +42,7 @@ func (fp *FundProtector) setTradingHalted(halted bool) {
 	// 这里应该设置一个交易状态标志
 	// 实际实现中，这个标志应该被交易系统检查
 	log.Printf("Trading halted status set to: %v", halted)
-	
+
 	if halted {
 		log.Printf("🛑 TRADING HALTED - All new trading activities are suspended")
 	} else {
@@ -53,15 +53,57 @@ func (fp *FundProtector) setTradingHalted(halted bool) {
 // logTradingEvent 记录交易事件
 func (fp *FundProtector) logTradingEvent(eventType, description string) {
 	log.Printf("Trading Event [%s]: %s", eventType, description)
-	
-	// TODO 将事件记录到数据库或发送到监控系统
-	// 实际实现中应该包含更详细的事件记录
+
+	// 记录事件到数据库
+	if fp.daoManager != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		// 创建紧急事件记录
+		event := &EmergencyEvent{
+			ID:          fp.generateEmergencyID(),
+			Type:        eventType,
+			Severity:    "INFO", // 交易事件通常为信息级别
+			Description: description,
+			Timestamp:   time.Now(),
+			TriggerData: map[string]interface{}{
+				"event_source": "trading_operations",
+				"event_type":   eventType,
+			},
+			Status: "LOGGED",
+		}
+
+		if err := fp.daoManager.EmergencyEvents().Insert(ctx, event); err != nil {
+			log.Printf("Failed to log trading event to database: %v", err)
+		}
+	}
+
+	// 发送到监控系统（如果配置了通知服务）
+	if fp.notificationService != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// 构建监控数据
+		monitoringPayload := map[string]interface{}{
+			"timestamp":   time.Now(),
+			"event_type":  eventType,
+			"description": description,
+			"source":      "fund_protector",
+			"component":   "trading_operations",
+			"severity":    "info",
+		}
+
+		// 发送到监控系统的Webhook（如果配置了）
+		if err := fp.notificationService.SendWebhook(ctx, "", monitoringPayload); err != nil {
+			log.Printf("Failed to send trading event to monitoring system: %v", err)
+		}
+	}
 }
 
 // stopAllTrading 停止所有交易
 func (fp *FundProtector) stopAllTrading() error {
 	log.Printf("Stopping all trading activities...")
-	
+
 	if fp.exchangeProvider == nil {
 		log.Printf("Exchange provider not configured, cannot stop trading")
 		return fmt.Errorf("exchange provider not configured")
@@ -94,7 +136,7 @@ func (fp *FundProtector) stopAllTrading() error {
 // closePosition 平仓指定仓位
 func (fp *FundProtector) closePosition(pos *Position) error {
 	log.Printf("Closing position: %s, Size: %.8f, Side: %s", pos.Symbol, pos.Size, pos.Side)
-	
+
 	if fp.exchangeProvider == nil {
 		return fmt.Errorf("exchange provider not configured")
 	}
@@ -123,12 +165,12 @@ func (fp *FundProtector) closePosition(pos *Position) error {
 		orderSide = "BUY"
 	}
 
-	log.Printf("Executing market order to close position: %s %s %.8f at ~%.2f", 
+	log.Printf("Executing market order to close position: %s %s %.8f at ~%.2f",
 		orderSide, pos.Symbol, pos.Size, currentPrice)
 
 	// 这里应该调用实际的交易API
 	// 例如: fp.tradingClient.PlaceMarketOrder(ctx, orderSide, pos.Symbol, pos.Size)
-	
+
 	// 模拟平仓延迟
 	time.Sleep(100 * time.Millisecond)
 

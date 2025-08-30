@@ -522,8 +522,61 @@ func (teh *TaskEventHandler) GetPriority() int {
 
 // subscribeToEvents 订阅事件
 func (ts *TaskScheduler) subscribeToEvents() {
-	// TODO 订阅一些通用事件
-	log.Println("事件驱动功能已启用")
+	// 订阅一些通用事件
+	if ts.eventBus == nil {
+		log.Println("警告: 事件总线未初始化，无法订阅事件")
+		return
+	}
+
+	// 创建通用事件处理器
+	systemEventHandler := &SystemEventHandler{scheduler: ts}
+
+	// 订阅系统相关事件
+	systemEvents := []events.EventType{
+		events.EventSystemAlert,    // 系统警报
+		events.EventSystemError,    // 系统错误
+		events.EventSystemRecovery, // 系统恢复
+	}
+
+	if _, err := ts.eventBus.Subscribe(systemEvents, systemEventHandler, nil); err != nil {
+		log.Printf("订阅系统事件失败: %v", err)
+	} else {
+		log.Printf("已订阅系统事件: %v", systemEvents)
+	}
+
+	// 创建工作流事件处理器
+	workflowEventHandler := &WorkflowEventHandler{scheduler: ts}
+
+	// 订阅工作流相关事件
+	workflowEvents := []events.EventType{
+		events.EventWorkflowStarted,   // 工作流开始
+		events.EventWorkflowCompleted, // 工作流完成
+		events.EventWorkflowFailed,    // 工作流失败
+	}
+
+	if _, err := ts.eventBus.Subscribe(workflowEvents, workflowEventHandler, nil); err != nil {
+		log.Printf("订阅工作流事件失败: %v", err)
+	} else {
+		log.Printf("已订阅工作流事件: %v", workflowEvents)
+	}
+
+	// 创建资源事件处理器
+	resourceEventHandler := &ResourceEventHandler{scheduler: ts}
+
+	// 订阅资源相关事件
+	resourceEvents := []events.EventType{
+		events.EventResourceAcquired,  // 资源获取
+		events.EventResourceReleased,  // 资源释放
+		events.EventResourceExhausted, // 资源耗尽
+	}
+
+	if _, err := ts.eventBus.Subscribe(resourceEvents, resourceEventHandler, nil); err != nil {
+		log.Printf("订阅资源事件失败: %v", err)
+	} else {
+		log.Printf("已订阅资源事件: %v", resourceEvents)
+	}
+
+	log.Println("事件驱动功能已启用，已订阅通用系统事件")
 }
 
 // runPeriodicTaskProcessor 运行周期任务处理器
@@ -726,4 +779,233 @@ func (ts *TaskScheduler) IsRunning() bool {
 	defer ts.runningMu.RUnlock()
 
 	return ts.isRunning
+}
+
+// SystemEventHandler 系统事件处理器
+type SystemEventHandler struct {
+	scheduler *TaskScheduler
+}
+
+// Handle 处理系统事件
+func (seh *SystemEventHandler) Handle(ctx context.Context, event *events.Event) error {
+	log.Printf("处理系统事件: %s, 来源: %s", event.Type, event.Source)
+
+	switch event.Type {
+	case events.EventSystemAlert:
+		// 系统警报事件 - 可能需要触发监控任务
+		return seh.handleSystemAlert(ctx, event)
+	case events.EventSystemError:
+		// 系统错误事件 - 可能需要触发错误处理任务
+		return seh.handleSystemError(ctx, event)
+	case events.EventSystemRecovery:
+		// 系统恢复事件 - 可能需要重新启动暂停的任务
+		return seh.handleSystemRecovery(ctx, event)
+	}
+
+	return nil
+}
+
+// handleSystemAlert 处理系统警报
+func (seh *SystemEventHandler) handleSystemAlert(ctx context.Context, event *events.Event) error {
+	log.Printf("处理系统警报: %+v", event.Data)
+
+	// 可以在这里触发相关的监控或诊断任务
+	// 例如：触发系统健康检查任务
+
+	return nil
+}
+
+// handleSystemError 处理系统错误
+func (seh *SystemEventHandler) handleSystemError(ctx context.Context, event *events.Event) error {
+	log.Printf("处理系统错误: %+v", event.Data)
+
+	// 可以在这里触发错误恢复任务
+	// 例如：暂停某些任务，启动错误诊断任务
+
+	return nil
+}
+
+// handleSystemRecovery 处理系统恢复
+func (seh *SystemEventHandler) handleSystemRecovery(ctx context.Context, event *events.Event) error {
+	log.Printf("处理系统恢复: %+v", event.Data)
+
+	// 可以在这里重新启动之前暂停的任务
+	// 例如：恢复被暂停的定时任务
+
+	return nil
+}
+
+// GetName 获取处理器名称
+func (seh *SystemEventHandler) GetName() string {
+	return "SystemEventHandler"
+}
+
+// GetEventTypes 获取事件类型
+func (seh *SystemEventHandler) GetEventTypes() []events.EventType {
+	return []events.EventType{
+		events.EventSystemAlert,
+		events.EventSystemError,
+		events.EventSystemRecovery,
+	}
+}
+
+// GetPriority 获取处理器优先级
+func (seh *SystemEventHandler) GetPriority() int {
+	return int(events.PriorityHigh)
+}
+
+// WorkflowEventHandler 工作流事件处理器
+type WorkflowEventHandler struct {
+	scheduler *TaskScheduler
+}
+
+// Handle 处理工作流事件
+func (weh *WorkflowEventHandler) Handle(ctx context.Context, event *events.Event) error {
+	log.Printf("处理工作流事件: %s, 来源: %s", event.Type, event.Source)
+
+	switch event.Type {
+	case events.EventWorkflowStarted:
+		// 工作流开始事件
+		return weh.handleWorkflowStarted(ctx, event)
+	case events.EventWorkflowCompleted:
+		// 工作流完成事件
+		return weh.handleWorkflowCompleted(ctx, event)
+	case events.EventWorkflowFailed:
+		// 工作流失败事件
+		return weh.handleWorkflowFailed(ctx, event)
+	}
+
+	return nil
+}
+
+// handleWorkflowStarted 处理工作流开始
+func (weh *WorkflowEventHandler) handleWorkflowStarted(ctx context.Context, event *events.Event) error {
+	log.Printf("工作流开始: %+v", event.Data)
+
+	// 可以在这里记录工作流开始时间，更新统计信息
+	weh.scheduler.statsMu.Lock()
+	weh.scheduler.stats.RunningTasks++
+	weh.scheduler.statsMu.Unlock()
+
+	return nil
+}
+
+// handleWorkflowCompleted 处理工作流完成
+func (weh *WorkflowEventHandler) handleWorkflowCompleted(ctx context.Context, event *events.Event) error {
+	log.Printf("工作流完成: %+v", event.Data)
+
+	// 更新统计信息
+	weh.scheduler.statsMu.Lock()
+	weh.scheduler.stats.RunningTasks--
+	weh.scheduler.stats.CompletedTasks++
+	weh.scheduler.statsMu.Unlock()
+
+	return nil
+}
+
+// handleWorkflowFailed 处理工作流失败
+func (weh *WorkflowEventHandler) handleWorkflowFailed(ctx context.Context, event *events.Event) error {
+	log.Printf("工作流失败: %+v", event.Data)
+
+	// 更新统计信息
+	weh.scheduler.statsMu.Lock()
+	weh.scheduler.stats.RunningTasks--
+	weh.scheduler.stats.FailedTasks++
+	weh.scheduler.statsMu.Unlock()
+
+	// 可以在这里触发重试逻辑或错误处理任务
+
+	return nil
+}
+
+// GetName 获取处理器名称
+func (weh *WorkflowEventHandler) GetName() string {
+	return "WorkflowEventHandler"
+}
+
+// GetEventTypes 获取事件类型
+func (weh *WorkflowEventHandler) GetEventTypes() []events.EventType {
+	return []events.EventType{
+		events.EventWorkflowStarted,
+		events.EventWorkflowCompleted,
+		events.EventWorkflowFailed,
+	}
+}
+
+// GetPriority 获取处理器优先级
+func (weh *WorkflowEventHandler) GetPriority() int {
+	return int(events.PriorityNormal)
+}
+
+// ResourceEventHandler 资源事件处理器
+type ResourceEventHandler struct {
+	scheduler *TaskScheduler
+}
+
+// Handle 处理资源事件
+func (reh *ResourceEventHandler) Handle(ctx context.Context, event *events.Event) error {
+	log.Printf("处理资源事件: %s, 来源: %s", event.Type, event.Source)
+
+	switch event.Type {
+	case events.EventResourceAcquired:
+		// 资源获取事件
+		return reh.handleResourceAcquired(ctx, event)
+	case events.EventResourceReleased:
+		// 资源释放事件
+		return reh.handleResourceReleased(ctx, event)
+	case events.EventResourceExhausted:
+		// 资源耗尽事件
+		return reh.handleResourceExhausted(ctx, event)
+	}
+
+	return nil
+}
+
+// handleResourceAcquired 处理资源获取
+func (reh *ResourceEventHandler) handleResourceAcquired(ctx context.Context, event *events.Event) error {
+	log.Printf("资源已获取: %+v", event.Data)
+
+	// 可以在这里记录资源使用情况
+	// 例如：更新资源使用统计，检查是否可以启动更多任务
+
+	return nil
+}
+
+// handleResourceReleased 处理资源释放
+func (reh *ResourceEventHandler) handleResourceReleased(ctx context.Context, event *events.Event) error {
+	log.Printf("资源已释放: %+v", event.Data)
+
+	// 可以在这里检查是否有等待资源的任务可以启动
+	// 例如：检查任务队列，启动等待中的任务
+
+	return nil
+}
+
+// handleResourceExhausted 处理资源耗尽
+func (reh *ResourceEventHandler) handleResourceExhausted(ctx context.Context, event *events.Event) error {
+	log.Printf("资源耗尽: %+v", event.Data)
+
+	// 可以在这里暂停低优先级任务，或者触发资源清理任务
+	// 例如：暂停非关键任务，启动资源清理任务
+
+	return nil
+}
+
+// GetName 获取处理器名称
+func (reh *ResourceEventHandler) GetName() string {
+	return "ResourceEventHandler"
+}
+
+// GetEventTypes 获取事件类型
+func (reh *ResourceEventHandler) GetEventTypes() []events.EventType {
+	return []events.EventType{
+		events.EventResourceAcquired,
+		events.EventResourceReleased,
+		events.EventResourceExhausted,
+	}
+}
+
+// GetPriority 获取处理器优先级
+func (reh *ResourceEventHandler) GetPriority() int {
+	return int(events.PriorityNormal)
 }

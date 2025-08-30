@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"qcat/internal/strategy/validation"
 	"sync"
 	"time"
 )
@@ -67,12 +68,13 @@ type HealthCheckConfig struct {
 
 // ProcessManager manages multiple processes
 type ProcessManager struct {
-	processes map[string]*Process
-	msgQueue  MessageQueue
-	monitor   *ProcessMonitor
-	mu        sync.RWMutex
-	ctx       context.Context
-	cancel    context.CancelFunc
+	processes          map[string]*Process
+	msgQueue           MessageQueue
+	monitor            *ProcessMonitor
+	strategyGatekeeper *validation.StrategyGatekeeper
+	mu                 sync.RWMutex
+	ctx                context.Context
+	cancel             context.CancelFunc
 }
 
 // NewProcessManager creates a new process manager
@@ -80,11 +82,12 @@ func NewProcessManager(msgQueue MessageQueue) *ProcessManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	pm := &ProcessManager{
-		processes: make(map[string]*Process),
-		msgQueue:  msgQueue,
-		mu:        sync.RWMutex{},
-		ctx:       ctx,
-		cancel:    cancel,
+		processes:          make(map[string]*Process),
+		msgQueue:           msgQueue,
+		strategyGatekeeper: validation.NewStrategyGatekeeper(),
+		mu:                 sync.RWMutex{},
+		ctx:                ctx,
+		cancel:             cancel,
 	}
 
 	pm.monitor = NewProcessMonitor(pm)
@@ -303,8 +306,20 @@ func (pm *ProcessManager) shouldAllowRestart(process *Process) bool {
 
 	// 检查是否是策略进程，如果是，需要检查策略黑名单
 	if process.Type == "strategy" {
-		// TODO: 这里需要与策略守门员集成，检查策略是否在黑名单中
-		// 暂时返回true，实际实现需要调用策略守门员的检查方法
+		// 与策略守门员集成，检查策略是否在黑名单中
+		strategyID := pm.extractStrategyID(process)
+		if strategyID == "" {
+			fmt.Printf("Warning: Cannot extract strategy ID from process %s, allowing restart\n", process.ID)
+			return true
+		}
+
+		// 检查策略是否在黑名单中
+		if pm.isStrategyBlacklisted(strategyID) {
+			fmt.Printf("Strategy %s is blacklisted, blocking restart for process %s\n", strategyID, process.ID)
+			return false
+		}
+
+		fmt.Printf("Strategy %s is not blacklisted, allowing restart for process %s\n", strategyID, process.ID)
 		return true
 	}
 
@@ -388,6 +403,62 @@ func (pm *ProcessManager) Shutdown() error {
 	case <-time.After(60 * time.Second):
 		return fmt.Errorf("timeout waiting for processes to stop")
 	}
+}
+
+// extractStrategyID extracts strategy ID from process information
+func (pm *ProcessManager) extractStrategyID(process *Process) string {
+	// 尝试从进程配置名称中提取策略ID
+	// 假设策略进程的命名格式为 "strategy-{strategyID}" 或类似格式
+	if process.Config.Name != "" {
+		// 简单的策略ID提取逻辑
+		// 实际实现可能需要更复杂的解析
+		if len(process.Config.Name) > 9 && process.Config.Name[:9] == "strategy-" {
+			return process.Config.Name[9:] // 返回 "strategy-" 后面的部分
+		}
+
+		// 如果进程名称就是策略ID
+		return process.Config.Name
+	}
+
+	// 尝试从进程ID中提取
+	if process.ID != "" {
+		return process.ID
+	}
+
+	return ""
+}
+
+// isStrategyBlacklisted checks if a strategy is blacklisted
+func (pm *ProcessManager) isStrategyBlacklisted(strategyID string) bool {
+	if pm.strategyGatekeeper == nil {
+		fmt.Printf("Warning: Strategy gatekeeper not initialized, allowing strategy %s\n", strategyID)
+		return false
+	}
+
+	// 使用策略守门员检查黑名单
+	return pm.strategyGatekeeper.IsBlacklisted(strategyID)
+}
+
+// GetStrategyGatekeeper returns the strategy gatekeeper instance
+func (pm *ProcessManager) GetStrategyGatekeeper() *validation.StrategyGatekeeper {
+	return pm.strategyGatekeeper
+}
+
+// UpdateStrategyBlacklist updates the strategy blacklist
+func (pm *ProcessManager) UpdateStrategyBlacklist(strategyID string, blacklisted bool) error {
+	if pm.strategyGatekeeper == nil {
+		return fmt.Errorf("strategy gatekeeper not initialized")
+	}
+
+	if blacklisted {
+		pm.strategyGatekeeper.AddToBlacklist(strategyID, "Added via process manager")
+		fmt.Printf("Added strategy %s to blacklist\n", strategyID)
+	} else {
+		pm.strategyGatekeeper.RemoveFromBlacklist(strategyID)
+		fmt.Printf("Removed strategy %s from blacklist\n", strategyID)
+	}
+
+	return nil
 }
 
 // generateProcessID generates a unique process ID

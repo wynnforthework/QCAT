@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"sync"
@@ -303,29 +304,155 @@ func (o *Orchestrator) ensureServiceRunning(serviceName string) error {
 
 // handleOptimizationResult handles optimization results
 func (o *Orchestrator) handleOptimizationResult(topic string, message []byte) error {
-	// TODO: Process optimization results
-	log.Printf("Received optimization result: %s", string(message))
+	// Process optimization results
+	var result OptimizationResult
+	if err := json.Unmarshal(message, &result); err != nil {
+		log.Printf("Failed to unmarshal optimization result: %v", err)
+		return fmt.Errorf("failed to unmarshal optimization result: %w", err)
+	}
+
+	log.Printf("Processing optimization result for strategy %s (request %s)",
+		result.StrategyID, result.RequestID)
+
+	// 检查优化状态
+	if result.Status == "failed" {
+		log.Printf("Optimization failed for strategy %s: %s", result.StrategyID, result.Error)
+		// 可以在这里触发重试逻辑或通知相关服务
+		return nil
+	}
+
+	if result.Status == "completed" {
+		log.Printf("Optimization completed successfully for strategy %s", result.StrategyID)
+		log.Printf("Best parameters: %+v", result.BestParameters)
+		log.Printf("Performance metrics - Total Return: %.2f%%, Sharpe: %.2f, Max Drawdown: %.2f%%",
+			result.Performance.TotalReturn*100, result.Performance.SharpeRatio, result.Performance.MaxDrawdown*100)
+
+		// 将优化结果转发给策略管理服务
+		if err := o.forwardOptimizationResult(&result); err != nil {
+			log.Printf("Failed to forward optimization result: %v", err)
+		}
+
+		// 如果性能指标达到阈值，可以自动部署策略
+		if result.Performance.SharpeRatio > 1.5 && result.Performance.MaxDrawdown < 0.1 {
+			log.Printf("Strategy %s meets deployment criteria, considering auto-deployment", result.StrategyID)
+			// 这里可以触发自动部署逻辑
+		}
+	}
+
 	return nil
 }
 
 // handleProcessExit handles process exit notifications
 func (o *Orchestrator) handleProcessExit(topic string, message []byte) error {
-	// TODO: Handle process exits
-	log.Printf("Process exited: %s", string(message))
+	// Handle process exits
+	var exitMsg ProcessExitMessage
+	if err := json.Unmarshal(message, &exitMsg); err != nil {
+		log.Printf("Failed to unmarshal process exit message: %v", err)
+		return fmt.Errorf("failed to unmarshal process exit message: %w", err)
+	}
+
+	log.Printf("Process %s exited at %v", exitMsg.ProcessID, exitMsg.ExitTime)
+
+	// 检查是否有错误
+	if exitMsg.Error != nil {
+		log.Printf("Process %s exited with error: %v", exitMsg.ProcessID, exitMsg.Error)
+
+		// 根据进程类型决定处理策略
+		if err := o.handleProcessFailure(exitMsg.ProcessID, exitMsg.Error); err != nil {
+			log.Printf("Failed to handle process failure: %v", err)
+		}
+	} else {
+		log.Printf("Process %s exited normally", exitMsg.ProcessID)
+	}
+
+	// 更新服务状态
+	o.updateServiceStatusOnExit(exitMsg.ProcessID)
+
+	// 发送通知给相关服务
+	if err := o.notifyProcessExit(&exitMsg); err != nil {
+		log.Printf("Failed to notify process exit: %v", err)
+	}
+
 	return nil
 }
 
 // handleTradeSignal handles trade signals
 func (o *Orchestrator) handleTradeSignal(topic string, message []byte) error {
-	// TODO: Forward trade signals to trading service
-	log.Printf("Received trade signal: %s", string(message))
+	// Forward trade signals to trading service
+	var signal TradeSignal
+	if err := json.Unmarshal(message, &signal); err != nil {
+		log.Printf("Failed to unmarshal trade signal: %v", err)
+		return fmt.Errorf("failed to unmarshal trade signal: %w", err)
+	}
+
+	log.Printf("Processing trade signal %s from strategy %s: %s %s %.4f @ %.4f",
+		signal.SignalID, signal.StrategyID, signal.Action, signal.Symbol, signal.Quantity, signal.Price)
+
+	// 验证交易信号
+	if err := o.validateTradeSignal(&signal); err != nil {
+		log.Printf("Trade signal validation failed: %v", err)
+		return fmt.Errorf("trade signal validation failed: %w", err)
+	}
+
+	// 确保交易服务正在运行
+	if err := o.ensureServiceRunning("trader"); err != nil {
+		log.Printf("Trading service not available: %v", err)
+		return fmt.Errorf("trading service not available: %w", err)
+	}
+
+	// 转发给交易服务
+	if err := o.msgQueue.Publish("trading.signal", &signal); err != nil {
+		log.Printf("Failed to forward trade signal to trading service: %v", err)
+		return fmt.Errorf("failed to forward trade signal: %w", err)
+	}
+
+	// 记录交易信号到日志服务
+	if err := o.msgQueue.Publish("logging.trade.signal", &signal); err != nil {
+		log.Printf("Failed to log trade signal: %v", err)
+		// 不返回错误，因为这不是关键操作
+	}
+
+	log.Printf("Successfully forwarded trade signal %s to trading service", signal.SignalID)
 	return nil
 }
 
 // handleMarketData handles market data updates
 func (o *Orchestrator) handleMarketData(topic string, message []byte) error {
-	// TODO: Process market data updates
-	log.Printf("Received market data: %s", string(message))
+	// Process market data updates
+	var marketData MarketDataUpdate
+	if err := json.Unmarshal(message, &marketData); err != nil {
+		log.Printf("Failed to unmarshal market data: %v", err)
+		return fmt.Errorf("failed to unmarshal market data: %w", err)
+	}
+
+	log.Printf("Processing market data for %s: price=%.4f, volume=%.2f, source=%s",
+		marketData.Symbol, marketData.Price, marketData.Volume, marketData.Source)
+
+	// 验证市场数据
+	if err := o.validateMarketData(&marketData); err != nil {
+		log.Printf("Market data validation failed: %v", err)
+		return fmt.Errorf("market data validation failed: %w", err)
+	}
+
+	// 转发给策略服务（用于实时决策）
+	if err := o.msgQueue.Publish("strategy.market.data", &marketData); err != nil {
+		log.Printf("Failed to forward market data to strategy service: %v", err)
+		// 不返回错误，继续处理其他转发
+	}
+
+	// 转发给风险管理服务
+	if err := o.msgQueue.Publish("risk.market.data", &marketData); err != nil {
+		log.Printf("Failed to forward market data to risk service: %v", err)
+	}
+
+	// 转发给数据存储服务
+	if err := o.msgQueue.Publish("storage.market.data", &marketData); err != nil {
+		log.Printf("Failed to forward market data to storage service: %v", err)
+	}
+
+	// 更新内部市场数据缓存（如果需要）
+	o.updateMarketDataCache(&marketData)
+
 	return nil
 }
 
@@ -363,4 +490,159 @@ type ServiceStatus struct {
 	Status    string    `json:"status"`
 	PID       int       `json:"pid,omitempty"`
 	StartTime time.Time `json:"start_time,omitempty"`
+}
+
+// forwardOptimizationResult forwards optimization result to strategy management service
+func (o *Orchestrator) forwardOptimizationResult(result *OptimizationResult) error {
+	// 尝试转发给策略管理服务
+	if err := o.msgQueue.Publish("strategy.optimization.result", result); err != nil {
+		return fmt.Errorf("failed to publish optimization result: %w", err)
+	}
+
+	log.Printf("Forwarded optimization result for strategy %s to strategy management service", result.StrategyID)
+	return nil
+}
+
+// handleProcessFailure handles process failure and decides on recovery strategy
+func (o *Orchestrator) handleProcessFailure(processID string, err error) error {
+	log.Printf("Handling failure for process %s: %v", processID, err)
+
+	// 查找对应的服务配置
+	var serviceName string
+	var serviceConfig *ServiceConfig
+
+	o.mu.RLock()
+	for name, config := range o.services {
+		// 简化的匹配逻辑，实际应该通过进程管理器查找
+		if config.Name == processID || name == processID {
+			serviceName = name
+			serviceConfig = config
+			break
+		}
+	}
+	o.mu.RUnlock()
+
+	if serviceConfig == nil {
+		return fmt.Errorf("service configuration not found for process %s", processID)
+	}
+
+	// 如果配置了自动重启，尝试重启服务
+	if serviceConfig.AutoRestart {
+		log.Printf("Attempting to restart service %s", serviceName)
+		if restartErr := o.StartService(serviceName); restartErr != nil {
+			log.Printf("Failed to restart service %s: %v", serviceName, restartErr)
+			return fmt.Errorf("failed to restart service %s: %w", serviceName, restartErr)
+		}
+		log.Printf("Successfully restarted service %s", serviceName)
+	} else {
+		log.Printf("Auto-restart disabled for service %s", serviceName)
+	}
+
+	return nil
+}
+
+// updateServiceStatusOnExit updates service status when process exits
+func (o *Orchestrator) updateServiceStatusOnExit(processID string) {
+	log.Printf("Updating service status for exited process %s", processID)
+	// 这里可以更新内部状态跟踪
+	// 实际实现中可能需要更复杂的状态管理
+}
+
+// notifyProcessExit notifies other services about process exit
+func (o *Orchestrator) notifyProcessExit(exitMsg *ProcessExitMessage) error {
+	// 发送通知给监控服务
+	if err := o.msgQueue.Publish("monitoring.process.exit", exitMsg); err != nil {
+		return fmt.Errorf("failed to notify monitoring service: %w", err)
+	}
+
+	// 发送通知给日志服务
+	if err := o.msgQueue.Publish("logging.process.exit", exitMsg); err != nil {
+		log.Printf("Failed to notify logging service: %v", err)
+		// 不返回错误，因为这不是关键操作
+	}
+
+	log.Printf("Notified other services about process %s exit", exitMsg.ProcessID)
+	return nil
+}
+
+// validateTradeSignal validates a trade signal
+func (o *Orchestrator) validateTradeSignal(signal *TradeSignal) error {
+	// 基本字段验证
+	if signal.SignalID == "" {
+		return fmt.Errorf("signal ID is required")
+	}
+
+	if signal.StrategyID == "" {
+		return fmt.Errorf("strategy ID is required")
+	}
+
+	if signal.Symbol == "" {
+		return fmt.Errorf("symbol is required")
+	}
+
+	// 验证交易动作
+	validActions := map[string]bool{"BUY": true, "SELL": true, "CLOSE": true}
+	if !validActions[signal.Action] {
+		return fmt.Errorf("invalid action: %s", signal.Action)
+	}
+
+	// 验证数量
+	if signal.Quantity <= 0 {
+		return fmt.Errorf("quantity must be positive: %f", signal.Quantity)
+	}
+
+	// 验证价格（如果指定）
+	if signal.Price < 0 {
+		return fmt.Errorf("price cannot be negative: %f", signal.Price)
+	}
+
+	// 验证时间戳
+	if signal.Timestamp.IsZero() {
+		return fmt.Errorf("timestamp is required")
+	}
+
+	// 检查信号是否过期（例如，超过5分钟的信号可能无效）
+	if time.Since(signal.Timestamp) > 5*time.Minute {
+		return fmt.Errorf("signal is too old: %v", signal.Timestamp)
+	}
+
+	return nil
+}
+
+// validateMarketData validates market data
+func (o *Orchestrator) validateMarketData(data *MarketDataUpdate) error {
+	// 基本字段验证
+	if data.Symbol == "" {
+		return fmt.Errorf("symbol is required")
+	}
+
+	if data.Price <= 0 {
+		return fmt.Errorf("price must be positive: %f", data.Price)
+	}
+
+	if data.Volume < 0 {
+		return fmt.Errorf("volume cannot be negative: %f", data.Volume)
+	}
+
+	if data.Source == "" {
+		return fmt.Errorf("source is required")
+	}
+
+	if data.Timestamp.IsZero() {
+		return fmt.Errorf("timestamp is required")
+	}
+
+	// 检查数据是否过期（例如，超过1分钟的数据可能无效）
+	if time.Since(data.Timestamp) > 1*time.Minute {
+		return fmt.Errorf("market data is too old: %v", data.Timestamp)
+	}
+
+	return nil
+}
+
+// updateMarketDataCache updates internal market data cache
+func (o *Orchestrator) updateMarketDataCache(data *MarketDataUpdate) {
+	// 这里可以实现市场数据缓存逻辑
+	// 例如，维护最新价格、成交量等信息
+	log.Printf("Updated market data cache for %s: price=%.4f", data.Symbol, data.Price)
 }

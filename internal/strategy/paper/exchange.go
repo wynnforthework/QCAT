@@ -562,6 +562,53 @@ func (e *Exchange) executeOrder(order *Order) error {
 	return nil
 }
 
+// Get24HrStats implements exchange.Exchange
+func (e *Exchange) Get24HrStats(ctx context.Context, symbol string) (*exchange.Stats24Hr, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	// 模拟24小时统计数据
+	currentPrice, err := e.GetSymbolPrice(ctx, symbol)
+	if err != nil {
+		// 如果无法获取当前价格，使用默认值
+		currentPrice = 50000.0
+	}
+
+	return &exchange.Stats24Hr{
+		Symbol:      symbol,
+		Volume:      100000.0,
+		QuoteVolume: currentPrice * 100000.0,
+		Count:       1000,
+		Open:        currentPrice * 0.98,
+		High:        currentPrice * 1.02,
+		Low:         currentPrice * 0.96,
+		Close:       currentPrice,
+		Change:      currentPrice * 0.02,
+		ChangeRate:  2.0,
+	}, nil
+}
+
+// GetAccount implements exchange.Exchange
+func (e *Exchange) GetAccount(ctx context.Context) (*exchange.Account, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	balances := make([]*exchange.AccountBalance, 0, len(e.account.Balances))
+	for asset, balance := range e.account.Balances {
+		balances = append(balances, &exchange.AccountBalance{
+			Asset:     asset,
+			Total:     balance,
+			Available: balance,
+			Locked:    0.0,
+		})
+	}
+
+	return &exchange.Account{
+		Balances:  balances,
+		UpdatedAt: time.Now(),
+	}, nil
+}
+
 // UpdateOrderBook updates the order book
 func (e *Exchange) UpdateOrderBook(symbol string, bids, asks []Level) {
 	e.mu.Lock()
