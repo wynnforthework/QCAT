@@ -609,6 +609,136 @@ func (e *Exchange) GetAccount(ctx context.Context) (*exchange.Account, error) {
 	}, nil
 }
 
+// GetAccountSnapshots implements exchange.Exchange
+func (e *Exchange) GetAccountSnapshots(ctx context.Context, days int) ([]*exchange.AccountSnapshot, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	// For paper trading, we'll create a simple snapshot based on current state
+	// In a real implementation, this would return historical snapshots
+	snapshots := make([]*exchange.AccountSnapshot, 0, days)
+
+	// Calculate current totals
+	totalWalletBalance := 0.0
+	totalUnrealizedPnL := 0.0
+	totalPositionValue := 0.0
+
+	// Sum up wallet balance
+	for _, balance := range e.account.Balances {
+		totalWalletBalance += balance
+	}
+
+	// Sum up position values and unrealized PnL
+	for _, pos := range e.account.Positions {
+		totalUnrealizedPnL += pos.UnrealizedPnL
+		totalPositionValue += pos.Quantity * pos.EntryPrice
+	}
+
+	totalMarginBalance := totalWalletBalance + totalUnrealizedPnL
+
+	// Create snapshots for the requested number of days
+	for i := 0; i < days; i++ {
+		snapshotTime := time.Now().AddDate(0, 0, -i)
+
+		// Simulate slight variations for historical data
+		variation := 1.0 + (float64(i%7)-3)*0.01 // ±3% variation
+
+		snapshot := &exchange.AccountSnapshot{
+			TotalWalletBalance: totalWalletBalance * variation,
+			TotalUnrealizedPnL: totalUnrealizedPnL * variation,
+			TotalMarginBalance: totalMarginBalance * variation,
+			TotalPositionValue: totalPositionValue * variation,
+			Timestamp:          snapshotTime,
+		}
+
+		snapshots = append(snapshots, snapshot)
+	}
+
+	return snapshots, nil
+}
+
+// GetTicker implements exchange.Exchange
+func (e *Exchange) GetTicker(ctx context.Context, symbol string) (*exchange.Ticker, error) {
+	// For paper trading, we'll return a simulated ticker
+	// In a real implementation, this would fetch from market data
+
+	// Get current price from order book if available
+	lastPrice := 0.0
+	if ob, exists := e.orderBook[symbol]; exists && len(ob.Asks) > 0 && len(ob.Bids) > 0 {
+		// Use mid price as last price
+		lastPrice = (ob.Asks[0].Price + ob.Bids[0].Price) / 2
+	} else {
+		// Default price for common symbols
+		switch symbol {
+		case "BTCUSDT":
+			lastPrice = 50000.0
+		case "ETHUSDT":
+			lastPrice = 3000.0
+		default:
+			lastPrice = 100.0
+		}
+	}
+
+	return &exchange.Ticker{
+		Symbol:    symbol,
+		LastPrice: lastPrice,
+		BidPrice:  lastPrice * 0.999, // Simulate bid slightly lower
+		AskPrice:  lastPrice * 1.001, // Simulate ask slightly higher
+		Volume:    1000000.0,         // Simulated volume
+		Change:    0.0,               // No change simulation
+		High:      lastPrice * 1.05,  // Simulated high
+		Low:       lastPrice * 0.95,  // Simulated low
+		Timestamp: time.Now(),
+	}, nil
+}
+
+// GetOrderBook implements exchange.Exchange
+func (e *Exchange) GetOrderBook(ctx context.Context, symbol string, limit int) (*exchange.OrderBook, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+
+	ob, exists := e.orderBook[symbol]
+	if !exists {
+		// Return empty order book if not found
+		return &exchange.OrderBook{
+			Symbol:    symbol,
+			Bids:      []*exchange.BookItem{},
+			Asks:      []*exchange.BookItem{},
+			Timestamp: time.Now(),
+		}, nil
+	}
+
+	// Convert internal order book to exchange format
+	bids := make([]*exchange.BookItem, 0, len(ob.Bids))
+	for i, bid := range ob.Bids {
+		if limit > 0 && i >= limit {
+			break
+		}
+		bids = append(bids, &exchange.BookItem{
+			Price:    bid.Price,
+			Quantity: bid.Quantity,
+		})
+	}
+
+	asks := make([]*exchange.BookItem, 0, len(ob.Asks))
+	for i, ask := range ob.Asks {
+		if limit > 0 && i >= limit {
+			break
+		}
+		asks = append(asks, &exchange.BookItem{
+			Price:    ask.Price,
+			Quantity: ask.Quantity,
+		})
+	}
+
+	return &exchange.OrderBook{
+		Symbol:    symbol,
+		Bids:      bids,
+		Asks:      asks,
+		Timestamp: ob.UpdatedAt,
+	}, nil
+}
+
 // UpdateOrderBook updates the order book
 func (e *Exchange) UpdateOrderBook(symbol string, bids, asks []Level) {
 	e.mu.Lock()

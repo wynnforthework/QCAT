@@ -312,6 +312,36 @@ func (sg *StrategyGatekeeper) Disable() {
 	log.Printf("警告: 策略守门员已禁用！所有策略将跳过验证")
 }
 
+// AddToBlacklist 添加策略到黑名单 (exported)
+func (sg *StrategyGatekeeper) AddToBlacklist(strategyID string, reason string) error {
+	return sg.addToBlacklist(context.Background(), strategyID, reason)
+}
+
+// RemoveFromBlacklist 从黑名单移除策略 (exported)
+func (sg *StrategyGatekeeper) RemoveFromBlacklist(strategyID string) error {
+	sg.mu.Lock()
+	defer sg.mu.Unlock()
+
+	if sg.blacklist == nil {
+		return nil
+	}
+
+	if _, exists := sg.blacklist[strategyID]; exists {
+		delete(sg.blacklist, strategyID)
+		log.Printf("策略 %s 已从黑名单移除", strategyID)
+
+		// 如果有数据库连接，从数据库删除
+		if sg.db != nil {
+			if err := sg.removeBlacklistEntryFromDB(context.Background(), strategyID); err != nil {
+				log.Printf("从数据库删除黑名单条目失败: %v", err)
+				// 不返回错误，允许内存操作继续
+			}
+		}
+	}
+
+	return nil
+}
+
 // addToBlacklist 添加策略到黑名单
 func (sg *StrategyGatekeeper) addToBlacklist(ctx context.Context, strategyID string, reason string) error {
 	sg.mu.Lock()
@@ -349,34 +379,39 @@ func (sg *StrategyGatekeeper) forceStopStrategy(ctx context.Context, strategyID 
 	log.Printf("强制停止策略 %s，原因: %s", strategyID, reason)
 
 	// 实现实际的策略停止逻辑
-	
+
 	// 1. 更新策略状态为停止
 	if err := sg.updateStrategyStatus(ctx, strategyID, "force_stopped", reason); err != nil {
 		return fmt.Errorf("failed to update strategy status: %w", err)
 	}
-	
+
 	// 2. 取消策略的所有活跃订单
 	if err := sg.cancelStrategyOrders(ctx, strategyID); err != nil {
 		log.Printf("Warning: Failed to cancel orders for strategy %s: %v", strategyID, err)
 	}
-	
+
 	// 3. 清理策略资源
 	if err := sg.cleanupStrategyResources(ctx, strategyID); err != nil {
 		log.Printf("Warning: Failed to cleanup resources for strategy %s: %v", strategyID, err)
 	}
-	
+
 	// 4. 发送停止通知
 	if err := sg.sendStrategyStopNotification(ctx, strategyID, reason); err != nil {
 		log.Printf("Warning: Failed to send stop notification for strategy %s: %v", strategyID, err)
 	}
-	
+
 	// 5. 记录停止事件
 	if err := sg.recordStrategyStopEvent(ctx, strategyID, reason); err != nil {
 		log.Printf("Warning: Failed to record stop event for strategy %s: %v", strategyID, err)
 	}
-	
+
 	log.Printf("Strategy %s has been force stopped successfully", strategyID)
 	return nil
+}
+
+// IsBlacklisted 检查策略是否在黑名单中 (exported)
+func (sg *StrategyGatekeeper) IsBlacklisted(strategyID string) bool {
+	return sg.isBlacklisted(strategyID)
 }
 
 // isBlacklisted 检查策略是否在黑名单中
@@ -471,23 +506,35 @@ func (sg *StrategyGatekeeper) loadBlacklistFromDB(ctx context.Context) error {
 	log.Printf("从数据库加载了 %d 个黑名单条目", len(sg.blacklist))
 	return rows.Err()
 }
+
+// removeBlacklistEntryFromDB 从数据库删除黑名单条目
+func (sg *StrategyGatekeeper) removeBlacklistEntryFromDB(ctx context.Context, strategyID string) error {
+	if sg.db == nil {
+		return fmt.Errorf("database connection not available")
+	}
+
+	query := `DELETE FROM strategy_blacklist WHERE strategy_id = $1`
+	_, err := sg.db.ExecContext(ctx, query, strategyID)
+	return err
+}
+
 // updateStrategyStatus 更新策略状态
 func (sg *StrategyGatekeeper) updateStrategyStatus(ctx context.Context, strategyID, status, reason string) error {
 	if sg.db == nil {
 		return fmt.Errorf("database not available")
 	}
-	
+
 	query := `
 		UPDATE strategies 
 		SET status = ?, stop_reason = ?, updated_at = ?, force_stopped_at = ?
 		WHERE id = ?
 	`
-	
+
 	_, err := sg.db.ExecContext(ctx, query, status, reason, time.Now(), time.Now(), strategyID)
 	if err != nil {
 		return fmt.Errorf("failed to update strategy status: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -496,20 +543,20 @@ func (sg *StrategyGatekeeper) cancelStrategyOrders(ctx context.Context, strategy
 	if sg.db == nil {
 		return fmt.Errorf("database not available")
 	}
-	
+
 	// 查询策略的活跃订单
 	query := `
 		SELECT id, exchange_order_id, symbol, exchange 
 		FROM orders 
 		WHERE strategy_id = ? AND status IN ('pending', 'partial_filled')
 	`
-	
+
 	rows, err := sg.db.QueryContext(ctx, query, strategyID)
 	if err != nil {
 		return fmt.Errorf("failed to query active orders: %w", err)
 	}
 	defer rows.Close()
-	
+
 	var cancelledCount int
 	for rows.Next() {
 		var orderID, exchangeOrderID, symbol, exchange string
@@ -517,21 +564,21 @@ func (sg *StrategyGatekeeper) cancelStrategyOrders(ctx context.Context, strategy
 			log.Printf("Failed to scan order: %v", err)
 			continue
 		}
-		
+
 		// 取消交易所订单
 		if err := sg.cancelExchangeOrder(ctx, exchangeOrderID, symbol, exchange); err != nil {
 			log.Printf("Failed to cancel exchange order %s: %v", exchangeOrderID, err)
 			continue
 		}
-		
+
 		// 更新本地订单状态
 		if err := sg.updateOrderStatus(ctx, orderID, "cancelled", "force_stopped"); err != nil {
 			log.Printf("Failed to update order status %s: %v", orderID, err)
 		}
-		
+
 		cancelledCount++
 	}
-	
+
 	log.Printf("Cancelled %d orders for strategy %s", cancelledCount, strategyID)
 	return nil
 }
@@ -541,15 +588,15 @@ func (sg *StrategyGatekeeper) cancelExchangeOrder(ctx context.Context, exchangeO
 	// 这里应该调用相应交易所的API来取消订单
 	// 由于没有具体的交易所客户端，我们模拟取消过程
 	log.Printf("Cancelling exchange order %s on %s for %s", exchangeOrderID, exchange, symbol)
-	
+
 	// 模拟API调用延迟
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// 在实际实现中，这里应该：
 	// 1. 根据exchange类型选择相应的客户端
 	// 2. 调用取消订单API
 	// 3. 处理API响应和错误
-	
+
 	return nil
 }
 
@@ -558,18 +605,18 @@ func (sg *StrategyGatekeeper) updateOrderStatus(ctx context.Context, orderID, st
 	if sg.db == nil {
 		return fmt.Errorf("database not available")
 	}
-	
+
 	query := `
 		UPDATE orders 
 		SET status = ?, cancel_reason = ?, updated_at = ?
 		WHERE id = ?
 	`
-	
+
 	_, err := sg.db.ExecContext(ctx, query, status, reason, time.Now(), orderID)
 	if err != nil {
 		return fmt.Errorf("failed to update order status: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -579,17 +626,17 @@ func (sg *StrategyGatekeeper) cleanupStrategyResources(ctx context.Context, stra
 	if err := sg.removeStrategyFromMemory(strategyID); err != nil {
 		log.Printf("Failed to remove strategy from memory: %v", err)
 	}
-	
+
 	// 2. 清理缓存数据
 	if err := sg.clearStrategyCache(ctx, strategyID); err != nil {
 		log.Printf("Failed to clear strategy cache: %v", err)
 	}
-	
+
 	// 3. 停止相关的定时任务
 	if err := sg.stopStrategyScheduledTasks(ctx, strategyID); err != nil {
 		log.Printf("Failed to stop scheduled tasks: %v", err)
 	}
-	
+
 	return nil
 }
 
@@ -623,7 +670,7 @@ func (sg *StrategyGatekeeper) sendStrategyStopNotification(ctx context.Context, 
 		"timestamp":   time.Now(),
 		"severity":    "high",
 	}
-	
+
 	// 这里应该发送到通知系统
 	log.Printf("Strategy stop notification: %+v", notification)
 	return nil
@@ -634,25 +681,25 @@ func (sg *StrategyGatekeeper) recordStrategyStopEvent(ctx context.Context, strat
 	if sg.db == nil {
 		return fmt.Errorf("database not available")
 	}
-	
+
 	query := `
 		INSERT INTO strategy_events 
 		(strategy_id, event_type, event_data, created_at)
 		VALUES (?, ?, ?, ?)
 	`
-	
+
 	eventData := map[string]interface{}{
 		"reason":    reason,
 		"timestamp": time.Now(),
 		"action":    "force_stop",
 	}
-	
+
 	eventDataJSON, _ := json.Marshal(eventData)
-	
+
 	_, err := sg.db.ExecContext(ctx, query, strategyID, "force_stopped", string(eventDataJSON), time.Now())
 	if err != nil {
 		return fmt.Errorf("failed to record strategy stop event: %w", err)
 	}
-	
+
 	return nil
 }

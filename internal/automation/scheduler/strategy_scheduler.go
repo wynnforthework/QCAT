@@ -5344,48 +5344,6 @@ func (ss *StrategyScheduler) validateStrategyStateForParameterUpdate(ctx context
 	return nil
 }
 
-// validateParameterValue 验证参数值的合理性
-func (ss *StrategyScheduler) validateParameterValue(paramName string, value interface{}) error {
-	// 定义参数的合理范围
-	paramRanges := map[string]struct {
-		min, max float64
-	}{
-		"stop_loss":     {0.001, 0.1}, // 0.1%-10%
-		"take_profit":   {0.005, 0.2}, // 0.5%-20%
-		"position_size": {0.01, 1.0},  // 1%-100%
-		"risk_ratio":    {0.001, 0.1}, // 0.1%-10%
-		"leverage":      {1.0, 10.0},  // 1x-10x
-	}
-
-	paramRange, exists := paramRanges[paramName]
-	if !exists {
-		return nil // 未定义范围的参数跳过验证
-	}
-
-	// 转换值为float64
-	var floatValue float64
-	switch v := value.(type) {
-	case float64:
-		floatValue = v
-	case string:
-		var err error
-		floatValue, err = strconv.ParseFloat(v, 64)
-		if err != nil {
-			return fmt.Errorf("invalid parameter value format: %s", v)
-		}
-	default:
-		return fmt.Errorf("unsupported parameter value type: %T", value)
-	}
-
-	// 检查范围
-	if floatValue < paramRange.min || floatValue > paramRange.max {
-		return fmt.Errorf("value %.4f outside valid range [%.4f, %.4f]",
-			floatValue, paramRange.min, paramRange.max)
-	}
-
-	return nil
-}
-
 // hasConflictingOptimization 检查是否有冲突的优化正在进行
 func (ss *StrategyScheduler) hasConflictingOptimization(ctx context.Context, strategyID string) bool {
 	if ss.db == nil {

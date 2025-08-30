@@ -411,6 +411,9 @@ func (cm *ConsistencyManager) broadcastModelResult(node *ClusterNode, result *Tr
 	// 3. 处理网络错误和重试逻辑
 	// 4. 验证响应和确认接收
 
+	// 记录广播数据大小用于监控
+	log.Printf("Broadcasting data with %d fields to node %s", len(broadcastData), node.NodeID)
+
 	// 模拟网络延迟
 	time.Sleep(10 * time.Millisecond)
 

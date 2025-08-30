@@ -1863,7 +1863,7 @@ func (engine *AutoMLEngine) trainSingleModel(task *MLTask, modelType string, dat
 	log.Printf("Training %s model for task: %s", modelType, task.ID)
 
 	// 1. 创建模型配置
-	modelConfig, err := engine.createModelConfig(modelType, task)
+	_, err := engine.createModelConfig(modelType, task)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create model config: %w", err)
 	}
@@ -1886,11 +1886,16 @@ func (engine *AutoMLEngine) trainSingleModel(task *MLTask, modelType string, dat
 	if err != nil {
 		log.Printf("Model validation failed: %v", err)
 		// 设置默认性能指标
+		defaultMetrics := make(map[string]float64)
+		defaultMetrics["accuracy"] = 0.5
+		defaultMetrics["precision"] = 0.5
+		defaultMetrics["recall"] = 0.5
+		defaultMetrics["f1_score"] = 0.5
+
 		performance = &ModelPerformance{
-			Accuracy:  0.5,
-			Precision: 0.5,
-			Recall:    0.5,
-			F1Score:   0.5,
+			ModelID:       trainedModel.ID,
+			OnlineMetrics: defaultMetrics,
+			LastEvaluated: time.Now(),
 		}
 	}
 

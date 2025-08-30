@@ -33,41 +33,41 @@ func (s *channelSubscription) Close() {
 
 // Ingestor manages market data collection with real Binance integration
 type Ingestor struct {
-	db            *sql.DB
-	binanceClient *binance.Client
-	binanceWS     *binance.WSClient
-	storage       *storage.Storage
+	db             *sql.DB
+	binanceClient  *binance.Client
+	binanceWS      *binance.WSClient
+	storage        *storage.Storage
 	qualityMonitor *quality.Monitor
-	mu            sync.RWMutex
+	mu             sync.RWMutex
 
 	// Configuration
-	testnet bool
-	apiKey  string
+	testnet   bool
+	apiKey    string
 	apiSecret string
 
 	// Subscription management
 	subscriptions map[string]*channelSubscription
-	
+
 	// Data processing workers
-	workers       int
-	workerPool    chan struct{}
-	
+	workers    int
+	workerPool chan struct{}
+
 	// Metrics and monitoring
-	stats         map[string]*IngestorStats
-	lastUpdate    time.Time
+	stats          map[string]*IngestorStats
+	lastUpdate     time.Time
 	latencyHistory []time.Duration
-	dataGaps      []time.Time
-	outliers      []interface{}
+	dataGaps       []time.Time
+	outliers       []interface{}
 }
 
 // IngestorStats represents ingestion statistics
 type IngestorStats struct {
-	Symbol          string    `json:"symbol"`
-	DataType        string    `json:"data_type"`
-	MessagesTotal   int64     `json:"messages_total"`
-	MessagesValid   int64     `json:"messages_valid"`
-	MessagesInvalid int64     `json:"messages_invalid"`
-	LastMessage     time.Time `json:"last_message"`
+	Symbol          string        `json:"symbol"`
+	DataType        string        `json:"data_type"`
+	MessagesTotal   int64         `json:"messages_total"`
+	MessagesValid   int64         `json:"messages_valid"`
+	MessagesInvalid int64         `json:"messages_invalid"`
+	LastMessage     time.Time     `json:"last_message"`
 	AvgLatency      time.Duration `json:"avg_latency"`
 }
 
@@ -80,18 +80,18 @@ func NewIngestor(db *sql.DB, apiKey, apiSecret string, testnet bool) *Ingestor {
 		APISecret: apiSecret,
 		TestNet:   testnet,
 	}
-	
+
 	// Create rate limiter (using nil cache for now)
 	rateLimiter := exchange.NewRateLimiter(nil, 1*time.Second) // 1 second default wait
-	
+
 	// Create Binance clients
 	binanceClient := binance.NewClient(config, rateLimiter)
 	binanceWS := binance.NewWSClient(testnet)
-	
+
 	// Create storage and quality monitor
 	storageManager := storage.NewStorage(db)
 	qualityMonitor := quality.NewMonitor()
-	
+
 	ingestor := &Ingestor{
 		db:             db,
 		binanceClient:  binanceClient,
@@ -106,17 +106,17 @@ func NewIngestor(db *sql.DB, apiKey, apiSecret string, testnet bool) *Ingestor {
 		workerPool:     make(chan struct{}, 10),
 		stats:          make(map[string]*IngestorStats),
 	}
-	
+
 	// Set up quality monitor callback
 	qualityMonitor.SetIssueCallback(func(issue quality.QualityIssue) {
 		log.Printf("Data quality issue: %s - %s", issue.IssueType, issue.Description)
 	})
-	
+
 	// Initialize worker pool
 	for i := 0; i < ingestor.workers; i++ {
 		ingestor.workerPool <- struct{}{}
 	}
-	
+
 	return ingestor
 }
 
@@ -168,7 +168,7 @@ func (i *Ingestor) SubscribeOrderBook(ctx context.Context, symbol string) (<-cha
 
 				// Store in database (async)
 				go func(ob *OrderBook) {
-					<-i.workerPool // Acquire worker
+					<-i.workerPool                                // Acquire worker
 					defer func() { i.workerPool <- struct{}{} }() // Release worker
 
 					if err := i.storage.SaveOrderBook(context.Background(), ob); err != nil {
@@ -244,7 +244,7 @@ func (i *Ingestor) SubscribeTrades(ctx context.Context, symbol string) (<-chan *
 
 				// Store in database (async)
 				go func(t *Trade) {
-					<-i.workerPool // Acquire worker
+					<-i.workerPool                                // Acquire worker
 					defer func() { i.workerPool <- struct{}{} }() // Release worker
 
 					if err := i.storage.SaveTrade(context.Background(), t); err != nil {
@@ -320,7 +320,7 @@ func (i *Ingestor) SubscribeKlines(ctx context.Context, symbol, interval string)
 
 				// Store in database (async)
 				go func(k *Kline) {
-					<-i.workerPool // Acquire worker
+					<-i.workerPool                                // Acquire worker
 					defer func() { i.workerPool <- struct{}{} }() // Release worker
 
 					if err := i.storage.SaveKline(context.Background(), k); err != nil {
@@ -706,6 +706,7 @@ func (i *Ingestor) GetOrderBook(ctx context.Context, symbol string) (*OrderBook,
 
 	return &orderBook, nil
 }
+
 // updateStats initializes or updates statistics for a symbol and data type
 func (i *Ingestor) updateStats(symbol, dataType string) {
 	key := fmt.Sprintf("%s:%s", symbol, dataType)
@@ -721,7 +722,7 @@ func (i *Ingestor) updateStats(symbol, dataType string) {
 func (i *Ingestor) updateStatsSuccess(symbol, dataType string) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	
+
 	key := fmt.Sprintf("%s:%s", symbol, dataType)
 	if stats, exists := i.stats[key]; exists {
 		stats.MessagesTotal++
@@ -734,7 +735,7 @@ func (i *Ingestor) updateStatsSuccess(symbol, dataType string) {
 func (i *Ingestor) updateStatsError(symbol, dataType string) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	
+
 	key := fmt.Sprintf("%s:%s", symbol, dataType)
 	if stats, exists := i.stats[key]; exists {
 		stats.MessagesTotal++
@@ -755,7 +756,34 @@ func (i *Ingestor) GetHistoricalTrades(ctx context.Context, symbol string, limit
 
 // GetCurrentOrderBook fetches current order book from Binance API
 func (i *Ingestor) GetCurrentOrderBook(ctx context.Context, symbol string, limit int) (*OrderBook, error) {
-	return i.binanceClient.GetOrderBook(ctx, symbol, limit)
+	exchangeOrderBook, err := i.binanceClient.GetOrderBook(ctx, symbol, limit)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert exchange.OrderBook to market.OrderBook
+	orderBook := &OrderBook{
+		Symbol:    exchangeOrderBook.Symbol,
+		UpdatedAt: exchangeOrderBook.Timestamp,
+	}
+
+	// Convert bids
+	for _, bid := range exchangeOrderBook.Bids {
+		orderBook.Bids = append(orderBook.Bids, Level{
+			Price:    bid.Price,
+			Quantity: bid.Quantity,
+		})
+	}
+
+	// Convert asks
+	for _, ask := range exchangeOrderBook.Asks {
+		orderBook.Asks = append(orderBook.Asks, Level{
+			Price:    ask.Price,
+			Quantity: ask.Quantity,
+		})
+	}
+
+	return orderBook, nil
 }
 
 // GetCurrentFundingRate fetches current funding rate from Binance API
@@ -772,14 +800,14 @@ func (i *Ingestor) GetCurrentOpenInterest(ctx context.Context, symbol string) (*
 func (i *Ingestor) GetStats() map[string]*IngestorStats {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
-	
+
 	result := make(map[string]*IngestorStats)
 	for k, v := range i.stats {
 		// Create a copy
 		stats := *v
 		result[k] = &stats
 	}
-	
+
 	return result
 }
 
@@ -802,46 +830,46 @@ func (i *Ingestor) GetOverallQualityScore() float64 {
 func (i *Ingestor) Close() error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	
+
 	// Close all subscriptions
 	for _, sub := range i.subscriptions {
 		sub.Close()
 	}
-	
+
 	// Close WebSocket connection
 	if err := i.binanceWS.Close(); err != nil {
 		log.Printf("Error closing Binance WebSocket: %v", err)
 	}
-	
+
 	return nil
 }
 
 // StartDataCollection starts collecting data for specified symbols
 func (i *Ingestor) StartDataCollection(ctx context.Context, symbols []string, intervals []string) error {
 	log.Printf("Starting data collection for %d symbols", len(symbols))
-	
+
 	for _, symbol := range symbols {
 		// Subscribe to order book updates
 		if _, err := i.SubscribeOrderBook(ctx, symbol); err != nil {
 			log.Printf("Failed to subscribe to order book for %s: %v", symbol, err)
 		}
-		
+
 		// Subscribe to trade updates
 		if _, err := i.SubscribeTrades(ctx, symbol); err != nil {
 			log.Printf("Failed to subscribe to trades for %s: %v", symbol, err)
 		}
-		
+
 		// Subscribe to kline updates for each interval
 		for _, interval := range intervals {
 			if _, err := i.SubscribeKlines(ctx, symbol, interval); err != nil {
 				log.Printf("Failed to subscribe to klines for %s %s: %v", symbol, interval, err)
 			}
 		}
-		
+
 		// Fetch and store initial historical data
 		go i.fetchInitialData(ctx, symbol, intervals)
 	}
-	
+
 	log.Printf("Data collection started successfully")
 	return nil
 }
@@ -849,7 +877,7 @@ func (i *Ingestor) StartDataCollection(ctx context.Context, symbols []string, in
 // fetchInitialData fetches initial historical data for a symbol
 func (i *Ingestor) fetchInitialData(ctx context.Context, symbol string, intervals []string) {
 	log.Printf("Fetching initial data for %s", symbol)
-	
+
 	// Fetch recent trades
 	trades, err := i.GetHistoricalTrades(ctx, symbol, 1000)
 	if err != nil {
@@ -862,18 +890,18 @@ func (i *Ingestor) fetchInitialData(ctx context.Context, symbol string, interval
 		}
 		log.Printf("Saved %d historical trades for %s", len(trades), symbol)
 	}
-	
+
 	// Fetch recent klines for each interval
 	endTime := time.Now()
 	startTime := endTime.Add(-24 * time.Hour) // Last 24 hours
-	
+
 	for _, interval := range intervals {
 		klines, err := i.GetHistoricalKlines(ctx, symbol, interval, startTime, endTime, 1000)
 		if err != nil {
 			log.Printf("Failed to fetch historical klines for %s %s: %v", symbol, interval, err)
 			continue
 		}
-		
+
 		for _, kline := range klines {
 			if err := i.storage.SaveKline(ctx, kline); err != nil {
 				log.Printf("Failed to save historical kline for %s %s: %v", symbol, interval, err)
@@ -881,7 +909,7 @@ func (i *Ingestor) fetchInitialData(ctx context.Context, symbol string, interval
 		}
 		log.Printf("Saved %d historical klines for %s %s", len(klines), symbol, interval)
 	}
-	
+
 	// Fetch current order book
 	orderBook, err := i.GetCurrentOrderBook(ctx, symbol, 20)
 	if err != nil {
@@ -898,11 +926,11 @@ func (i *Ingestor) fetchInitialData(ctx context.Context, symbol string, interval
 // PerformDataCleanup performs periodic data cleanup
 func (i *Ingestor) PerformDataCleanup(ctx context.Context, retentionDays int) error {
 	log.Printf("Starting data cleanup with %d days retention", retentionDays)
-	
+
 	if err := i.storage.CleanupOldData(ctx, retentionDays); err != nil {
 		return fmt.Errorf("failed to cleanup old data: %w", err)
 	}
-	
+
 	log.Printf("Data cleanup completed successfully")
 	return nil
 }

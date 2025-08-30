@@ -24,6 +24,7 @@ type Sandbox struct {
 	errors     chan error
 	done       chan struct{}
 	state      string // 沙盒状态：initializing, running, stopped
+	isRunning  bool   // 运行状态标志
 	mu         sync.RWMutex
 }
 
@@ -347,27 +348,28 @@ func (s *Sandbox) OnPosition(position interface{}) {
 		log.Printf("Position channel is full, dropped position: %+v", position)
 	}
 }
+
 // handleConnectionReconnect 处理连接重连
 func (s *Sandbox) handleConnectionReconnect(err error) {
 	log.Printf("Handling connection reconnect for error: %v", err)
-	
+
 	// 实现指数退避重连策略
 	maxRetries := 5
 	baseDelay := time.Second
-	
+
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		// 计算退避延迟
 		delay := time.Duration(attempt) * baseDelay
 		log.Printf("Reconnection attempt %d/%d, waiting %v", attempt, maxRetries, delay)
-		
+
 		time.Sleep(delay)
-		
+
 		// 尝试重新建立连接
 		if s.exchange != nil {
 			// 这里应该调用exchange的重连方法
 			// 由于exchange接口可能没有重连方法，我们模拟重连过程
 			log.Printf("Attempting to reconnect to exchange...")
-			
+
 			// 模拟重连成功
 			if attempt >= 3 { // 假设第3次尝试成功
 				log.Printf("Reconnection successful after %d attempts", attempt)
@@ -375,7 +377,7 @@ func (s *Sandbox) handleConnectionReconnect(err error) {
 			}
 		}
 	}
-	
+
 	log.Printf("Failed to reconnect after %d attempts, marking sandbox as disconnected", maxRetries)
 	// 标记沙盒为断开连接状态
 	s.mu.Lock()
@@ -386,28 +388,28 @@ func (s *Sandbox) handleConnectionReconnect(err error) {
 // handleRateLimitBackoff 处理速率限制退避
 func (s *Sandbox) handleRateLimitBackoff(err error) {
 	log.Printf("Handling rate limit backoff for error: %v", err)
-	
+
 	// 实现速率限制退避策略
 	backoffDuration := 30 * time.Second // 基础退避时间
-	
+
 	// 从错误信息中提取建议的等待时间（如果有的话）
 	if strings.Contains(err.Error(), "retry after") {
 		// 尝试解析重试时间
 		// 这里可以添加更复杂的解析逻辑
 		backoffDuration = 60 * time.Second
 	}
-	
+
 	log.Printf("Rate limit hit, backing off for %v", backoffDuration)
-	
+
 	// 暂停交易活动
 	s.mu.Lock()
 	wasRunning := s.isRunning
 	s.isRunning = false
 	s.mu.Unlock()
-	
+
 	// 等待退避时间
 	time.Sleep(backoffDuration)
-	
+
 	// 恢复交易活动
 	if wasRunning {
 		s.mu.Lock()
@@ -420,47 +422,63 @@ func (s *Sandbox) handleRateLimitBackoff(err error) {
 // handleInsufficientBalance 处理余额不足
 func (s *Sandbox) handleInsufficientBalance(err error) {
 	log.Printf("Handling insufficient balance for error: %v", err)
-	
+
 	// 停止所有交易活动
 	s.mu.Lock()
 	s.isRunning = false
 	s.mu.Unlock()
-	
+
 	log.Printf("Trading stopped due to insufficient balance")
-	
+
 	// 发送余额不足通知
 	s.sendBalanceAlert(err)
-	
+
 	// 可以在这里添加自动资金管理逻辑
 	// 例如：从其他账户转移资金、发送通知给管理员等
-	
+
 	// 记录余额不足事件
 	s.recordBalanceEvent(err)
 }
 
 // sendBalanceAlert 发送余额不足警报
 func (s *Sandbox) sendBalanceAlert(err error) {
-	alert := map[string]interface{}{
-		"type":      "insufficient_balance",
-		"message":   "Trading stopped due to insufficient balance",
-		"error":     err.Error(),
-		"timestamp": time.Now(),
-		"sandbox_id": s.strategy.Name, // 假设strategy有Name字段
+	// 获取策略名称
+	strategyName := "unknown"
+	if s.config != nil {
+		if name, ok := s.config["name"].(string); ok {
+			strategyName = name
+		}
 	}
-	
+
+	alert := map[string]interface{}{
+		"type":       "insufficient_balance",
+		"message":    "Trading stopped due to insufficient balance",
+		"error":      err.Error(),
+		"timestamp":  time.Now(),
+		"sandbox_id": strategyName,
+	}
+
 	// 这里应该发送到监控系统或通知服务
 	log.Printf("Balance alert: %+v", alert)
 }
 
 // recordBalanceEvent 记录余额事件
 func (s *Sandbox) recordBalanceEvent(err error) {
+	// 获取策略名称
+	strategyName := "unknown"
+	if s.config != nil {
+		if name, ok := s.config["name"].(string); ok {
+			strategyName = name
+		}
+	}
+
 	event := map[string]interface{}{
 		"event_type": "balance_insufficient",
 		"error":      err.Error(),
 		"timestamp":  time.Now(),
-		"strategy":   s.strategy.Name, // 假设strategy有Name字段
+		"strategy":   strategyName,
 	}
-	
+
 	// 这里应该记录到数据库或日志系统
 	log.Printf("Balance event recorded: %+v", event)
 }
