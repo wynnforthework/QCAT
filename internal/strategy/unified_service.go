@@ -410,8 +410,13 @@ func (s *UnifiedStrategyService) getStrategyFromDB(ctx context.Context, strategy
 
 		// 解析配置JSON
 		if configJSON.Valid {
-			// TODO: 解析JSON配置
-			strategy.Config = make(map[string]interface{})
+			var config map[string]interface{}
+			if err := json.Unmarshal([]byte(configJSON.String), &config); err != nil {
+				log.Printf("Failed to parse strategy config JSON for %s: %v", strategyID, err)
+				strategy.Config = make(map[string]interface{})
+			} else {
+				strategy.Config = config
+			}
 		}
 	} else {
 		// 如果没有数据库连接，返回错误而不是 mock 数据
@@ -428,12 +433,17 @@ func (s *UnifiedStrategyService) enhanceStrategyInfo(ctx context.Context, basic 
 	// 从策略池获取执行信息
 	if s.strategyPool != nil {
 		if poolStrategy, err := s.strategyPool.GetStrategyInfo(basic.ID); err == nil {
+			// 从策略池获取实际的执行统计
+			executionCount := s.getStrategyExecutionCount(basic.ID)
+			successRate := s.getStrategySuccessRate(basic.ID)
+			avgLatency := s.getStrategyAvgLatency(basic.ID)
+
 			unified.Execution = ExecutionInfo{
 				IsRunning:      poolStrategy.IsActive && poolStrategy.TradingEnabled,
 				LastExecution:  poolStrategy.LastUpdated,
-				ExecutionCount: 100, // TODO: 从实际数据获取
-				SuccessRate:    95.5,
-				AvgLatency:     8.5,
+				ExecutionCount: executionCount,
+				SuccessRate:    successRate,
+				AvgLatency:     avgLatency,
 			}
 
 			unified.Pool = PoolInfo{
@@ -591,8 +601,98 @@ func (s *UnifiedStrategyService) generateSummary(strategies []UnifiedStrategy) S
 	return summary
 }
 
-// 删除了 getMockStrategies 方法，不再使用 mock 数据
+// getStrategyExecutionCount 获取策略执行次数
+func (s *UnifiedStrategyService) getStrategyExecutionCount(strategyID string) int {
+	if s.db == nil {
+		return 0
+	}
 
-// 删除了 getMockExecutionInfo 方法，不再使用 mock 数据
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-// 删除了 getMockPerformanceInfo 和 getMockPoolInfo 方法，不再使用 mock 数据
+	var count int
+	query := `
+		SELECT COUNT(*)
+		FROM strategy_executions
+		WHERE strategy_id = $1 AND created_at > NOW() - INTERVAL '24 hours'
+	`
+
+	err := s.db.DB.QueryRowContext(ctx, query, strategyID).Scan(&count)
+	if err != nil {
+		log.Printf("Failed to get execution count for strategy %s: %v", strategyID, err)
+		return 0
+	}
+
+	return count
+}
+
+// getStrategySuccessRate 获取策略成功率
+func (s *UnifiedStrategyService) getStrategySuccessRate(strategyID string) float64 {
+	if s.db == nil {
+		return 0.0
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var totalCount, successCount int
+
+	// 获取总执行次数
+	totalQuery := `
+		SELECT COUNT(*)
+		FROM strategy_executions
+		WHERE strategy_id = $1 AND created_at > NOW() - INTERVAL '24 hours'
+	`
+	err := s.db.DB.QueryRowContext(ctx, totalQuery, strategyID).Scan(&totalCount)
+	if err != nil {
+		log.Printf("Failed to get total execution count for strategy %s: %v", strategyID, err)
+		return 0.0
+	}
+
+	if totalCount == 0 {
+		return 0.0
+	}
+
+	// 获取成功执行次数
+	successQuery := `
+		SELECT COUNT(*)
+		FROM strategy_executions
+		WHERE strategy_id = $1 AND status = 'SUCCESS' AND created_at > NOW() - INTERVAL '24 hours'
+	`
+	err = s.db.DB.QueryRowContext(ctx, successQuery, strategyID).Scan(&successCount)
+	if err != nil {
+		log.Printf("Failed to get success execution count for strategy %s: %v", strategyID, err)
+		return 0.0
+	}
+
+	return float64(successCount) / float64(totalCount) * 100.0
+}
+
+// getStrategyAvgLatency 获取策略平均延迟
+func (s *UnifiedStrategyService) getStrategyAvgLatency(strategyID string) float64 {
+	if s.db == nil {
+		return 0.0
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var avgLatency float64
+	query := `
+		SELECT AVG(EXTRACT(EPOCH FROM (completed_at - started_at)) * 1000) as avg_latency_ms
+		FROM strategy_executions
+		WHERE strategy_id = $1
+		  AND status = 'SUCCESS'
+		  AND started_at IS NOT NULL
+		  AND completed_at IS NOT NULL
+		  AND created_at > NOW() - INTERVAL '24 hours'
+	`
+
+	err := s.db.DB.QueryRowContext(ctx, query, strategyID).Scan(&avgLatency)
+	if err != nil {
+		log.Printf("Failed to get average latency for strategy %s: %v", strategyID, err)
+		return 0.0
+	}
+
+	return avgLatency
+}

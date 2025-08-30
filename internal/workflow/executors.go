@@ -2,7 +2,6 @@ package workflow
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"math/rand"
 	"time"
@@ -22,72 +21,6 @@ func (be *BaseExecutor) GetName() string {
 // GetResourceRequirements 获取资源需求
 func (be *BaseExecutor) GetResourceRequirements() map[string]interface{} {
 	return be.resourceRequirements
-}
-
-// MockExecutor 模拟执行器（用于测试）
-type MockExecutor struct {
-	BaseExecutor
-	simulateFailure bool
-	executionTime   time.Duration
-}
-
-// NewMockExecutor 创建模拟执行器
-func NewMockExecutor(name string, executionTime time.Duration, simulateFailure bool) *MockExecutor {
-	return &MockExecutor{
-		BaseExecutor: BaseExecutor{
-			name: name,
-			resourceRequirements: map[string]interface{}{
-				"cpu":    "low",
-				"memory": "medium",
-				"io":     "low",
-			},
-		},
-		simulateFailure: simulateFailure,
-		executionTime:   executionTime,
-	}
-}
-
-// Execute 执行模拟任务
-func (me *MockExecutor) Execute(ctx context.Context, params map[string]interface{}) (interface{}, error) {
-	functionID := params["function_id"].(int)
-	functionName := params["function_name"].(string)
-
-	log.Printf("🔄 [模拟] 开始执行功能 %d: %s", functionID, functionName)
-
-	// 模拟执行时间
-	select {
-	case <-time.After(me.executionTime):
-		// 正常完成
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
-
-	// 模拟失败
-	// 基于功能ID生成确定性的失败模拟
-	if me.simulateFailure && (functionID%10 == 0) { // 每10个功能中有1个失败
-		return nil, fmt.Errorf("simulated failure for function %d", functionID)
-	}
-
-	// 基于功能ID生成确定性的测试数据
-	processedItems := 100 + (functionID*50)%900
-	successRate := 0.95 + float64(functionID%5)*0.01
-	performanceScore := 80.0 + float64(functionID%20)
-
-	result := map[string]interface{}{
-		"function_id":    functionID,
-		"function_name":  functionName,
-		"status":         "completed",
-		"execution_time": me.executionTime.String(),
-		"timestamp":      time.Now(),
-		"test_data": map[string]interface{}{
-			"processed_items":   processedItems,
-			"success_rate":      successRate,
-			"performance_score": performanceScore,
-		},
-	}
-
-	log.Printf("✅ [模拟] 功能 %d (%s) 执行完成", functionID, functionName)
-	return result, nil
 }
 
 // StrategyOptimizationExecutor 策略优化执行器
@@ -338,22 +271,9 @@ func CreateDefaultExecutors() map[int]AutomationExecutor {
 		26: "市场模式识别",
 	}
 
-	for id, name := range functionNames {
-		// 根据功能类型设置确定性的执行时间
-		var execTime time.Duration
-		switch {
-		case id >= 24: // 学习进化类功能
-			execTime = time.Duration(10+(id%20)) * time.Second
-		case id >= 18: // 数据分析类功能
-			execTime = time.Duration(5+(id%10)) * time.Second
-		case id >= 12: // 风险安全类功能
-			execTime = time.Duration(1+(id%5)) * time.Second
-		default: // 交易策略类功能
-			execTime = time.Duration(2+(id%8)) * time.Second
-		}
-
-		executors[id] = NewMockExecutor(name, execTime, false)
-	}
+	// 其他功能的执行器需要根据实际需求实现
+	// 不再使用mock执行器，避免在生产环境中使用模拟数据
+	log.Printf("Warning: %d additional function executors need to be implemented", len(functionNames))
 
 	return executors
 }

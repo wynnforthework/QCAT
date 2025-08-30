@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
-	"math/big"
 	"time"
 )
 
@@ -22,11 +21,11 @@ type WalletService interface {
 
 // TransferRequest 转账请求
 type TransferRequest struct {
-	Type          string                 `json:"type"`           // PROFIT_TRANSFER, EMERGENCY_TRANSFER
+	Type          string                 `json:"type"` // PROFIT_TRANSFER, EMERGENCY_TRANSFER
 	Amount        float64                `json:"amount"`
 	FromAddress   string                 `json:"from_address"`
 	ToAddress     string                 `json:"to_address"`
-	Priority      int                    `json:"priority"`       // 1-10, 10为最高优先级
+	Priority      int                    `json:"priority"` // 1-10, 10为最高优先级
 	TriggerReason string                 `json:"trigger_reason"`
 	Metadata      map[string]interface{} `json:"metadata"`
 }
@@ -54,21 +53,21 @@ type TransferStatus struct {
 
 // WalletConfig 钱包配置
 type WalletConfig struct {
-	Provider           string        `json:"provider"`            // ethereum, bitcoin, binance_smart_chain
-	NetworkURL         string        `json:"network_url"`
-	PrivateKey         string        `json:"private_key"`
-	HotWalletAddress   string        `json:"hot_wallet_address"`
-	ColdWalletAddress  string        `json:"cold_wallet_address"`
-	MinConfirmations   int           `json:"min_confirmations"`
-	MaxGasPrice        float64       `json:"max_gas_price"`
-	TransferTimeout    time.Duration `json:"transfer_timeout"`
-	EnableMultiSig     bool          `json:"enable_multi_sig"`
-	MultiSigThreshold  int           `json:"multi_sig_threshold"`
+	Provider          string        `json:"provider"` // ethereum, bitcoin, binance_smart_chain
+	NetworkURL        string        `json:"network_url"`
+	PrivateKey        string        `json:"private_key"`
+	HotWalletAddress  string        `json:"hot_wallet_address"`
+	ColdWalletAddress string        `json:"cold_wallet_address"`
+	MinConfirmations  int           `json:"min_confirmations"`
+	MaxGasPrice       float64       `json:"max_gas_price"`
+	TransferTimeout   time.Duration `json:"transfer_timeout"`
+	EnableMultiSig    bool          `json:"enable_multi_sig"`
+	MultiSigThreshold int           `json:"multi_sig_threshold"`
 }
 
 // DefaultWalletService 默认钱包服务实现
 type DefaultWalletService struct {
-	config   *WalletConfig
+	config    *WalletConfig
 	transfers map[string]*TransferStatus
 }
 
@@ -161,7 +160,7 @@ func (ws *DefaultWalletService) validateTransferRequest(request *TransferRequest
 
 // executeTransfer 执行实际转账
 func (ws *DefaultWalletService) executeTransfer(ctx context.Context, request *TransferRequest, transferID string) (string, error) {
-	log.Printf("Executing transfer %s: %.8f from %s to %s", 
+	log.Printf("Executing transfer %s: %.8f from %s to %s",
 		transferID, request.Amount, request.FromAddress, request.ToAddress)
 
 	// 这里应该集成实际的区块链钱包API
@@ -182,13 +181,13 @@ func (ws *DefaultWalletService) executeTransfer(ctx context.Context, request *Tr
 func (ws *DefaultWalletService) executeEthereumTransfer(ctx context.Context, request *TransferRequest) (string, error) {
 	// 这里应该使用以太坊客户端库（如go-ethereum）
 	// 实现实际的以太坊转账逻辑
-	
+
 	// 模拟转账过程
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// 生成模拟的交易哈希
 	txHash := ws.generateTransactionHash()
-	
+
 	log.Printf("Ethereum transfer executed: %s", txHash)
 	return txHash, nil
 }
@@ -197,13 +196,13 @@ func (ws *DefaultWalletService) executeEthereumTransfer(ctx context.Context, req
 func (ws *DefaultWalletService) executeBitcoinTransfer(ctx context.Context, request *TransferRequest) (string, error) {
 	// 这里应该使用比特币客户端库
 	// 实现实际的比特币转账逻辑
-	
+
 	// 模拟转账过程
 	time.Sleep(200 * time.Millisecond)
-	
+
 	// 生成模拟的交易哈希
 	txHash := ws.generateTransactionHash()
-	
+
 	log.Printf("Bitcoin transfer executed: %s", txHash)
 	return txHash, nil
 }
@@ -262,7 +261,7 @@ func (ws *DefaultWalletService) CancelTransfer(ctx context.Context, transferID s
 // GetTransferHistory 获取转账历史
 func (ws *DefaultWalletService) GetTransferHistory(ctx context.Context, limit int) ([]*TransferRecord, error) {
 	records := make([]*TransferRecord, 0, len(ws.transfers))
-	
+
 	for _, status := range ws.transfers {
 		record := &TransferRecord{
 			ID:              status.TransferID,
@@ -346,125 +345,4 @@ func (ws *DefaultWalletService) generateTransactionHash() string {
 	randomBytes := make([]byte, 32)
 	rand.Read(randomBytes)
 	return "0x" + hex.EncodeToString(randomBytes)
-}
-
-// MockWalletService 模拟钱包服务（用于测试）
-type MockWalletService struct {
-	transfers   map[string]*TransferStatus
-	shouldFail  bool
-	failureRate float64
-}
-
-// NewMockWalletService 创建模拟钱包服务
-func NewMockWalletService() *MockWalletService {
-	return &MockWalletService{
-		transfers:   make(map[string]*TransferStatus),
-		shouldFail:  false,
-		failureRate: 0.0,
-	}
-}
-
-// InitiateTransfer 发起转账（模拟）
-func (m *MockWalletService) InitiateTransfer(ctx context.Context, request *TransferRequest) (*TransferResponse, error) {
-	if m.shouldFail {
-		return nil, fmt.Errorf("mock transfer failure")
-	}
-
-	// 模拟随机失败
-	if m.failureRate > 0 {
-		randomValue, _ := rand.Int(rand.Reader, big.NewInt(100))
-		if float64(randomValue.Int64()) < m.failureRate*100 {
-			return nil, fmt.Errorf("random mock transfer failure")
-		}
-	}
-
-	transferID := fmt.Sprintf("MOCK_TXF_%d", time.Now().Unix())
-	txHash := fmt.Sprintf("0x%x", time.Now().UnixNano())
-
-	status := &TransferStatus{
-		TransferID:      transferID,
-		Status:          "CONFIRMED",
-		TransactionHash: txHash,
-		Confirmations:   6,
-		ActualFee:       0.001,
-		Metadata:        request.Metadata,
-	}
-	now := time.Now()
-	status.CompletedAt = &now
-
-	m.transfers[transferID] = status
-
-	response := &TransferResponse{
-		TransferID:      transferID,
-		Status:          "CONFIRMED",
-		TransactionHash: txHash,
-		EstimatedFee:    0.001,
-		CreatedAt:       time.Now(),
-	}
-
-	log.Printf("Mock transfer initiated: %s", transferID)
-	return response, nil
-}
-
-// GetTransferStatus 获取转账状态（模拟）
-func (m *MockWalletService) GetTransferStatus(ctx context.Context, transferID string) (*TransferStatus, error) {
-	status, exists := m.transfers[transferID]
-	if !exists {
-		return nil, fmt.Errorf("transfer not found: %s", transferID)
-	}
-	return status, nil
-}
-
-// CancelTransfer 取消转账（模拟）
-func (m *MockWalletService) CancelTransfer(ctx context.Context, transferID string) error {
-	status, exists := m.transfers[transferID]
-	if !exists {
-		return fmt.Errorf("transfer not found: %s", transferID)
-	}
-	status.Status = "CANCELLED"
-	return nil
-}
-
-// GetTransferHistory 获取转账历史（模拟）
-func (m *MockWalletService) GetTransferHistory(ctx context.Context, limit int) ([]*TransferRecord, error) {
-	records := make([]*TransferRecord, 0, len(m.transfers))
-	for _, status := range m.transfers {
-		record := &TransferRecord{
-			ID:              status.TransferID,
-			Status:          status.Status,
-			TransactionHash: status.TransactionHash,
-			Timestamp:       time.Now(),
-			Metadata:        status.Metadata,
-		}
-		records = append(records, record)
-	}
-	return records, nil
-}
-
-// ValidateAddress 验证地址（模拟）
-func (m *MockWalletService) ValidateAddress(address string) error {
-	if len(address) < 10 {
-		return fmt.Errorf("address too short: %s", address)
-	}
-	return nil
-}
-
-// EstimateTransferFee 估算转账手续费（模拟）
-func (m *MockWalletService) EstimateTransferFee(ctx context.Context, amount float64, toAddress string) (float64, error) {
-	return 0.001, nil
-}
-
-// SetShouldFail 设置是否应该失败（测试用）
-func (m *MockWalletService) SetShouldFail(shouldFail bool) {
-	m.shouldFail = shouldFail
-}
-
-// SetFailureRate 设置失败率（测试用）
-func (m *MockWalletService) SetFailureRate(rate float64) {
-	m.failureRate = rate
-}
-
-// GetTransfers 获取所有转账（测试用）
-func (m *MockWalletService) GetTransfers() map[string]*TransferStatus {
-	return m.transfers
 }

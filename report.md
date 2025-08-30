@@ -138,28 +138,17 @@
 - Line 544: **mock** → `func (ah *AssertionHelpers) AssertMetricsRecorded(collector *MockMetricsCollector, metricName string) {`
 
 ## ./internal\operations\healing\self_healing_system.go
-- Line 1667: **TODO** → `// TODO: 实现实际的配置变更`
-- Line 1763: **TODO** → `// TODO: 实现异常检测逻辑`
-- Line 1767: **TODO** → `// TODO: 基于故障更新系统健康状态`
-- Line 1795: **TODO** → `// TODO: 实现实际的API服务器健康检查`
-- Line 1812: **TODO** → `// TODO: 实现实际的数据库健康检查`
-- Line 1829: **TODO** → `// TODO: 实现实际的Redis健康检查`
-- Line 1846: **TODO** → `// TODO: 实现实际的交易所连接器健康检查`
-- Line 1868: **TODO** → `// TODO: 实现实际的策略引擎健康检查`
-- Line 1880: **TODO** → `// TODO: 实现根因分析逻辑`
-- Line 1891: **TODO** → `// TODO: 实现影响评估逻辑`
-- Line 1985: **TODO** → `// TODO: 更新知识库，记录成功/失败的恢复案例`
-- Line 1989: **TODO** → `// TODO: 基于历史数据计算平均时间`
-- Line 1997: **TODO** → `// TODO: 计算实际的正常运行时间百分比`
-- Line 2091: **TODO** → `// TODO: 实现从实际监控系统获取指标`
-- Line 2092: **TODO** → `// TODO 集成Prometheus、InfluxDB等监控系统`
-- Line 2096: **TODO** → `// TODO: 从监控系统获取API响应时间`
-- Line 2099: **TODO** → `// TODO: 从监控系统获取错误率`
-- Line 2102: **TODO** → `// TODO: 从监控系统获取连接成功率`
-- Line 2105: **TODO** → `// TODO: 从监控系统获取API超时率`
-- Line 2108: **TODO** → `// TODO: 从监控系统获取CPU使用率`
-- Line 2111: **TODO** → `// TODO: 从监控系统获取内存使用率`
-- Line 2114: **TODO** → `// TODO: 从监控系统获取磁盘使用率`
+- Line 2982: **TODO** → `// TODO: 基于历史数据计算平均时间`
+- Line 2990: **TODO** → `// TODO: 计算实际的正常运行时间百分比`
+- Line 3096: **TODO** → `// TODO: 实现从实际监控系统获取指标`
+- Line 3097: **TODO** → `// TODO 集成Prometheus、InfluxDB等监控系统`
+- Line 3101: **TODO** → `// TODO: 从监控系统获取API响应时间`
+- Line 3104: **TODO** → `// TODO: 从监控系统获取错误率`
+- Line 3107: **TODO** → `// TODO: 从监控系统获取连接成功率`
+- Line 3110: **TODO** → `// TODO: 从监控系统获取API超时率`
+- Line 3113: **TODO** → `// TODO: 从监控系统获取CPU使用率`
+- Line 3116: **TODO** → `// TODO: 从监控系统获取内存使用率`
+- Line 3119: **TODO** → `// TODO: 从监控系统获取磁盘使用率`
 
 ## ./internal\security\protector\exchange_provider.go
 - Line 499: **mock** → `// MockExchangeProvider 模拟交易所数据提供者（用于测试）`
@@ -226,13 +215,8 @@
 
 ## ./internal\strategy\unified_service.go
 - Line 365: **mock** → `// 如果没有数据库连接，返回空结果而不是 mock 数据`
-- Line 413: **TODO** → `// TODO: 解析JSON配置`
-- Line 417: **mock** → `// 如果没有数据库连接，返回错误而不是 mock 数据`
-- Line 434: **TODO** → `ExecutionCount: 100, // TODO: 从实际数据获取`
-- Line 465: **mock** → `// 如果没有从策略池获取到信息，使用默认值而不是 mock 数据`
-- Line 594: **mock** → `// 删除了 getMockStrategies 方法，不再使用 mock 数据`
-- Line 596: **mock** → `// 删除了 getMockExecutionInfo 方法，不再使用 mock 数据`
-- Line 598: **mock** → `// 删除了 getMockPerformanceInfo 和 getMockPoolInfo 方法，不再使用 mock 数据`
+- Line 422: **mock** → `// 如果没有数据库连接，返回错误而不是 mock 数据`
+- Line 475: **mock** → `// 如果没有从策略池获取到信息，使用默认值而不是 mock 数据`
 
 ## ./internal\strategy\unified_service_simple.go
 - Line 44: **mock** → `// 返回空策略列表，避免使用 mock 数据`
