@@ -28,6 +28,12 @@ const (
 	BaseTestnetSpotURL = "https://testnet.binance.vision"
 )
 
+// APIError represents a Binance API error response
+type APIError struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+}
+
 // Client represents a Binance API client
 type Client struct {
 	*exchange.BaseExchange
@@ -176,6 +182,11 @@ func (c *Client) makeRequest(ctx context.Context, method, endpoint string, param
 	maxRetries := 3
 	baseDelay := time.Second
 
+	// Validate API credentials before making request
+	if c.config.APIKey == "" || c.config.APISecret == "" {
+		return nil, fmt.Errorf("API key or secret not configured")
+	}
+
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		// Add timestamp (refresh for each attempt)
 		params.Set("timestamp", strconv.FormatInt(time.Now().UnixMilli(), 10))
@@ -233,6 +244,35 @@ func (c *Client) makeRequest(ctx context.Context, method, endpoint string, param
 		}
 
 		if resp.StatusCode != http.StatusOK {
+			// Parse API error for better diagnostics
+			var apiError APIError
+			if err := json.Unmarshal(body, &apiError); err == nil {
+				// Handle specific error codes
+				switch apiError.Code {
+				case -2015:
+					log.Printf("API Authentication Error: Invalid API-key, IP, or permissions")
+					log.Printf("API Key (first 8 chars): %s...", c.config.APIKey[:min(8, len(c.config.APIKey))])
+					log.Printf("TestNet mode: %v", c.config.TestNet)
+					log.Printf("Base URL: %s", c.baseURL)
+					return nil, fmt.Errorf("invalid API key, IP, or permissions for action (code: %d): %s", apiError.Code, apiError.Msg)
+				case -1021:
+					log.Printf("Timestamp Error: Request timestamp outside recvWindow")
+					return nil, fmt.Errorf("timestamp for this request is outside the recvWindow (code: %d): %s", apiError.Code, apiError.Msg)
+				case -1022:
+					log.Printf("Signature Error: Invalid signature")
+					return nil, fmt.Errorf("signature for this request is not valid (code: %d): %s", apiError.Code, apiError.Msg)
+				default:
+					if attempt < maxRetries && (resp.StatusCode >= 500 || resp.StatusCode == 429) {
+						delay := time.Duration(attempt+1) * baseDelay
+						log.Printf("Server error %d on attempt %d/%d, retrying in %v",
+							resp.StatusCode, attempt+1, maxRetries+1, delay)
+						time.Sleep(delay)
+						continue
+					}
+					return nil, fmt.Errorf("API error %d: %s", apiError.Code, apiError.Msg)
+				}
+			}
+
 			if attempt < maxRetries && (resp.StatusCode >= 500 || resp.StatusCode == 429) {
 				delay := time.Duration(attempt+1) * baseDelay
 				log.Printf("Server error %d on attempt %d/%d, retrying in %v",
@@ -247,6 +287,14 @@ func (c *Client) makeRequest(ctx context.Context, method, endpoint string, param
 	}
 
 	return nil, fmt.Errorf("max retries exceeded")
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // isNetworkError 检查是否是网络连接错误
