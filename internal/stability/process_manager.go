@@ -729,7 +729,7 @@ func (d *defaultStrategy) OnMarketData(data interface{}) error {
 	}
 
 	// 处理市场数据的逻辑
-	// 这里实现策略的市场数据处理逻辑
+	// TODO 策略的市场数据处理逻辑
 
 	return nil
 }
@@ -742,7 +742,7 @@ func (d *defaultStrategy) OnOrderUpdate(order interface{}) error {
 	}
 
 	// 处理订单更新的逻辑
-	// 这里实现策略的订单处理逻辑
+	// TODO 策略的订单处理逻辑
 
 	return nil
 }
@@ -755,7 +755,7 @@ func (d *defaultStrategy) OnPositionUpdate(position interface{}) error {
 	}
 
 	// 处理仓位更新的逻辑
-	// 这里实现策略的仓位处理逻辑
+	// TODO 策略的仓位处理逻辑
 
 	return nil
 }
@@ -788,7 +788,7 @@ func (d *defaultStrategy) OnTick(ctx context.Context, data interface{}) error {
 	}
 
 	// 处理tick数据的逻辑
-	// 这里实现策略的tick数据处理逻辑
+	// TODO 策略的tick数据处理逻辑
 
 	return nil
 }
@@ -801,7 +801,7 @@ func (d *defaultStrategy) OnSignal(ctx context.Context, signal *strategy.Signal)
 	}
 
 	// 处理交易信号的逻辑
-	// 这里实现策略的信号处理逻辑
+	// TODO 策略的信号处理逻辑
 
 	return nil
 }
@@ -814,7 +814,7 @@ func (d *defaultStrategy) OnOrder(ctx context.Context, order *exchange.Order) er
 	}
 
 	// 处理订单更新的逻辑
-	// 这里实现策略的订单处理逻辑
+	// TODO 策略的订单处理逻辑
 
 	return nil
 }
@@ -827,7 +827,7 @@ func (d *defaultStrategy) OnPosition(ctx context.Context, position *exchange.Pos
 	}
 
 	// 处理仓位更新的逻辑
-	// 这里实现策略的仓位处理逻辑
+	// TODO 策略的仓位处理逻辑
 
 	return nil
 }
@@ -1038,7 +1038,7 @@ func (pm *ProcessManager) getProcessResourceUsage(pid int) (memUsage uint64, cpu
 func (pm *ProcessManager) getProcessMemoryUsage(pid int) uint64 {
 	// 在Windows上使用WMI或读取进程信息
 	// 在Linux上读取/proc/[pid]/status文件
-	// 这里实现跨平台的内存监控
+	// TODO 跨平台的内存监控
 
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
@@ -1053,7 +1053,7 @@ func (pm *ProcessManager) getProcessMemoryUsage(pid int) uint64 {
 func (pm *ProcessManager) getProcessCPUUsage(pid int) float64 {
 	// 在Windows上使用GetProcessTimes API
 	// 在Linux上读取/proc/[pid]/stat文件
-	// 这里实现跨平台的CPU监控
+	// TODO 跨平台的CPU监控
 
 	// 获取当前Goroutine数量作为CPU使用的一个指标
 	numGoroutines := runtime.NumGoroutine()
