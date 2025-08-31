@@ -442,8 +442,10 @@ func TestLayeredPositionManager_DetermineOptimalEntryExitPoints(t *testing.T) {
 			t.Errorf("Entry point %d (%f) should be below current price (%f) for LONG", i, entryPrice, currentPrice)
 		}
 
-		if i > 0 && entryPrice > entryPoints[i-1] {
-			t.Errorf("Entry points should be in ascending order for LONG, but point %d (%f) > point %d (%f)", i, entryPrice, i-1, entryPoints[i-1])
+		// For LONG strategy, entry points should be in descending order (higher to lower)
+		// This allows buying at progressively lower prices as the market falls
+		if i > 0 && entryPrice >= entryPoints[i-1] {
+			t.Errorf("Entry points should be in descending order for LONG, but point %d (%f) >= point %d (%f)", i, entryPrice, i-1, entryPoints[i-1])
 		}
 	}
 
