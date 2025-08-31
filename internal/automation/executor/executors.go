@@ -21,6 +21,29 @@ import (
 	"qcat/internal/security/protector"
 )
 
+// StrategyManagerInterface 定义策略管理器接口
+type StrategyManagerInterface interface {
+	SuspendNewPositions(ctx context.Context, duration time.Duration) error
+	ResumeNewPositions(ctx context.Context) error
+	GetActiveStrategies(ctx context.Context) ([]string, error)
+	NotifyParameterUpdate(ctx context.Context, strategyID string, params map[string]interface{}) error
+}
+
+// StrategyInstanceInterface 定义策略实例接口
+type StrategyInstanceInterface interface {
+	UpdateParameters(ctx context.Context, params map[string]interface{}) error
+	GetStatus(ctx context.Context) (string, error)
+	Stop(ctx context.Context) error
+	Start(ctx context.Context) error
+}
+
+// SchedulerInterface 定义调度器接口
+type SchedulerInterface interface {
+	StopStrategyTasks(ctx context.Context, strategyID string) error
+	StartStrategyTasks(ctx context.Context, strategyID string) error
+	GetTaskStatus(ctx context.Context, strategyID string) (map[string]string, error)
+}
+
 // absFloat returns the absolute value of a float64
 func absFloat(x float64) float64 {
 	return math.Abs(x)
@@ -708,8 +731,16 @@ func (re *RiskExecutor) suspendNewPositions(ctx context.Context, action *Executi
 
 	// 3. 通知所有策略执行器暂停新开仓
 	if re.strategyManager != nil {
-		// TODO: Implement strategy manager integration when available
-		log.Printf("Strategy manager integration not yet implemented")
+		// 实现策略管理器集成 - 暂停所有策略的新开仓
+		if manager, ok := re.strategyManager.(StrategyManagerInterface); ok {
+			if err := manager.SuspendNewPositions(ctx, duration); err != nil {
+				log.Printf("Failed to suspend new positions via strategy manager: %v", err)
+			} else {
+				log.Printf("Successfully suspended new positions for all strategies via strategy manager")
+			}
+		} else {
+			log.Printf("Strategy manager does not implement required interface")
+		}
 	}
 
 	// 4. 更新数据库状态
@@ -783,8 +814,16 @@ func (re *RiskExecutor) resumeNewPositions(ctx context.Context, reason string) e
 
 	// 通知所有策略执行器恢复新开仓
 	if re.strategyManager != nil {
-		// TODO: Implement strategy manager integration when available
-		log.Printf("Strategy manager integration not yet implemented for resumption")
+		// 实现策略管理器集成 - 恢复所有策略的新开仓
+		if manager, ok := re.strategyManager.(StrategyManagerInterface); ok {
+			if err := manager.ResumeNewPositions(ctx); err != nil {
+				log.Printf("Failed to resume new positions via strategy manager: %v", err)
+			} else {
+				log.Printf("Successfully resumed new positions for all strategies via strategy manager")
+			}
+		} else {
+			log.Printf("Strategy manager does not implement required interface")
+		}
 	}
 
 	// 更新数据库状态
@@ -1951,8 +1990,20 @@ func (se *StrategyExecutor) notifyParameterUpdate(ctx context.Context, strategyI
 
 	// 如果有策略实例的直接引用
 	if se.strategyInstances != nil {
-		// TODO: Implement strategy instance integration when available
-		log.Printf("Strategy instance integration not yet implemented for strategy %s", strategyID)
+		// 实现策略实例集成 - 直接更新策略实例参数
+		if instance, exists := se.strategyInstances[strategyID]; exists {
+			if strategyInstance, ok := instance.(StrategyInstanceInterface); ok {
+				if err := strategyInstance.UpdateParameters(ctx, newParameters); err != nil {
+					log.Printf("Failed to update parameters for strategy instance %s: %v", strategyID, err)
+				} else {
+					log.Printf("Successfully updated parameters for strategy instance %s", strategyID)
+				}
+			} else {
+				log.Printf("Strategy instance %s does not implement required interface", strategyID)
+			}
+		} else {
+			log.Printf("Strategy instance %s not found in instances map", strategyID)
+		}
 	}
 
 	// 通过事件系统通知
@@ -7878,8 +7929,16 @@ func (se *StrategyExecutor) liquidateStrategyPositions(ctx context.Context, stra
 func (se *StrategyExecutor) stopStrategyExecution(ctx context.Context, strategyID string) error {
 	// 停止策略的定时任务
 	if se.scheduler != nil {
-		// TODO: Implement scheduler integration when available
-		log.Printf("Scheduler integration not yet implemented for strategy %s", strategyID)
+		// 实现调度器集成 - 停止策略相关的所有定时任务
+		if scheduler, ok := se.scheduler.(SchedulerInterface); ok {
+			if err := scheduler.StopStrategyTasks(ctx, strategyID); err != nil {
+				log.Printf("Failed to stop scheduled tasks for strategy %s: %v", strategyID, err)
+			} else {
+				log.Printf("Successfully stopped all scheduled tasks for strategy %s", strategyID)
+			}
+		} else {
+			log.Printf("Scheduler does not implement required interface for strategy %s", strategyID)
+		}
 	}
 
 	// 停止策略的数据订阅
