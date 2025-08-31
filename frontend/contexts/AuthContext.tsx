@@ -124,15 +124,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             clearAuthData();
           }
         } else {
-          // Token还有效，从localStorage恢复用户信息
-          // 这里我们需要从token中解析用户信息，或者调用一个获取用户信息的接口
-          // 暂时先设置一个占位符，后续可以优化
-          const userInfo = {
-            id: 'temp-id',
-            username: 'temp-username',
-            role: 'user'
-          };
-          setUser(userInfo);
+          // Token还有效，调用API获取用户信息
+          try {
+            const userProfile = await apiClient.getUserProfile();
+            setUser({
+              id: userProfile.id,
+              username: userProfile.username,
+              role: userProfile.role
+            });
+          } catch (error) {
+            console.error('Failed to get user profile:', error);
+            // 如果获取用户信息失败，清除认证数据
+            clearAuthData();
+          }
         }
       } catch (error) {
         console.error('Auth initialization failed:', error);

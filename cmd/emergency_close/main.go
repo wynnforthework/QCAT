@@ -6,6 +6,7 @@ import (
 	"log"
 	"math"
 	"os"
+	"strings"
 	"time"
 
 	"qcat/internal/config"
@@ -184,9 +185,12 @@ func (ec *EmergencyCloser) closePosition(ctx context.Context, position *exchange
 		side = "BUY"
 	}
 
+	// Normalize symbol to ensure it's in the correct format for the exchange
+	normalizedSymbol := normalizeSymbol(position.Symbol)
+
 	// Create market order to close position
 	orderReq := &exchange.OrderRequest{
-		Symbol:     position.Symbol,
+		Symbol:     normalizedSymbol,
 		Side:       side,
 		Type:       "MARKET",
 		Quantity:   closeQuantity,
@@ -265,4 +269,37 @@ func main() {
 	}
 
 	log.Println("Emergency closure completed successfully!")
+}
+
+// normalizeSymbol 标准化交易对符号，将各种格式转换为Binance API接受的格式
+func normalizeSymbol(symbol string) string {
+	// 移除常见的分隔符和后缀
+	normalized := strings.ToUpper(symbol)
+
+	// 处理格式如 "ETH/USDT:USDT" -> "ETHUSDT"
+	if strings.Contains(normalized, "/") {
+		parts := strings.Split(normalized, "/")
+		if len(parts) >= 2 {
+			base := parts[0]
+			quote := parts[1]
+			// 移除冒号后的部分，如 "USDT:USDT" -> "USDT"
+			if strings.Contains(quote, ":") {
+				quote = strings.Split(quote, ":")[0]
+			}
+			normalized = base + quote
+		}
+	}
+
+	// 处理格式如 "ETH-USDT" -> "ETHUSDT"
+	normalized = strings.ReplaceAll(normalized, "-", "")
+
+	// 处理格式如 "ETH_USDT" -> "ETHUSDT"
+	normalized = strings.ReplaceAll(normalized, "_", "")
+
+	// 移除其他特殊字符
+	normalized = strings.ReplaceAll(normalized, ":", "")
+	normalized = strings.ReplaceAll(normalized, ".", "")
+
+	log.Printf("Symbol normalized: %s -> %s", symbol, normalized)
+	return normalized
 }

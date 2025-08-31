@@ -2451,6 +2451,85 @@ type DashboardHandler struct {
 	accountManager *account.Manager
 }
 
+// checkDatabaseHealth performs a comprehensive health check on the database connection
+// Returns nil if healthy, error if there are connectivity issues
+func (h *DashboardHandler) checkDatabaseHealth() error {
+	if h.db == nil || h.db.DB == nil {
+		return fmt.Errorf("database connection is not initialized - this indicates a critical system error")
+	}
+
+	// Test connectivity with a reasonable timeout
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// First try a simple ping
+	if err := h.db.PingContext(ctx); err != nil {
+		// Log connection pool stats for debugging
+		stats := h.db.Stats()
+		log.Printf("Database connection pool stats: Open=%d, InUse=%d, Idle=%d",
+			stats.OpenConnections, stats.InUse, stats.Idle)
+
+		return fmt.Errorf("database ping failed: %w", err)
+	}
+
+	// Optionally test with a simple query to ensure the database is actually responsive
+	var result int
+	if err := h.db.QueryRowContext(ctx, "SELECT 1").Scan(&result); err != nil {
+		return fmt.Errorf("database query test failed: %w", err)
+	}
+
+	return nil
+}
+
+// getDatabaseHealthStatus returns detailed database health information
+func (h *DashboardHandler) getDatabaseHealthStatus() map[string]interface{} {
+	if h.db == nil || h.db.DB == nil {
+		return map[string]interface{}{
+			"status": "critical",
+			"error":  "Database connection not initialized",
+		}
+	}
+
+	stats := h.db.Stats()
+	healthInfo := map[string]interface{}{
+		"status":              "healthy",
+		"open_connections":    stats.OpenConnections,
+		"in_use":              stats.InUse,
+		"idle":                stats.Idle,
+		"wait_count":          stats.WaitCount,
+		"wait_duration":       stats.WaitDuration.String(),
+		"max_idle_closed":     stats.MaxIdleClosed,
+		"max_lifetime_closed": stats.MaxLifetimeClosed,
+	}
+
+	// Test connectivity
+	if err := h.checkDatabaseHealth(); err != nil {
+		healthInfo["status"] = "degraded"
+		healthInfo["error"] = err.Error()
+	}
+
+	return healthInfo
+}
+
+// executeWithFallback executes a database operation with fallback handling
+// If the database is temporarily unavailable, it returns fallback data instead of failing
+func (h *DashboardHandler) executeWithFallback(operation func() (interface{}, error), fallbackData interface{}, operationName string) interface{} {
+	// Check database health first
+	if err := h.checkDatabaseHealth(); err != nil {
+		log.Printf("Database health check failed for %s: %v - using fallback data", operationName, err)
+		return fallbackData
+	}
+
+	// Try to execute the operation
+	result, err := operation()
+	if err != nil {
+		log.Printf("Database operation %s failed: %v - using fallback data", operationName, err)
+		return fallbackData
+	}
+
+	return result
+}
+
 // MarketHandler handles market data requests
 type MarketHandler struct {
 	db      *database.DB
@@ -2511,14 +2590,41 @@ func (h *DashboardHandler) GetDashboardData(c *gin.Context) {
 		"performance": performanceData,
 	}
 
-	// 记录指标
-	h.metrics.IncrementCounter("dashboard_requests", map[string]string{
-		"endpoint": "dashboard",
-	})
+	// 记录指标 (only if metrics collector is available)
+	if h.metrics != nil {
+		h.metrics.IncrementCounter("dashboard_requests", map[string]string{
+			"endpoint": "dashboard",
+		})
+	}
 
 	c.JSON(http.StatusOK, Response{
 		Success: true,
 		Data:    dashboardData,
+	})
+}
+
+// GetDatabaseHealth returns database health status
+func (h *DashboardHandler) GetDatabaseHealth(c *gin.Context) {
+	healthStatus := h.getDatabaseHealthStatus()
+
+	// Record metrics if available
+	if h.metrics != nil {
+		h.metrics.IncrementCounter("database_health_checks", map[string]string{
+			"status": healthStatus["status"].(string),
+		})
+	}
+
+	// Return appropriate HTTP status based on health
+	status := http.StatusOK
+	if healthStatus["status"] == "critical" {
+		status = http.StatusServiceUnavailable
+	} else if healthStatus["status"] == "degraded" {
+		status = http.StatusPartialContent
+	}
+
+	c.JSON(status, Response{
+		Success: healthStatus["status"] != "critical",
+		Data:    healthStatus,
 	})
 }
 
@@ -2816,17 +2922,143 @@ func (h *DashboardHandler) getAccountData() map[string]interface{} {
 		pnlPercent = (totalUnrealizedPnL / totalEquity) * 100
 	}
 
+	// Calculate current and max drawdown
+	currentDrawdown := h.calculateCurrentDrawdown(totalEquity)
+	maxDrawdown := h.calculateMaxDrawdown()
+
 	return map[string]interface{}{
 		"equity":      totalEquity,
 		"pnl":         totalUnrealizedPnL,
 		"pnlPercent":  pnlPercent,
-		"drawdown":    0.0, // TODO: Implement calculateCurrentDrawdown
-		"maxDrawdown": 0.0, // TODO: Implement calculateMaxDrawdown
+		"drawdown":    currentDrawdown,
+		"maxDrawdown": maxDrawdown,
 	}
+}
+
+// calculateCurrentDrawdown calculates the current drawdown based on current equity
+func (h *DashboardHandler) calculateCurrentDrawdown(currentEquity float64) float64 {
+	if currentEquity <= 0 {
+		return 0.0
+	}
+
+	ctx := context.Background()
+
+	// Get the peak equity from recent history (last 30 days)
+	query := `
+		SELECT MAX(total_equity) as peak_equity
+		FROM account_equity_history
+		WHERE created_at >= NOW() - INTERVAL '30 days'
+	`
+
+	var peakEquity sql.NullFloat64
+	err := h.db.QueryRowContext(ctx, query).Scan(&peakEquity)
+	if err != nil || !peakEquity.Valid {
+		// If no historical data, try to get from historical_equity table
+		query = `
+			SELECT MAX(equity_value) as peak_equity
+			FROM historical_equity
+			WHERE timestamp >= NOW() - INTERVAL '30 days'
+		`
+		err = h.db.QueryRowContext(ctx, query).Scan(&peakEquity)
+		if err != nil || !peakEquity.Valid {
+			// No historical data available, assume current equity is the peak
+			return 0.0
+		}
+	}
+
+	peak := peakEquity.Float64
+	if peak <= 0 || currentEquity >= peak {
+		return 0.0
+	}
+
+	// Calculate drawdown as percentage
+	drawdown := (peak - currentEquity) / peak
+	return drawdown
+}
+
+// calculateMaxDrawdown calculates the maximum drawdown from historical equity data
+func (h *DashboardHandler) calculateMaxDrawdown() float64 {
+	ctx := context.Background()
+
+	// Try to get equity history from account_equity_history table first
+	query := `
+		SELECT total_equity, created_at
+		FROM account_equity_history
+		WHERE created_at >= NOW() - INTERVAL '90 days'
+		ORDER BY created_at ASC
+	`
+
+	rows, err := h.db.QueryContext(ctx, query)
+	if err != nil {
+		// Fallback to historical_equity table
+		query = `
+			SELECT equity_value as total_equity, timestamp as created_at
+			FROM historical_equity
+			WHERE timestamp >= NOW() - INTERVAL '90 days'
+			ORDER BY timestamp ASC
+		`
+		rows, err = h.db.QueryContext(ctx, query)
+		if err != nil {
+			log.Printf("Failed to get equity history for drawdown calculation: %v", err)
+			return 0.0
+		}
+	}
+	defer rows.Close()
+
+	var equityValues []float64
+	for rows.Next() {
+		var equity float64
+		var timestamp time.Time
+		if err := rows.Scan(&equity, &timestamp); err != nil {
+			continue
+		}
+		equityValues = append(equityValues, equity)
+	}
+
+	if len(equityValues) < 2 {
+		return 0.0
+	}
+
+	// Calculate maximum drawdown
+	maxDrawdown := 0.0
+	peak := equityValues[0]
+
+	for _, equity := range equityValues {
+		// Update peak if current equity is higher
+		if equity > peak {
+			peak = equity
+		}
+
+		// Calculate current drawdown
+		if peak > 0 {
+			drawdown := (peak - equity) / peak
+			if drawdown > maxDrawdown {
+				maxDrawdown = drawdown
+			}
+		}
+	}
+
+	return maxDrawdown
 }
 
 // getStrategyStatistics retrieves strategy statistics
 func (h *DashboardHandler) getStrategyStatistics() map[string]interface{} {
+	// Check database health
+	if err := h.checkDatabaseHealth(); err != nil {
+		log.Printf("Database health check failed for strategy statistics: %v", err)
+		// 返回基本的错误信息，但不完全阻止功能
+		return map[string]interface{}{
+			"total":    0,
+			"running":  0,
+			"stopped":  0,
+			"error":    0,
+			"enabled":  0,
+			"disabled": 0,
+			"message":  "Database connectivity issue - using fallback data",
+			"db_error": err.Error(),
+		}
+	}
+
 	ctx := context.Background()
 
 	// 首先检查strategies表是否存在数据
@@ -2980,6 +3212,26 @@ func (h *DashboardHandler) createSampleStrategies(ctx context.Context) error {
 
 // getRiskData retrieves risk management data
 func (h *DashboardHandler) getRiskData() map[string]interface{} {
+	// Check database health
+	if err := h.checkDatabaseHealth(); err != nil {
+		log.Printf("Database health check failed for risk data: %v - using safe fallback values", err)
+		// 返回安全的默认风险值
+		return map[string]interface{}{
+			"level":      "unknown",
+			"exposure":   0.0,
+			"limit":      100000.00,
+			"violations": 0,
+			"metrics": map[string]interface{}{
+				"risk_score": 0.0,
+				"var_95":     0.0,
+				"drawdown":   0.0,
+				"leverage":   0.0,
+			},
+			"message":  "Using safe fallback values due to database connectivity issue",
+			"db_error": err.Error(),
+		}
+	}
+
 	ctx := context.Background()
 
 	// 查询风险指标数据
@@ -2987,10 +3239,10 @@ func (h *DashboardHandler) getRiskData() map[string]interface{} {
 		SELECT
 			COALESCE(AVG(risk_score), 0) as avg_risk_score,
 			COALESCE(AVG(var_95), 0) as avg_var,
-			COALESCE(AVG(max_drawdown), 0) as avg_drawdown,
+			COALESCE(AVG(drawdown), 0) as avg_drawdown,
 			COALESCE(AVG(leverage), 0) as avg_leverage,
 			COUNT(*) as total_positions
-		FROM risk_metrics
+		FROM risk_snapshots
 		WHERE created_at >= NOW() - INTERVAL '1 hour'
 	`
 
@@ -3015,11 +3267,11 @@ func (h *DashboardHandler) getRiskData() map[string]interface{} {
 	}
 
 	// 计算风险等级
-	riskLevel := "低风险"
+	riskLevel := "low"
 	if err != nil || totalPositions == 0 {
 		// 如果查询失败或没有数据，返回默认值
-		return map[string]interface{}{
-			"level":      "未知",
+		result := map[string]interface{}{
+			"level":      "unknown",
 			"exposure":   0.0,
 			"limit":      100000.00,
 			"violations": violations,
@@ -3029,20 +3281,28 @@ func (h *DashboardHandler) getRiskData() map[string]interface{} {
 				"drawdown":   0.0,
 				"leverage":   0.0,
 			},
-			"db_error": err.Error(),
 		}
+
+		// Only add db_error if err is not nil
+		if err != nil {
+			result["db_error"] = err.Error()
+		} else {
+			result["message"] = "No risk data available"
+		}
+
+		return result
 	}
 
 	// 根据风险分数确定风险等级
 	switch {
 	case avgRiskScore < 0.2:
-		riskLevel = "低风险"
+		riskLevel = "low"
 	case avgRiskScore < 0.4:
-		riskLevel = "中风险"
+		riskLevel = "medium"
 	case avgRiskScore < 0.7:
-		riskLevel = "高风险"
+		riskLevel = "high"
 	default:
-		riskLevel = "极高风险"
+		riskLevel = "critical"
 	}
 
 	// 计算风险暴露（基于VaR）
@@ -3066,6 +3326,22 @@ func (h *DashboardHandler) getRiskData() map[string]interface{} {
 
 // getPerformanceData retrieves performance metrics
 func (h *DashboardHandler) getPerformanceData() map[string]interface{} {
+	// Check database health
+	if err := h.checkDatabaseHealth(); err != nil {
+		log.Printf("Database health check failed for performance data: %v - using neutral fallback values", err)
+		return map[string]interface{}{
+			"sharpe":      0.0,
+			"sortino":     0.0,
+			"calmar":      0.0,
+			"winRate":     0.0,
+			"totalReturn": 0.0,
+			"maxDrawdown": 0.0,
+			"volatility":  0.0,
+			"message":     "Using neutral fallback values due to database connectivity issue",
+			"db_error":    err.Error(),
+		}
+	}
+
 	ctx := context.Background()
 
 	// 查询策略性能指标
@@ -3079,9 +3355,8 @@ func (h *DashboardHandler) getPerformanceData() map[string]interface{} {
 			COALESCE(AVG(max_drawdown), 0) as avg_drawdown,
 			COALESCE(AVG(volatility), 0) as avg_volatility,
 			COUNT(*) as strategy_count
-		FROM strategy_performance
+		FROM strategy_metrics
 		WHERE updated_at >= NOW() - INTERVAL '24 hours'
-		AND status = 'active'
 	`
 
 	var avgSharpe, avgSortino, avgCalmar, avgWinRate float64
@@ -4977,17 +5252,17 @@ func (h *AutoStartHandler) GetAutoStartStrategies(c *gin.Context) {
 	var strategies []map[string]interface{}
 	for rows.Next() {
 		var strategy struct {
-			ID              string         `json:"id"`
-			Name            string         `json:"name"`
-			Type            string         `json:"type"`
-			Status          string         `json:"status"`
-			Enabled         bool           `json:"enabled"`
-			AutoStart       bool           `json:"auto_start"`
-			StartupPriority int            `json:"startup_priority"`
-			LastAutoStart   sql.NullTime   `json:"last_auto_start"`
-			IsRunning       bool           `json:"is_running"`
-			CreatedAt       time.Time      `json:"created_at"`
-			UpdatedAt       time.Time      `json:"updated_at"`
+			ID              string       `json:"id"`
+			Name            string       `json:"name"`
+			Type            string       `json:"type"`
+			Status          string       `json:"status"`
+			Enabled         bool         `json:"enabled"`
+			AutoStart       bool         `json:"auto_start"`
+			StartupPriority int          `json:"startup_priority"`
+			LastAutoStart   sql.NullTime `json:"last_auto_start"`
+			IsRunning       bool         `json:"is_running"`
+			CreatedAt       time.Time    `json:"created_at"`
+			UpdatedAt       time.Time    `json:"updated_at"`
 		}
 
 		err := rows.Scan(

@@ -642,8 +642,12 @@ func (s *Server) setupRoutes() {
 		protected := v1.Group("")
 		protected.Use(s.jwtManager.AuthMiddleware())
 		{
+			// Auth profile route (protected)
+			protected.GET("/auth/profile", s.handlers.Auth.GetProfile)
+
 			// Dashboard routes (now protected)
 			protected.GET("/dashboard", s.handlers.Dashboard.GetDashboardData)
+			protected.GET("/dashboard/db-health", s.handlers.Dashboard.GetDatabaseHealth)
 
 			// Market data routes (now protected)
 			protected.GET("/market/data", s.handlers.Market.GetMarketData)
@@ -656,10 +660,22 @@ func (s *Server) setupRoutes() {
 			// System metrics (now protected)
 			protected.GET("/metrics/system", s.handlers.Metrics.GetSystemMetrics)
 
-			// Strategy routes (all protected) - only modification routes
+			// Strategy routes (all protected) - both read and modification routes
 			strategy := protected.Group("/strategy")
 			{
-				// Keep original routes for backward compatibility
+				// Read routes
+				strategy.GET("", s.handlers.Strategy.ListStrategies)
+				strategy.GET("/:id", s.handlers.Strategy.GetStrategy)
+
+				// Pool overview routes
+				if s.handlers.UnifiedStrategy != nil {
+					strategy.GET("/pool/overview", s.handlers.UnifiedStrategy.GetPoolOverview)
+					strategy.GET("/execution/overview", s.handlers.UnifiedStrategy.GetExecutionOverview)
+					strategy.GET("/execution/realtime", s.handlers.UnifiedStrategy.GetRealtimeStatus)
+					strategy.GET("/workflow/status", s.handlers.UnifiedStrategy.GetWorkflowStatus)
+				}
+
+				// Modification routes
 				strategy.POST("/", s.handlers.Strategy.CreateStrategy)
 				strategy.PUT("/:id", s.handlers.Strategy.UpdateStrategy)
 				strategy.DELETE("/:id", s.handlers.Strategy.DeleteStrategy)
@@ -824,18 +840,7 @@ func (s *Server) setupRoutes() {
 				audit.GET("/logs", s.handlers.Audit.GetLogs)
 			}
 
-			// Unified Strategy routes (moved back to protected for security)
-			if s.handlers.UnifiedStrategy != nil {
-				unifiedStrategy := protected.Group("/strategy")
-				{
-					unifiedStrategy.GET("", s.handlers.UnifiedStrategy.ListStrategies)
-					unifiedStrategy.GET("/:id", s.handlers.UnifiedStrategy.GetStrategy)
-					unifiedStrategy.GET("/pool/overview", s.handlers.UnifiedStrategy.GetPoolOverview)
-					unifiedStrategy.GET("/execution/overview", s.handlers.UnifiedStrategy.GetExecutionOverview)
-					unifiedStrategy.GET("/execution/realtime", s.handlers.UnifiedStrategy.GetRealtimeStatus)
-					unifiedStrategy.GET("/workflow/status", s.handlers.UnifiedStrategy.GetWorkflowStatus)
-				}
-			}
+			// Note: Unified Strategy routes are now integrated into the main strategy group above
 
 			audit1 := protected.Group("/audit")
 			{

@@ -12,8 +12,6 @@
 
 ## ./internal\api\handlers.go
 - Line 54: **mock** → `// Create a mock orchestrator when database is not available`
-- Line 2823: **TODO** → `"drawdown":    0.0, // TODO: Implement calculateCurrentDrawdown`
-- Line 2824: **TODO** → `"maxDrawdown": 0.0, // TODO: Implement calculateMaxDrawdown`
 
 ## ./internal\automation\executor\executors.go
 - Line 711: **TODO** → `// TODO: Implement strategy manager integration when available`

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -423,7 +424,9 @@ func (esm *EmergencyStopManager) cancelOrdersViaExchange(ctx context.Context, st
 			log.Printf("扫描交易对失败: %v", err)
 			continue
 		}
-		symbols = append(symbols, symbol)
+		// 标准化交易对符号
+		normalizedSymbol := esm.normalizeSymbol(symbol)
+		symbols = append(symbols, normalizedSymbol)
 	}
 
 	// 为每个交易对取消所有订单
@@ -473,4 +476,37 @@ func (esm *EmergencyStopManager) GetEmergencyStopStatus() map[string]interface{}
 	}
 
 	return status
+}
+
+// normalizeSymbol 标准化交易对符号，将各种格式转换为Binance API接受的格式
+func (esm *EmergencyStopManager) normalizeSymbol(symbol string) string {
+	// 移除常见的分隔符和后缀
+	normalized := strings.ToUpper(symbol)
+
+	// 处理格式如 "ETH/USDT:USDT" -> "ETHUSDT"
+	if strings.Contains(normalized, "/") {
+		parts := strings.Split(normalized, "/")
+		if len(parts) >= 2 {
+			base := parts[0]
+			quote := parts[1]
+			// 移除冒号后的部分，如 "USDT:USDT" -> "USDT"
+			if strings.Contains(quote, ":") {
+				quote = strings.Split(quote, ":")[0]
+			}
+			normalized = base + quote
+		}
+	}
+
+	// 处理格式如 "ETH-USDT" -> "ETHUSDT"
+	normalized = strings.ReplaceAll(normalized, "-", "")
+
+	// 处理格式如 "ETH_USDT" -> "ETHUSDT"
+	normalized = strings.ReplaceAll(normalized, "_", "")
+
+	// 移除其他特殊字符
+	normalized = strings.ReplaceAll(normalized, ":", "")
+	normalized = strings.ReplaceAll(normalized, ".", "")
+
+	log.Printf("Symbol normalized: %s -> %s", symbol, normalized)
+	return normalized
 }

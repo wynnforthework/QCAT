@@ -201,6 +201,10 @@ class ApiClient {
     }, true); // 跳过认证检查
   }
 
+  async getUserProfile(): Promise<{ id: string; username: string; role: string }> {
+    return this.request<{ id: string; username: string; role: string }>('/api/v1/auth/profile');
+  }
+
   // Dashboard API
   async getDashboardData(): Promise<DashboardData> {
     try {
