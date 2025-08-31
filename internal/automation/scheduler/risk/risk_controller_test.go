@@ -33,8 +33,8 @@ func TestRiskController_TriggerPositionReduction(t *testing.T) {
 	originalPositions := make([]shared.Position, len(testRC.testDB.positions))
 	copy(originalPositions, testRC.testDB.positions)
 
-	// Call the test implementation
-	action, err := testRC.triggerPositionReductionMocked(ctx, marginStatus, 0.3)
+	// Call the real implementation instead of mock
+	action, err := testRC.TriggerPositionReduction(ctx, marginStatus, 0.3)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, action)
@@ -54,7 +54,7 @@ func TestRiskController_TriggerEmergencyStop(t *testing.T) {
 	ctx := context.Background()
 	reason := "Critical margin ratio exceeded"
 
-	action, err := testRC.triggerEmergencyStopMocked(ctx, reason)
+	action, err := testRC.TriggerEmergencyStop(ctx, reason)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, action)
@@ -79,7 +79,7 @@ func TestRiskController_TriggerLeverageReduction(t *testing.T) {
 	ctx := context.Background()
 	targetLeverage := 5.0
 
-	action, err := testRC.triggerLeverageReductionMocked(ctx, targetLeverage)
+	action, err := testRC.TriggerLeverageReduction(ctx, targetLeverage)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, action)
@@ -200,7 +200,7 @@ func TestRiskController_EmergencyMode(t *testing.T) {
 	// Trigger emergency stop to activate emergency mode
 	ctx := context.Background()
 
-	_, err := testRC.triggerEmergencyStopMocked(ctx, "Test emergency")
+	_, err := testRC.TriggerEmergencyStop(ctx, "Test emergency")
 	assert.NoError(t, err)
 
 	// Should now be in emergency mode
