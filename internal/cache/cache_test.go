@@ -5,14 +5,9 @@ import (
 	"fmt"
 	"testing"
 	"time"
-
-	"qcat/internal/testutils"
 )
 
 func TestMemoryCache(t *testing.T) {
-	suite := testutils.NewTestSuite(t, nil)
-	defer suite.TearDown()
-
 	cache := NewMemoryCache(100)
 	ctx := context.Background()
 
@@ -25,7 +20,8 @@ func TestMemoryCache(t *testing.T) {
 		}
 
 		// Get
-		value, err := cache.Get(ctx, "key1")
+		var value string
+		err = cache.Get(ctx, "key1", &value)
 		if err != nil {
 			t.Errorf("Get failed: %v", err)
 		}
@@ -49,7 +45,8 @@ func TestMemoryCache(t *testing.T) {
 		}
 
 		// Get after delete
-		_, err = cache.Get(ctx, "key1")
+		var deletedValue string
+		err = cache.Get(ctx, "key1", &deletedValue)
 		if err == nil {
 			t.Error("Expected error for non-existent key")
 		}
@@ -63,7 +60,8 @@ func TestMemoryCache(t *testing.T) {
 		}
 
 		// 立即获取应该成功
-		value, err := cache.Get(ctx, "expire_key")
+		var value string
+		err = cache.Get(ctx, "expire_key", &value)
 		if err != nil {
 			t.Errorf("Get failed: %v", err)
 		}
@@ -75,7 +73,8 @@ func TestMemoryCache(t *testing.T) {
 		time.Sleep(150 * time.Millisecond)
 
 		// 过期后获取应该失败
-		_, err = cache.Get(ctx, "expire_key")
+		var expiredValue string
+		err = cache.Get(ctx, "expire_key", &expiredValue)
 		if err == nil {
 			t.Error("Expected error for expired key")
 		}
@@ -91,18 +90,21 @@ func TestMemoryCache(t *testing.T) {
 		smallCache.Set(ctx, "k3", "v3", time.Minute)
 
 		// k1应该被淘汰
-		_, err := smallCache.Get(ctx, "k1")
+		var v1 string
+		err := smallCache.Get(ctx, "k1", &v1)
 		if err == nil {
 			t.Error("k1 should have been evicted")
 		}
 
 		// k2和k3应该存在
-		_, err = smallCache.Get(ctx, "k2")
+		var v2 string
+		err = smallCache.Get(ctx, "k2", &v2)
 		if err != nil {
 			t.Error("k2 should exist")
 		}
 
-		_, err = smallCache.Get(ctx, "k3")
+		var v3 string
+		err = smallCache.Get(ctx, "k3", &v3)
 		if err != nil {
 			t.Error("k3 should exist")
 		}
@@ -110,28 +112,36 @@ func TestMemoryCache(t *testing.T) {
 }
 
 func TestCacheAdapter(t *testing.T) {
-	suite := testutils.NewTestSuite(t, nil)
-	defer suite.TearDown()
-
-	// 创建缓存管理器
+	// 创建缓存管理器 - 使用CreateCache而不是CreateMemoryOnlyCache
 	factory := NewCacheFactory(&CacheFactoryConfig{
 		RedisEnabled:  false,
 		MemoryEnabled: true,
 		MemoryMaxSize: 100,
 	})
 
-	manager := factory.CreateMemoryOnlyCache()
-	adapter := NewCacheAdapter(manager.(*CacheManager))
+	manager, err := factory.CreateCache(nil)
+	if err != nil {
+		t.Fatalf("Failed to create cache manager: %v", err)
+	}
+
+	// 类型断言为*CacheManager
+	cacheManager, ok := manager.(*CacheManager)
+	if !ok {
+		t.Fatalf("Expected *CacheManager, got %T", manager)
+	}
+
+	adapter := NewCacheAdapter(cacheManager)
 
 	ctx := context.Background()
 
 	// 测试适配器功能
-	err := adapter.Set(ctx, "test_key", "test_value", time.Minute)
+	err = adapter.Set(ctx, "test_key", "test_value", time.Minute)
 	if err != nil {
 		t.Errorf("Set failed: %v", err)
 	}
 
-	value, err := adapter.Get(ctx, "test_key")
+	var value string
+	err = adapter.Get(ctx, "test_key", &value)
 	if err != nil {
 		t.Errorf("Get failed: %v", err)
 	}
@@ -142,9 +152,6 @@ func TestCacheAdapter(t *testing.T) {
 }
 
 func TestCacheFallback(t *testing.T) {
-	suite := testutils.NewTestSuite(t, nil)
-	defer suite.TearDown()
-
 	// 创建带降级的缓存管理器
 	factory := NewCacheFactory(&CacheFactoryConfig{
 		RedisEnabled:    true,
@@ -168,7 +175,8 @@ func TestCacheFallback(t *testing.T) {
 		t.Errorf("Set with fallback failed: %v", err)
 	}
 
-	value, err := manager.Get(ctx, "fallback_key")
+	var value string
+	err = manager.Get(ctx, "fallback_key", &value)
 	if err != nil {
 		t.Errorf("Get with fallback failed: %v", err)
 	}
@@ -179,26 +187,22 @@ func TestCacheFallback(t *testing.T) {
 }
 
 func BenchmarkMemoryCache(b *testing.B) {
-	config := &testutils.TestConfig{
-		UseRealCache: false,
-		LogLevel:     testutils.LogLevel("error"),
-	}
+	cache := NewMemoryCache(10000)
+	ctx := context.Background()
 
-	testutils.RunBenchmark(b, "MemoryCache_Set_Get", config, func(b *testing.B, suite *testutils.BenchmarkSuite) {
-		cache := NewMemoryCache(10000)
-		ctx := context.Background()
+	b.RunParallel(func(pb *testing.PB) {
+		i := 0
+		for pb.Next() {
+			key := fmt.Sprintf("test_key_%d", i)
+			value := fmt.Sprintf("test_value_%d", i)
 
-		b.RunParallel(func(pb *testing.PB) {
-			for pb.Next() {
-				key := fmt.Sprintf("test_key_%d", b.N)
-				value := fmt.Sprintf("test_value_%d", b.N)
+			// Set
+			cache.Set(ctx, key, value, time.Minute)
 
-				// Set
-				cache.Set(ctx, key, value, time.Minute)
-
-				// Get
-				cache.Get(ctx, key)
-			}
-		})
+			// Get
+			var result string
+			cache.Get(ctx, key, &result)
+			i++
+		}
 	})
 }
