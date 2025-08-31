@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -44,13 +45,13 @@ func TestRegisterHandler(t *testing.T) {
 	scheduler := NewScheduler()
 	require.NotNil(t, scheduler)
 
-	// Create mock handler
-	mockHandler := &MockTaskHandler{
+	// Create test task handler that implements TaskHandler interface
+	testHandler := &MockTaskHandler{
 		name: "test-handler",
 	}
 
 	// Test register handler
-	scheduler.RegisterHandler(TaskTypeMarketHealth, mockHandler)
+	scheduler.RegisterHandler(TaskTypeMarketHealth, testHandler)
 
 	// Verify handler was registered
 	scheduler.mu.RLock()
@@ -58,7 +59,7 @@ func TestRegisterHandler(t *testing.T) {
 	scheduler.mu.RUnlock()
 
 	assert.True(t, exists)
-	assert.Equal(t, mockHandler, handler)
+	assert.Equal(t, testHandler, handler)
 }
 
 // TestAddTask tests adding scheduled tasks
@@ -236,7 +237,6 @@ func TestTaskExecution(t *testing.T) {
 
 	// Verify handler was called
 	assert.True(t, mockHandler.executeCalled)
-	assert.Equal(t, task, mockHandler.lastTask)
 }
 
 // TestTaskStatus tests task status management
@@ -306,12 +306,12 @@ type MockTaskHandler struct {
 	mu            sync.Mutex
 }
 
-func (m *MockTaskHandler) Execute(ctx context.Context, task *Task) error {
+func (m *MockTaskHandler) Handle(ctx context.Context) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.executeCalled = true
-	m.lastTask = task
+	// m.lastTask = task // 在 Handle 方法中没有 task 参数
 	return m.executeError
 }
 
@@ -322,7 +322,7 @@ func (m *MockTaskHandler) GetName() string {
 func (m *MockTaskHandler) Reset() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	
+
 	m.executeCalled = false
 	m.lastTask = nil
 	m.executeError = nil
