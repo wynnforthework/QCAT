@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// MockWalletService 模拟钱包服务（用于测试）
+// MockWalletService 测试用钱包服务，实现完整的 WalletService 接口
 type MockWalletService struct {
 	transfers   map[string]*TransferStatus
 	shouldFail  bool

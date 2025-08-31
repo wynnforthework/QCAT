@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// MockExchangeProvider 模拟交易所数据提供者（用于测试）
+// MockExchangeProvider 测试用交易所数据提供者，实现完整的 ExchangeDataProvider 接口
 type MockExchangeProvider struct {
 	fundData  *ExchangeFundData
 	positions []*Position
@@ -27,16 +27,16 @@ func NewMockExchangeProvider() *MockExchangeProvider {
 		},
 		positions: []*Position{
 			{
-				Symbol:            "BTCUSDT",
-				Side:              "LONG",
-				Size:              1.5,
-				Notional:          75000.0,
-				EntryPrice:        48000.0,
-				MarkPrice:         50000.0,
-				UnrealizedPnL:     3000.0,
-				Leverage:          10,
-				MarginType:        "CROSS",
-				LiquidationPrice:  45000.0,
+				Symbol:           "BTCUSDT",
+				Side:             "LONG",
+				Size:             1.5,
+				Notional:         75000.0,
+				EntryPrice:       48000.0,
+				MarkPrice:        50000.0,
+				UnrealizedPnL:    3000.0,
+				Leverage:         10,
+				MarginType:       "CROSS",
+				LiquidationPrice: 45000.0,
 			},
 		},
 		healthy: true,
@@ -69,7 +69,7 @@ func (m *MockExchangeProvider) GetHistoricalReturns(ctx context.Context, days in
 	if !m.healthy {
 		return nil, fmt.Errorf("exchange is not healthy")
 	}
-	
+
 	// 生成模拟的历史收益率数据
 	returns := make([]float64, days)
 	for i := 0; i < days; i++ {
@@ -84,11 +84,11 @@ func (m *MockExchangeProvider) GetHistoricalEquity(ctx context.Context, days int
 	if !m.healthy {
 		return nil, fmt.Errorf("exchange is not healthy")
 	}
-	
+
 	// 生成模拟的历史净值数据
 	equity := make([]float64, days)
 	baseValue := 100000.0
-	
+
 	for i := 0; i < days; i++ {
 		// 简单的增长模型
 		growth := 1.0 + float64(i)*0.001 // 每天0.1%增长
@@ -102,18 +102,18 @@ func (m *MockExchangeProvider) GetSymbolPrice(ctx context.Context, symbol string
 	if !m.healthy {
 		return 0, fmt.Errorf("exchange is not healthy")
 	}
-	
+
 	// 返回模拟价格
 	prices := map[string]float64{
 		"BTCUSDT": 50000.0,
 		"ETHUSDT": 3000.0,
 		"BNBUSDT": 400.0,
 	}
-	
+
 	if price, exists := prices[symbol]; exists {
 		return price, nil
 	}
-	
+
 	return 0, fmt.Errorf("symbol %s not found", symbol)
 }
 
@@ -122,12 +122,12 @@ func (m *MockExchangeProvider) GetOrderBookDepth(ctx context.Context, symbol str
 	if !m.healthy {
 		return nil, fmt.Errorf("exchange is not healthy")
 	}
-	
+
 	price, err := m.GetSymbolPrice(ctx, symbol)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return &OrderBookDepth{
 		Symbol: symbol,
 		Bids: []PriceSize{
@@ -147,7 +147,7 @@ func (m *MockExchangeProvider) GetTradingVolume(ctx context.Context, symbol stri
 	if !m.healthy {
 		return 0, fmt.Errorf("exchange is not healthy")
 	}
-	
+
 	// 返回模拟交易量
 	return 1000000.0, nil
 }

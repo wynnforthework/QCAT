@@ -8,13 +8,13 @@ import (
 	"time"
 )
 
-// MockNotificationService 模拟通知服务（用于测试）
+// MockNotificationService 测试用通知服务，实现完整的 NotificationService 接口
 type MockNotificationService struct {
-	emailsSent    []EmailRecord
-	smsSent       []SMSRecord
-	webhooksSent  []WebhookRecord
-	slackSent     []SlackRecord
-	shouldFail    bool
+	emailsSent   []EmailRecord
+	smsSent      []SMSRecord
+	webhooksSent []WebhookRecord
+	slackSent    []SlackRecord
+	shouldFail   bool
 }
 
 // EmailRecord 邮件记录
