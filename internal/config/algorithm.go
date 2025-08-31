@@ -11,18 +11,18 @@ import (
 
 // AlgorithmConfig represents algorithm configuration
 type AlgorithmConfig struct {
-	Optimizer     OptimizerConfig     `yaml:"optimizer"`
-	Elimination   EliminationConfig   `yaml:"elimination"`
-	RiskMgmt      RiskManagementConfig `yaml:"risk_management"`
-	Overfitting   OverfittingConfig   `yaml:"overfitting"`
-	Performance   PerformanceConfig   `yaml:"performance"`
-	MarketData    MarketDataConfig    `yaml:"market_data"`
-	Hotlist       HotlistConfig       `yaml:"hotlist"`
-	Monitoring    MonitoringConfig    `yaml:"monitoring"`
-	Backtesting   BacktestingConfig   `yaml:"backtesting"`
-	Automation    AutomationConfig    `yaml:"automation"`
-	Logging       LoggingConfig       `yaml:"logging"`
-	
+	Optimizer   OptimizerConfig      `yaml:"optimizer"`
+	Elimination EliminationConfig    `yaml:"elimination"`
+	RiskMgmt    RiskManagementConfig `yaml:"risk_management"`
+	Overfitting OverfittingConfig    `yaml:"overfitting"`
+	Performance PerformanceConfig    `yaml:"performance"`
+	MarketData  MarketDataConfig     `yaml:"market_data"`
+	Hotlist     HotlistConfig        `yaml:"hotlist"`
+	Monitoring  MonitoringConfig     `yaml:"monitoring"`
+	Backtesting BacktestingConfig    `yaml:"backtesting"`
+	Automation  AutomationConfig     `yaml:"automation"`
+	Logging     LoggingConfig        `yaml:"logging"`
+
 	// Internal fields
 	mu       sync.RWMutex
 	filePath string
@@ -31,18 +31,20 @@ type AlgorithmConfig struct {
 
 // OptimizerConfig represents optimizer configuration
 type OptimizerConfig struct {
-	GridSearch   GridSearchConfig   `yaml:"grid_search"`
-	Bayesian     BayesianConfig     `yaml:"bayesian"`
-	CMAES        CMAESConfig        `yaml:"cma_es"`
-	Genetic      GeneticConfig      `yaml:"genetic"`
-	WalkForward  WalkForwardConfig  `yaml:"walk_forward"`
+	GridSearch    GridSearchConfig  `yaml:"grid_search"`
+	Bayesian      BayesianConfig    `yaml:"bayesian"`
+	CMAES         CMAESConfig       `yaml:"cma_es"`
+	Genetic       GeneticConfig     `yaml:"genetic"`
+	WalkForward   WalkForwardConfig `yaml:"walk_forward"`
+	MaxIterations int               `yaml:"max_iterations"`
+	Concurrency   int               `yaml:"concurrency"`
 }
 
 // GridSearchConfig represents grid search configuration
 type GridSearchConfig struct {
-	DefaultGridSize       int     `yaml:"default_grid_size"`
-	MaxIterations         int     `yaml:"max_iterations"`
-	ConvergenceThreshold  float64 `yaml:"convergence_threshold"`
+	DefaultGridSize      int     `yaml:"default_grid_size"`
+	MaxIterations        int     `yaml:"max_iterations"`
+	ConvergenceThreshold float64 `yaml:"convergence_threshold"`
 }
 
 // BayesianConfig represents Bayesian optimization configuration
@@ -80,12 +82,12 @@ type WalkForwardConfig struct {
 
 // EliminationConfig represents strategy elimination configuration
 type EliminationConfig struct {
-	WindowSizeDays        int     `yaml:"window_size_days"`
-	MinTrades             int     `yaml:"min_trades"`
-	PerformanceThreshold  float64 `yaml:"performance_threshold"`
-	CorrelationThreshold  float64 `yaml:"correlation_threshold"`
-	VolatilityThreshold   float64 `yaml:"volatility_threshold"`
-	Bandit                BanditConfig `yaml:"bandit"`
+	WindowSizeDays       int          `yaml:"window_size_days"`
+	MinTrades            int          `yaml:"min_trades"`
+	PerformanceThreshold float64      `yaml:"performance_threshold"`
+	CorrelationThreshold float64      `yaml:"correlation_threshold"`
+	VolatilityThreshold  float64      `yaml:"volatility_threshold"`
+	Bandit               BanditConfig `yaml:"bandit"`
 }
 
 // BanditConfig represents multi-armed bandit configuration
@@ -105,18 +107,18 @@ type RiskManagementConfig struct {
 
 // PositionConfig represents position sizing configuration
 type PositionConfig struct {
-	MaxWeightPercent    float64 `yaml:"max_weight_percent"`
-	MinWeightPercent    float64 `yaml:"min_weight_percent"`
-	RebalanceThreshold  float64 `yaml:"rebalance_threshold"`
-	MaxLeverage         int     `yaml:"max_leverage"`
+	MaxWeightPercent   float64 `yaml:"max_weight_percent"`
+	MinWeightPercent   float64 `yaml:"min_weight_percent"`
+	RebalanceThreshold float64 `yaml:"rebalance_threshold"`
+	MaxLeverage        int     `yaml:"max_leverage"`
 }
 
 // StopLossConfig represents stop loss configuration
 type StopLossConfig struct {
-	DefaultATRMultiplier  float64 `yaml:"default_atr_multiplier"`
-	TrailingStopPercent   float64 `yaml:"trailing_stop_percent"`
-	MaxStopLossPercent    float64 `yaml:"max_stop_loss_percent"`
-	MinStopLossPercent    float64 `yaml:"min_stop_loss_percent"`
+	DefaultATRMultiplier float64 `yaml:"default_atr_multiplier"`
+	TrailingStopPercent  float64 `yaml:"trailing_stop_percent"`
+	MaxStopLossPercent   float64 `yaml:"max_stop_loss_percent"`
+	MinStopLossPercent   float64 `yaml:"min_stop_loss_percent"`
 }
 
 // MarginConfig represents margin management configuration
@@ -129,12 +131,12 @@ type MarginConfig struct {
 
 // OverfittingConfig represents overfitting detection configuration
 type OverfittingConfig struct {
-	MinSamples                int                    `yaml:"min_samples"`
-	ConfidenceLevel           float64                `yaml:"confidence_level"`
-	PBOThreshold              float64                `yaml:"pbo_threshold"`
-	DeflatedSharpeThreshold   float64                `yaml:"deflated_sharpe_threshold"`
-	SensitivityThreshold      float64                `yaml:"sensitivity_threshold"`
-	CrossValidation           CrossValidationConfig  `yaml:"cross_validation"`
+	MinSamples              int                   `yaml:"min_samples"`
+	ConfidenceLevel         float64               `yaml:"confidence_level"`
+	PBOThreshold            float64               `yaml:"pbo_threshold"`
+	DeflatedSharpeThreshold float64               `yaml:"deflated_sharpe_threshold"`
+	SensitivityThreshold    float64               `yaml:"sensitivity_threshold"`
+	CrossValidation         CrossValidationConfig `yaml:"cross_validation"`
 }
 
 // CrossValidationConfig represents cross-validation configuration
@@ -146,45 +148,46 @@ type CrossValidationConfig struct {
 
 // PerformanceConfig represents performance metrics configuration
 type PerformanceConfig struct {
-	RiskFreeRate         float64           `yaml:"risk_free_rate"`
-	TradingDaysPerYear   int               `yaml:"trading_days_per_year"`
-	Benchmark            BenchmarkConfig   `yaml:"benchmark"`
-	Metrics              MetricsConfig     `yaml:"metrics"`
+	RiskFreeRate       float64         `yaml:"risk_free_rate"`
+	TradingDaysPerYear int             `yaml:"trading_days_per_year"`
+	Benchmark          BenchmarkConfig `yaml:"benchmark"`
+	Metrics            MetricsConfig   `yaml:"metrics"`
 }
 
 // BenchmarkConfig represents benchmark configuration
 type BenchmarkConfig struct {
-	Symbol              string `yaml:"symbol"`
-	RebalanceFrequency  string `yaml:"rebalance_frequency"`
+	Symbol             string `yaml:"symbol"`
+	RebalanceFrequency string `yaml:"rebalance_frequency"`
 }
 
 // MetricsConfig represents metrics calculation configuration
 type MetricsConfig struct {
-	RollingWindowDays        int       `yaml:"rolling_window_days"`
-	VaRConfidenceLevels      []float64 `yaml:"var_confidence_levels"`
-	MaxDrawdownLookbackDays  int       `yaml:"max_drawdown_lookback_days"`
+	RollingWindowDays       int       `yaml:"rolling_window_days"`
+	VaRConfidenceLevels     []float64 `yaml:"var_confidence_levels"`
+	MaxDrawdownLookbackDays int       `yaml:"max_drawdown_lookback_days"`
 }
 
 // MarketDataConfig represents market data configuration
 type MarketDataConfig struct {
-	Quality   QualityConfig   `yaml:"quality"`
-	Sampling  SamplingConfig  `yaml:"sampling"`
-	Storage   StorageConfig   `yaml:"storage"`
+	Quality  QualityConfig  `yaml:"quality"`
+	Sampling SamplingConfig `yaml:"sampling"`
+	Storage  StorageConfig  `yaml:"storage"`
+	Symbols  []string       `yaml:"symbols"`
 }
 
 // QualityConfig represents data quality configuration
 type QualityConfig struct {
-	MaxLatencyMs           int     `yaml:"max_latency_ms"`
-	MaxGapDurationSeconds  int     `yaml:"max_gap_duration_seconds"`
-	MinQualityScore        float64 `yaml:"min_quality_score"`
-	OutlierThresholdStd    float64 `yaml:"outlier_threshold_std"`
+	MaxLatencyMs          int     `yaml:"max_latency_ms"`
+	MaxGapDurationSeconds int     `yaml:"max_gap_duration_seconds"`
+	MinQualityScore       float64 `yaml:"min_quality_score"`
+	OutlierThresholdStd   float64 `yaml:"outlier_threshold_std"`
 }
 
 // SamplingConfig represents data sampling configuration
 type SamplingConfig struct {
-	TickSampleRate    int      `yaml:"tick_sample_rate"`
-	KlineIntervals    []string `yaml:"kline_intervals"`
-	OrderbookDepth    int      `yaml:"orderbook_depth"`
+	TickSampleRate int      `yaml:"tick_sample_rate"`
+	KlineIntervals []string `yaml:"kline_intervals"`
+	OrderbookDepth int      `yaml:"orderbook_depth"`
 }
 
 // StorageConfig represents data storage configuration
@@ -196,87 +199,95 @@ type StorageConfig struct {
 
 // HotlistConfig represents hotlist configuration
 type HotlistConfig struct {
-	Scoring              ScoringConfig    `yaml:"scoring"`
-	Thresholds           ThresholdsConfig `yaml:"thresholds"`
-	UpdateIntervalMinutes int             `yaml:"update_interval_minutes"`
-	TopNSymbols          int             `yaml:"top_n_symbols"`
+	Scoring               ScoringConfig    `yaml:"scoring"`
+	Thresholds            ThresholdsConfig `yaml:"thresholds"`
+	UpdateIntervalMinutes int              `yaml:"update_interval_minutes"`
+	TopNSymbols           int              `yaml:"top_n_symbols"`
 }
 
 // ScoringConfig represents scoring weights configuration
 type ScoringConfig struct {
-	VolumeWeight        float64 `yaml:"volume_weight"`
-	VolatilityWeight    float64 `yaml:"volatility_weight"`
-	MomentumWeight      float64 `yaml:"momentum_weight"`
-	FundingRateWeight   float64 `yaml:"funding_rate_weight"`
-	OpenInterestWeight  float64 `yaml:"open_interest_weight"`
+	VolumeWeight       float64 `yaml:"volume_weight"`
+	VolatilityWeight   float64 `yaml:"volatility_weight"`
+	MomentumWeight     float64 `yaml:"momentum_weight"`
+	FundingRateWeight  float64 `yaml:"funding_rate_weight"`
+	OpenInterestWeight float64 `yaml:"open_interest_weight"`
 }
 
 // ThresholdsConfig represents threshold configuration
 type ThresholdsConfig struct {
-	MinVolume24h    float64 `yaml:"min_volume_24h"`
-	MinMarketCap    float64 `yaml:"min_market_cap"`
-	MaxVolatility   float64 `yaml:"max_volatility"`
+	MinVolume24h  float64 `yaml:"min_volume_24h"`
+	MinMarketCap  float64 `yaml:"min_market_cap"`
+	MaxVolatility float64 `yaml:"max_volatility"`
 }
-
-
 
 // BacktestingConfig represents backtesting configuration
 type BacktestingConfig struct {
-	Default   DefaultBacktestConfig   `yaml:"default"`
-	Execution ExecutionConfig         `yaml:"execution"`
-	Risk      RiskSimulationConfig    `yaml:"risk"`
+	Default   DefaultBacktestConfig `yaml:"default"`
+	Execution ExecutionConfig       `yaml:"execution"`
+	Risk      RiskSimulationConfig  `yaml:"risk"`
 }
 
 // DefaultBacktestConfig represents default backtesting parameters
 type DefaultBacktestConfig struct {
-	InitialCapital  float64 `yaml:"initial_capital"`
-	CommissionRate  float64 `yaml:"commission_rate"`
-	SlippageRate    float64 `yaml:"slippage_rate"`
+	InitialCapital float64 `yaml:"initial_capital"`
+	CommissionRate float64 `yaml:"commission_rate"`
+	SlippageRate   float64 `yaml:"slippage_rate"`
 }
 
 // ExecutionConfig represents execution simulation configuration
 type ExecutionConfig struct {
-	FillProbability      float64 `yaml:"fill_probability"`
-	PartialFillEnabled   bool    `yaml:"partial_fill_enabled"`
-	MarketImpactModel    string  `yaml:"market_impact_model"`
-	LatencySimulationMs  int     `yaml:"latency_simulation_ms"`
+	FillProbability     float64 `yaml:"fill_probability"`
+	PartialFillEnabled  bool    `yaml:"partial_fill_enabled"`
+	MarketImpactModel   string  `yaml:"market_impact_model"`
+	LatencySimulationMs int     `yaml:"latency_simulation_ms"`
 }
 
 // RiskSimulationConfig represents risk simulation configuration
 type RiskSimulationConfig struct {
-	MarginCallEnabled   bool `yaml:"margin_call_enabled"`
-	LiquidationEnabled  bool `yaml:"liquidation_enabled"`
-	FundingRateEnabled  bool `yaml:"funding_rate_enabled"`
+	MarginCallEnabled  bool `yaml:"margin_call_enabled"`
+	LiquidationEnabled bool `yaml:"liquidation_enabled"`
+	FundingRateEnabled bool `yaml:"funding_rate_enabled"`
 }
 
 // AutomationConfig represents automation configuration
 type AutomationConfig struct {
-	Rebalancing     RebalancingConfig     `yaml:"rebalancing"`
-	Optimization    OptimizationConfig    `yaml:"optimization"`
-	RiskMonitoring  RiskMonitoringConfig  `yaml:"risk_monitoring"`
+	Rebalancing    RebalancingConfig    `yaml:"rebalancing"`
+	Optimization   OptimizationConfig   `yaml:"optimization"`
+	RiskMonitoring RiskMonitoringConfig `yaml:"risk_monitoring"`
+	Learning       *LearningConfig      `yaml:"learning"`
 }
 
 // RebalancingConfig represents rebalancing configuration
 type RebalancingConfig struct {
-	Frequency           string  `yaml:"frequency"`
-	TimeUTC             string  `yaml:"time_utc"`
-	MinRebalanceAmount  float64 `yaml:"min_rebalance_amount"`
+	Frequency          string  `yaml:"frequency"`
+	TimeUTC            string  `yaml:"time_utc"`
+	MinRebalanceAmount float64 `yaml:"min_rebalance_amount"`
 }
 
 // OptimizationConfig represents optimization scheduling configuration
 type OptimizationConfig struct {
-	Frequency   string `yaml:"frequency"`
-	DayOfWeek   string `yaml:"day_of_week"`
-	TimeUTC     string `yaml:"time_utc"`
+	Frequency string `yaml:"frequency"`
+	DayOfWeek string `yaml:"day_of_week"`
+	TimeUTC   string `yaml:"time_utc"`
 }
 
 // RiskMonitoringConfig represents risk monitoring configuration
 type RiskMonitoringConfig struct {
-	CheckIntervalSeconds  int `yaml:"check_interval_seconds"`
-	AlertCooldownMinutes  int `yaml:"alert_cooldown_minutes"`
+	CheckIntervalSeconds int `yaml:"check_interval_seconds"`
+	AlertCooldownMinutes int `yaml:"alert_cooldown_minutes"`
 }
 
-
+// LearningConfig represents machine learning configuration
+type LearningConfig struct {
+	Enabled                 bool   `yaml:"enabled"`
+	AutoMLEnabled           bool   `yaml:"automl_enabled"`
+	GeneticAlgorithmEnabled bool   `yaml:"genetic_algorithm_enabled"`
+	ReinforcementLearning   bool   `yaml:"reinforcement_learning"`
+	ModelRetrainingInterval string `yaml:"model_retraining_interval"`
+	FeatureEngineering      bool   `yaml:"feature_engineering"`
+	HyperparameterTuning    bool   `yaml:"hyperparameter_tuning"`
+}
 
 // Global algorithm configuration instance
 var (
@@ -324,7 +335,7 @@ func ReloadAlgorithmConfig() error {
 		algorithmMu.RUnlock()
 		return fmt.Errorf("algorithm config not loaded")
 	}
-	
+
 	filePath := algorithmConfig.filePath
 	lastMod := algorithmConfig.lastMod
 	algorithmMu.RUnlock()
@@ -350,8 +361,8 @@ func (c *AlgorithmConfig) Validate() error {
 	if c.Optimizer.GridSearch.DefaultGridSize <= 0 {
 		return fmt.Errorf("grid search default_grid_size must be positive")
 	}
-	
-	if c.Optimizer.WalkForward.TrainRatio + c.Optimizer.WalkForward.ValidationRatio + c.Optimizer.WalkForward.TestRatio != 1.0 {
+
+	if c.Optimizer.WalkForward.TrainRatio+c.Optimizer.WalkForward.ValidationRatio+c.Optimizer.WalkForward.TestRatio != 1.0 {
 		return fmt.Errorf("walk forward ratios must sum to 1.0")
 	}
 
@@ -429,7 +440,7 @@ func (c *AlgorithmConfig) UpdateConfig(updates map[string]interface{}) error {
 			if v, ok := value.(float64); ok {
 				c.RiskMgmt.Position.MaxWeightPercent = v
 			}
-		// Add more cases as needed
+			// Add more cases as needed
 		}
 	}
 

@@ -410,15 +410,37 @@ func (f *RealMarketDataFetcher) fetchAllOrderBooks() {
 
 // fetchOrderBookWithRetry 带重试的订单簿数据获取
 func (f *RealMarketDataFetcher) fetchOrderBookWithRetry(symbol string) {
-	var orderBook *types.OrderBook
+	var exchangeOrderBook *exchange.OrderBook
 	var err error
 
 	for attempt := 0; attempt < f.config.MaxRetries; attempt++ {
 		ctx, cancel := context.WithTimeout(f.ctx, 10*time.Second)
-		orderBook, err = f.binanceClient.GetOrderBook(ctx, symbol, 20) // 获取前20档
+		exchangeOrderBook, err = f.binanceClient.GetOrderBook(ctx, symbol, 20) // 获取前20档
 		cancel()
 
 		if err == nil {
+			// 转换为 types.OrderBook
+			orderBook := &types.OrderBook{
+				Symbol:    exchangeOrderBook.Symbol,
+				UpdatedAt: exchangeOrderBook.Timestamp,
+			}
+
+			// 转换 bids
+			for _, bid := range exchangeOrderBook.Bids {
+				orderBook.Bids = append(orderBook.Bids, types.Level{
+					Price:    bid.Price,
+					Quantity: bid.Quantity,
+				})
+			}
+
+			// 转换 asks
+			for _, ask := range exchangeOrderBook.Asks {
+				orderBook.Asks = append(orderBook.Asks, types.Level{
+					Price:    ask.Price,
+					Quantity: ask.Quantity,
+				})
+			}
+
 			f.cacheOrderBook(symbol, orderBook)
 			return
 		}

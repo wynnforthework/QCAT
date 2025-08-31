@@ -6,8 +6,6 @@ import (
 	"log"
 	"sync"
 	"time"
-
-	"qcat/internal/exchange"
 )
 
 // Monitor monitors PnL and triggers automated actions
@@ -16,13 +14,13 @@ type Monitor struct {
 	thresholds *RiskThresholds
 	callbacks  []TriggerCallback
 	mu         sync.RWMutex
-	
+
 	// State tracking
 	lastCheck    time.Time
 	alertHistory map[string]time.Time
-	
+
 	// Configuration
-	checkInterval time.Duration
+	checkInterval  time.Duration
 	cooldownPeriod time.Duration
 }
 
@@ -31,19 +29,19 @@ type RiskThresholds struct {
 	// Margin thresholds
 	MaxMarginRatio     float64 `json:"max_margin_ratio"`     // Maximum margin usage ratio (e.g., 0.8 = 80%)
 	WarningMarginRatio float64 `json:"warning_margin_ratio"` // Warning margin ratio (e.g., 0.7 = 70%)
-	
+
 	// PnL thresholds
 	MaxDailyLoss       float64 `json:"max_daily_loss"`       // Maximum daily loss in USD
 	MaxTotalLoss       float64 `json:"max_total_loss"`       // Maximum total loss in USD
 	MaxDrawdownPercent float64 `json:"max_drawdown_percent"` // Maximum drawdown percentage
-	
+
 	// Position thresholds
-	MaxPositionLoss    float64 `json:"max_position_loss"`    // Maximum loss per position in USD
+	MaxPositionLoss        float64 `json:"max_position_loss"`         // Maximum loss per position in USD
 	MaxPositionLossPercent float64 `json:"max_position_loss_percent"` // Maximum loss per position as percentage
-	
+
 	// Account thresholds
-	MinAccountBalance  float64 `json:"min_account_balance"`  // Minimum account balance in USD
-	MaxLeverage        int     `json:"max_leverage"`         // Maximum allowed leverage
+	MinAccountBalance float64 `json:"min_account_balance"` // Minimum account balance in USD
+	MaxLeverage       int     `json:"max_leverage"`        // Maximum allowed leverage
 }
 
 // TriggerType represents the type of trigger
@@ -72,15 +70,15 @@ const (
 
 // TriggerEvent represents a trigger event
 type TriggerEvent struct {
-	Type        TriggerType   `json:"type"`
-	Action      TriggerAction `json:"action"`
-	Symbol      string        `json:"symbol"`
-	CurrentValue float64      `json:"current_value"`
-	Threshold   float64       `json:"threshold"`
-	Message     string        `json:"message"`
-	Severity    string        `json:"severity"`
-	Timestamp   time.Time     `json:"timestamp"`
-	Metadata    map[string]interface{} `json:"metadata"`
+	Type         TriggerType            `json:"type"`
+	Action       TriggerAction          `json:"action"`
+	Symbol       string                 `json:"symbol"`
+	CurrentValue float64                `json:"current_value"`
+	Threshold    float64                `json:"threshold"`
+	Message      string                 `json:"message"`
+	Severity     string                 `json:"severity"`
+	Timestamp    time.Time              `json:"timestamp"`
+	Metadata     map[string]interface{} `json:"metadata"`
 }
 
 // TriggerCallback represents a callback function for trigger events
@@ -108,10 +106,10 @@ func (m *Monitor) AddCallback(callback TriggerCallback) {
 // StartMonitoring starts the PnL monitoring process
 func (m *Monitor) StartMonitoring(ctx context.Context) error {
 	log.Println("Starting PnL monitoring...")
-	
+
 	ticker := time.NewTicker(m.checkInterval)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -128,39 +126,39 @@ func (m *Monitor) StartMonitoring(ctx context.Context) error {
 // checkTriggers checks all trigger conditions
 func (m *Monitor) checkTriggers(ctx context.Context) error {
 	m.lastCheck = time.Now()
-	
+
 	// Check margin ratio
 	if err := m.checkMarginRatio(ctx); err != nil {
 		log.Printf("Error checking margin ratio: %v", err)
 	}
-	
+
 	// Check daily loss
 	if err := m.checkDailyLoss(ctx); err != nil {
 		log.Printf("Error checking daily loss: %v", err)
 	}
-	
+
 	// Check position losses
 	if err := m.checkPositionLosses(ctx); err != nil {
 		log.Printf("Error checking position losses: %v", err)
 	}
-	
+
 	// Check account balance
 	if err := m.checkAccountBalance(ctx); err != nil {
 		log.Printf("Error checking account balance: %v", err)
 	}
-	
+
 	// Check drawdown
 	if err := m.checkDrawdown(ctx); err != nil {
 		log.Printf("Error checking drawdown: %v", err)
 	}
-	
+
 	return nil
 }
 
 // checkMarginRatio checks margin ratio and triggers actions if needed
 func (m *Monitor) checkMarginRatio(ctx context.Context) error {
 	marginRatio := m.calculator.GetMarginRatio()
-	
+
 	if marginRatio > m.thresholds.MaxMarginRatio {
 		event := &TriggerEvent{
 			Type:         TriggerTypeMarginCall,
@@ -175,7 +173,7 @@ func (m *Monitor) checkMarginRatio(ctx context.Context) error {
 				"total_realized_pnl":   m.calculator.GetTotalRealizedPnL(),
 			},
 		}
-		
+
 		return m.triggerEvent(event)
 	} else if marginRatio > m.thresholds.WarningMarginRatio {
 		event := &TriggerEvent{
@@ -187,10 +185,10 @@ func (m *Monitor) checkMarginRatio(ctx context.Context) error {
 			Severity:     "warning",
 			Timestamp:    time.Now(),
 		}
-		
+
 		return m.triggerEvent(event)
 	}
-	
+
 	return nil
 }
 
@@ -198,7 +196,7 @@ func (m *Monitor) checkMarginRatio(ctx context.Context) error {
 func (m *Monitor) checkDailyLoss(ctx context.Context) error {
 	// Calculate daily PnL (simplified - would need to track daily start balance)
 	totalPnL := m.calculator.GetTotalUnrealizedPnL() + m.calculator.GetTotalRealizedPnL()
-	
+
 	if totalPnL < -m.thresholds.MaxDailyLoss {
 		event := &TriggerEvent{
 			Type:         TriggerTypeDailyLoss,
@@ -209,10 +207,10 @@ func (m *Monitor) checkDailyLoss(ctx context.Context) error {
 			Severity:     "critical",
 			Timestamp:    time.Now(),
 		}
-		
+
 		return m.triggerEvent(event)
 	}
-	
+
 	return nil
 }
 
@@ -222,7 +220,7 @@ func (m *Monitor) checkPositionLosses(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get PnL snapshots: %w", err)
 	}
-	
+
 	for _, snapshot := range snapshots {
 		// Check absolute loss
 		if snapshot.UnrealizedPnL < -m.thresholds.MaxPositionLoss {
@@ -241,12 +239,12 @@ func (m *Monitor) checkPositionLosses(ctx context.Context) error {
 					"mark_price":    snapshot.MarkPrice,
 				},
 			}
-			
+
 			if err := m.triggerEvent(event); err != nil {
 				log.Printf("Failed to trigger position loss event for %s: %v", snapshot.Symbol, err)
 			}
 		}
-		
+
 		// Check percentage loss
 		if snapshot.EntryPrice > 0 && snapshot.PositionSize != 0 {
 			lossPercent := snapshot.UnrealizedPnL / (abs(snapshot.PositionSize) * snapshot.EntryPrice)
@@ -261,14 +259,14 @@ func (m *Monitor) checkPositionLosses(ctx context.Context) error {
 					Severity:     "medium",
 					Timestamp:    time.Now(),
 				}
-				
+
 				if err := m.triggerEvent(event); err != nil {
 					log.Printf("Failed to trigger position loss percentage event for %s: %v", snapshot.Symbol, err)
 				}
 			}
 		}
 	}
-	
+
 	return nil
 }
 
@@ -277,11 +275,11 @@ func (m *Monitor) checkAccountBalance(ctx context.Context) error {
 	// This would need to be implemented based on actual balance tracking
 	// For now, we'll use a simplified approach
 	totalPnL := m.calculator.GetTotalUnrealizedPnL() + m.calculator.GetTotalRealizedPnL()
-	
+
 	// Assume starting balance and calculate current balance
 	// In a real implementation, this would track actual account balance
 	estimatedBalance := 100000.0 + totalPnL // Assume $100k starting balance
-	
+
 	if estimatedBalance < m.thresholds.MinAccountBalance {
 		event := &TriggerEvent{
 			Type:         TriggerTypeAccountBalance,
@@ -292,10 +290,10 @@ func (m *Monitor) checkAccountBalance(ctx context.Context) error {
 			Severity:     "critical",
 			Timestamp:    time.Now(),
 		}
-		
+
 		return m.triggerEvent(event)
 	}
-	
+
 	return nil
 }
 
@@ -304,11 +302,11 @@ func (m *Monitor) checkDrawdown(ctx context.Context) error {
 	// This would need historical equity tracking to calculate proper drawdown
 	// For now, we'll use a simplified approach based on total PnL
 	totalPnL := m.calculator.GetTotalUnrealizedPnL() + m.calculator.GetTotalRealizedPnL()
-	
+
 	// Simplified drawdown calculation (would need peak equity tracking)
 	if totalPnL < 0 {
 		drawdownPercent := abs(totalPnL) / 100000.0 // Assume $100k starting balance
-		
+
 		if drawdownPercent > m.thresholds.MaxDrawdownPercent {
 			event := &TriggerEvent{
 				Type:         TriggerTypeDrawdown,
@@ -319,11 +317,11 @@ func (m *Monitor) checkDrawdown(ctx context.Context) error {
 				Severity:     "high",
 				Timestamp:    time.Now(),
 			}
-			
+
 			return m.triggerEvent(event)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -331,7 +329,7 @@ func (m *Monitor) checkDrawdown(ctx context.Context) error {
 func (m *Monitor) triggerEvent(event *TriggerEvent) error {
 	// Check cooldown period to avoid spam
 	alertKey := fmt.Sprintf("%s:%s:%s", event.Type, event.Action, event.Symbol)
-	
+
 	m.mu.Lock()
 	lastAlert, exists := m.alertHistory[alertKey]
 	if exists && time.Since(lastAlert) < m.cooldownPeriod {
@@ -340,16 +338,16 @@ func (m *Monitor) triggerEvent(event *TriggerEvent) error {
 	}
 	m.alertHistory[alertKey] = time.Now()
 	m.mu.Unlock()
-	
+
 	log.Printf("Triggering risk event: %s - %s", event.Type, event.Message)
-	
+
 	// Execute all callbacks
 	for _, callback := range m.callbacks {
 		if err := callback(event); err != nil {
 			log.Printf("Callback error for event %s: %v", event.Type, err)
 		}
 	}
-	
+
 	return nil
 }
 
@@ -357,14 +355,14 @@ func (m *Monitor) triggerEvent(event *TriggerEvent) error {
 func (m *Monitor) GetCurrentStatus() map[string]interface{} {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	return map[string]interface{}{
-		"last_check":        m.lastCheck,
-		"margin_ratio":      m.calculator.GetMarginRatio(),
-		"total_unrealized":  m.calculator.GetTotalUnrealizedPnL(),
-		"total_realized":    m.calculator.GetTotalRealizedPnL(),
-		"alert_count":       len(m.alertHistory),
-		"thresholds":        m.thresholds,
+		"last_check":       m.lastCheck,
+		"margin_ratio":     m.calculator.GetMarginRatio(),
+		"total_unrealized": m.calculator.GetTotalUnrealizedPnL(),
+		"total_realized":   m.calculator.GetTotalRealizedPnL(),
+		"alert_count":      len(m.alertHistory),
+		"thresholds":       m.thresholds,
 	}
 }
 
@@ -379,7 +377,7 @@ func (m *Monitor) UpdateThresholds(thresholds *RiskThresholds) {
 func (m *Monitor) GetThresholds() *RiskThresholds {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	
+
 	// Return a copy to prevent external modification
 	return &RiskThresholds{
 		MaxMarginRatio:         m.thresholds.MaxMarginRatio,

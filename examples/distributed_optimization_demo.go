@@ -105,14 +105,14 @@ func simulateServerOptimization(serverID string, serverIndex int, consistencyMgr
 		result.Performance.MaxDrawdown = rand.Float64() * 8.0     // 0-8% 最大回撤
 		result.Performance.WinRate = 0.3 + rand.Float64()*0.5     // 30-80% 胜率
 
-		fmt.Printf("[%s] 第 %d 次尝试结果: 收益率=%.2f%%, 夏普比率=%.2f\n", 
+		fmt.Printf("[%s] 第 %d 次尝试结果: 收益率=%.2f%%, 夏普比率=%.2f\n",
 			serverID, attempt, result.Performance.ProfitRate, result.Performance.SharpeRatio)
 
 		// 检查是否为新的全局最优
 		if optimizer.IsNewGlobalBest(taskID, result) {
-			fmt.Printf("[%s] 🎉 发现新的全局最优结果! 收益率: %.2f%%\n", 
+			fmt.Printf("[%s] 🎉 发现新的全局最优结果! 收益率: %.2f%%\n",
 				serverID, result.Performance.ProfitRate)
-			
+
 			// 广播给其他服务器
 			go optimizer.BroadcastBestResult(result)
 		}
@@ -165,10 +165,10 @@ func analyzeResults(results []*automl.OptimizationResult) {
 	// 性能分布
 	fmt.Printf("\n📈 性能分布:\n")
 	profitRanges := map[string]int{
-		"5-10%":   0,
-		"10-15%":  0,
-		"15-20%":  0,
-		"20%+":    0,
+		"5-10%":  0,
+		"10-15%": 0,
+		"15-20%": 0,
+		"20%+":   0,
 	}
 
 	for _, result := range results {
@@ -185,8 +185,8 @@ func analyzeResults(results []*automl.OptimizationResult) {
 		}
 	}
 
-	for range, count := range profitRanges {
-		fmt.Printf("  %s: %d 个结果\n", range, count)
+	for profitRange, count := range profitRanges {
+		fmt.Printf("  %s: %d 个结果\n", profitRange, count)
 	}
 
 	// 分布式优化效果分析

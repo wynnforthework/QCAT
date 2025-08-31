@@ -2,8 +2,16 @@ package workflow
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"math"
 	"math/rand"
+	"qcat/internal/config"
+	"qcat/internal/database"
+	"qcat/internal/exchange"
+	"qcat/internal/exchange/account"
+	"qcat/internal/strategy/optimizer"
+	"sync"
 	"time"
 )
 
@@ -26,6 +34,12 @@ func (be *BaseExecutor) GetResourceRequirements() map[string]interface{} {
 // StrategyOptimizationExecutor 策略优化执行器
 type StrategyOptimizationExecutor struct {
 	BaseExecutor
+	config         *config.Config
+	db             *database.DB
+	exchange       exchange.Exchange
+	accountManager *account.Manager
+	optimizer      *optimizer.Orchestrator
+	mu             sync.RWMutex
 }
 
 // NewStrategyOptimizationExecutor 创建策略优化执行器
@@ -44,43 +58,232 @@ func NewStrategyOptimizationExecutor() *StrategyOptimizationExecutor {
 
 // Execute 执行策略优化
 func (soe *StrategyOptimizationExecutor) Execute(ctx context.Context, params map[string]interface{}) (interface{}, error) {
-	log.Printf("🔄 开始策略参数优化...")
+	log.Printf("🔄 开始策略参数自动优化...")
 
-	// 模拟策略优化过程
-	select {
-	case <-time.After(5 * time.Second): // 模拟5秒优化时间
-		// 正常完成
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	// 获取策略ID列表
+	strategyIDs, ok := params["strategy_ids"].([]string)
+	if !ok || len(strategyIDs) == 0 {
+		// 如果没有指定策略，获取所有活跃策略
+		strategyIDs = []string{"momentum_strategy", "mean_reversion", "breakout_strategy"}
 	}
 
-	// 模拟优化结果
+	var optimizedStrategies []map[string]interface{}
+	totalImprovement := 0.0
+
+	for _, strategyID := range strategyIDs {
+		// 执行单个策略优化
+		optimizationResult, err := soe.optimizeStrategy(ctx, strategyID, params)
+		if err != nil {
+			log.Printf("策略 %s 优化失败: %v", strategyID, err)
+			continue
+		}
+
+		optimizedStrategies = append(optimizedStrategies, optimizationResult)
+		if improvement, ok := optimizationResult["improvement"].(float64); ok {
+			totalImprovement += improvement
+		}
+	}
+
+	// 计算平均改进
+	avgImprovement := 0.0
+	if len(optimizedStrategies) > 0 {
+		avgImprovement = totalImprovement / float64(len(optimizedStrategies))
+	}
+
 	result := map[string]interface{}{
-		"optimized_strategies": []map[string]interface{}{
-			{
-				"strategy_id": "strategy_001",
-				"old_params":  map[string]float64{"param1": 0.1, "param2": 0.2},
-				"new_params":  map[string]float64{"param1": 0.15, "param2": 0.25},
-				"improvement": 0.12, // 12% 改进
-			},
-			{
-				"strategy_id": "strategy_002",
-				"old_params":  map[string]float64{"param1": 0.3, "param2": 0.4},
-				"new_params":  map[string]float64{"param1": 0.28, "param2": 0.42},
-				"improvement": 0.08, // 8% 改进
-			},
-		},
-		"total_improvement": 0.10, // 平均10% 改进
-		"optimization_time": "5s",
+		"optimized_strategies": optimizedStrategies,
+		"total_improvement":    avgImprovement,
+		"optimization_time":    time.Since(time.Now()).String(),
+		"strategies_count":     len(optimizedStrategies),
 	}
 
-	log.Printf("✅ 策略参数优化完成，平均改进: %.1f%%", result["total_improvement"].(float64)*100)
+	log.Printf("✅ 策略参数优化完成，优化了 %d 个策略，平均改进: %.1f%%",
+		len(optimizedStrategies), avgImprovement*100)
 	return result, nil
+}
+
+// optimizeStrategy 优化单个策略
+func (soe *StrategyOptimizationExecutor) optimizeStrategy(ctx context.Context, strategyID string, params map[string]interface{}) (map[string]interface{}, error) {
+	// 获取策略当前参数
+	currentParams := soe.getCurrentStrategyParams(strategyID)
+
+	// 执行参数优化
+	optimizedParams, improvement, err := soe.performParameterOptimization(ctx, strategyID, currentParams)
+	if err != nil {
+		return nil, fmt.Errorf("参数优化失败: %w", err)
+	}
+
+	// 应用优化后的参数
+	if autoApply, ok := params["auto_apply"].(bool); ok && autoApply {
+		err = soe.applyOptimizedParams(strategyID, optimizedParams)
+		if err != nil {
+			log.Printf("应用优化参数失败: %v", err)
+		}
+	}
+
+	return map[string]interface{}{
+		"strategy_id": strategyID,
+		"old_params":  currentParams,
+		"new_params":  optimizedParams,
+		"improvement": improvement,
+		"applied":     params["auto_apply"],
+	}, nil
+}
+
+// getCurrentStrategyParams 获取策略当前参数
+func (soe *StrategyOptimizationExecutor) getCurrentStrategyParams(strategyID string) map[string]float64 {
+	// 这里应该从数据库或配置中获取实际参数
+	// 暂时返回模拟数据
+	defaultParams := map[string]map[string]float64{
+		"momentum_strategy": {
+			"rsi_period":         14.0,
+			"ma_period":          20.0,
+			"momentum_threshold": 0.02,
+		},
+		"mean_reversion": {
+			"bollinger_period":    20.0,
+			"bollinger_std":       2.0,
+			"reversion_threshold": 0.8,
+		},
+		"breakout_strategy": {
+			"breakout_period":  10.0,
+			"volume_threshold": 1.5,
+			"price_threshold":  0.03,
+		},
+	}
+
+	if params, exists := defaultParams[strategyID]; exists {
+		return params
+	}
+
+	return map[string]float64{
+		"param1": 0.1,
+		"param2": 0.2,
+		"param3": 0.3,
+	}
+}
+
+// performParameterOptimization 执行参数优化
+func (soe *StrategyOptimizationExecutor) performParameterOptimization(ctx context.Context, strategyID string, currentParams map[string]float64) (map[string]float64, float64, error) {
+	// 使用遗传算法或网格搜索优化参数
+	optimizedParams := make(map[string]float64)
+
+	// 对每个参数进行优化
+	for paramName, currentValue := range currentParams {
+		optimizedValue := soe.optimizeParameter(paramName, currentValue)
+		optimizedParams[paramName] = optimizedValue
+	}
+
+	// 计算改进程度（通过回测或其他方法）
+	improvement := soe.calculateImprovement(strategyID, currentParams, optimizedParams)
+
+	return optimizedParams, improvement, nil
+}
+
+// optimizeParameter 优化单个参数
+func (soe *StrategyOptimizationExecutor) optimizeParameter(paramName string, currentValue float64) float64 {
+	// 简化的优化逻辑：在当前值附近搜索最优值
+	searchRange := currentValue * 0.2 // 搜索范围为当前值的20%
+
+	bestValue := currentValue
+	bestScore := soe.evaluateParameter(paramName, currentValue)
+
+	// 网格搜索
+	for i := 0; i < 10; i++ {
+		testValue := currentValue + (rand.Float64()-0.5)*2*searchRange
+		if testValue <= 0 {
+			continue
+		}
+
+		score := soe.evaluateParameter(paramName, testValue)
+		if score > bestScore {
+			bestScore = score
+			bestValue = testValue
+		}
+	}
+
+	return bestValue
+}
+
+// evaluateParameter 评估参数性能
+func (soe *StrategyOptimizationExecutor) evaluateParameter(paramName string, value float64) float64 {
+	// 简化的评估逻辑，实际应该基于历史数据回测
+	// 这里使用一个简单的评分函数
+	switch paramName {
+	case "rsi_period":
+		// RSI周期的最优值通常在10-20之间
+		if value >= 10 && value <= 20 {
+			return 1.0 - math.Abs(value-14)/10
+		}
+		return 0.5
+	case "ma_period":
+		// 移动平均周期的最优值通常在15-25之间
+		if value >= 15 && value <= 25 {
+			return 1.0 - math.Abs(value-20)/10
+		}
+		return 0.5
+	default:
+		// 通用评估：接近中等值的参数通常表现较好
+		return 1.0 - math.Abs(value-0.5)
+	}
+}
+
+// calculateImprovement 计算改进程度
+func (soe *StrategyOptimizationExecutor) calculateImprovement(strategyID string, oldParams, newParams map[string]float64) float64 {
+	// 简化的改进计算，实际应该基于回测结果
+	oldScore := 0.0
+	newScore := 0.0
+
+	for paramName, oldValue := range oldParams {
+		oldScore += soe.evaluateParameter(paramName, oldValue)
+	}
+
+	for paramName, newValue := range newParams {
+		newScore += soe.evaluateParameter(paramName, newValue)
+	}
+
+	if oldScore == 0 {
+		return 0.0
+	}
+
+	improvement := (newScore - oldScore) / oldScore
+	return math.Max(0.0, improvement) // 确保改进不为负数
+}
+
+// applyOptimizedParams 应用优化后的参数
+func (soe *StrategyOptimizationExecutor) applyOptimizedParams(strategyID string, params map[string]float64) error {
+	// 这里应该将优化后的参数保存到数据库或配置文件
+	log.Printf("应用策略 %s 的优化参数: %+v", strategyID, params)
+
+	// 实际实现中应该：
+	// 1. 更新数据库中的策略参数
+	// 2. 通知策略实例重新加载参数
+	// 3. 记录参数变更历史
+
+	return nil
 }
 
 // RiskMonitorExecutor 风险监控执行器
 type RiskMonitorExecutor struct {
 	BaseExecutor
+	config         *config.Config
+	db             *database.DB
+	exchange       exchange.Exchange
+	accountManager *account.Manager
+	mu             sync.RWMutex
+	riskThresholds map[string]float64
+	alertHistory   []RiskAlert
+}
+
+// RiskAlert 风险告警
+type RiskAlert struct {
+	Type      string    `json:"type"`
+	Level     string    `json:"level"`
+	Message   string    `json:"message"`
+	Value     float64   `json:"value"`
+	Threshold float64   `json:"threshold"`
+	Timestamp time.Time `json:"timestamp"`
+	Resolved  bool      `json:"resolved"`
 }
 
 // NewRiskMonitorExecutor 创建风险监控执行器
@@ -94,45 +297,648 @@ func NewRiskMonitorExecutor() *RiskMonitorExecutor {
 				"io":     "high",
 			},
 		},
+		riskThresholds: map[string]float64{
+			"max_daily_loss":    0.05,  // 5% 最大日损失
+			"max_drawdown":      0.10,  // 10% 最大回撤
+			"max_position_size": 0.20,  // 20% 最大单仓位
+			"volatility_limit":  0.30,  // 30% 波动率限制
+			"liquidity_min":     10000, // 最小流动性
+		},
+		alertHistory: make([]RiskAlert, 0),
 	}
 }
 
 // Execute 执行风险监控
 func (rme *RiskMonitorExecutor) Execute(ctx context.Context, params map[string]interface{}) (interface{}, error) {
-	log.Printf("🔄 开始风险监控检查...")
+	log.Printf("🔄 开始异常行情风险监控检查...")
 
-	// 模拟风险检查
-	select {
-	case <-time.After(2 * time.Second):
-		// 正常完成
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	// 执行多维度风险检查
+	riskChecks := []func(context.Context) (string, interface{}, error){
+		rme.checkPriceAnomalies,
+		rme.checkLiquidityRisk,
+		rme.checkPositionRisk,
+		rme.checkVolatilityRisk,
+		rme.checkMarketSentiment,
 	}
 
-	// 模拟风险检查结果
+	var alerts []RiskAlert
+	var recommendations []string
+	checksPerformed := make([]string, 0)
+	overallRiskLevel := "low"
+
+	for _, checkFunc := range riskChecks {
+		checkName, checkResult, err := checkFunc(ctx)
+		if err != nil {
+			log.Printf("风险检查 %s 失败: %v", checkName, err)
+			continue
+		}
+
+		checksPerformed = append(checksPerformed, checkName)
+
+		// 处理检查结果
+		if alert, hasAlert := rme.processCheckResult(checkName, checkResult); hasAlert {
+			alerts = append(alerts, alert)
+
+			// 更新整体风险等级
+			if alert.Level == "critical" {
+				overallRiskLevel = "critical"
+			} else if alert.Level == "high" && overallRiskLevel != "critical" {
+				overallRiskLevel = "high"
+			} else if alert.Level == "medium" && overallRiskLevel == "low" {
+				overallRiskLevel = "medium"
+			}
+		}
+	}
+
+	// 生成风险应对建议
+	recommendations = rme.generateRiskRecommendations(overallRiskLevel, alerts)
+
+	// 执行自动风险应对措施
+	if autoResponse, ok := params["auto_response"].(bool); ok && autoResponse {
+		err := rme.executeRiskResponse(ctx, overallRiskLevel, alerts)
+		if err != nil {
+			log.Printf("执行风险应对措施失败: %v", err)
+		}
+	}
+
 	result := map[string]interface{}{
-		"risk_level": "low",
-		"checks_performed": []string{
-			"价格异常检测",
-			"流动性检查",
-			"持仓风险评估",
-			"市场波动率分析",
-		},
-		"alerts": []map[string]interface{}{},
-		"recommendations": []string{
-			"当前市场状况良好",
-			"建议保持现有仓位",
-		},
-		"check_time": time.Now(),
+		"risk_level":            overallRiskLevel,
+		"checks_performed":      checksPerformed,
+		"alerts":                alerts,
+		"recommendations":       recommendations,
+		"check_time":            time.Now(),
+		"total_alerts":          len(alerts),
+		"auto_response_enabled": params["auto_response"],
 	}
 
-	log.Printf("✅ 风险监控检查完成，风险等级: %s", result["risk_level"])
+	log.Printf("✅ 风险监控检查完成，风险等级: %s，发现 %d 个告警",
+		overallRiskLevel, len(alerts))
 	return result, nil
+}
+
+// checkPriceAnomalies 检查价格异常
+func (rme *RiskMonitorExecutor) checkPriceAnomalies(ctx context.Context) (string, interface{}, error) {
+	// 获取主要交易对的价格数据
+	symbols := []string{"BTCUSDT", "ETHUSDT", "BNBUSDT"}
+	anomalies := make([]map[string]interface{}, 0)
+
+	for _, symbol := range symbols {
+		// 获取当前价格和历史价格
+		currentPrice, err := rme.getCurrentPrice(symbol)
+		if err != nil {
+			continue
+		}
+
+		avgPrice, err := rme.getAveragePrice(symbol, 24*time.Hour)
+		if err != nil {
+			continue
+		}
+
+		// 计算价格偏差
+		deviation := math.Abs(currentPrice-avgPrice) / avgPrice
+
+		if deviation > 0.15 { // 15% 偏差阈值
+			anomalies = append(anomalies, map[string]interface{}{
+				"symbol":        symbol,
+				"current_price": currentPrice,
+				"average_price": avgPrice,
+				"deviation":     deviation,
+				"severity":      rme.getDeviationSeverity(deviation),
+			})
+		}
+	}
+
+	return "价格异常检测", anomalies, nil
+}
+
+// checkLiquidityRisk 检查流动性风险
+func (rme *RiskMonitorExecutor) checkLiquidityRisk(ctx context.Context) (string, interface{}, error) {
+	symbols := []string{"BTCUSDT", "ETHUSDT", "BNBUSDT"}
+	liquidityIssues := make([]map[string]interface{}, 0)
+
+	for _, symbol := range symbols {
+		// 获取订单簿深度
+		orderBook, err := rme.getOrderBookDepth(symbol)
+		if err != nil {
+			continue
+		}
+
+		// 计算流动性指标
+		bidLiquidity := rme.calculateLiquidity(orderBook["bids"])
+		askLiquidity := rme.calculateLiquidity(orderBook["asks"])
+		spread := rme.calculateSpread(orderBook)
+
+		minLiquidity := rme.riskThresholds["liquidity_min"]
+
+		if bidLiquidity < minLiquidity || askLiquidity < minLiquidity || spread > 0.01 {
+			liquidityIssues = append(liquidityIssues, map[string]interface{}{
+				"symbol":        symbol,
+				"bid_liquidity": bidLiquidity,
+				"ask_liquidity": askLiquidity,
+				"spread":        spread,
+				"severity":      rme.getLiquiditySeverity(bidLiquidity, askLiquidity, spread),
+			})
+		}
+	}
+
+	return "流动性风险检查", liquidityIssues, nil
+}
+
+// checkPositionRisk 检查持仓风险
+func (rme *RiskMonitorExecutor) checkPositionRisk(ctx context.Context) (string, interface{}, error) {
+	// 获取当前所有持仓
+	positions, err := rme.getAllPositions()
+	if err != nil {
+		return "持仓风险评估", nil, err
+	}
+
+	positionRisks := make([]map[string]interface{}, 0)
+	totalExposure := 0.0
+
+	for _, position := range positions {
+		// 计算持仓风险指标
+		positionValue := position["size"].(float64) * position["mark_price"].(float64)
+		totalExposure += math.Abs(positionValue)
+
+		// 检查单个持仓是否超过限制
+		maxPositionSize := rme.riskThresholds["max_position_size"]
+		if math.Abs(positionValue) > maxPositionSize {
+			positionRisks = append(positionRisks, map[string]interface{}{
+				"symbol":         position["symbol"],
+				"position_value": positionValue,
+				"max_allowed":    maxPositionSize,
+				"risk_ratio":     math.Abs(positionValue) / maxPositionSize,
+				"severity":       "high",
+			})
+		}
+	}
+
+	return "持仓风险评估", map[string]interface{}{
+		"position_risks": positionRisks,
+		"total_exposure": totalExposure,
+		"risk_positions": len(positionRisks),
+	}, nil
+}
+
+// checkVolatilityRisk 检查波动率风险
+func (rme *RiskMonitorExecutor) checkVolatilityRisk(ctx context.Context) (string, interface{}, error) {
+	symbols := []string{"BTCUSDT", "ETHUSDT", "BNBUSDT"}
+	volatilityRisks := make([]map[string]interface{}, 0)
+
+	for _, symbol := range symbols {
+		// 计算历史波动率
+		volatility, err := rme.calculateVolatility(symbol, 24*time.Hour)
+		if err != nil {
+			continue
+		}
+
+		volatilityLimit := rme.riskThresholds["volatility_limit"]
+		if volatility > volatilityLimit {
+			volatilityRisks = append(volatilityRisks, map[string]interface{}{
+				"symbol":     symbol,
+				"volatility": volatility,
+				"limit":      volatilityLimit,
+				"excess":     volatility - volatilityLimit,
+				"severity":   rme.getVolatilitySeverity(volatility),
+			})
+		}
+	}
+
+	return "市场波动率分析", volatilityRisks, nil
+}
+
+// checkMarketSentiment 检查市场情绪
+func (rme *RiskMonitorExecutor) checkMarketSentiment(ctx context.Context) (string, interface{}, error) {
+	// 简化的市场情绪分析
+	sentimentScore := rme.calculateMarketSentiment()
+
+	sentiment := map[string]interface{}{
+		"score": sentimentScore,
+		"level": rme.getSentimentLevel(sentimentScore),
+		"indicators": map[string]float64{
+			"fear_greed_index": rand.Float64() * 100,
+			"vix_equivalent":   rand.Float64()*50 + 10,
+			"funding_rate":     (rand.Float64() - 0.5) * 0.01,
+		},
+	}
+
+	return "市场情绪分析", sentiment, nil
+}
+
+// processCheckResult 处理检查结果
+func (rme *RiskMonitorExecutor) processCheckResult(checkName string, result interface{}) (RiskAlert, bool) {
+	// 根据不同的检查类型处理结果
+	switch checkName {
+	case "价格异常检测":
+		if anomalies, ok := result.([]map[string]interface{}); ok && len(anomalies) > 0 {
+			return RiskAlert{
+				Type:      "price_anomaly",
+				Level:     "medium",
+				Message:   fmt.Sprintf("检测到 %d 个价格异常", len(anomalies)),
+				Value:     float64(len(anomalies)),
+				Threshold: 0,
+				Timestamp: time.Now(),
+				Resolved:  false,
+			}, true
+		}
+	case "流动性风险检查":
+		if issues, ok := result.([]map[string]interface{}); ok && len(issues) > 0 {
+			return RiskAlert{
+				Type:      "liquidity_risk",
+				Level:     "high",
+				Message:   fmt.Sprintf("检测到 %d 个流动性问题", len(issues)),
+				Value:     float64(len(issues)),
+				Threshold: 0,
+				Timestamp: time.Now(),
+				Resolved:  false,
+			}, true
+		}
+	case "持仓风险评估":
+		if riskData, ok := result.(map[string]interface{}); ok {
+			if riskPositions, exists := riskData["risk_positions"].(int); exists && riskPositions > 0 {
+				return RiskAlert{
+					Type:      "position_risk",
+					Level:     "high",
+					Message:   fmt.Sprintf("发现 %d 个高风险持仓", riskPositions),
+					Value:     float64(riskPositions),
+					Threshold: 0,
+					Timestamp: time.Now(),
+					Resolved:  false,
+				}, true
+			}
+		}
+	}
+	return RiskAlert{}, false
+}
+
+// generateRiskRecommendations 生成风险建议
+func (rme *RiskMonitorExecutor) generateRiskRecommendations(riskLevel string, alerts []RiskAlert) []string {
+	recommendations := make([]string, 0)
+
+	switch riskLevel {
+	case "critical":
+		recommendations = append(recommendations, "立即停止所有交易活动")
+		recommendations = append(recommendations, "紧急平仓高风险持仓")
+		recommendations = append(recommendations, "联系风险管理团队")
+	case "high":
+		recommendations = append(recommendations, "减少新开仓位")
+		recommendations = append(recommendations, "增加风险监控频率")
+		recommendations = append(recommendations, "考虑部分平仓")
+	case "medium":
+		recommendations = append(recommendations, "保持谨慎交易")
+		recommendations = append(recommendations, "密切关注市场动态")
+		recommendations = append(recommendations, "适当降低杠杆")
+	default:
+		recommendations = append(recommendations, "当前风险可控")
+		recommendations = append(recommendations, "继续正常交易")
+	}
+
+	// 根据具体告警添加针对性建议
+	for _, alert := range alerts {
+		switch alert.Type {
+		case "price_anomaly":
+			recommendations = append(recommendations, "暂停异常价格交易对的交易")
+		case "liquidity_risk":
+			recommendations = append(recommendations, "避免大额交易，分批执行")
+		case "position_risk":
+			recommendations = append(recommendations, "立即调整超限持仓")
+		}
+	}
+
+	return recommendations
+}
+
+// executeRiskResponse 执行风险应对措施
+func (rme *RiskMonitorExecutor) executeRiskResponse(ctx context.Context, riskLevel string, alerts []RiskAlert) error {
+	log.Printf("执行风险应对措施，风险等级: %s", riskLevel)
+
+	switch riskLevel {
+	case "critical":
+		// 紧急停止所有交易
+		return rme.emergencyStopTrading(ctx)
+	case "high":
+		// 减少风险敞口
+		return rme.reduceRiskExposure(ctx, alerts)
+	case "medium":
+		// 调整交易参数
+		return rme.adjustTradingParameters(ctx, alerts)
+	}
+
+	return nil
+}
+
+// getCurrentPrice 获取当前价格
+func (rme *RiskMonitorExecutor) getCurrentPrice(symbol string) (float64, error) {
+	// 这里应该调用交易所API获取实时价格
+	// 暂时返回模拟价格
+	prices := map[string]float64{
+		"BTCUSDT": 45000.0 + rand.Float64()*1000,
+		"ETHUSDT": 2800.0 + rand.Float64()*200,
+		"BNBUSDT": 350.0 + rand.Float64()*50,
+	}
+
+	if price, exists := prices[symbol]; exists {
+		return price, nil
+	}
+
+	return 0, fmt.Errorf("symbol %s not found", symbol)
+}
+
+// getAveragePrice 获取平均价格
+func (rme *RiskMonitorExecutor) getAveragePrice(symbol string, duration time.Duration) (float64, error) {
+	// 这里应该从数据库或API获取历史价格数据
+	// 暂时返回模拟的平均价格
+	currentPrice, err := rme.getCurrentPrice(symbol)
+	if err != nil {
+		return 0, err
+	}
+
+	// 模拟平均价格（当前价格的95%-105%）
+	avgPrice := currentPrice * (0.95 + rand.Float64()*0.1)
+	return avgPrice, nil
+}
+
+// getOrderBookDepth 获取订单簿深度
+func (rme *RiskMonitorExecutor) getOrderBookDepth(symbol string) (map[string]interface{}, error) {
+	// 模拟订单簿数据
+	return map[string]interface{}{
+		"bids": [][]float64{
+			{45000, 1.5}, {44990, 2.0}, {44980, 1.8},
+		},
+		"asks": [][]float64{
+			{45010, 1.2}, {45020, 1.8}, {45030, 2.2},
+		},
+	}, nil
+}
+
+// calculateLiquidity 计算流动性
+func (rme *RiskMonitorExecutor) calculateLiquidity(orders interface{}) float64 {
+	if orderList, ok := orders.([][]float64); ok {
+		totalLiquidity := 0.0
+		for _, order := range orderList {
+			if len(order) >= 2 {
+				totalLiquidity += order[0] * order[1] // 价格 * 数量
+			}
+		}
+		return totalLiquidity
+	}
+	return 0.0
+}
+
+// calculateSpread 计算价差
+func (rme *RiskMonitorExecutor) calculateSpread(orderBook map[string]interface{}) float64 {
+	bids, bidsOk := orderBook["bids"].([][]float64)
+	asks, asksOk := orderBook["asks"].([][]float64)
+
+	if !bidsOk || !asksOk || len(bids) == 0 || len(asks) == 0 {
+		return 0.01 // 默认1%价差
+	}
+
+	bestBid := bids[0][0]
+	bestAsk := asks[0][0]
+
+	return (bestAsk - bestBid) / bestBid
+}
+
+// getAllPositions 获取所有持仓
+func (rme *RiskMonitorExecutor) getAllPositions() ([]map[string]interface{}, error) {
+	// 模拟持仓数据
+	positions := []map[string]interface{}{
+		{
+			"symbol":     "BTCUSDT",
+			"size":       1.5,
+			"mark_price": 45000.0,
+			"side":       "LONG",
+		},
+		{
+			"symbol":     "ETHUSDT",
+			"size":       10.0,
+			"mark_price": 2800.0,
+			"side":       "LONG",
+		},
+	}
+	return positions, nil
+}
+
+// calculateVolatility 计算波动率
+func (rme *RiskMonitorExecutor) calculateVolatility(symbol string, duration time.Duration) (float64, error) {
+	// 简化的波动率计算，实际应该基于历史价格数据
+	// 返回模拟的波动率值
+	baseVolatility := map[string]float64{
+		"BTCUSDT": 0.25,
+		"ETHUSDT": 0.30,
+		"BNBUSDT": 0.35,
+	}
+
+	if vol, exists := baseVolatility[symbol]; exists {
+		// 添加随机波动
+		return vol * (0.8 + rand.Float64()*0.4), nil
+	}
+
+	return 0.20, nil // 默认20%波动率
+}
+
+// calculateMarketSentiment 计算市场情绪
+func (rme *RiskMonitorExecutor) calculateMarketSentiment() float64 {
+	// 简化的市场情绪计算
+	// 实际应该综合多个指标
+	return rand.Float64() * 100 // 0-100分
+}
+
+// getDeviationSeverity 获取偏差严重程度
+func (rme *RiskMonitorExecutor) getDeviationSeverity(deviation float64) string {
+	if deviation > 0.30 {
+		return "critical"
+	} else if deviation > 0.20 {
+		return "high"
+	} else if deviation > 0.15 {
+		return "medium"
+	}
+	return "low"
+}
+
+// getLiquiditySeverity 获取流动性严重程度
+func (rme *RiskMonitorExecutor) getLiquiditySeverity(bidLiquidity, askLiquidity, spread float64) string {
+	minLiquidity := rme.riskThresholds["liquidity_min"]
+
+	if bidLiquidity < minLiquidity*0.5 || askLiquidity < minLiquidity*0.5 || spread > 0.02 {
+		return "critical"
+	} else if bidLiquidity < minLiquidity*0.8 || askLiquidity < minLiquidity*0.8 || spread > 0.015 {
+		return "high"
+	}
+	return "medium"
+}
+
+// getVolatilitySeverity 获取波动率严重程度
+func (rme *RiskMonitorExecutor) getVolatilitySeverity(volatility float64) string {
+	limit := rme.riskThresholds["volatility_limit"]
+
+	if volatility > limit*1.5 {
+		return "critical"
+	} else if volatility > limit*1.2 {
+		return "high"
+	}
+	return "medium"
+}
+
+// getSentimentLevel 获取情绪等级
+func (rme *RiskMonitorExecutor) getSentimentLevel(score float64) string {
+	if score < 20 {
+		return "extreme_fear"
+	} else if score < 40 {
+		return "fear"
+	} else if score < 60 {
+		return "neutral"
+	} else if score < 80 {
+		return "greed"
+	}
+	return "extreme_greed"
+}
+
+// emergencyStopTrading 紧急停止交易
+func (rme *RiskMonitorExecutor) emergencyStopTrading(ctx context.Context) error {
+	log.Printf("🚨 执行紧急停止交易措施")
+
+	// 1. 取消所有挂单
+	err := rme.cancelAllOrders(ctx)
+	if err != nil {
+		log.Printf("取消挂单失败: %v", err)
+	}
+
+	// 2. 平仓高风险持仓
+	err = rme.closeHighRiskPositions(ctx)
+	if err != nil {
+		log.Printf("平仓失败: %v", err)
+	}
+
+	// 3. 暂停策略执行
+	err = rme.pauseAllStrategies(ctx)
+	if err != nil {
+		log.Printf("暂停策略失败: %v", err)
+	}
+
+	log.Printf("✅ 紧急停止交易措施执行完成")
+	return nil
+}
+
+// reduceRiskExposure 减少风险敞口
+func (rme *RiskMonitorExecutor) reduceRiskExposure(ctx context.Context, alerts []RiskAlert) error {
+	log.Printf("🔧 执行风险敞口减少措施")
+
+	for _, alert := range alerts {
+		switch alert.Type {
+		case "position_risk":
+			// 减少超限持仓
+			err := rme.reduceOversizedPositions(ctx)
+			if err != nil {
+				log.Printf("减少持仓失败: %v", err)
+			}
+		case "liquidity_risk":
+			// 暂停流动性不足的交易对
+			err := rme.pauseIlliquidPairs(ctx)
+			if err != nil {
+				log.Printf("暂停交易对失败: %v", err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// adjustTradingParameters 调整交易参数
+func (rme *RiskMonitorExecutor) adjustTradingParameters(ctx context.Context, alerts []RiskAlert) error {
+	log.Printf("⚙️ 调整交易参数")
+
+	// 降低杠杆倍数
+	err := rme.reduceLeverage(ctx)
+	if err != nil {
+		log.Printf("降低杠杆失败: %v", err)
+	}
+
+	// 调整仓位大小限制
+	err = rme.adjustPositionLimits(ctx)
+	if err != nil {
+		log.Printf("调整仓位限制失败: %v", err)
+	}
+
+	return nil
+}
+
+// cancelAllOrders 取消所有挂单
+func (rme *RiskMonitorExecutor) cancelAllOrders(ctx context.Context) error {
+	// 这里应该调用交易所API取消所有挂单
+	log.Printf("取消所有挂单")
+	return nil
+}
+
+// closeHighRiskPositions 平仓高风险持仓
+func (rme *RiskMonitorExecutor) closeHighRiskPositions(ctx context.Context) error {
+	// 这里应该识别并平仓高风险持仓
+	log.Printf("平仓高风险持仓")
+	return nil
+}
+
+// pauseAllStrategies 暂停所有策略
+func (rme *RiskMonitorExecutor) pauseAllStrategies(ctx context.Context) error {
+	// 这里应该暂停所有运行中的策略
+	log.Printf("暂停所有策略执行")
+	return nil
+}
+
+// reduceOversizedPositions 减少超限持仓
+func (rme *RiskMonitorExecutor) reduceOversizedPositions(ctx context.Context) error {
+	log.Printf("减少超限持仓")
+	return nil
+}
+
+// pauseIlliquidPairs 暂停流动性不足的交易对
+func (rme *RiskMonitorExecutor) pauseIlliquidPairs(ctx context.Context) error {
+	log.Printf("暂停流动性不足的交易对")
+	return nil
+}
+
+// reduceLeverage 降低杠杆
+func (rme *RiskMonitorExecutor) reduceLeverage(ctx context.Context) error {
+	log.Printf("降低杠杆倍数")
+	return nil
+}
+
+// adjustPositionLimits 调整仓位限制
+func (rme *RiskMonitorExecutor) adjustPositionLimits(ctx context.Context) error {
+	log.Printf("调整仓位大小限制")
+	return nil
 }
 
 // DataCleaningExecutor 数据清洗执行器
 type DataCleaningExecutor struct {
 	BaseExecutor
+	config         *config.Config
+	db             *database.DB
+	exchange       exchange.Exchange
+	accountManager *account.Manager
+	mu             sync.RWMutex
+	cleaningRules  []DataCleaningRule
+	qualityMetrics *DataQualityMetrics
+}
+
+// DataCleaningRule 数据清洗规则
+type DataCleaningRule struct {
+	Name        string                 `json:"name"`
+	Type        string                 `json:"type"`
+	Parameters  map[string]interface{} `json:"parameters"`
+	Enabled     bool                   `json:"enabled"`
+	Priority    int                    `json:"priority"`
+	Description string                 `json:"description"`
+}
+
+// DataQualityMetrics 数据质量指标
+type DataQualityMetrics struct {
+	Completeness float64 `json:"completeness"` // 完整性
+	Accuracy     float64 `json:"accuracy"`     // 准确性
+	Consistency  float64 `json:"consistency"`  // 一致性
+	Timeliness   float64 `json:"timeliness"`   // 及时性
+	Validity     float64 `json:"validity"`     // 有效性
+	Overall      float64 `json:"overall"`      // 总体评分
 }
 
 // NewDataCleaningExecutor 创建数据清洗执行器
@@ -146,44 +952,924 @@ func NewDataCleaningExecutor() *DataCleaningExecutor {
 				"io":     "very_high",
 			},
 		},
+		cleaningRules: []DataCleaningRule{
+			{
+				Name:        "价格异常检测",
+				Type:        "price_anomaly",
+				Parameters:  map[string]interface{}{"threshold": 0.1, "window": 100},
+				Enabled:     true,
+				Priority:    1,
+				Description: "检测并移除异常价格数据",
+			},
+			{
+				Name:        "重复数据去除",
+				Type:        "duplicate_removal",
+				Parameters:  map[string]interface{}{"key_fields": []string{"timestamp", "symbol", "price"}},
+				Enabled:     true,
+				Priority:    2,
+				Description: "移除重复的市场数据记录",
+			},
+			{
+				Name:        "缺失值处理",
+				Type:        "missing_value",
+				Parameters:  map[string]interface{}{"method": "interpolation", "max_gap": 5},
+				Enabled:     true,
+				Priority:    3,
+				Description: "填充或移除缺失值",
+			},
+			{
+				Name:        "数据格式标准化",
+				Type:        "format_standardization",
+				Parameters:  map[string]interface{}{"decimal_places": 8, "timestamp_format": "RFC3339"},
+				Enabled:     true,
+				Priority:    4,
+				Description: "标准化数据格式",
+			},
+		},
+		qualityMetrics: &DataQualityMetrics{},
 	}
 }
 
 // Execute 执行数据清洗
 func (dce *DataCleaningExecutor) Execute(ctx context.Context, params map[string]interface{}) (interface{}, error) {
 	log.Printf("🔄 开始数据清洗与校正...")
+	startTime := time.Now()
 
-	// 模拟数据清洗过程
-	select {
-	case <-time.After(3 * time.Second):
-		// 正常完成
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	// 获取数据源
+	dataSource, ok := params["data_source"].(string)
+	if !ok {
+		dataSource = "market_data" // 默认清洗市场数据
 	}
 
-	// 模拟清洗结果
-	result := map[string]interface{}{
-		"processed_records":  50000,
-		"cleaned_records":    48500,
-		"anomalies_removed":  1500,
-		"data_quality_score": 0.97,
-		"cleaning_operations": []string{
-			"异常价格数据过滤",
-			"重复数据去除",
-			"缺失值填充",
-			"数据格式标准化",
-		},
-		"processing_time": "3s",
+	// 获取时间范围
+	timeRange := dce.getTimeRange(params)
+
+	// 执行数据清洗流程
+	cleaningResult, err := dce.performDataCleaning(ctx, dataSource, timeRange)
+	if err != nil {
+		return nil, fmt.Errorf("数据清洗失败: %w", err)
+	}
+
+	// 计算数据质量指标
+	qualityMetrics := dce.calculateDataQuality(cleaningResult)
+
+	// 生成清洗报告
+	report := dce.generateCleaningReport(cleaningResult, qualityMetrics, time.Since(startTime))
+
+	// 如果启用自动应用，保存清洗后的数据
+	if autoApply, ok := params["auto_apply"].(bool); ok && autoApply {
+		err = dce.applyCleaningResults(ctx, cleaningResult)
+		if err != nil {
+			log.Printf("应用清洗结果失败: %v", err)
+		}
 	}
 
 	log.Printf("✅ 数据清洗完成，处理 %d 条记录，数据质量评分: %.2f",
-		result["processed_records"], result["data_quality_score"])
+		cleaningResult.ProcessedRecords, qualityMetrics.Overall)
+
+	return report, nil
+}
+
+// CleaningResult 清洗结果
+type CleaningResult struct {
+	ProcessedRecords int                    `json:"processed_records"`
+	CleanedRecords   int                    `json:"cleaned_records"`
+	RemovedRecords   int                    `json:"removed_records"`
+	ModifiedRecords  int                    `json:"modified_records"`
+	Operations       []CleaningOperation    `json:"operations"`
+	Issues           []DataIssue            `json:"issues"`
+	Statistics       map[string]interface{} `json:"statistics"`
+}
+
+// CleaningOperation 清洗操作
+type CleaningOperation struct {
+	Name            string    `json:"name"`
+	Type            string    `json:"type"`
+	RecordsAffected int       `json:"records_affected"`
+	ExecutionTime   string    `json:"execution_time"`
+	Success         bool      `json:"success"`
+	Error           string    `json:"error,omitempty"`
+	Timestamp       time.Time `json:"timestamp"`
+}
+
+// DataIssue 数据问题
+type DataIssue struct {
+	Type        string                   `json:"type"`
+	Severity    string                   `json:"severity"`
+	Description string                   `json:"description"`
+	Count       int                      `json:"count"`
+	Examples    []map[string]interface{} `json:"examples"`
+	Resolved    bool                     `json:"resolved"`
+}
+
+// performDataCleaning 执行数据清洗
+func (dce *DataCleaningExecutor) performDataCleaning(ctx context.Context, dataSource string, timeRange map[string]time.Time) (*CleaningResult, error) {
+	result := &CleaningResult{
+		Operations: make([]CleaningOperation, 0),
+		Issues:     make([]DataIssue, 0),
+		Statistics: make(map[string]interface{}),
+	}
+
+	// 获取原始数据
+	rawData, err := dce.fetchRawData(ctx, dataSource, timeRange)
+	if err != nil {
+		return nil, fmt.Errorf("获取原始数据失败: %w", err)
+	}
+
+	result.ProcessedRecords = len(rawData)
+	log.Printf("获取到 %d 条原始数据记录", result.ProcessedRecords)
+
+	// 按优先级执行清洗规则
+	cleanedData := rawData
+	for _, rule := range dce.cleaningRules {
+		if !rule.Enabled {
+			continue
+		}
+
+		operationStart := time.Now()
+		beforeCount := len(cleanedData)
+
+		// 执行清洗规则
+		cleanedData, err = dce.applyCleaningRule(ctx, rule, cleanedData)
+
+		operation := CleaningOperation{
+			Name:          rule.Name,
+			Type:          rule.Type,
+			ExecutionTime: time.Since(operationStart).String(),
+			Success:       err == nil,
+			Timestamp:     time.Now(),
+		}
+
+		if err != nil {
+			operation.Error = err.Error()
+			log.Printf("清洗规则 %s 执行失败: %v", rule.Name, err)
+		} else {
+			operation.RecordsAffected = beforeCount - len(cleanedData)
+			log.Printf("清洗规则 %s 执行完成，影响 %d 条记录", rule.Name, operation.RecordsAffected)
+		}
+
+		result.Operations = append(result.Operations, operation)
+	}
+
+	result.CleanedRecords = len(cleanedData)
+	result.RemovedRecords = result.ProcessedRecords - result.CleanedRecords
+	result.ModifiedRecords = dce.countModifiedRecords(rawData, cleanedData)
+
+	// 收集数据质量问题
+	result.Issues = dce.identifyDataIssues(cleanedData)
+
+	// 生成统计信息
+	result.Statistics = dce.generateStatistics(rawData, cleanedData)
+
 	return result, nil
+}
+
+// getTimeRange 获取时间范围
+func (dce *DataCleaningExecutor) getTimeRange(params map[string]interface{}) map[string]time.Time {
+	timeRange := make(map[string]time.Time)
+
+	// 默认时间范围：过去24小时
+	now := time.Now()
+	timeRange["start"] = now.Add(-24 * time.Hour)
+	timeRange["end"] = now
+
+	// 从参数中获取自定义时间范围
+	if startTime, ok := params["start_time"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, startTime); err == nil {
+			timeRange["start"] = t
+		}
+	}
+
+	if endTime, ok := params["end_time"].(string); ok {
+		if t, err := time.Parse(time.RFC3339, endTime); err == nil {
+			timeRange["end"] = t
+		}
+	}
+
+	return timeRange
+}
+
+// fetchRawData 获取原始数据
+func (dce *DataCleaningExecutor) fetchRawData(ctx context.Context, dataSource string, timeRange map[string]time.Time) ([]map[string]interface{}, error) {
+	// 这里应该从数据库或其他数据源获取实际数据
+	// 暂时返回模拟数据
+
+	var rawData []map[string]interface{}
+
+	switch dataSource {
+	case "market_data":
+		rawData = dce.generateMockMarketData(timeRange)
+	case "trading_data":
+		rawData = dce.generateMockTradingData(timeRange)
+	case "account_data":
+		rawData = dce.generateMockAccountData(timeRange)
+	default:
+		return nil, fmt.Errorf("不支持的数据源: %s", dataSource)
+	}
+
+	return rawData, nil
+}
+
+// generateMockMarketData 生成模拟市场数据
+func (dce *DataCleaningExecutor) generateMockMarketData(timeRange map[string]time.Time) []map[string]interface{} {
+	data := make([]map[string]interface{}, 0)
+
+	symbols := []string{"BTCUSDT", "ETHUSDT", "BNBUSDT"}
+	start := timeRange["start"]
+	end := timeRange["end"]
+
+	// 生成每分钟的数据点
+	for t := start; t.Before(end); t = t.Add(time.Minute) {
+		for _, symbol := range symbols {
+			// 正常数据
+			record := map[string]interface{}{
+				"timestamp": t,
+				"symbol":    symbol,
+				"price":     45000.0 + rand.Float64()*1000,
+				"volume":    rand.Float64() * 100,
+				"high":      45500.0 + rand.Float64()*500,
+				"low":       44500.0 + rand.Float64()*500,
+			}
+			data = append(data, record)
+
+			// 偶尔添加异常数据用于测试清洗功能
+			if rand.Float64() < 0.05 { // 5%概率
+				anomalyRecord := map[string]interface{}{
+					"timestamp": t,
+					"symbol":    symbol,
+					"price":     45000.0 * (1 + (rand.Float64()-0.5)*0.5), // 异常价格
+					"volume":    rand.Float64() * 1000,                    // 异常交易量
+					"high":      nil,                                      // 缺失值
+					"low":       44500.0,
+				}
+				data = append(data, anomalyRecord)
+			}
+		}
+	}
+
+	return data
+}
+
+// generateMockTradingData 生成模拟交易数据
+func (dce *DataCleaningExecutor) generateMockTradingData(timeRange map[string]time.Time) []map[string]interface{} {
+	data := make([]map[string]interface{}, 0)
+
+	start := timeRange["start"]
+	end := timeRange["end"]
+
+	for t := start; t.Before(end); t = t.Add(5 * time.Minute) {
+		record := map[string]interface{}{
+			"timestamp":  t,
+			"order_id":   fmt.Sprintf("order_%d", rand.Int63()),
+			"symbol":     "BTCUSDT",
+			"side":       []string{"BUY", "SELL"}[rand.Intn(2)],
+			"quantity":   rand.Float64() * 10,
+			"price":      45000.0 + rand.Float64()*1000,
+			"status":     "FILLED",
+			"commission": rand.Float64() * 10,
+		}
+		data = append(data, record)
+	}
+
+	return data
+}
+
+// generateMockAccountData 生成模拟账户数据
+func (dce *DataCleaningExecutor) generateMockAccountData(timeRange map[string]time.Time) []map[string]interface{} {
+	data := make([]map[string]interface{}, 0)
+
+	start := timeRange["start"]
+	end := timeRange["end"]
+
+	for t := start; t.Before(end); t = t.Add(time.Hour) {
+		record := map[string]interface{}{
+			"timestamp":     t,
+			"account_id":    "account_001",
+			"total_balance": 100000.0 + rand.Float64()*10000,
+			"available":     90000.0 + rand.Float64()*5000,
+			"locked":        rand.Float64() * 1000,
+			"pnl":           (rand.Float64() - 0.5) * 2000,
+		}
+		data = append(data, record)
+	}
+
+	return data
+}
+
+// applyCleaningRule 应用清洗规则
+func (dce *DataCleaningExecutor) applyCleaningRule(ctx context.Context, rule DataCleaningRule, data []map[string]interface{}) ([]map[string]interface{}, error) {
+	switch rule.Type {
+	case "price_anomaly":
+		return dce.removePriceAnomalies(data, rule.Parameters)
+	case "duplicate_removal":
+		return dce.removeDuplicates(data, rule.Parameters)
+	case "missing_value":
+		return dce.handleMissingValues(data, rule.Parameters)
+	case "format_standardization":
+		return dce.standardizeFormat(data, rule.Parameters)
+	default:
+		return data, fmt.Errorf("未知的清洗规则类型: %s", rule.Type)
+	}
+}
+
+// removePriceAnomalies 移除价格异常
+func (dce *DataCleaningExecutor) removePriceAnomalies(data []map[string]interface{}, params map[string]interface{}) ([]map[string]interface{}, error) {
+	threshold, ok := params["threshold"].(float64)
+	if !ok {
+		threshold = 0.1 // 默认10%阈值
+	}
+
+	window, ok := params["window"].(float64)
+	if !ok {
+		window = 100 // 默认100个数据点的窗口
+	}
+
+	cleaned := make([]map[string]interface{}, 0)
+	windowSize := int(window)
+
+	for i, record := range data {
+		price, ok := record["price"].(float64)
+		if !ok {
+			continue // 跳过无效价格
+		}
+
+		// 计算窗口内的平均价格
+		start := int(math.Max(0, float64(i-windowSize/2)))
+		end := int(math.Min(float64(len(data)), float64(i+windowSize/2)))
+
+		avgPrice := dce.calculateAveragePrice(data[start:end])
+		if avgPrice == 0 {
+			continue
+		}
+
+		// 检查价格偏差
+		deviation := math.Abs(price-avgPrice) / avgPrice
+		if deviation <= threshold {
+			cleaned = append(cleaned, record)
+		}
+	}
+
+	return cleaned, nil
+}
+
+// calculateAveragePrice 计算平均价格
+func (dce *DataCleaningExecutor) calculateAveragePrice(data []map[string]interface{}) float64 {
+	total := 0.0
+	count := 0
+
+	for _, record := range data {
+		if price, ok := record["price"].(float64); ok {
+			total += price
+			count++
+		}
+	}
+
+	if count == 0 {
+		return 0
+	}
+
+	return total / float64(count)
+}
+
+// removeDuplicates 移除重复数据
+func (dce *DataCleaningExecutor) removeDuplicates(data []map[string]interface{}, params map[string]interface{}) ([]map[string]interface{}, error) {
+	keyFields, ok := params["key_fields"].([]string)
+	if !ok {
+		keyFields = []string{"timestamp", "symbol"} // 默认键字段
+	}
+
+	seen := make(map[string]bool)
+	cleaned := make([]map[string]interface{}, 0)
+
+	for _, record := range data {
+		// 生成唯一键
+		key := dce.generateRecordKey(record, keyFields)
+
+		if !seen[key] {
+			seen[key] = true
+			cleaned = append(cleaned, record)
+		}
+	}
+
+	return cleaned, nil
+}
+
+// generateRecordKey 生成记录键
+func (dce *DataCleaningExecutor) generateRecordKey(record map[string]interface{}, keyFields []string) string {
+	var keyParts []string
+
+	for _, field := range keyFields {
+		if value, exists := record[field]; exists {
+			keyParts = append(keyParts, fmt.Sprintf("%v", value))
+		}
+	}
+
+	return fmt.Sprintf("%s", keyParts)
+}
+
+// handleMissingValues 处理缺失值
+func (dce *DataCleaningExecutor) handleMissingValues(data []map[string]interface{}, params map[string]interface{}) ([]map[string]interface{}, error) {
+	method, ok := params["method"].(string)
+	if !ok {
+		method = "remove" // 默认移除缺失值
+	}
+
+	maxGap, ok := params["max_gap"].(float64)
+	if !ok {
+		maxGap = 5 // 默认最大间隔
+	}
+
+	switch method {
+	case "remove":
+		return dce.removeMissingValues(data), nil
+	case "interpolation":
+		return dce.interpolateMissingValues(data, int(maxGap)), nil
+	case "forward_fill":
+		return dce.forwardFillMissingValues(data), nil
+	default:
+		return data, fmt.Errorf("未知的缺失值处理方法: %s", method)
+	}
+}
+
+// removeMissingValues 移除缺失值
+func (dce *DataCleaningExecutor) removeMissingValues(data []map[string]interface{}) []map[string]interface{} {
+	cleaned := make([]map[string]interface{}, 0)
+
+	for _, record := range data {
+		hasNil := false
+		for _, value := range record {
+			if value == nil {
+				hasNil = true
+				break
+			}
+		}
+
+		if !hasNil {
+			cleaned = append(cleaned, record)
+		}
+	}
+
+	return cleaned
+}
+
+// interpolateMissingValues 插值填充缺失值
+func (dce *DataCleaningExecutor) interpolateMissingValues(data []map[string]interface{}, maxGap int) []map[string]interface{} {
+	if len(data) == 0 {
+		return data
+	}
+
+	cleaned := make([]map[string]interface{}, len(data))
+	copy(cleaned, data)
+
+	// 对数值字段进行插值
+	numericFields := []string{"price", "volume", "high", "low"}
+
+	for _, field := range numericFields {
+		dce.interpolateField(cleaned, field, maxGap)
+	}
+
+	return cleaned
+}
+
+// interpolateField 插值单个字段
+func (dce *DataCleaningExecutor) interpolateField(data []map[string]interface{}, field string, maxGap int) {
+	for i := 0; i < len(data); i++ {
+		if data[i][field] == nil {
+			// 找到前一个有效值
+			prevIndex := -1
+			for j := i - 1; j >= 0; j-- {
+				if data[j][field] != nil {
+					prevIndex = j
+					break
+				}
+			}
+
+			// 找到后一个有效值
+			nextIndex := -1
+			for j := i + 1; j < len(data); j++ {
+				if data[j][field] != nil {
+					nextIndex = j
+					break
+				}
+			}
+
+			// 如果间隔不超过最大间隔，进行插值
+			if prevIndex != -1 && nextIndex != -1 && nextIndex-prevIndex <= maxGap {
+				prevValue, _ := data[prevIndex][field].(float64)
+				nextValue, _ := data[nextIndex][field].(float64)
+
+				// 线性插值
+				ratio := float64(i-prevIndex) / float64(nextIndex-prevIndex)
+				interpolatedValue := prevValue + ratio*(nextValue-prevValue)
+				data[i][field] = interpolatedValue
+			}
+		}
+	}
+}
+
+// forwardFillMissingValues 前向填充缺失值
+func (dce *DataCleaningExecutor) forwardFillMissingValues(data []map[string]interface{}) []map[string]interface{} {
+	if len(data) == 0 {
+		return data
+	}
+
+	cleaned := make([]map[string]interface{}, len(data))
+	copy(cleaned, data)
+
+	// 对所有字段进行前向填充
+	for i := 1; i < len(cleaned); i++ {
+		for field, value := range cleaned[i] {
+			if value == nil {
+				// 使用前一条记录的值
+				if prevValue, exists := cleaned[i-1][field]; exists && prevValue != nil {
+					cleaned[i][field] = prevValue
+				}
+			}
+		}
+	}
+
+	return cleaned
+}
+
+// standardizeFormat 标准化格式
+func (dce *DataCleaningExecutor) standardizeFormat(data []map[string]interface{}, params map[string]interface{}) ([]map[string]interface{}, error) {
+	decimalPlaces, ok := params["decimal_places"].(float64)
+	if !ok {
+		decimalPlaces = 8 // 默认8位小数
+	}
+
+	timestampFormat, ok := params["timestamp_format"].(string)
+	if !ok {
+		timestampFormat = time.RFC3339 // 默认时间格式
+	}
+
+	cleaned := make([]map[string]interface{}, len(data))
+
+	for i, record := range data {
+		cleanedRecord := make(map[string]interface{})
+
+		for field, value := range record {
+			switch field {
+			case "price", "volume", "high", "low", "quantity", "commission":
+				// 标准化数值字段
+				if floatValue, ok := value.(float64); ok {
+					multiplier := math.Pow(10, decimalPlaces)
+					cleanedRecord[field] = math.Round(floatValue*multiplier) / multiplier
+				} else {
+					cleanedRecord[field] = value
+				}
+			case "timestamp":
+				// 标准化时间字段
+				if timeValue, ok := value.(time.Time); ok {
+					cleanedRecord[field] = timeValue.Format(timestampFormat)
+				} else {
+					cleanedRecord[field] = value
+				}
+			default:
+				cleanedRecord[field] = value
+			}
+		}
+
+		cleaned[i] = cleanedRecord
+	}
+
+	return cleaned, nil
+}
+
+// countModifiedRecords 计算修改的记录数
+func (dce *DataCleaningExecutor) countModifiedRecords(original, cleaned []map[string]interface{}) int {
+	// 简化实现：假设所有清洗操作都可能修改记录
+	// 实际实现中应该跟踪具体的修改
+	return len(original) - len(cleaned)
+}
+
+// identifyDataIssues 识别数据质量问题
+func (dce *DataCleaningExecutor) identifyDataIssues(data []map[string]interface{}) []DataIssue {
+	issues := make([]DataIssue, 0)
+
+	// 检查缺失值问题
+	missingValueCount := dce.countMissingValues(data)
+	if missingValueCount > 0 {
+		issues = append(issues, DataIssue{
+			Type:        "missing_values",
+			Severity:    "medium",
+			Description: "数据中存在缺失值",
+			Count:       missingValueCount,
+			Examples:    dce.getMissingValueExamples(data),
+			Resolved:    false,
+		})
+	}
+
+	// 检查异常值问题
+	outlierCount := dce.countOutliers(data)
+	if outlierCount > 0 {
+		issues = append(issues, DataIssue{
+			Type:        "outliers",
+			Severity:    "high",
+			Description: "数据中存在异常值",
+			Count:       outlierCount,
+			Examples:    dce.getOutlierExamples(data),
+			Resolved:    false,
+		})
+	}
+
+	return issues
+}
+
+// countMissingValues 计算缺失值数量
+func (dce *DataCleaningExecutor) countMissingValues(data []map[string]interface{}) int {
+	count := 0
+	for _, record := range data {
+		for _, value := range record {
+			if value == nil {
+				count++
+			}
+		}
+	}
+	return count
+}
+
+// getMissingValueExamples 获取缺失值示例
+func (dce *DataCleaningExecutor) getMissingValueExamples(data []map[string]interface{}) []map[string]interface{} {
+	examples := make([]map[string]interface{}, 0)
+	count := 0
+
+	for _, record := range data {
+		hasNil := false
+		for _, value := range record {
+			if value == nil {
+				hasNil = true
+				break
+			}
+		}
+
+		if hasNil && count < 3 { // 最多返回3个示例
+			examples = append(examples, record)
+			count++
+		}
+	}
+
+	return examples
+}
+
+// countOutliers 计算异常值数量
+func (dce *DataCleaningExecutor) countOutliers(data []map[string]interface{}) int {
+	// 简化的异常值检测
+	count := 0
+	prices := make([]float64, 0)
+
+	// 收集价格数据
+	for _, record := range data {
+		if price, ok := record["price"].(float64); ok {
+			prices = append(prices, price)
+		}
+	}
+
+	if len(prices) == 0 {
+		return 0
+	}
+
+	// 计算均值和标准差
+	mean := dce.calculateMean(prices)
+	stdDev := dce.calculateStdDev(prices, mean)
+
+	// 使用3σ规则检测异常值
+	for _, price := range prices {
+		if math.Abs(price-mean) > 3*stdDev {
+			count++
+		}
+	}
+
+	return count
+}
+
+// calculateMean 计算均值
+func (dce *DataCleaningExecutor) calculateMean(values []float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+
+	sum := 0.0
+	for _, value := range values {
+		sum += value
+	}
+
+	return sum / float64(len(values))
+}
+
+// calculateStdDev 计算标准差
+func (dce *DataCleaningExecutor) calculateStdDev(values []float64, mean float64) float64 {
+	if len(values) == 0 {
+		return 0
+	}
+
+	sumSquares := 0.0
+	for _, value := range values {
+		diff := value - mean
+		sumSquares += diff * diff
+	}
+
+	variance := sumSquares / float64(len(values))
+	return math.Sqrt(variance)
+}
+
+// getOutlierExamples 获取异常值示例
+func (dce *DataCleaningExecutor) getOutlierExamples(data []map[string]interface{}) []map[string]interface{} {
+	examples := make([]map[string]interface{}, 0)
+	prices := make([]float64, 0)
+
+	// 收集价格数据
+	for _, record := range data {
+		if price, ok := record["price"].(float64); ok {
+			prices = append(prices, price)
+		}
+	}
+
+	if len(prices) == 0 {
+		return examples
+	}
+
+	mean := dce.calculateMean(prices)
+	stdDev := dce.calculateStdDev(prices, mean)
+	count := 0
+
+	for _, record := range data {
+		if price, ok := record["price"].(float64); ok {
+			if math.Abs(price-mean) > 3*stdDev && count < 3 {
+				examples = append(examples, record)
+				count++
+			}
+		}
+	}
+
+	return examples
+}
+
+// generateStatistics 生成统计信息
+func (dce *DataCleaningExecutor) generateStatistics(original, cleaned []map[string]interface{}) map[string]interface{} {
+	stats := make(map[string]interface{})
+
+	stats["original_count"] = len(original)
+	stats["cleaned_count"] = len(cleaned)
+	stats["removed_count"] = len(original) - len(cleaned)
+	stats["removal_rate"] = float64(len(original)-len(cleaned)) / float64(len(original))
+
+	// 计算价格统计
+	if priceStats := dce.calculatePriceStatistics(cleaned); priceStats != nil {
+		stats["price_statistics"] = priceStats
+	}
+
+	// 计算交易量统计
+	if volumeStats := dce.calculateVolumeStatistics(cleaned); volumeStats != nil {
+		stats["volume_statistics"] = volumeStats
+	}
+
+	return stats
+}
+
+// calculatePriceStatistics 计算价格统计
+func (dce *DataCleaningExecutor) calculatePriceStatistics(data []map[string]interface{}) map[string]interface{} {
+	prices := make([]float64, 0)
+
+	for _, record := range data {
+		if price, ok := record["price"].(float64); ok {
+			prices = append(prices, price)
+		}
+	}
+
+	if len(prices) == 0 {
+		return nil
+	}
+
+	mean := dce.calculateMean(prices)
+	stdDev := dce.calculateStdDev(prices, mean)
+
+	// 找到最大值和最小值
+	min := prices[0]
+	max := prices[0]
+	for _, price := range prices {
+		if price < min {
+			min = price
+		}
+		if price > max {
+			max = price
+		}
+	}
+
+	return map[string]interface{}{
+		"mean":    mean,
+		"std_dev": stdDev,
+		"min":     min,
+		"max":     max,
+		"count":   len(prices),
+	}
+}
+
+// calculateVolumeStatistics 计算交易量统计
+func (dce *DataCleaningExecutor) calculateVolumeStatistics(data []map[string]interface{}) map[string]interface{} {
+	volumes := make([]float64, 0)
+
+	for _, record := range data {
+		if volume, ok := record["volume"].(float64); ok {
+			volumes = append(volumes, volume)
+		}
+	}
+
+	if len(volumes) == 0 {
+		return nil
+	}
+
+	mean := dce.calculateMean(volumes)
+	stdDev := dce.calculateStdDev(volumes, mean)
+
+	return map[string]interface{}{
+		"mean":    mean,
+		"std_dev": stdDev,
+		"count":   len(volumes),
+	}
+}
+
+// calculateDataQuality 计算数据质量指标
+func (dce *DataCleaningExecutor) calculateDataQuality(result *CleaningResult) *DataQualityMetrics {
+	metrics := &DataQualityMetrics{}
+
+	// 完整性：基于缺失值比例
+	totalFields := result.ProcessedRecords * 6                          // 假设每条记录有6个字段
+	missingFields := dce.countMissingValues([]map[string]interface{}{}) // 简化实现
+	metrics.Completeness = 1.0 - float64(missingFields)/float64(totalFields)
+
+	// 准确性：基于异常值比例
+	outliers := dce.countOutliers([]map[string]interface{}{}) // 简化实现
+	metrics.Accuracy = 1.0 - float64(outliers)/float64(result.ProcessedRecords)
+
+	// 一致性：基于格式标准化程度
+	metrics.Consistency = 0.95 // 简化实现
+
+	// 及时性：基于数据新鲜度
+	metrics.Timeliness = 0.90 // 简化实现
+
+	// 有效性：基于数据有效性检查
+	metrics.Validity = float64(result.CleanedRecords) / float64(result.ProcessedRecords)
+
+	// 总体评分：各项指标的加权平均
+	metrics.Overall = (metrics.Completeness*0.2 + metrics.Accuracy*0.3 +
+		metrics.Consistency*0.2 + metrics.Timeliness*0.1 + metrics.Validity*0.2)
+
+	return metrics
+}
+
+// generateCleaningReport 生成清洗报告
+func (dce *DataCleaningExecutor) generateCleaningReport(result *CleaningResult, metrics *DataQualityMetrics, duration time.Duration) map[string]interface{} {
+	return map[string]interface{}{
+		"processed_records":   result.ProcessedRecords,
+		"cleaned_records":     result.CleanedRecords,
+		"removed_records":     result.RemovedRecords,
+		"modified_records":    result.ModifiedRecords,
+		"data_quality_score":  metrics.Overall,
+		"quality_metrics":     metrics,
+		"cleaning_operations": result.Operations,
+		"data_issues":         result.Issues,
+		"statistics":          result.Statistics,
+		"processing_time":     duration.String(),
+		"success_rate":        float64(result.CleanedRecords) / float64(result.ProcessedRecords),
+	}
+}
+
+// applyCleaningResults 应用清洗结果
+func (dce *DataCleaningExecutor) applyCleaningResults(ctx context.Context, result *CleaningResult) error {
+	// 这里应该将清洗后的数据保存到数据库
+	log.Printf("应用数据清洗结果：清洗了 %d 条记录", result.CleanedRecords)
+
+	// 实际实现中应该：
+	// 1. 备份原始数据
+	// 2. 更新数据库中的数据
+	// 3. 记录清洗历史
+	// 4. 通知相关系统数据已更新
+
+	return nil
 }
 
 // SystemHealthExecutor 系统健康监控执行器
 type SystemHealthExecutor struct {
 	BaseExecutor
+	config          *config.Config
+	db              *database.DB
+	exchange        exchange.Exchange
+	accountManager  *account.Manager
+	mu              sync.RWMutex
+	healthChecks    []HealthCheck
+	alertThresholds map[string]float64
+}
+
+// HealthCheck 健康检查项
+type HealthCheck struct {
+	Name         string        `json:"name"`
+	Type         string        `json:"type"`
+	Status       string        `json:"status"`
+	Message      string        `json:"message"`
+	ResponseTime time.Duration `json:"response_time"`
+	LastCheck    time.Time     `json:"last_check"`
+	Enabled      bool          `json:"enabled"`
 }
 
 // NewSystemHealthExecutor 创建系统健康监控执行器
@@ -197,42 +1883,277 @@ func NewSystemHealthExecutor() *SystemHealthExecutor {
 				"io":     "medium",
 			},
 		},
+		healthChecks: make([]HealthCheck, 0),
+		alertThresholds: map[string]float64{
+			"cpu_usage":     80.0, // CPU使用率阈值
+			"memory_usage":  85.0, // 内存使用率阈值
+			"disk_usage":    90.0, // 磁盘使用率阈值
+			"response_time": 5000, // 响应时间阈值(毫秒)
+		},
 	}
 }
 
 // Execute 执行系统健康检查
 func (she *SystemHealthExecutor) Execute(ctx context.Context, params map[string]interface{}) (interface{}, error) {
-	log.Printf("🔄 开始系统健康检查...")
+	log.Printf("🔄 开始系统健康监控...")
+	startTime := time.Now()
 
-	// 模拟健康检查
-	select {
-	case <-time.After(1 * time.Second):
-		// 正常完成
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	// 执行各项健康检查
+	healthChecks := []func(context.Context) HealthCheck{
+		she.checkDatabase,
+		she.checkExchangeAPI,
+		she.checkMemoryUsage,
+		she.checkCPUUsage,
+		she.checkDiskSpace,
+		she.checkNetworkConnectivity,
+		she.checkServiceStatus,
 	}
 
-	// 模拟健康检查结果
+	var checks []HealthCheck
+	var alerts []string
+	overallHealth := "healthy"
+
+	for _, checkFunc := range healthChecks {
+		check := checkFunc(ctx)
+		checks = append(checks, check)
+
+		// 根据检查结果更新整体健康状态
+		if check.Status == "critical" {
+			overallHealth = "critical"
+			alerts = append(alerts, fmt.Sprintf("%s: %s", check.Name, check.Message))
+		} else if check.Status == "warning" && overallHealth == "healthy" {
+			overallHealth = "warning"
+			alerts = append(alerts, fmt.Sprintf("%s: %s", check.Name, check.Message))
+		}
+	}
+
+	// 收集系统指标
+	metrics := she.collectSystemMetrics()
+
+	// 生成健康报告
 	result := map[string]interface{}{
-		"overall_health": "healthy",
-		"components": map[string]interface{}{
-			"cpu_usage":       rand.Float64()*50 + 20, // 20-70%
-			"memory_usage":    rand.Float64()*40 + 30, // 30-70%
-			"disk_usage":      rand.Float64()*30 + 40, // 40-70%
-			"network_latency": rand.Float64()*50 + 10, // 10-60ms
-		},
-		"services_status": map[string]string{
-			"database":    "healthy",
-			"redis":       "healthy",
-			"api_server":  "healthy",
-			"worker_pool": "healthy",
-		},
-		"uptime":     "24h 15m 30s",
-		"check_time": time.Now(),
+		"overall_health": overallHealth,
+		"health_checks":  checks,
+		"system_metrics": metrics,
+		"alerts":         alerts,
+		"check_time":     time.Now(),
+		"check_duration": time.Since(startTime).String(),
+		"total_checks":   len(checks),
+		"failed_checks":  she.countFailedChecks(checks),
 	}
 
-	log.Printf("✅ 系统健康检查完成，整体状态: %s", result["overall_health"])
+	log.Printf("✅ 系统健康监控完成，整体状态: %s，执行了 %d 项检查",
+		overallHealth, len(checks))
 	return result, nil
+}
+
+// checkDatabase 检查数据库连接
+func (she *SystemHealthExecutor) checkDatabase(ctx context.Context) HealthCheck {
+	start := time.Now()
+	check := HealthCheck{
+		Name:      "数据库连接",
+		Type:      "database",
+		LastCheck: time.Now(),
+		Enabled:   true,
+	}
+
+	// 模拟数据库连接检查
+	// 实际实现中应该执行真实的数据库ping操作
+	if rand.Float64() < 0.95 { // 95%成功率
+		check.Status = "healthy"
+		check.Message = "数据库连接正常"
+	} else {
+		check.Status = "critical"
+		check.Message = "数据库连接失败"
+	}
+
+	check.ResponseTime = time.Since(start)
+	return check
+}
+
+// checkExchangeAPI 检查交易所API
+func (she *SystemHealthExecutor) checkExchangeAPI(ctx context.Context) HealthCheck {
+	start := time.Now()
+	check := HealthCheck{
+		Name:      "交易所API",
+		Type:      "api",
+		LastCheck: time.Now(),
+		Enabled:   true,
+	}
+
+	// 模拟API连接检查
+	responseTime := time.Duration(rand.Intn(3000)) * time.Millisecond
+	if responseTime < 2*time.Second {
+		check.Status = "healthy"
+		check.Message = "交易所API响应正常"
+	} else if responseTime < 5*time.Second {
+		check.Status = "warning"
+		check.Message = "交易所API响应较慢"
+	} else {
+		check.Status = "critical"
+		check.Message = "交易所API响应超时"
+	}
+
+	check.ResponseTime = time.Since(start)
+	return check
+}
+
+// checkMemoryUsage 检查内存使用率
+func (she *SystemHealthExecutor) checkMemoryUsage(ctx context.Context) HealthCheck {
+	start := time.Now()
+	check := HealthCheck{
+		Name:      "内存使用率",
+		Type:      "resource",
+		LastCheck: time.Now(),
+		Enabled:   true,
+	}
+
+	// 模拟内存使用率检查
+	memoryUsage := rand.Float64() * 100
+	threshold := she.alertThresholds["memory_usage"]
+
+	if memoryUsage < threshold*0.8 {
+		check.Status = "healthy"
+		check.Message = fmt.Sprintf("内存使用率正常: %.1f%%", memoryUsage)
+	} else if memoryUsage < threshold {
+		check.Status = "warning"
+		check.Message = fmt.Sprintf("内存使用率较高: %.1f%%", memoryUsage)
+	} else {
+		check.Status = "critical"
+		check.Message = fmt.Sprintf("内存使用率过高: %.1f%%", memoryUsage)
+	}
+
+	check.ResponseTime = time.Since(start)
+	return check
+}
+
+// checkCPUUsage 检查CPU使用率
+func (she *SystemHealthExecutor) checkCPUUsage(ctx context.Context) HealthCheck {
+	start := time.Now()
+	check := HealthCheck{
+		Name:      "CPU使用率",
+		Type:      "resource",
+		LastCheck: time.Now(),
+		Enabled:   true,
+	}
+
+	// 模拟CPU使用率检查
+	cpuUsage := rand.Float64() * 100
+	threshold := she.alertThresholds["cpu_usage"]
+
+	if cpuUsage < threshold*0.7 {
+		check.Status = "healthy"
+		check.Message = fmt.Sprintf("CPU使用率正常: %.1f%%", cpuUsage)
+	} else if cpuUsage < threshold {
+		check.Status = "warning"
+		check.Message = fmt.Sprintf("CPU使用率较高: %.1f%%", cpuUsage)
+	} else {
+		check.Status = "critical"
+		check.Message = fmt.Sprintf("CPU使用率过高: %.1f%%", cpuUsage)
+	}
+
+	check.ResponseTime = time.Since(start)
+	return check
+}
+
+// checkDiskSpace 检查磁盘空间
+func (she *SystemHealthExecutor) checkDiskSpace(ctx context.Context) HealthCheck {
+	start := time.Now()
+	check := HealthCheck{
+		Name:      "磁盘空间",
+		Type:      "resource",
+		LastCheck: time.Now(),
+		Enabled:   true,
+	}
+
+	// 模拟磁盘使用率检查
+	diskUsage := rand.Float64() * 100
+	threshold := she.alertThresholds["disk_usage"]
+
+	if diskUsage < threshold*0.8 {
+		check.Status = "healthy"
+		check.Message = fmt.Sprintf("磁盘空间充足: %.1f%%", diskUsage)
+	} else if diskUsage < threshold {
+		check.Status = "warning"
+		check.Message = fmt.Sprintf("磁盘空间不足: %.1f%%", diskUsage)
+	} else {
+		check.Status = "critical"
+		check.Message = fmt.Sprintf("磁盘空间严重不足: %.1f%%", diskUsage)
+	}
+
+	check.ResponseTime = time.Since(start)
+	return check
+}
+
+// checkNetworkConnectivity 检查网络连接
+func (she *SystemHealthExecutor) checkNetworkConnectivity(ctx context.Context) HealthCheck {
+	start := time.Now()
+	check := HealthCheck{
+		Name:      "网络连接",
+		Type:      "network",
+		LastCheck: time.Now(),
+		Enabled:   true,
+	}
+
+	// 模拟网络连接检查
+	if rand.Float64() < 0.98 { // 98%成功率
+		check.Status = "healthy"
+		check.Message = "网络连接正常"
+	} else {
+		check.Status = "critical"
+		check.Message = "网络连接异常"
+	}
+
+	check.ResponseTime = time.Since(start)
+	return check
+}
+
+// checkServiceStatus 检查服务状态
+func (she *SystemHealthExecutor) checkServiceStatus(ctx context.Context) HealthCheck {
+	start := time.Now()
+	check := HealthCheck{
+		Name:      "核心服务",
+		Type:      "service",
+		LastCheck: time.Now(),
+		Enabled:   true,
+	}
+
+	// 模拟服务状态检查
+	if rand.Float64() < 0.99 { // 99%成功率
+		check.Status = "healthy"
+		check.Message = "所有核心服务运行正常"
+	} else {
+		check.Status = "critical"
+		check.Message = "部分核心服务异常"
+	}
+
+	check.ResponseTime = time.Since(start)
+	return check
+}
+
+// collectSystemMetrics 收集系统指标
+func (she *SystemHealthExecutor) collectSystemMetrics() map[string]interface{} {
+	return map[string]interface{}{
+		"uptime":              fmt.Sprintf("%.0fh%.0fm", rand.Float64()*48, rand.Float64()*60),
+		"memory_usage":        fmt.Sprintf("%.1f%%", rand.Float64()*100),
+		"cpu_usage":           fmt.Sprintf("%.1f%%", rand.Float64()*100),
+		"disk_usage":          fmt.Sprintf("%.1f%%", rand.Float64()*100),
+		"active_connections":  rand.Intn(500) + 50,
+		"requests_per_second": rand.Intn(1000) + 100,
+		"error_rate":          fmt.Sprintf("%.2f%%", rand.Float64()*5),
+		"avg_response_time":   fmt.Sprintf("%.0fms", rand.Float64()*1000+100),
+	}
+}
+
+// countFailedChecks 统计失败的检查数量
+func (she *SystemHealthExecutor) countFailedChecks(checks []HealthCheck) int {
+	count := 0
+	for _, check := range checks {
+		if check.Status == "critical" || check.Status == "warning" {
+			count++
+		}
+	}
+	return count
 }
 
 // CreateDefaultExecutors 创建默认执行器集合

@@ -34,6 +34,7 @@ type Config struct {
 	Cache           CacheConfig           `yaml:"cache"`
 	Hedging         HedgingConfig         `yaml:"hedging"`
 	LayeredPosition LayeredPositionConfig `yaml:"layered_position"`
+	Automation      AutomationConfig      `yaml:"automation"`
 }
 
 // AppConfig 应用配置

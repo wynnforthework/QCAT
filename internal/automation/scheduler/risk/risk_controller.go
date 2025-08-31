@@ -37,6 +37,7 @@ type RiskAction struct {
 	Result      ActionResult           `json:"result"`
 	ExecutedAt  time.Time              `json:"executed_at"`
 	Duration    time.Duration          `json:"duration"`
+	Timestamp   time.Time              `json:"timestamp"`
 }
 
 // RiskActionType defines types of risk control actions
@@ -73,12 +74,12 @@ func (rat RiskActionType) String() string {
 
 // ActionResult represents the result of a risk action
 type ActionResult struct {
-	Success      bool                   `json:"success"`
-	Error        string                 `json:"error,omitempty"`
-	AffectedPositions []string          `json:"affected_positions"`
-	AmountReduced float64               `json:"amount_reduced"`
-	NewRiskLevel shared.RiskLevel       `json:"new_risk_level"`
-	Metrics      map[string]interface{} `json:"metrics"`
+	Success           bool                   `json:"success"`
+	Error             string                 `json:"error,omitempty"`
+	AffectedPositions []string               `json:"affected_positions"`
+	AmountReduced     float64                `json:"amount_reduced"`
+	NewRiskLevel      shared.RiskLevel       `json:"new_risk_level"`
+	Metrics           map[string]interface{} `json:"metrics"`
 }
 
 // NewRiskController creates a new risk controller
@@ -108,7 +109,7 @@ func (rc *RiskController) TriggerPositionReduction(ctx context.Context, marginSt
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
 
-	log.Printf("Triggering position reduction: margin_ratio=%.4f, reduction=%.2f%%", 
+	log.Printf("Triggering position reduction: margin_ratio=%.4f, reduction=%.2f%%",
 		marginStatus.MarginRatio, reductionPercent*100)
 
 	startTime := time.Now()
@@ -118,9 +119,9 @@ func (rc *RiskController) TriggerPositionReduction(ctx context.Context, marginSt
 		Trigger:     fmt.Sprintf("Margin ratio %.4f exceeds threshold", marginStatus.MarginRatio),
 		Description: fmt.Sprintf("Reduce positions by %.2f%% due to high margin usage", reductionPercent*100),
 		Parameters: map[string]interface{}{
-			"margin_ratio":       marginStatus.MarginRatio,
-			"reduction_percent":  reductionPercent,
-			"trigger_threshold":  0.8, // From config
+			"margin_ratio":      marginStatus.MarginRatio,
+			"reduction_percent": reductionPercent,
+			"trigger_threshold": 0.8, // From config
 		},
 		ExecutedAt: startTime,
 	}
@@ -160,7 +161,7 @@ func (rc *RiskController) TriggerPositionReduction(ctx context.Context, marginSt
 			errors = append(errors, fmt.Sprintf("Position %s: %v", reduction.PositionID, err))
 			continue
 		}
-		
+
 		affectedPositions = append(affectedPositions, reduction.PositionID)
 		totalReduced += reduction.ReductionAmount
 	}
@@ -189,10 +190,10 @@ func (rc *RiskController) TriggerPositionReduction(ctx context.Context, marginSt
 		AmountReduced:     totalReduced,
 		NewRiskLevel:      newRiskLevel,
 		Metrics: map[string]interface{}{
-			"positions_targeted": len(positionsToReduce),
-			"positions_reduced":  len(affectedPositions),
+			"positions_targeted":  len(positionsToReduce),
+			"positions_reduced":   len(affectedPositions),
 			"total_value_reduced": totalReduced,
-			"error_count":        len(errors),
+			"error_count":         len(errors),
 		},
 	}
 	action.Duration = time.Since(startTime)
@@ -201,7 +202,7 @@ func (rc *RiskController) TriggerPositionReduction(ctx context.Context, marginSt
 	rc.recordAction(*action)
 	rc.lastAction = time.Now()
 
-	log.Printf("Position reduction completed: success=%t, positions=%d, amount=%.2f", 
+	log.Printf("Position reduction completed: success=%t, positions=%d, amount=%.2f",
 		success, len(affectedPositions), totalReduced)
 
 	return action, nil
@@ -222,7 +223,7 @@ func (rc *RiskController) TriggerEmergencyStop(ctx context.Context, reason strin
 		Description: "Emergency stop - close all positions immediately",
 		Parameters: map[string]interface{}{
 			"emergency_reason": reason,
-			"stop_time":       startTime,
+			"stop_time":        startTime,
 		},
 		ExecutedAt: startTime,
 	}
@@ -253,7 +254,7 @@ func (rc *RiskController) TriggerEmergencyStop(ctx context.Context, reason strin
 			errors = append(errors, fmt.Sprintf("Position %s: %v", position.ID, err))
 			continue
 		}
-		
+
 		affectedPositions = append(affectedPositions, position.ID)
 		totalClosed += position.Size * position.CurrentPrice
 	}
@@ -278,11 +279,11 @@ func (rc *RiskController) TriggerEmergencyStop(ctx context.Context, reason strin
 		AmountReduced:     totalClosed,
 		NewRiskLevel:      shared.RiskLevelLow, // Should be low after emergency stop
 		Metrics: map[string]interface{}{
-			"total_positions":     len(positions),
-			"positions_closed":    len(affectedPositions),
-			"total_value_closed":  totalClosed,
-			"error_count":         len(errors),
-			"emergency_mode":      true,
+			"total_positions":    len(positions),
+			"positions_closed":   len(affectedPositions),
+			"total_value_closed": totalClosed,
+			"error_count":        len(errors),
+			"emergency_mode":     true,
 		},
 	}
 	action.Duration = time.Since(startTime)
@@ -294,7 +295,7 @@ func (rc *RiskController) TriggerEmergencyStop(ctx context.Context, reason strin
 	// Send emergency notification
 	rc.sendEmergencyNotification(ctx, action)
 
-	log.Printf("Emergency stop completed: success=%t, positions_closed=%d, value=%.2f", 
+	log.Printf("Emergency stop completed: success=%t, positions_closed=%d, value=%.2f",
 		success, len(affectedPositions), totalClosed)
 
 	return action, nil
@@ -388,7 +389,7 @@ func (rc *RiskController) TriggerLeverageReduction(ctx context.Context, targetLe
 	rc.recordAction(*action)
 	rc.lastAction = time.Now()
 
-	log.Printf("Leverage reduction completed: success=%t, positions=%d, amount=%.2f", 
+	log.Printf("Leverage reduction completed: success=%t, positions=%d, amount=%.2f",
 		success, len(affectedPositions), totalReduced)
 
 	return action, nil
@@ -415,7 +416,7 @@ func (rc *RiskController) getCurrentPositions(ctx context.Context) ([]shared.Pos
 		WHERE status = 'ACTIVE'
 		ORDER BY margin_used DESC
 	`
-	
+
 	rows, err := rc.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -441,27 +442,27 @@ func (rc *RiskController) getCurrentPositions(ctx context.Context) ([]shared.Pos
 // selectPositionsForReduction selects positions for reduction based on risk
 func (rc *RiskController) selectPositionsForReduction(ctx context.Context, positions []shared.Position, reductionPercent float64) ([]PositionReduction, error) {
 	var reductions []PositionReduction
-	
+
 	// Calculate total portfolio value
 	totalValue := 0.0
 	for _, pos := range positions {
 		totalValue += pos.Size * pos.CurrentPrice
 	}
-	
+
 	targetReduction := totalValue * reductionPercent
 	currentReduction := 0.0
-	
+
 	// Sort positions by risk (highest margin usage first)
 	// This is a simplified approach - in practice, you'd use more sophisticated risk metrics
 	for _, pos := range positions {
 		if currentReduction >= targetReduction {
 			break
 		}
-		
+
 		// Calculate how much to reduce this position
 		positionValue := pos.Size * pos.CurrentPrice
 		remainingReduction := targetReduction - currentReduction
-		
+
 		var reductionAmount float64
 		if positionValue <= remainingReduction {
 			// Reduce entire position
@@ -470,7 +471,7 @@ func (rc *RiskController) selectPositionsForReduction(ctx context.Context, posit
 			// Partial reduction
 			reductionAmount = pos.Size * (remainingReduction / positionValue)
 		}
-		
+
 		if reductionAmount > 0 {
 			reduction := PositionReduction{
 				PositionID:       pos.ID,
@@ -483,7 +484,7 @@ func (rc *RiskController) selectPositionsForReduction(ctx context.Context, posit
 			currentReduction += reductionAmount * pos.CurrentPrice
 		}
 	}
-	
+
 	return reductions, nil
 }
 
@@ -495,29 +496,29 @@ func (rc *RiskController) executePositionReduction(ctx context.Context, reductio
 		SET size = $1, updated_at = NOW()
 		WHERE id = $2 AND status = 'ACTIVE'
 	`
-	
+
 	result, err := rc.db.ExecContext(ctx, query, reduction.NewSize, reduction.PositionID)
 	if err != nil {
 		return fmt.Errorf("failed to update position in database: %w", err)
 	}
-	
+
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
-	
+
 	if rowsAffected == 0 {
 		return fmt.Errorf("position %s not found or already closed", reduction.PositionID)
 	}
-	
+
 	// In a real implementation, you would also:
 	// 1. Place market orders to reduce the position on the exchange
 	// 2. Update margin calculations
 	// 3. Send notifications
-	
-	log.Printf("Position %s reduced from %.4f to %.4f (%.2f%% reduction)", 
+
+	log.Printf("Position %s reduced from %.4f to %.4f (%.2f%% reduction)",
 		reduction.PositionID, reduction.CurrentSize, reduction.NewSize, reduction.ReductionPercent*100)
-	
+
 	return nil
 }
 
@@ -529,26 +530,26 @@ func (rc *RiskController) executeEmergencyClose(ctx context.Context, position sh
 		SET status = 'CLOSED', size = 0, closed_at = NOW(), updated_at = NOW()
 		WHERE id = $1 AND status = 'ACTIVE'
 	`
-	
+
 	result, err := rc.db.ExecContext(ctx, query, position.ID)
 	if err != nil {
 		return fmt.Errorf("failed to close position in database: %w", err)
 	}
-	
+
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
-	
+
 	if rowsAffected == 0 {
 		return fmt.Errorf("position %s not found or already closed", position.ID)
 	}
-	
+
 	// In a real implementation, you would also place market orders on the exchange
-	
-	log.Printf("Emergency close: Position %s (%s) closed, size: %.4f", 
+
+	log.Printf("Emergency close: Position %s (%s) closed, size: %.4f",
 		position.ID, position.Symbol, position.Size)
-	
+
 	return nil
 }
 
@@ -559,17 +560,17 @@ func (rc *RiskController) cancelAllPendingOrders(ctx context.Context) error {
 		SET status = 'CANCELLED', updated_at = NOW()
 		WHERE status IN ('PENDING', 'PARTIALLY_FILLED')
 	`
-	
+
 	result, err := rc.db.ExecContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to cancel orders in database: %w", err)
 	}
-	
+
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
-	
+
 	log.Printf("Cancelled %d pending orders", rowsAffected)
 	return nil
 }
@@ -584,7 +585,7 @@ func (rc *RiskController) getHighLeveragePositions(ctx context.Context, maxLever
 		WHERE status = 'ACTIVE' AND leverage > $1
 		ORDER BY leverage DESC
 	`
-	
+
 	rows, err := rc.db.QueryContext(ctx, query, maxLeverage)
 	if err != nil {
 		return nil, err
@@ -612,15 +613,15 @@ func (rc *RiskController) calculateReducedPositionSize(position shared.Position,
 	if targetLeverage <= 0 {
 		return 0, fmt.Errorf("target leverage must be positive")
 	}
-	
+
 	if position.Leverage <= targetLeverage {
 		return position.Size, nil // No reduction needed
 	}
-	
+
 	// Calculate new size based on leverage ratio
 	leverageRatio := targetLeverage / position.Leverage
 	newSize := position.Size * leverageRatio
-	
+
 	return newSize, nil
 }
 
@@ -628,17 +629,17 @@ func (rc *RiskController) calculateReducedPositionSize(position shared.Position,
 func (rc *RiskController) recordAction(action RiskAction) {
 	// Add to memory
 	rc.actionHistory = append(rc.actionHistory, action)
-	
+
 	// Keep only last 100 actions in memory
 	if len(rc.actionHistory) > 100 {
 		rc.actionHistory = rc.actionHistory[1:]
 	}
-	
+
 	// Record in database
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		
+
 		err := rc.recordActionInDatabase(ctx, action)
 		if err != nil {
 			log.Printf("Failed to record risk action in database: %v", err)
@@ -655,12 +656,12 @@ func (rc *RiskController) recordActionInDatabase(ctx context.Context, action Ris
 			new_risk_level, metrics, executed_at, duration_ms
 		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`
-	
+
 	// Convert parameters and metrics to JSON strings (simplified)
 	parametersJSON := fmt.Sprintf("%v", action.Parameters)
 	metricsJSON := fmt.Sprintf("%v", action.Result.Metrics)
 	affectedPositionsJSON := fmt.Sprintf("%v", action.Result.AffectedPositions)
-	
+
 	_, err := rc.db.ExecContext(ctx, query,
 		action.ID,
 		action.Type.String(),
@@ -676,7 +677,7 @@ func (rc *RiskController) recordActionInDatabase(ctx context.Context, action Ris
 		action.ExecutedAt,
 		action.Duration.Milliseconds(),
 	)
-	
+
 	return err
 }
 
@@ -687,7 +688,7 @@ func (rc *RiskController) sendEmergencyNotification(ctx context.Context, action 
 	// - SMS
 	// - Slack/Discord webhooks
 	// - Push notifications
-	
+
 	log.Printf("EMERGENCY NOTIFICATION: %s - %s", action.Type.String(), action.Description)
 }
 
@@ -695,7 +696,7 @@ func (rc *RiskController) sendEmergencyNotification(ctx context.Context, action 
 func (rc *RiskController) GetActionHistory() []RiskAction {
 	rc.mu.RLock()
 	defer rc.mu.RUnlock()
-	
+
 	// Return a copy
 	history := make([]RiskAction, len(rc.actionHistory))
 	copy(history, rc.actionHistory)
@@ -721,7 +722,7 @@ func (rc *RiskController) ClearEmergencyMode() {
 func (rc *RiskController) Start() error {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
-	
+
 	rc.isRunning = true
 	log.Printf("Risk controller started")
 	return nil
@@ -731,7 +732,7 @@ func (rc *RiskController) Start() error {
 func (rc *RiskController) Stop() error {
 	rc.mu.Lock()
 	defer rc.mu.Unlock()
-	
+
 	rc.isRunning = false
 	log.Printf("Risk controller stopped")
 	return nil

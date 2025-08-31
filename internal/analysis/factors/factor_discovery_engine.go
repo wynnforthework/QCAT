@@ -2,6 +2,7 @@ package factors
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"math"
@@ -48,17 +49,28 @@ type FactorDiscoveryEngine struct {
 	discoveryHistory []DiscoveryEvent
 
 	// 配置参数
-	enabled bool
+	enabled                 bool
+	autoMLEnabled           bool
+	geneticAlgorithmEnabled bool
+	maxIterations           int
+	maxConcurrentJobs       int
+	symbols                 []string
+
+	// 数据存储
+	baseFactors map[string]Factor
+	db          *sql.DB
 }
 
 // Factor 因子
 type Factor struct {
-	ID         string             `json:"id"`
-	Name       string             `json:"name"`
-	Type       string             `json:"type"`       // TECHNICAL, FUNDAMENTAL, SENTIMENT, MACRO, CUSTOM
-	Formula    string             `json:"formula"`    // 因子计算公式
-	Expression *Expression        `json:"expression"` // 解析后的表达式
-	Parameters map[string]float64 `json:"parameters"`
+	ID          string             `json:"id"`
+	Name        string             `json:"name"`
+	Type        string             `json:"type"`        // TECHNICAL, FUNDAMENTAL, SENTIMENT, MACRO, CUSTOM
+	Category    string             `json:"category"`    // 因子分类
+	Description string             `json:"description"` // 因子描述
+	Formula     string             `json:"formula"`     // 因子计算公式
+	Expression  *Expression        `json:"expression"`  // 解析后的表达式
+	Parameters  map[string]float64 `json:"parameters"`
 
 	// 统计特性
 	Mean     float64 `json:"mean"`
@@ -482,7 +494,7 @@ func NewFactorDiscoveryEngine(cfg *config.Config) (*FactorDiscoveryEngine, error
 	// 从配置文件读取参数
 	if cfg != nil {
 		// 从自动化配置读取学习参数
-		if cfg.Automation != nil && cfg.Automation.Learning != nil {
+		if cfg.Automation.Learning != nil {
 			if cfg.Automation.Learning.Enabled {
 				fde.enabled = cfg.Automation.Learning.Enabled
 			}
@@ -495,17 +507,16 @@ func NewFactorDiscoveryEngine(cfg *config.Config) (*FactorDiscoveryEngine, error
 		}
 
 		// 从优化器配置读取参数
-		if cfg.Optimizer != nil {
-			if cfg.Optimizer.MaxIterations > 0 {
-				fde.maxIterations = cfg.Optimizer.MaxIterations
-			}
-			if cfg.Optimizer.Concurrency > 0 {
-				fde.maxConcurrentJobs = cfg.Optimizer.Concurrency
-			}
+		// Note: cfg.Optimizer is a struct, not a pointer, so we don't need nil check
+		if cfg.Optimizer.MaxIterations > 0 {
+			fde.maxIterations = cfg.Optimizer.MaxIterations
+		}
+		if cfg.Optimizer.Concurrency > 0 {
+			fde.maxConcurrentJobs = cfg.Optimizer.Concurrency
 		}
 
 		// 从市场数据配置读取符号列表
-		if cfg.MarketData != nil && len(cfg.MarketData.Symbols) > 0 {
+		if len(cfg.MarketData.Symbols) > 0 {
 			fde.symbols = cfg.MarketData.Symbols
 		}
 	}
@@ -653,76 +664,76 @@ func (fde *FactorDiscoveryEngine) initializeBaseFactors() error {
 			Name:        "Simple Moving Average 5",
 			Type:        "technical",
 			Category:    "trend",
-			Expression:  "SMA(close, 5)",
+			Formula:     "SMA(close, 5)",
+			Expression:  nil, // 将在后续解析
 			Description: "5日简单移动平均线",
-			Parameters: map[string]interface{}{
+			Parameters: map[string]float64{
 				"period": 5,
 			},
-			IsActive: true,
 		},
 		{
 			ID:          "sma_20",
 			Name:        "Simple Moving Average 20",
 			Type:        "technical",
 			Category:    "trend",
-			Expression:  "SMA(close, 20)",
+			Formula:     "SMA(close, 20)",
+			Expression:  nil, // 将在后续解析
 			Description: "20日简单移动平均线",
-			Parameters: map[string]interface{}{
+			Parameters: map[string]float64{
 				"period": 20,
 			},
-			IsActive: true,
 		},
 		{
 			ID:          "rsi_14",
 			Name:        "Relative Strength Index 14",
 			Type:        "technical",
 			Category:    "momentum",
-			Expression:  "RSI(close, 14)",
+			Formula:     "RSI(close, 14)",
+			Expression:  nil, // 将在后续解析
 			Description: "14日相对强弱指数",
-			Parameters: map[string]interface{}{
+			Parameters: map[string]float64{
 				"period": 14,
 			},
-			IsActive: true,
 		},
 		{
 			ID:          "macd",
 			Name:        "MACD",
 			Type:        "technical",
 			Category:    "momentum",
-			Expression:  "MACD(close, 12, 26, 9)",
+			Formula:     "MACD(close, 12, 26, 9)",
+			Expression:  nil, // 将在后续解析
 			Description: "移动平均收敛散度指标",
-			Parameters: map[string]interface{}{
+			Parameters: map[string]float64{
 				"fast_period":   12,
 				"slow_period":   26,
 				"signal_period": 9,
 			},
-			IsActive: true,
 		},
 		{
 			ID:          "bb_upper",
 			Name:        "Bollinger Bands Upper",
 			Type:        "technical",
 			Category:    "volatility",
-			Expression:  "BB_UPPER(close, 20, 2)",
+			Formula:     "BB_UPPER(close, 20, 2)",
+			Expression:  nil, // 将在后续解析
 			Description: "布林带上轨",
-			Parameters: map[string]interface{}{
+			Parameters: map[string]float64{
 				"period": 20,
 				"std":    2,
 			},
-			IsActive: true,
 		},
 		{
 			ID:          "bb_lower",
 			Name:        "Bollinger Bands Lower",
 			Type:        "technical",
 			Category:    "volatility",
-			Expression:  "BB_LOWER(close, 20, 2)",
+			Formula:     "BB_LOWER(close, 20, 2)",
+			Expression:  nil, // 将在后续解析
 			Description: "布林带下轨",
-			Parameters: map[string]interface{}{
+			Parameters: map[string]float64{
 				"period": 20,
 				"std":    2,
 			},
-			IsActive: true,
 		},
 	}
 
@@ -733,44 +744,44 @@ func (fde *FactorDiscoveryEngine) initializeBaseFactors() error {
 			Name:        "1-Day Price Return",
 			Type:        "price",
 			Category:    "return",
-			Expression:  "(close - close[1]) / close[1]",
+			Formula:     "(close - close[1]) / close[1]",
+			Expression:  nil, // 将在后续解析
 			Description: "1日价格收益率",
-			Parameters:  map[string]interface{}{},
-			IsActive:    true,
+			Parameters:  map[string]float64{},
 		},
 		{
 			ID:          "price_return_5d",
 			Name:        "5-Day Price Return",
 			Type:        "price",
 			Category:    "return",
-			Expression:  "(close - close[5]) / close[5]",
+			Formula:     "(close - close[5]) / close[5]",
+			Expression:  nil, // 将在后续解析
 			Description: "5日价格收益率",
-			Parameters:  map[string]interface{}{},
-			IsActive:    true,
+			Parameters:  map[string]float64{},
 		},
 		{
 			ID:          "volume_ratio",
 			Name:        "Volume Ratio",
 			Type:        "volume",
 			Category:    "activity",
-			Expression:  "volume / SMA(volume, 20)",
+			Formula:     "volume / SMA(volume, 20)",
+			Expression:  nil, // 将在后续解析
 			Description: "成交量比率",
-			Parameters: map[string]interface{}{
+			Parameters: map[string]float64{
 				"period": 20,
 			},
-			IsActive: true,
 		},
 		{
 			ID:          "price_volatility",
 			Name:        "Price Volatility",
 			Type:        "volatility",
 			Category:    "risk",
-			Expression:  "STDDEV(log(close/close[1]), 20)",
+			Formula:     "STDDEV(log(close/close[1]), 20)",
+			Expression:  nil, // 将在后续解析
 			Description: "价格波动率",
-			Parameters: map[string]interface{}{
+			Parameters: map[string]float64{
 				"period": 20,
 			},
-			IsActive: true,
 		},
 	}
 
@@ -781,20 +792,20 @@ func (fde *FactorDiscoveryEngine) initializeBaseFactors() error {
 			Name:        "High-Low Ratio",
 			Type:        "market_structure",
 			Category:    "range",
-			Expression:  "(high - low) / close",
+			Formula:     "(high - low) / close",
+			Expression:  nil, // 将在后续解析
 			Description: "最高最低价比率",
-			Parameters:  map[string]interface{}{},
-			IsActive:    true,
+			Parameters:  map[string]float64{},
 		},
 		{
 			ID:          "open_close_gap",
 			Name:        "Open-Close Gap",
 			Type:        "market_structure",
 			Category:    "gap",
-			Expression:  "(open - close[1]) / close[1]",
+			Formula:     "(open - close[1]) / close[1]",
+			Expression:  nil, // 将在后续解析
 			Description: "开盘跳空",
-			Parameters:  map[string]interface{}{},
-			IsActive:    true,
+			Parameters:  map[string]float64{},
 		},
 	}
 
@@ -807,8 +818,9 @@ func (fde *FactorDiscoveryEngine) initializeBaseFactors() error {
 	defer fde.mu.Unlock()
 
 	for _, factor := range allFactors {
-		factor.CreatedAt = time.Now()
-		factor.UpdatedAt = time.Now()
+		factor.DiscoveredAt = time.Now()
+		factor.LastUpdated = time.Now()
+		factor.Status = "ACTIVE"
 		fde.baseFactors[factor.ID] = factor
 
 		log.Printf("Loaded base factor: %s (%s)", factor.Name, factor.ID)
@@ -1014,9 +1026,10 @@ func (fde *FactorDiscoveryEngine) runRandomSearch() {
 
 	// 设置随机搜索参数
 	maxIterations := 1000
-	if fde.config != nil && fde.config.FactorDiscovery != nil {
-		if fde.config.FactorDiscovery.RandomSearch.MaxIterations > 0 {
-			maxIterations = fde.config.FactorDiscovery.RandomSearch.MaxIterations
+	if fde.config != nil {
+		// 使用优化器配置中的最大迭代次数
+		if fde.config.Optimizer.MaxIterations > 0 {
+			maxIterations = fde.config.Optimizer.MaxIterations
 		}
 	}
 
@@ -1041,16 +1054,17 @@ func (fde *FactorDiscoveryEngine) runRandomSearch() {
 
 		// 创建候选因子
 		candidateFactor := Factor{
-			ID:          fmt.Sprintf("random_%d_%d", time.Now().Unix(), i),
-			Name:        fmt.Sprintf("Random Factor %d", i+1),
-			Type:        "composite",
-			Category:    "random_search",
-			Expression:  expression,
-			Description: fmt.Sprintf("Randomly generated factor: %s", expression),
-			Parameters:  map[string]interface{}{},
-			IsActive:    true,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
+			ID:           fmt.Sprintf("random_%d_%d", time.Now().Unix(), i),
+			Name:         fmt.Sprintf("Random Factor %d", i+1),
+			Type:         "composite",
+			Category:     "random_search",
+			Formula:      expression,
+			Expression:   nil, // 将在后续解析
+			Description:  fmt.Sprintf("Randomly generated factor: %s", expression),
+			Parameters:   map[string]float64{},
+			DiscoveredAt: time.Now(),
+			LastUpdated:  time.Now(),
+			Status:       "ACTIVE",
 		}
 
 		// 评估因子
@@ -1063,10 +1077,10 @@ func (fde *FactorDiscoveryEngine) runRandomSearch() {
 		// 检查因子质量
 		if fde.isFactorQualified(evaluation) {
 			// 检查因子新颖性
-			if fde.isFactorNovel(candidateFactor) {
+			if fde.isFactorNovel(&candidateFactor) {
 				// 添加到发现的因子中
 				fde.mu.Lock()
-				fde.discoveredFactors[candidateFactor.ID] = candidateFactor
+				fde.discoveredFactors[candidateFactor.ID] = &candidateFactor
 				fde.factorEvaluations[candidateFactor.ID] = *evaluation
 				fde.mu.Unlock()
 
@@ -1378,7 +1392,7 @@ func (fde *FactorDiscoveryEngine) evaluateAndStoreFactor(factor Factor) bool {
 	}
 
 	// 检查因子新颖性
-	if !fde.isFactorNovel(factor) {
+	if !fde.isFactorNovel(&factor) {
 		return false
 	}
 
@@ -1990,7 +2004,7 @@ func (fde *FactorDiscoveryEngine) selectBestFactors() []*Factor {
 	return factors[:topN]
 }
 
-func (fde *FactorDiscoveryEngine) isFactorNovel(factor Factor) bool {
+func (fde *FactorDiscoveryEngine) isFactorNovel(factor *Factor) bool {
 	// 检查因子是否新颖（不与现有因子重复）
 	threshold := 0.85 // 相似度阈值，降低一些以允许更多变化
 
@@ -2045,7 +2059,7 @@ func (fde *FactorDiscoveryEngine) isFactorNovel(factor Factor) bool {
 }
 
 // hasStructuralSimilarity 检查结构相似性
-func (fde *FactorDiscoveryEngine) hasStructuralSimilarity(factor Factor) bool {
+func (fde *FactorDiscoveryEngine) hasStructuralSimilarity(factor *Factor) bool {
 	// 提取表达式的结构特征
 	structure := fde.extractStructure(factor.Expression)
 
@@ -2115,7 +2129,7 @@ func (fde *FactorDiscoveryEngine) areParametersSimilar(params1, params2 map[stri
 }
 
 // hasParameterSimilarity 检查参数组合的新颖性
-func (fde *FactorDiscoveryEngine) hasParameterSimilarity(factor Factor) bool {
+func (fde *FactorDiscoveryEngine) hasParameterSimilarity(factor *Factor) bool {
 	// 检查是否存在相同类型和相似参数的因子
 	for _, existingFactor := range fde.discoveredFactors {
 		if factor.Type == existingFactor.Type && factor.Category == existingFactor.Category {
@@ -5910,22 +5924,6 @@ type FactorHistoricalData struct {
 	IC     float64
 	RankIC float64
 	Return float64
-}
-
-// PerformancePoint 性能数据点
-type PerformancePoint struct {
-	Date   time.Time `json:"date"`
-	IC     float64   `json:"ic"`
-	RankIC float64   `json:"rank_ic"`
-	Return float64   `json:"return"`
-}
-
-// min 返回两个整数的最小值
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // calculateMean 计算平均值

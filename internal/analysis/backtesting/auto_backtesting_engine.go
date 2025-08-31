@@ -138,6 +138,9 @@ type BacktestResult struct {
 
 	// 验证结果
 	ValidationResult *ValidationResult `json:"validation_result"`
+
+	// 风险指标
+	RiskMetrics *RiskMetrics `json:"risk_metrics"`
 }
 
 // EquityPoint 净值点
@@ -227,6 +230,7 @@ type KlineData struct {
 
 // Candle K线数据
 type Candle struct {
+	Symbol string    `json:"symbol"`
 	Time   time.Time `json:"time"`
 	Open   float64   `json:"open"`
 	High   float64   `json:"high"`
@@ -548,6 +552,8 @@ type StrategyPerformance struct {
 	AvgSharpe        float64 `json:"avg_sharpe"`
 	AvgMaxDrawdown   float64 `json:"avg_max_drawdown"`
 	ConsistencyScore float64 `json:"consistency_score"`
+	BestPerformance  float64 `json:"best_performance"`
+	WorstPerformance float64 `json:"worst_performance"`
 
 	// 历史表现
 	PerformanceHistory []PerformanceRecord `json:"performance_history"`
@@ -2311,10 +2317,15 @@ func (abe *AutoBacktestingEngine) generateRiskAnalysis(result *BacktestResult) R
 		riskFactors = append(riskFactors, "Low win rate")
 	}
 
+	riskMetrics := RiskMetrics{}
+	if result.RiskMetrics != nil {
+		riskMetrics = *result.RiskMetrics
+	}
+
 	return RiskAnalysis{
 		RiskLevel:   riskLevel,
 		RiskFactors: riskFactors,
-		RiskMetrics: result.RiskMetrics,
+		RiskMetrics: riskMetrics,
 	}
 }
 
@@ -2719,7 +2730,7 @@ func (abe *AutoBacktestingEngine) updateStrategyRankings(strategies map[string]*
 	// 更新策略性能记录
 	abe.mu.Lock()
 	for _, ranking := range rankings {
-		if perf, exists := abe.strategyPerformance[ranking.ID]; exists {
+		if _, exists := abe.strategyPerformance[ranking.ID]; exists {
 			// 这里可以添加排名字段到StrategyPerformance结构体
 			log.Printf("Strategy %s ranked #%d with score %.4f", ranking.ID, ranking.Rank, ranking.Score)
 		}

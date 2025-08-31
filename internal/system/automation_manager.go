@@ -15,43 +15,43 @@ import (
 
 // AutomationManager 自动化管理器 - 统一管理所有自动化组件
 type AutomationManager struct {
-	db                   *sql.DB
-	riskMonitor          *risk.RealtimeRiskMonitor
-	backtestScheduler    *automation.BacktestScheduler
-	parameterOptimizer   *automation.ParameterOptimizer
-	strategyGatekeeper   *validation.StrategyGatekeeper
-	running              bool
-	mu                   sync.RWMutex
-	ctx                  context.Context
-	cancel               context.CancelFunc
+	db                 *sql.DB
+	riskMonitor        *risk.RealtimeRiskMonitor
+	backtestScheduler  *automation.BacktestScheduler
+	parameterOptimizer *automation.ParameterOptimizer
+	strategyGatekeeper *validation.StrategyGatekeeper
+	running            bool
+	mu                 sync.RWMutex
+	ctx                context.Context
+	cancel             context.CancelFunc
 }
 
 // SystemStatus 系统状态
 type SystemStatus struct {
-	AutomationEnabled    bool                   `json:"automation_enabled"`
-	RiskMonitorRunning   bool                   `json:"risk_monitor_running"`
-	BacktestRunning      bool                   `json:"backtest_running"`
-	OptimizerRunning     bool                   `json:"optimizer_running"`
-	GatekeeperEnabled    bool                   `json:"gatekeeper_enabled"`
-	StartTime            time.Time              `json:"start_time"`
-	Uptime               time.Duration          `json:"uptime"`
-	ComponentStatus      map[string]interface{} `json:"component_status"`
-	LastHealthCheck      time.Time              `json:"last_health_check"`
+	AutomationEnabled  bool                   `json:"automation_enabled"`
+	RiskMonitorRunning bool                   `json:"risk_monitor_running"`
+	BacktestRunning    bool                   `json:"backtest_running"`
+	OptimizerRunning   bool                   `json:"optimizer_running"`
+	GatekeeperEnabled  bool                   `json:"gatekeeper_enabled"`
+	StartTime          time.Time              `json:"start_time"`
+	Uptime             time.Duration          `json:"uptime"`
+	ComponentStatus    map[string]interface{} `json:"component_status"`
+	LastHealthCheck    time.Time              `json:"last_health_check"`
 }
 
 // NewAutomationManager 创建自动化管理器
 func NewAutomationManager(db *sql.DB) *AutomationManager {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// 创建回测调度器
 	backtestScheduler := automation.NewBacktestScheduler(db)
-	
+
 	// 创建参数优化器
 	parameterOptimizer := automation.NewParameterOptimizer(db, backtestScheduler)
-	
+
 	return &AutomationManager{
 		db:                 db,
-		riskMonitor:        risk.NewRealtimeRiskMonitor(db),
+		riskMonitor:        risk.NewRealtimeRiskMonitor(db, nil, nil, nil), // 暂时传递nil，实际使用时需要传递真实的实现
 		backtestScheduler:  backtestScheduler,
 		parameterOptimizer: parameterOptimizer,
 		strategyGatekeeper: validation.NewStrategyGatekeeper(),
@@ -210,7 +210,7 @@ func (am *AutomationManager) checkUnvalidatedStrategies() error {
 		for _, strategy := range unvalidatedStrategies {
 			log.Printf("   - %s", strategy)
 		}
-		
+
 		// 可以选择自动停止这些策略
 		// am.stopUnvalidatedStrategies(unvalidatedStrategies)
 	}
@@ -280,8 +280,8 @@ func (am *AutomationManager) EmergencyStop(reason string) error {
 // GetAutomationSummary 获取自动化系统摘要
 func (am *AutomationManager) GetAutomationSummary() map[string]interface{} {
 	return map[string]interface{}{
-		"system_name":    "QCAT 量化交易自动化系统",
-		"version":        "1.0.0",
+		"system_name": "QCAT 量化交易自动化系统",
+		"version":     "1.0.0",
 		"features": []string{
 			"强制回测验证",
 			"实时风险监控",
@@ -290,10 +290,10 @@ func (am *AutomationManager) GetAutomationSummary() map[string]interface{} {
 			"策略守门员保护",
 			"紧急停止机制",
 		},
-		"running":           am.running,
-		"components_count":  5,
-		"safety_level":      "HIGH",
-		"description":       "全自动化的量化交易风险控制和策略优化系统",
+		"running":          am.running,
+		"components_count": 5,
+		"safety_level":     "HIGH",
+		"description":      "全自动化的量化交易风险控制和策略优化系统",
 	}
 }
 

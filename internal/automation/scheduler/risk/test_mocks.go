@@ -55,7 +55,7 @@ func (tdb *TestDB) QueryContext(ctx context.Context, query string, args ...inter
 	return nil, nil // This will be handled by the calling code
 }
 
-// ExecContext mock implementation  
+// ExecContext mock implementation
 func (tdb *TestDB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
 	// Simulate successful database operations
 	return &TestResult{rowsAffected: 1}, nil
@@ -134,7 +134,7 @@ func NewTestRiskMonitor() *RiskMonitor {
 		metrics:       make(map[string]interface{}),
 		isRunning:     false,
 	}
-	
+
 	return rm
 }
 
@@ -142,28 +142,6 @@ func NewTestRiskMonitor() *RiskMonitor {
 type MockRiskController struct {
 	*RiskController
 	testDB *TestDB
-}
-
-// NewTestRiskController creates a RiskController for testing
-func NewTestRiskController() *MockRiskController {
-	testDB := NewTestDB()
-	riskMonitor := NewTestRiskMonitor()
-	
-	rc := &RiskController{
-		config:        &config.Config{},
-		db:            nil, // We'll override the database methods
-		riskMonitor:   riskMonitor,
-		errorHandler:  shared.NewErrorHandler(nil, nil),
-		actionHistory: make([]RiskAction, 0),
-		emergencyMode: false,
-	}
-	
-	mockRC := &MockRiskController{
-		RiskController: rc,
-		testDB:         testDB,
-	}
-	
-	return mockRC
 }
 
 // Override getCurrentPositions for testing
@@ -223,12 +201,12 @@ func (mrc *MockRiskController) recordActionInDatabase(ctx context.Context, actio
 func (mrc *MockRiskController) recordAction(action RiskAction) {
 	// Add to memory only
 	mrc.actionHistory = append(mrc.actionHistory, action)
-	
+
 	// Keep only last 100 actions in memory
 	if len(mrc.actionHistory) > 100 {
 		mrc.actionHistory = mrc.actionHistory[1:]
 	}
-	
+
 	// Don't try to record in database for testing
 }
 
@@ -244,9 +222,9 @@ func (mrc *MockRiskController) triggerPositionReductionMocked(ctx context.Contex
 		Trigger:     fmt.Sprintf("Margin ratio %.4f exceeds threshold", marginStatus.MarginRatio),
 		Description: fmt.Sprintf("Reduce positions by %.2f%% due to high margin usage", reductionPercent*100),
 		Parameters: map[string]interface{}{
-			"margin_ratio":       marginStatus.MarginRatio,
-			"reduction_percent":  reductionPercent,
-			"trigger_threshold":  0.8,
+			"margin_ratio":      marginStatus.MarginRatio,
+			"reduction_percent": reductionPercent,
+			"trigger_threshold": 0.8,
 		},
 		ExecutedAt: startTime,
 	}
@@ -275,7 +253,7 @@ func (mrc *MockRiskController) triggerPositionReductionMocked(ctx context.Contex
 		if err != nil {
 			continue
 		}
-		
+
 		affectedPositions = append(affectedPositions, reduction.PositionID)
 		totalReduced += reduction.ReductionAmount
 	}
@@ -287,8 +265,8 @@ func (mrc *MockRiskController) triggerPositionReductionMocked(ctx context.Contex
 		AmountReduced:     totalReduced,
 		NewRiskLevel:      shared.RiskLevelMedium,
 		Metrics: map[string]interface{}{
-			"positions_targeted": len(positionsToReduce),
-			"positions_reduced":  len(affectedPositions),
+			"positions_targeted":  len(positionsToReduce),
+			"positions_reduced":   len(affectedPositions),
 			"total_value_reduced": totalReduced,
 		},
 	}
@@ -314,7 +292,7 @@ func (mrc *MockRiskController) triggerEmergencyStopMocked(ctx context.Context, r
 		Description: "Emergency stop - close all positions immediately",
 		Parameters: map[string]interface{}{
 			"emergency_reason": reason,
-			"stop_time":       startTime,
+			"stop_time":        startTime,
 		},
 		ExecutedAt: startTime,
 	}
@@ -334,7 +312,7 @@ func (mrc *MockRiskController) triggerEmergencyStopMocked(ctx context.Context, r
 		if err != nil {
 			continue
 		}
-		
+
 		affectedPositions = append(affectedPositions, position.ID)
 		totalClosed += position.Size * position.CurrentPrice
 	}
@@ -349,10 +327,10 @@ func (mrc *MockRiskController) triggerEmergencyStopMocked(ctx context.Context, r
 		AmountReduced:     totalClosed,
 		NewRiskLevel:      shared.RiskLevelLow,
 		Metrics: map[string]interface{}{
-			"total_positions":     len(positions),
-			"positions_closed":    len(affectedPositions),
-			"total_value_closed":  totalClosed,
-			"emergency_mode":      true,
+			"total_positions":    len(positions),
+			"positions_closed":   len(affectedPositions),
+			"total_value_closed": totalClosed,
+			"emergency_mode":     true,
 		},
 	}
 	action.Duration = time.Since(startTime)
@@ -454,30 +432,5 @@ func CreateTestPosition(id, symbol string, size, price float64) shared.Position 
 		Leverage:     1.0,
 		MarginUsed:   size * price * 0.1, // 10% margin
 		Timestamp:    time.Now(),
-	}
-}
-
-// CreateTestMarginStatus creates a test margin status
-func CreateTestMarginStatus(totalEquity, usedMargin float64) *MarginStatus {
-	marginRatio := usedMargin / totalEquity
-	var riskLevel shared.RiskLevel
-	
-	if marginRatio >= 0.85 {
-		riskLevel = shared.RiskLevelCritical
-	} else if marginRatio >= 0.7 {
-		riskLevel = shared.RiskLevelHigh
-	} else if marginRatio >= 0.5 {
-		riskLevel = shared.RiskLevelMedium
-	} else {
-		riskLevel = shared.RiskLevelLow
-	}
-	
-	return &MarginStatus{
-		TotalEquity:     totalEquity,
-		UsedMargin:      usedMargin,
-		AvailableMargin: totalEquity - usedMargin,
-		MarginRatio:     marginRatio,
-		RiskLevel:       riskLevel,
-		Timestamp:       time.Now(),
 	}
 }

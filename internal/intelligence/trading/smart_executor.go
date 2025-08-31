@@ -616,7 +616,7 @@ func (ste *SmartTradingExecutor) waitForFill(ctx context.Context, orderID string
 		ID:       orderID,
 		Quantity: 100,
 		Price:    50000,
-		Status:   exchange.OrderStatusFilled,
+		Status:   string(exchange.OrderStatusFilled),
 	}, nil
 }
 
