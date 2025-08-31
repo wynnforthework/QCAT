@@ -158,6 +158,30 @@ func NewAutomationScheduler(
 	return scheduler
 }
 
+// NewAutomationSchedulerWithoutDB 创建不依赖数据库的自动化调度器（用于测试）
+func NewAutomationSchedulerWithoutDB() *AutomationScheduler {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	scheduler := &AutomationScheduler{
+		config:           nil, // 测试环境可以使用 nil 配置
+		db:               nil,
+		accountManager:   nil,
+		metrics:          nil,
+		optimizerFactory: nil,
+		ctx:              ctx,
+		cancel:           cancel,
+		tasks:            make(map[string]*ScheduledTask),
+		taskQueue:        make(chan *ScheduledTask, 1000),
+		workers:          make([]*TaskWorker, 0),
+		stats:            &SchedulerStats{},
+	}
+
+	// 初始化工作线程（简化版本）
+	scheduler.initializeWorkers()
+
+	return scheduler
+}
+
 // Start 启动调度器
 func (as *AutomationScheduler) Start() error {
 	as.mu.Lock()
@@ -751,19 +775,19 @@ func (as *AutomationScheduler) RegisterTask(task *ScheduledTask) {
 func (as *AutomationScheduler) shouldEnableByDefault(taskID string) bool {
 	// 默认启用的关键任务列表
 	defaultEnabledTasks := []string{
-		"risk_monitoring",                    // 风险监控
-		"system_health",                      // 系统健康检查
-		"minimum_strategy_check",             // 最小策略数量检查
-		"abnormal_market_response",           // 异常行情应对
-		"account_security_monitoring",        // 账户安全监控
-		"multi_exchange_redundancy",          // 多交易所冗余
-		"audit_logging",                      // 日志与审计追踪
-		"market_pattern_recognition",         // 市场模式识别
-		"data_cleaning",                      // 数据清洗
-		"position_optimization",              // 仓位动态优化
-		"stop_loss_adjustment",               // 止盈止损线自动调整
-		"dynamic_fund_allocation",            // 资金动态分配
-		"layered_position_management",        // 仓位分层机制
+		"risk_monitoring",             // 风险监控
+		"system_health",               // 系统健康检查
+		"minimum_strategy_check",      // 最小策略数量检查
+		"abnormal_market_response",    // 异常行情应对
+		"account_security_monitoring", // 账户安全监控
+		"multi_exchange_redundancy",   // 多交易所冗余
+		"audit_logging",               // 日志与审计追踪
+		"market_pattern_recognition",  // 市场模式识别
+		"data_cleaning",               // 数据清洗
+		"position_optimization",       // 仓位动态优化
+		"stop_loss_adjustment",        // 止盈止损线自动调整
+		"dynamic_fund_allocation",     // 资金动态分配
+		"layered_position_management", // 仓位分层机制
 	}
 
 	for _, enabledTask := range defaultEnabledTasks {

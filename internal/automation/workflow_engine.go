@@ -106,14 +106,23 @@ func NewAutomationWorkflowEngine(config *WorkflowEngineConfig) *AutomationWorkfl
 		poolManager = concurrent.NewPoolManager(poolConfig)
 	}
 
+	// 创建自动化调度器（如果启用）
+	var automationScheduler *scheduler.AutomationScheduler
+	if config.EnableScheduler {
+		// 创建一个基本的调度器配置
+		// 注意：这里使用 nil 数据库，因为在测试环境中可能没有数据库
+		automationScheduler = scheduler.NewAutomationSchedulerWithoutDB()
+	}
+
 	awe := &AutomationWorkflowEngine{
-		workflowEngine: workflowEngine,
-		poolManager:    poolManager,
-		eventBus:       eventBus,
-		config:         config,
-		ctx:            ctx,
-		cancel:         cancel,
-		activeTasks:    make(map[string]*ActiveTask),
+		workflowEngine:      workflowEngine,
+		automationScheduler: automationScheduler,
+		poolManager:         poolManager,
+		eventBus:            eventBus,
+		config:              config,
+		ctx:                 ctx,
+		cancel:              cancel,
+		activeTasks:         make(map[string]*ActiveTask),
 		stats: &WorkflowEngineStats{
 			StartTime: time.Now(),
 		},
@@ -500,9 +509,9 @@ func (awe *AutomationWorkflowEngine) GetWorkflowEngine() *workflow.EnhancedWorkf
 	return awe.workflowEngine
 }
 
-// GetTaskScheduler 获取任务调度器（暂未实现）
+// GetTaskScheduler 获取任务调度器
 func (awe *AutomationWorkflowEngine) GetTaskScheduler() interface{} {
-	return nil
+	return awe.automationScheduler
 }
 
 // WorkflowEventHandler 工作流事件处理器
