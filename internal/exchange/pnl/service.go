@@ -249,19 +249,20 @@ func (s *Service) loadInitialData(ctx context.Context) error {
 	}
 
 	// Load account balances
-	// TODO: Implement GetAccountBalances method in exchange interface
-	// balances, err := s.exchange.GetAccountBalances(ctx)
-	// if err != nil {
-	//	return fmt.Errorf("failed to get account balances: %w", err)
-	// }
-	balances := make(map[string]float64) // Temporary placeholder
+	balances, err := s.exchange.GetAccountBalance(ctx)
+	if err != nil {
+		log.Printf("Failed to get account balances: %v, using empty balances", err)
+		balances = make(map[string]*exchange.AccountBalance) // Use empty balances if exchange unavailable
+	}
 
 	// Update calculator with balances
 	for asset, balance := range balances {
-		// TODO: Fix UpdateBalance method signature
-		_ = asset
-		_ = balance
-		// s.calculator.UpdateBalance(asset, balance)
+		// 实现真实的余额更新逻辑
+		if balance != nil {
+			s.calculator.UpdateBalance(asset, balance)
+			log.Printf("Updated balance for %s: Total=%.6f, Available=%.6f, Locked=%.6f",
+				asset, balance.Total, balance.Available, balance.Locked)
+		}
 	}
 
 	log.Printf("Loaded %d positions and %d balances", len(positions), len(balances))
@@ -496,7 +497,7 @@ func (s *Service) GetStatus() map[string]interface{} {
 	return map[string]interface{}{
 		"running":           s.running,
 		"config":            s.config,
-		"calculator_status": "active", // TODO: Implement GetCurrentStatus method
+		"calculator_status": s.calculator.GetCurrentStatus(), // 实现真实的状态获取
 		"monitor_status":    s.monitor.GetCurrentStatus(),
 		"executor_status":   s.executor.GetStatus(),
 	}

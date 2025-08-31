@@ -133,6 +133,22 @@ func (c *Calculator) UpdateBalance(asset string, balance *exchange.AccountBalanc
 	c.balances[asset] = balance
 }
 
+// GetCurrentStatus returns the current status of the calculator
+func (c *Calculator) GetCurrentStatus() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if len(c.positions) == 0 && len(c.balances) == 0 {
+		return "idle"
+	}
+
+	if len(c.positions) > 0 {
+		return "active"
+	}
+
+	return "monitoring"
+}
+
 // CalculateUnrealizedPnL calculates unrealized PnL for a symbol
 func (c *Calculator) CalculateUnrealizedPnL(symbol string) float64 {
 	c.mu.RLock()

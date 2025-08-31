@@ -306,10 +306,42 @@ func (e *Executor) sendAlert(event *TriggerEvent) error {
 
 // cancelAllOrders cancels all open orders
 func (e *Executor) cancelAllOrders() error {
-	// Get all open orders - need to specify a symbol or get all symbols
-	// For now, we'll skip this implementation as it requires symbol information
-	// TODO: Implement proper order cancellation logic
-	log.Printf("cancelAllOrders: Implementation needed")
+	ctx := context.Background()
+
+	// Get all open orders from exchange
+	openOrders, err := e.exchange.GetOpenOrders(ctx, "")
+	if err != nil {
+		return fmt.Errorf("failed to get open orders: %w", err)
+	}
+
+	if len(openOrders) == 0 {
+		log.Printf("No open orders to cancel")
+		return nil
+	}
+
+	log.Printf("Cancelling %d open orders", len(openOrders))
+
+	var cancelErrors []error
+	for _, order := range openOrders {
+		cancelReq := &exchange.OrderCancelRequest{
+			Symbol:  order.Symbol,
+			OrderID: order.OrderID,
+		}
+
+		_, err := e.exchange.CancelOrder(ctx, cancelReq)
+		if err != nil {
+			log.Printf("Failed to cancel order %s: %v", order.OrderID, err)
+			cancelErrors = append(cancelErrors, fmt.Errorf("order %s: %w", order.OrderID, err))
+		} else {
+			log.Printf("Successfully cancelled order: %s", order.OrderID)
+		}
+	}
+
+	if len(cancelErrors) > 0 {
+		return fmt.Errorf("failed to cancel %d orders: %v", len(cancelErrors), cancelErrors)
+	}
+
+	log.Printf("Successfully cancelled all %d orders", len(openOrders))
 	return nil
 }
 
