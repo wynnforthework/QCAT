@@ -35,8 +35,14 @@ func (ca *CacheAdapter) Get(ctx context.Context, key string, dest interface{}) e
 		return nil
 	}
 
-	// Try to unmarshal JSON if value is a string
+	// Handle string values specially
 	if valueStr, ok := rawValue.(string); ok {
+		// If dest is a string pointer, assign directly
+		if destStr, ok := dest.(*string); ok {
+			*destStr = valueStr
+			return nil
+		}
+		// Otherwise try to unmarshal as JSON
 		return json.Unmarshal([]byte(valueStr), dest)
 	}
 

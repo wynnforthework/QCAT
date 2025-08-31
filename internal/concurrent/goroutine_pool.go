@@ -110,7 +110,7 @@ func NewGoroutinePool(config *PoolConfig) *GoroutinePool {
 			ID:       i + 1,
 			pool:     pool,
 			taskChan: make(chan Task),
-			quit:     make(chan bool),
+			quit:     make(chan bool, 1), // 缓冲通道防止阻塞
 			wg:       &pool.wg,
 		}
 		pool.workers[i] = worker
@@ -165,6 +165,14 @@ func (gp *GoroutinePool) Stop() {
 
 // Submit 提交任务
 func (gp *GoroutinePool) Submit(task Task) error {
+	// 首先检查池是否已关闭
+	select {
+	case <-gp.ctx.Done():
+		return fmt.Errorf("pool is shutting down")
+	default:
+	}
+
+	// 尝试提交任务
 	select {
 	case gp.taskQueue <- task:
 		atomic.AddInt64(&gp.totalTasks, 1)
@@ -282,7 +290,7 @@ func (gp *GoroutinePool) resultCollector() {
 	for result := range gp.resultChan {
 		// 添加结果处理逻辑
 		gp.processTaskResult(result)
-		
+
 		log.Printf("收集到任务结果: %s (成功: %t, 耗时: %v)",
 			result.TaskID, result.Success, result.Duration)
 	}
@@ -292,16 +300,16 @@ func (gp *GoroutinePool) resultCollector() {
 func (gp *GoroutinePool) processTaskResult(result *TaskResult) {
 	// 1. 更新统计信息
 	gp.updateStatistics(result)
-	
+
 	// 2. 记录结果到内存存储
 	gp.recordResult(result)
-	
+
 	// 3. 检查是否需要告警
 	gp.checkAlerts(result)
-	
+
 	// 4. 执行结果回调
 	gp.executeResultCallbacks(result)
-	
+
 	// 5. 清理过期结果
 	gp.cleanupExpiredResults()
 }
@@ -310,10 +318,10 @@ func (gp *GoroutinePool) processTaskResult(result *TaskResult) {
 func (gp *GoroutinePool) updateStatistics(result *TaskResult) {
 	gp.mu.Lock()
 	defer gp.mu.Unlock()
-	
+
 	atomic.AddInt64(&gp.completedTasks, 1)
 	atomic.AddInt64(&gp.activeTasks, -1)
-	
+
 	if !result.Success {
 		atomic.AddInt64(&gp.failedTasks, 1)
 	}
@@ -323,17 +331,17 @@ func (gp *GoroutinePool) updateStatistics(result *TaskResult) {
 func (gp *GoroutinePool) recordResult(result *TaskResult) {
 	gp.mu.Lock()
 	defer gp.mu.Unlock()
-	
+
 	// 初始化结果历史存储（如果还没有）
 	if gp.resultHistory == nil {
 		gp.resultHistory = make(map[string]*TaskResult)
 		gp.resultQueue = make([]*TaskResult, 0)
 	}
-	
+
 	// 存储结果
 	gp.resultHistory[result.TaskID] = result
 	gp.resultQueue = append(gp.resultQueue, result)
-	
+
 	// 限制历史记录数量（保留最近1000条）
 	maxHistorySize := 1000
 	if len(gp.resultQueue) > maxHistorySize {
@@ -350,12 +358,12 @@ func (gp *GoroutinePool) checkAlerts(result *TaskResult) {
 	if gp.shouldAlertOnFailureRate() {
 		gp.sendFailureRateAlert()
 	}
-	
+
 	// 检查任务执行时间
 	if gp.shouldAlertOnSlowTask(result) {
 		gp.sendSlowTaskAlert(result)
 	}
-	
+
 	// 检查连续失败
 	if gp.shouldAlertOnConsecutiveFailures(result) {
 		gp.sendConsecutiveFailuresAlert(result)
@@ -366,14 +374,14 @@ func (gp *GoroutinePool) checkAlerts(result *TaskResult) {
 func (gp *GoroutinePool) shouldAlertOnFailureRate() bool {
 	gp.mu.RLock()
 	defer gp.mu.RUnlock()
-	
+
 	completed := atomic.LoadInt64(&gp.completedTasks)
 	failed := atomic.LoadInt64(&gp.failedTasks)
-	
+
 	if completed < 10 { // 至少需要10个任务才计算失败率
 		return false
 	}
-	
+
 	failureRate := float64(failed) / float64(completed)
 	return failureRate > 0.1 // 失败率超过10%告警
 }
@@ -390,7 +398,7 @@ func (gp *GoroutinePool) shouldAlertOnConsecutiveFailures(result *TaskResult) bo
 		gp.consecutiveFailures = 0
 		return false
 	}
-	
+
 	gp.consecutiveFailures++
 	return gp.consecutiveFailures >= 5 // 连续5次失败告警
 }
@@ -400,10 +408,10 @@ func (gp *GoroutinePool) sendFailureRateAlert() {
 	completed := atomic.LoadInt64(&gp.completedTasks)
 	failed := atomic.LoadInt64(&gp.failedTasks)
 	failureRate := float64(failed) / float64(completed) * 100
-	
-	log.Printf("ALERT: High task failure rate detected: %.2f%% (%d/%d)", 
+
+	log.Printf("ALERT: High task failure rate detected: %.2f%% (%d/%d)",
 		failureRate, failed, completed)
-	
+
 	// 这里可以集成实际的告警系统
 	// 比如发送邮件、Slack通知等
 }
@@ -411,15 +419,15 @@ func (gp *GoroutinePool) sendFailureRateAlert() {
 // sendSlowTaskAlert 发送慢任务告警
 func (gp *GoroutinePool) sendSlowTaskAlert(result *TaskResult) {
 	log.Printf("ALERT: Slow task detected: %s took %v", result.TaskID, result.Duration)
-	
+
 	// 这里可以集成实际的告警系统
 }
 
 // sendConsecutiveFailuresAlert 发送连续失败告警
 func (gp *GoroutinePool) sendConsecutiveFailuresAlert(result *TaskResult) {
-	log.Printf("ALERT: %d consecutive task failures detected, latest: %s", 
+	log.Printf("ALERT: %d consecutive task failures detected, latest: %s",
 		gp.consecutiveFailures, result.TaskID)
-	
+
 	// 这里可以集成实际的告警系统
 }
 
@@ -428,7 +436,7 @@ func (gp *GoroutinePool) executeResultCallbacks(result *TaskResult) {
 	gp.mu.RLock()
 	callbacks := gp.resultCallbacks
 	gp.mu.RUnlock()
-	
+
 	for _, callback := range callbacks {
 		go func(cb ResultCallback) {
 			defer func() {
@@ -445,15 +453,15 @@ func (gp *GoroutinePool) executeResultCallbacks(result *TaskResult) {
 func (gp *GoroutinePool) cleanupExpiredResults() {
 	gp.mu.Lock()
 	defer gp.mu.Unlock()
-	
+
 	if gp.resultQueue == nil {
 		return
 	}
-	
+
 	// 清理超过24小时的结果
 	cutoffTime := time.Now().Add(-24 * time.Hour)
 	var validResults []*TaskResult
-	
+
 	for _, result := range gp.resultQueue {
 		if result.EndTime.After(cutoffTime) {
 			validResults = append(validResults, result)
@@ -461,7 +469,7 @@ func (gp *GoroutinePool) cleanupExpiredResults() {
 			delete(gp.resultHistory, result.TaskID)
 		}
 	}
-	
+
 	gp.resultQueue = validResults
 }
 
@@ -472,11 +480,11 @@ type ResultCallback func(*TaskResult)
 func (gp *GoroutinePool) AddResultCallback(callback ResultCallback) {
 	gp.mu.Lock()
 	defer gp.mu.Unlock()
-	
+
 	if gp.resultCallbacks == nil {
 		gp.resultCallbacks = make([]ResultCallback, 0)
 	}
-	
+
 	gp.resultCallbacks = append(gp.resultCallbacks, callback)
 }
 
@@ -484,11 +492,11 @@ func (gp *GoroutinePool) AddResultCallback(callback ResultCallback) {
 func (gp *GoroutinePool) GetTaskResult(taskID string) (*TaskResult, bool) {
 	gp.mu.RLock()
 	defer gp.mu.RUnlock()
-	
+
 	if gp.resultHistory == nil {
 		return nil, false
 	}
-	
+
 	result, exists := gp.resultHistory[taskID]
 	return result, exists
 }
@@ -497,19 +505,19 @@ func (gp *GoroutinePool) GetTaskResult(taskID string) (*TaskResult, bool) {
 func (gp *GoroutinePool) GetRecentResults(limit int) []*TaskResult {
 	gp.mu.RLock()
 	defer gp.mu.RUnlock()
-	
+
 	if gp.resultQueue == nil {
 		return nil
 	}
-	
+
 	start := len(gp.resultQueue) - limit
 	if start < 0 {
 		start = 0
 	}
-	
+
 	results := make([]*TaskResult, len(gp.resultQueue)-start)
 	copy(results, gp.resultQueue[start:])
-	
+
 	return results
 }
 
@@ -517,18 +525,18 @@ func (gp *GoroutinePool) GetRecentResults(limit int) []*TaskResult {
 func (gp *GoroutinePool) GetFailedResults(limit int) []*TaskResult {
 	gp.mu.RLock()
 	defer gp.mu.RUnlock()
-	
+
 	if gp.resultQueue == nil {
 		return nil
 	}
-	
+
 	var failedResults []*TaskResult
 	for i := len(gp.resultQueue) - 1; i >= 0 && len(failedResults) < limit; i-- {
 		if !gp.resultQueue[i].Success {
 			failedResults = append(failedResults, gp.resultQueue[i])
 		}
 	}
-	
+
 	return failedResults
 }
 
@@ -643,6 +651,7 @@ func (at *AutomationTask) SetParam(key string, value interface{}) {
 func (at *AutomationTask) GetParam(key string) interface{} {
 	return at.params[key]
 }
+
 // NewPool 创建池的别名函数，为了兼容性
 func NewPool(name string, config *PoolConfig) *GoroutinePool {
 	return NewGoroutinePool(config)

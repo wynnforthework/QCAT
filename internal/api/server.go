@@ -578,6 +578,14 @@ func (s *Server) setupRoutes() {
 		s.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
+	// Basic metrics endpoint (always available)
+	s.router.GET("/metrics", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":    "ok",
+			"timestamp": time.Now().UTC(),
+		})
+	})
+
 	// Prometheus metrics
 	if s.config.Monitoring.PrometheusEnabled {
 		s.router.GET(s.config.Monitoring.PrometheusPath, gin.WrapH(monitoring.PrometheusHandler()))

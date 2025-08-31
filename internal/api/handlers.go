@@ -420,7 +420,7 @@ func (h *StrategyHandler) CreateStrategy(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, Response{
 			Success: false,
-			Error:   err.Error(),
+			Error:   "Invalid JSON format: " + err.Error(),
 		})
 		return
 	}

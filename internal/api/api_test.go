@@ -144,7 +144,7 @@ func TestStrategyAPI(t *testing.T) {
 
 	t.Run("invalid request", func(t *testing.T) {
 		// 发送无效的JSON
-		invalidJSON := `{"invalid": json}`
+		invalidJSON := `{"invalid": json, "malformed"`
 
 		req := bytes.NewReader([]byte(invalidJSON))
 		resp := httpHelper.Request("POST", "/api/v1/strategy", req, map[string]string{
@@ -295,7 +295,9 @@ func TestErrorHandling(t *testing.T) {
 	})
 
 	t.Run("method not allowed", func(t *testing.T) {
-		resp := httpHelper.Request("PATCH", "/api/v1/strategy", nil, nil)
+		resp := httpHelper.Request("PATCH", "/api/v1/strategy", nil, map[string]string{
+			"Authorization": "Bearer test-token",
+		})
 		resp.AssertStatus(http.StatusMethodNotAllowed)
 	})
 
@@ -383,7 +385,13 @@ func setupTestRoutes(router *gin.Engine, suite *testutils.TestSuite) {
 		strategies.POST("", func(c *gin.Context) {
 			var strategy map[string]interface{}
 			if err := c.ShouldBindJSON(&strategy); err != nil {
-				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON format: " + err.Error()})
+				return
+			}
+
+			// 验证必需字段
+			if name, ok := strategy["name"].(string); !ok || name == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Strategy name is required"})
 				return
 			}
 
@@ -406,6 +414,53 @@ func setupTestRoutes(router *gin.Engine, suite *testutils.TestSuite) {
 			} else {
 				c.JSON(http.StatusNotFound, gin.H{"error": "strategy not found"})
 			}
+		})
+
+		// 处理不支持的方法
+		strategies.PATCH("", func(c *gin.Context) {
+			c.JSON(http.StatusMethodNotAllowed, gin.H{"error": "Method not allowed"})
+		})
+	}
+
+	// 投资组合路由
+	portfolio := api.Group("/portfolio")
+	{
+		portfolio.GET("/allocations", func(c *gin.Context) {
+			c.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"data": map[string]interface{}{
+					"allocations": []map[string]interface{}{
+						{
+							"symbol":     "BTCUSDT",
+							"allocation": 0.6,
+							"value":      10000.0,
+						},
+						{
+							"symbol":     "ETHUSDT",
+							"allocation": 0.4,
+							"value":      6666.67,
+						},
+					},
+					"total_value": 16666.67,
+				},
+			})
+		})
+
+		portfolio.POST("/rebalance", func(c *gin.Context) {
+			var request map[string]interface{}
+			if err := c.ShouldBindJSON(&request); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"data": map[string]interface{}{
+					"rebalance_id": "rebalance-123",
+					"mode":         "bandit",
+					"status":       "initiated",
+				},
+			})
 		})
 	}
 
