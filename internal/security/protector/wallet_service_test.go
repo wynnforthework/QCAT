@@ -138,10 +138,12 @@ func TestMockWalletService(t *testing.T) {
 
 	// 测试发起转账
 	request := &TransferRequest{
-		ToAddress: "0x1234567890abcdef",
-		Amount:    100.0,
-		Currency:  "USDT",
-		Metadata:  map[string]interface{}{"test": "value"},
+		Type:        "PROFIT_TRANSFER",
+		ToAddress:   "0x1234567890abcdef",
+		FromAddress: "0xabcdef1234567890",
+		Amount:      100.0,
+		Priority:    1,
+		Metadata:    map[string]interface{}{"test": "value"},
 	}
 
 	response, err := mock.InitiateTransfer(ctx, request)

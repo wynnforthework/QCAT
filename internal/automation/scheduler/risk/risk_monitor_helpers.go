@@ -581,21 +581,29 @@ func (rm *RiskMonitor) detectCorrelationBreakdown(ctx context.Context, marketDat
 	var lowCorrelations []string
 	lowCorrCount := 0
 
-	for i, symbol1 := range symbols[:min(10, len(symbols))] {
-		for j := i + 1; j < min(10, len(symbols)); j++ {
+	maxSymbols := len(symbols)
+	if maxSymbols > 10 {
+		maxSymbols = 10
+	}
+
+	for i := 0; i < maxSymbols; i++ {
+		symbol1 := symbols[i]
+		for j := i + 1; j < maxSymbols; j++ {
 			symbol2 := symbols[j]
-			if corr, exists := correlationMatrix[symbol1][symbol2]; exists {
-				if math.Abs(corr) < 0.2 { // Very low correlation
-					lowCorrelations = append(lowCorrelations, fmt.Sprintf("%s-%s", symbol1, symbol2))
-					lowCorrCount++
+			if correlationMatrix[symbol1] != nil {
+				if corr, exists := correlationMatrix[symbol1][symbol2]; exists {
+					if math.Abs(corr) < 0.2 { // Very low correlation
+						lowCorrelations = append(lowCorrelations, fmt.Sprintf("%s-%s", symbol1, symbol2))
+						lowCorrCount++
+					}
 				}
 			}
 		}
 	}
 
 	// If more than 30% of pairs have low correlation, it might indicate breakdown
-	totalPairs := (min(10, len(symbols)) * (min(10, len(symbols)) - 1)) / 2
-	if float64(lowCorrCount)/float64(totalPairs) < 0.3 {
+	totalPairs := (maxSymbols * (maxSymbols - 1)) / 2
+	if totalPairs == 0 || float64(lowCorrCount)/float64(totalPairs) < 0.3 {
 		return nil
 	}
 

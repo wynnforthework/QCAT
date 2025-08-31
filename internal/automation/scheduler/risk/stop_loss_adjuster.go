@@ -25,24 +25,24 @@ type StopLossAdjuster struct {
 	isRunning      bool
 	lastCheck      time.Time
 	metrics        map[string]interface{}
-	atrCache       map[string][]float64 // Cache for ATR calculations
-	rvCache        map[string][]float64 // Cache for RV calculations
+	atrCache       map[string][]float64            // Cache for ATR calculations
+	rvCache        map[string][]float64            // Cache for RV calculations
 	regimeCache    map[string]*shared.MarketRegime // Cache for market regime
 }
 
 // StopLossLevel represents a calculated stop loss level
 type StopLossLevel struct {
-	Symbol         string                 `json:"symbol"`
-	PositionID     string                 `json:"position_id"`
-	CurrentLevel   float64                `json:"current_level"`
-	RecommendedLevel float64              `json:"recommended_level"`
-	ATRBasedLevel  float64                `json:"atr_based_level"`
-	RVBasedLevel   float64                `json:"rv_based_level"`
-	RegimeAdjustment float64              `json:"regime_adjustment"`
-	Confidence     float64                `json:"confidence"`
-	Rationale      string                 `json:"rationale"`
-	Timestamp      time.Time              `json:"timestamp"`
-	Metadata       map[string]interface{} `json:"metadata"`
+	Symbol           string                 `json:"symbol"`
+	PositionID       string                 `json:"position_id"`
+	CurrentLevel     float64                `json:"current_level"`
+	RecommendedLevel float64                `json:"recommended_level"`
+	ATRBasedLevel    float64                `json:"atr_based_level"`
+	RVBasedLevel     float64                `json:"rv_based_level"`
+	RegimeAdjustment float64                `json:"regime_adjustment"`
+	Confidence       float64                `json:"confidence"`
+	Rationale        string                 `json:"rationale"`
+	Timestamp        time.Time              `json:"timestamp"`
+	Metadata         map[string]interface{} `json:"metadata"`
 }
 
 // StopLossAdjustment represents a stop loss adjustment instruction
@@ -59,30 +59,30 @@ type StopLossAdjustment struct {
 
 // ATRCalculationResult represents ATR calculation results
 type ATRCalculationResult struct {
-	Symbol         string    `json:"symbol"`
-	Period         int       `json:"period"`
-	CurrentATR     float64   `json:"current_atr"`
-	ATRValues      []float64 `json:"atr_values"`
-	ATRPercentile  float64   `json:"atr_percentile"`
-	Trend          float64   `json:"trend"` // -1 to 1, negative means decreasing ATR
-	Timestamp      time.Time `json:"timestamp"`
+	Symbol        string    `json:"symbol"`
+	Period        int       `json:"period"`
+	CurrentATR    float64   `json:"current_atr"`
+	ATRValues     []float64 `json:"atr_values"`
+	ATRPercentile float64   `json:"atr_percentile"`
+	Trend         float64   `json:"trend"` // -1 to 1, negative means decreasing ATR
+	Timestamp     time.Time `json:"timestamp"`
 }
 
 // RVCalculationResult represents Realized Volatility calculation results
 type RVCalculationResult struct {
-	Symbol         string    `json:"symbol"`
-	Period         int       `json:"period"`
-	CurrentRV      float64   `json:"current_rv"`
-	RVValues       []float64 `json:"rv_values"`
-	RVPercentile   float64   `json:"rv_percentile"`
-	Trend          float64   `json:"trend"` // -1 to 1, negative means decreasing volatility
-	Timestamp      time.Time `json:"timestamp"`
+	Symbol       string    `json:"symbol"`
+	Period       int       `json:"period"`
+	CurrentRV    float64   `json:"current_rv"`
+	RVValues     []float64 `json:"rv_values"`
+	RVPercentile float64   `json:"rv_percentile"`
+	Trend        float64   `json:"trend"` // -1 to 1, negative means decreasing volatility
+	Timestamp    time.Time `json:"timestamp"`
 }
 
 // NewStopLossAdjuster creates a new stop loss adjuster instance
 func NewStopLossAdjuster(cfg *config.Config, db *database.DB, accountManager *account.Manager) *StopLossAdjuster {
 	configManager := shared.NewConfigManager()
-	
+
 	// Initialize error handling
 	retryStrategy := shared.NewRetryStrategy(3, time.Second, time.Minute*5, 2.0)
 	circuitBreaker := shared.NewCircuitBreaker(shared.CircuitBreakerConfig{
@@ -149,7 +149,7 @@ func (sla *StopLossAdjuster) CalculateATRBasedStopLoss(ctx context.Context, symb
 
 	// Calculate stop loss based on ATR
 	atrMultiplier := sla.getATRMultiplier(atrResult.ATRPercentile)
-	
+
 	var stopLossLevel float64
 	if position.Side == "LONG" {
 		stopLossLevel = position.CurrentPrice - (atrResult.CurrentATR * atrMultiplier)
@@ -164,7 +164,7 @@ func (sla *StopLossAdjuster) CalculateATRBasedStopLoss(ctx context.Context, symb
 	// Update metrics
 	sla.updateATRMetrics(symbol, atrResult, stopLossLevel)
 
-	log.Printf("ATR-based stop loss calculated for %s: %.6f (ATR: %.6f, Multiplier: %.2f)", 
+	log.Printf("ATR-based stop loss calculated for %s: %.6f (ATR: %.6f, Multiplier: %.2f)",
 		symbol, stopLossLevel, atrResult.CurrentATR, atrMultiplier)
 
 	return stopLossLevel, nil
@@ -213,11 +213,11 @@ func (sla *StopLossAdjuster) CalculateRVBasedStopLoss(ctx context.Context, symbo
 
 	// Calculate stop loss based on RV
 	rvMultiplier := sla.getRVMultiplier(rvResult.RVPercentile)
-	
+
 	// Convert annualized volatility to daily volatility for stop loss calculation
 	dailyVolatility := rvResult.CurrentRV / math.Sqrt(252)
 	volatilityDistance := position.CurrentPrice * dailyVolatility * rvMultiplier
-	
+
 	var stopLossLevel float64
 	if position.Side == "LONG" {
 		stopLossLevel = position.CurrentPrice - volatilityDistance
@@ -232,7 +232,7 @@ func (sla *StopLossAdjuster) CalculateRVBasedStopLoss(ctx context.Context, symbo
 	// Update metrics
 	sla.updateRVMetrics(symbol, rvResult, stopLossLevel)
 
-	log.Printf("RV-based stop loss calculated for %s: %.6f (RV: %.6f, Multiplier: %.2f)", 
+	log.Printf("RV-based stop loss calculated for %s: %.6f (RV: %.6f, Multiplier: %.2f)",
 		symbol, stopLossLevel, rvResult.CurrentRV, rvMultiplier)
 
 	return stopLossLevel, nil
@@ -252,7 +252,7 @@ func (sla *StopLossAdjuster) AdjustStopLossLevels(ctx context.Context, adjustmen
 	// Sort adjustments by priority (higher priority first)
 	sortedAdjustments := make([]StopLossAdjustment, len(adjustments))
 	copy(sortedAdjustments, adjustments)
-	
+
 	// Simple bubble sort by priority
 	for i := 0; i < len(sortedAdjustments)-1; i++ {
 		for j := 0; j < len(sortedAdjustments)-i-1; j++ {
@@ -264,7 +264,7 @@ func (sla *StopLossAdjuster) AdjustStopLossLevels(ctx context.Context, adjustmen
 
 	successCount := 0
 	errorCount := 0
-	
+
 	for _, adjustment := range sortedAdjustments {
 		err := sla.executeStopLossAdjustment(ctx, adjustment)
 		if err != nil {
@@ -316,14 +316,14 @@ func (sla *StopLossAdjuster) MonitorMarketRegime(ctx context.Context) (*shared.M
 
 	// Calculate regime indicators
 	regime := sla.detectMarketRegime(marketData)
-	
+
 	// Cache the regime result
 	sla.regimeCache["market"] = regime
 
 	// Update metrics
 	sla.updateRegimeMetrics(regime)
 
-	log.Printf("Market regime detected: Type=%s, Confidence=%.2f, Volatility=%.4f, Trend=%.4f", 
+	log.Printf("Market regime detected: Type=%s, Confidence=%.2f, Volatility=%.4f, Trend=%.4f",
 		regime.Type, regime.Confidence, regime.Volatility, regime.Trend)
 
 	return regime, nil
@@ -366,7 +366,7 @@ func (sla *StopLossAdjuster) CalculateOptimalStopLoss(ctx context.Context, posit
 		// Both methods available - use weighted average
 		atrWeight := 0.6
 		rvWeight := 0.4
-		
+
 		optimalStopLoss = atrStopLoss*atrWeight + rvStopLoss*rvWeight
 		confidence = 0.8
 		rationale = "Combined ATR and RV methods"
@@ -418,7 +418,7 @@ func (sla *StopLossAdjuster) CalculateOptimalStopLoss(ctx context.Context, posit
 	// Update metrics
 	sla.updateOptimalStopLossMetrics(stopLossLevel)
 
-	log.Printf("Optimal stop loss calculated for %s: %.6f (Confidence: %.2f, Method: %s)", 
+	log.Printf("Optimal stop loss calculated for %s: %.6f (Confidence: %.2f, Method: %s)",
 		position.Symbol, optimalStopLoss, confidence, rationale)
 
 	return optimalStopLoss, nil
@@ -449,7 +449,7 @@ func (sla *StopLossAdjuster) GenerateStopLossAdjustments(ctx context.Context) ([
 	}
 
 	var adjustments []StopLossAdjustment
-	
+
 	for _, position := range positions {
 		// Calculate optimal stop loss for this position
 		optimalStopLoss, err := sla.CalculateOptimalStopLoss(ctx, position)
@@ -468,18 +468,18 @@ func (sla *StopLossAdjuster) GenerateStopLossAdjustments(ctx context.Context) ([
 		// Check if adjustment is needed
 		if sla.shouldAdjustStopLoss(currentStopLoss, optimalStopLoss, position.Side) {
 			priority := sla.calculateAdjustmentPriority(currentStopLoss, optimalStopLoss, position)
-			
+
 			adjustment := StopLossAdjustment{
 				PositionID:     position.ID,
 				Symbol:         position.Symbol,
 				OldLevel:       currentStopLoss,
 				NewLevel:       optimalStopLoss,
 				AdjustmentType: "OPTIMAL",
-				Reason:         fmt.Sprintf("Optimal stop loss adjustment based on current market conditions"),
+				Reason:         "Optimal stop loss adjustment based on current market conditions",
 				Priority:       priority,
 				Timestamp:      time.Now(),
 			}
-			
+
 			adjustments = append(adjustments, adjustment)
 		}
 	}
@@ -494,7 +494,7 @@ func (sla *StopLossAdjuster) GenerateStopLossAdjustments(ctx context.Context) ([
 func (sla *StopLossAdjuster) calculateATRBasedStopLossInternal(ctx context.Context, symbol string) (float64, error) {
 	// This is the same logic as CalculateATRBasedStopLoss but without mutex lock
 	// (since it's called from within locked methods)
-	
+
 	atrResult, err := sla.calculateATR(ctx, symbol)
 	if err != nil {
 		return 0, err
@@ -506,7 +506,7 @@ func (sla *StopLossAdjuster) calculateATRBasedStopLossInternal(ctx context.Conte
 	}
 
 	atrMultiplier := sla.getATRMultiplier(atrResult.ATRPercentile)
-	
+
 	var stopLossLevel float64
 	if position.Side == "LONG" {
 		stopLossLevel = position.CurrentPrice - (atrResult.CurrentATR * atrMultiplier)
@@ -535,7 +535,7 @@ func (sla *StopLossAdjuster) calculateRVBasedStopLossInternal(ctx context.Contex
 	rvMultiplier := sla.getRVMultiplier(rvResult.RVPercentile)
 	dailyVolatility := rvResult.CurrentRV / math.Sqrt(252)
 	volatilityDistance := position.CurrentPrice * dailyVolatility * rvMultiplier
-	
+
 	var stopLossLevel float64
 	if position.Side == "LONG" {
 		stopLossLevel = position.CurrentPrice - volatilityDistance
@@ -566,7 +566,7 @@ func (sla *StopLossAdjuster) getMarketRegime(ctx context.Context) (*shared.Marke
 // calculateRegimeAdjustment calculates adjustment based on market regime
 func (sla *StopLossAdjuster) calculateRegimeAdjustment(regime *shared.MarketRegime) float64 {
 	baseAdjustment := 0.0
-	
+
 	switch regime.Type {
 	case "VOLATILE":
 		baseAdjustment = 0.2 // Widen stops by 20% in volatile markets
@@ -577,7 +577,7 @@ func (sla *StopLossAdjuster) calculateRegimeAdjustment(regime *shared.MarketRegi
 	case "SIDEWAYS":
 		baseAdjustment = 0.0 // No adjustment in sideways markets
 	}
-	
+
 	// Scale by confidence
 	return baseAdjustment * regime.Confidence
 }
@@ -603,7 +603,7 @@ func (sla *StopLossAdjuster) getAllActivePositions(ctx context.Context) ([]share
 		WHERE status = 'ACTIVE'
 		ORDER BY created_at DESC
 	`
-	
+
 	rows, err := sla.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -629,7 +629,7 @@ func (sla *StopLossAdjuster) getAllActivePositions(ctx context.Context) ([]share
 // getCurrentStopLoss gets current stop loss level for a position
 func (sla *StopLossAdjuster) getCurrentStopLoss(ctx context.Context, positionID string) (float64, error) {
 	query := `SELECT stop_loss FROM positions WHERE id = ? AND status = 'ACTIVE'`
-	
+
 	var stopLoss float64
 	err := sla.db.QueryRowContext(ctx, query, positionID).Scan(&stopLoss)
 	if err != nil {
@@ -701,7 +701,7 @@ func (sla *StopLossAdjuster) updateOptimalStopLossMetrics(level *StopLossLevel) 
 func (sla *StopLossAdjuster) GetMetrics() map[string]interface{} {
 	sla.mu.RLock()
 	defer sla.mu.RUnlock()
-	
+
 	// Return a copy to prevent external modifications
 	metrics := make(map[string]interface{})
 	for k, v := range sla.metrics {
@@ -721,7 +721,7 @@ func (sla *StopLossAdjuster) IsRunning() bool {
 func (sla *StopLossAdjuster) Start() error {
 	sla.mu.Lock()
 	defer sla.mu.Unlock()
-	
+
 	sla.isRunning = true
 	sla.lastCheck = time.Now()
 	log.Printf("Stop loss adjuster started")
@@ -732,7 +732,7 @@ func (sla *StopLossAdjuster) Start() error {
 func (sla *StopLossAdjuster) Stop() error {
 	sla.mu.Lock()
 	defer sla.mu.Unlock()
-	
+
 	sla.isRunning = false
 	log.Printf("Stop loss adjuster stopped")
 	return nil

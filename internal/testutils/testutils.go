@@ -18,6 +18,8 @@ import (
 	"testing"
 	"time"
 
+	_ "github.com/mattn/go-sqlite3"
+
 	"qcat/internal/cache"
 	"qcat/internal/database"
 	"qcat/internal/logger"

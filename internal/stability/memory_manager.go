@@ -181,7 +181,11 @@ func (mm *MemoryManager) initializeMetrics() {
 
 // monitor continuously monitors memory usage
 func (mm *MemoryManager) monitor() {
-	ticker := time.NewTicker(mm.config.MonitorInterval)
+	interval := mm.config.MonitorInterval
+	if interval <= 0 {
+		interval = 30 * time.Second // Default to 30 seconds if invalid
+	}
+	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
 	for {

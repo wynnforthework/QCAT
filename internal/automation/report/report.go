@@ -806,7 +806,7 @@ func (r *Reporter) calculateVolatility(metrics []PerformanceMetric) float64 {
 
 // calculateCalmarRatio calculates Calmar ratio
 func (r *Reporter) calculateCalmarRatio(currentEquity, initialEquity, maxDrawdown float64) float64 {
-	if maxDrawdown == 0 {
+	if maxDrawdown == 0 || initialEquity == 0 {
 		return 0
 	}
 
@@ -823,7 +823,7 @@ func (r *Reporter) calculateROI(position *exchange.Position, trades []*exchange.
 	// Simplified ROI calculation
 	// In a real implementation, you would track the initial investment
 	totalInvestment := position.EntryPrice * position.Quantity
-	if totalInvestment == 0 {
+	if totalInvestment == 0 || position.EntryPrice == 0 || position.Quantity == 0 {
 		return 0
 	}
 

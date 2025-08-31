@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"qcat/internal/config"
+	"qcat/internal/exchange"
 	"qcat/internal/security/protector/dao"
 )
 
@@ -19,10 +20,12 @@ func TestFundProtectorCreation(t *testing.T) {
 	}
 
 	exchangeProvider := NewMockExchangeProvider()
-	notificationService := NewMockNotificationService()
-	walletService := NewMockWalletService()
+	mockNotificationService := NewMockNotificationService()
+	mockWalletService := NewMockWalletService()
+	var mockExchange exchange.Exchange
+	var mockDAOManager dao.DAOManager
 
-	fp, err := NewFundProtector(cfg, exchangeProvider, nil, notificationService, walletService)
+	fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, mockNotificationService, mockWalletService)
 	if err != nil {
 		t.Fatalf("Failed to create fund protector: %v", err)
 	}
@@ -199,8 +202,10 @@ func TestRiskCalculations(t *testing.T) {
 	exchangeProvider := NewMockExchangeProvider()
 	notificationService := NewMockNotificationService()
 	walletService := NewMockWalletService()
+	var mockExchange exchange.Exchange
+	var mockDAOManager dao.DAOManager
 
-	fp, err := NewFundProtector(cfg, exchangeProvider, nil, notificationService, walletService)
+	fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
 	if err != nil {
 		t.Fatalf("Failed to create fund protector: %v", err)
 	}
@@ -242,10 +247,12 @@ func TestEmergencyProtocol(t *testing.T) {
 	}
 
 	exchangeProvider := NewMockExchangeProvider()
-	notificationService := NewMockNotificationService()
+	mockNotificationService := NewMockNotificationService()
 	walletService := NewMockWalletService()
+	var mockExchange exchange.Exchange
+	var mockDAOManager dao.DAOManager
 
-	fp, err := NewFundProtector(cfg, exchangeProvider, nil, notificationService, walletService)
+	fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, mockNotificationService, walletService)
 	if err != nil {
 		t.Fatalf("Failed to create fund protector: %v", err)
 	}
@@ -282,12 +289,12 @@ func TestEmergencyProtocol(t *testing.T) {
 	}
 
 	// 验证通知被发送
-	emails := notificationService.(*MockNotificationService).GetEmailsSent()
+	emails := mockNotificationService.GetEmailsSent()
 	if len(emails) == 0 {
 		t.Error("Expected emergency email to be sent")
 	}
 
-	sms := notificationService.(*MockNotificationService).GetSMSSent()
+	sms := mockNotificationService.GetSMSSent()
 	if len(sms) == 0 {
 		t.Error("Expected emergency SMS to be sent")
 	}
@@ -305,8 +312,10 @@ func TestCircuitBreaker(t *testing.T) {
 	exchangeProvider := NewMockExchangeProvider()
 	notificationService := NewMockNotificationService()
 	walletService := NewMockWalletService()
+	var mockExchange exchange.Exchange
+	var mockDAOManager dao.DAOManager
 
-	fp, err := NewFundProtector(cfg, exchangeProvider, nil, notificationService, walletService)
+	fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
 	if err != nil {
 		t.Fatalf("Failed to create fund protector: %v", err)
 	}
@@ -345,8 +354,10 @@ func TestAutoTransfer(t *testing.T) {
 	exchangeProvider := NewMockExchangeProvider()
 	notificationService := NewMockNotificationService()
 	walletService := NewMockWalletService()
+	var mockExchange exchange.Exchange
+	var mockDAOManager dao.DAOManager
 
-	fp, err := NewFundProtector(cfg, exchangeProvider, nil, notificationService, walletService)
+	fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
 	if err != nil {
 		t.Fatalf("Failed to create fund protector: %v", err)
 	}
@@ -362,7 +373,7 @@ func TestAutoTransfer(t *testing.T) {
 	fp.checkAutoTransfer()
 
 	// 验证转账被执行
-	transfers := walletService.(*MockWalletService).GetTransfers()
+	transfers := walletService.GetTransfers()
 	if len(transfers) == 0 {
 		t.Error("Expected auto transfer to be executed")
 	}
@@ -385,8 +396,10 @@ func TestProtectionMetrics(t *testing.T) {
 	exchangeProvider := NewMockExchangeProvider()
 	notificationService := NewMockNotificationService()
 	walletService := NewMockWalletService()
+	var mockExchange exchange.Exchange
+	var mockDAOManager dao.DAOManager
 
-	fp, err := NewFundProtector(cfg, exchangeProvider, nil, notificationService, walletService)
+	fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
 	if err != nil {
 		t.Fatalf("Failed to create fund protector: %v", err)
 	}
@@ -428,8 +441,10 @@ func BenchmarkRiskCalculation(b *testing.B) {
 	exchangeProvider := NewMockExchangeProvider()
 	notificationService := NewMockNotificationService()
 	walletService := NewMockWalletService()
+	var mockExchange exchange.Exchange
+	var mockDAOManager dao.DAOManager
 
-	fp, err := NewFundProtector(cfg, exchangeProvider, nil, notificationService, walletService)
+	fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
 	if err != nil {
 		b.Fatalf("Failed to create fund protector: %v", err)
 	}

@@ -59,6 +59,24 @@ const (
 	RiskLevelEmergency
 )
 
+// String 返回风险等级的字符串表示
+func (rl RiskLevel) String() string {
+	switch rl {
+	case RiskLevelLow:
+		return "LOW"
+	case RiskLevelMedium:
+		return "MEDIUM"
+	case RiskLevelHigh:
+		return "HIGH"
+	case RiskLevelCritical:
+		return "CRITICAL"
+	case RiskLevelEmergency:
+		return "EMERGENCY"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 // RealTimeRiskMetrics 实时风险指标
 type RealTimeRiskMetrics struct {
 	PortfolioVaR      float64   `json:"portfolio_var"`
@@ -1127,7 +1145,7 @@ func (irc *IntelligentRiskController) saveReportToDatabase(report string, metric
 
 	_, err := irc.db.ExecContext(ctx, query,
 		report,
-		string(irc.currentRiskLevel),
+		irc.currentRiskLevel.String(),
 		metrics.PortfolioVaR,
 		metrics.PortfolioCVaR,
 		metrics.MaxDrawdown,
@@ -1177,7 +1195,7 @@ func (irc *IntelligentRiskController) sendReportToStakeholders(report string, me
 func (irc *IntelligentRiskController) sendEmailNotification(report string, metrics *RealTimeRiskMetrics) error {
 	// 构建邮件内容
 	subject := fmt.Sprintf("风险控制报告 - %s - %s",
-		irc.currentRiskLevel, time.Now().Format("2006-01-02 15:04"))
+		irc.currentRiskLevel.String(), time.Now().Format("2006-01-02 15:04"))
 
 	emailBody := fmt.Sprintf(`
 <html>
@@ -1203,7 +1221,7 @@ func (irc *IntelligentRiskController) sendEmailNotification(report string, metri
 </body>
 </html>
 	`,
-		irc.currentRiskLevel,
+		irc.currentRiskLevel.String(),
 		time.Now().Format("2006-01-02 15:04:05"),
 		metrics.PortfolioVaR,
 		metrics.PortfolioCVaR,
@@ -1245,7 +1263,7 @@ func (irc *IntelligentRiskController) sendSlackNotification(report string, metri
 
 %s
 	`,
-		irc.currentRiskLevel,
+		irc.currentRiskLevel.String(),
 		time.Now().Format("2006-01-02 15:04:05"),
 		metrics.PortfolioVaR,
 		metrics.MaxDrawdown,
@@ -1266,7 +1284,7 @@ func (irc *IntelligentRiskController) sendSlackNotification(report string, metri
 func (irc *IntelligentRiskController) sendSMSNotification(report string, metrics *RealTimeRiskMetrics) error {
 	// 构建短信内容（简化版）
 	message := fmt.Sprintf("风险警报: %s级别风险，VaR: %.4f，请立即查看详细报告。时间: %s",
-		irc.currentRiskLevel,
+		irc.currentRiskLevel.String(),
 		metrics.PortfolioVaR,
 		time.Now().Format("15:04"),
 	)
@@ -1292,7 +1310,7 @@ func (irc *IntelligentRiskController) sendWebhookNotification(report string, met
 	payload := map[string]interface{}{
 		"type":       "risk_report",
 		"timestamp":  time.Now().Unix(),
-		"risk_level": string(irc.currentRiskLevel),
+		"risk_level": irc.currentRiskLevel.String(),
 		"metrics": map[string]float64{
 			"portfolio_var":      metrics.PortfolioVaR,
 			"portfolio_cvar":     metrics.PortfolioCVaR,
@@ -1337,7 +1355,7 @@ func (irc *IntelligentRiskController) updateReportHistory(report string) error {
 	// 计算报告哈希值用于去重
 	reportHash := fmt.Sprintf("%x", sha256.Sum256([]byte(report)))
 
-	_, err := irc.db.ExecContext(ctx, query, reportHash, time.Now(), string(irc.currentRiskLevel))
+	_, err := irc.db.ExecContext(ctx, query, reportHash, time.Now(), irc.currentRiskLevel.String())
 	if err != nil {
 		return fmt.Errorf("failed to update report history: %w", err)
 	}

@@ -547,8 +547,11 @@ func (fp *FundProtector) updateFundStatus() {
 // checkFundSafety 检查资金安全
 func (fp *FundProtector) checkFundSafety() {
 	fp.fundStatus.mu.RLock()
-	dailyLossRatio := -fp.fundStatus.DailyPL / fp.fundStatus.TotalBalance
-	totalLossRatio := -fp.fundStatus.ProfitLoss / fp.fundStatus.TotalBalance
+	var dailyLossRatio, totalLossRatio float64
+	if fp.fundStatus.TotalBalance > 0 {
+		dailyLossRatio = -fp.fundStatus.DailyPL / fp.fundStatus.TotalBalance
+		totalLossRatio = -fp.fundStatus.ProfitLoss / fp.fundStatus.TotalBalance
+	}
 	fp.fundStatus.mu.RUnlock()
 
 	// 检查日亏损是否超限
@@ -707,7 +710,10 @@ func (fp *FundProtector) checkCircuitBreaker() {
 
 	// 检查是否需要触发熔断器
 	fp.fundStatus.mu.RLock()
-	dailyLossRatio := -fp.fundStatus.DailyPL / fp.fundStatus.TotalBalance
+	var dailyLossRatio float64
+	if fp.fundStatus.TotalBalance > 0 {
+		dailyLossRatio = -fp.fundStatus.DailyPL / fp.fundStatus.TotalBalance
+	}
 	fp.fundStatus.mu.RUnlock()
 
 	if dailyLossRatio > fp.circuitBreaker.maxDailyLoss {
@@ -2458,7 +2464,21 @@ func (fp *FundProtector) GetFundStatus() *FundStatus {
 	fp.fundStatus.mu.RLock()
 	defer fp.fundStatus.mu.RUnlock()
 
-	status := *fp.fundStatus
+	// 创建副本避免复制锁
+	status := FundStatus{
+		TotalBalance:      fp.fundStatus.TotalBalance,
+		AvailableBalance:  fp.fundStatus.AvailableBalance,
+		LockedBalance:     fp.fundStatus.LockedBalance,
+		DailyPL:           fp.fundStatus.DailyPL,
+		ProfitLoss:        fp.fundStatus.ProfitLoss,
+		UnrealizedPL:      fp.fundStatus.UnrealizedPL,
+		RealizedPL:        fp.fundStatus.RealizedPL,
+		CurrentRisk:       fp.fundStatus.CurrentRisk,
+		MaxRisk:           fp.fundStatus.MaxRisk,
+		VaR95:             fp.fundStatus.VaR95,
+		ExpectedShortfall: fp.fundStatus.ExpectedShortfall,
+		LastUpdated:       fp.fundStatus.LastUpdated,
+	}
 	return &status
 }
 
@@ -2467,7 +2487,22 @@ func (fp *FundProtector) GetProtectionMetrics() *ProtectionMetrics {
 	fp.protectionMetrics.mu.RLock()
 	defer fp.protectionMetrics.mu.RUnlock()
 
-	metrics := *fp.protectionMetrics
+	// 创建副本避免复制锁
+	metrics := ProtectionMetrics{
+		CircuitBreakerTriggered: fp.protectionMetrics.CircuitBreakerTriggered,
+		EmergencyActivations:    fp.protectionMetrics.EmergencyActivations,
+		AutoTransfers:           fp.protectionMetrics.AutoTransfers,
+		ManualInterventions:     fp.protectionMetrics.ManualInterventions,
+		LossesPrevented:         fp.protectionMetrics.LossesPrevented,
+		ProfitsSecured:          fp.protectionMetrics.ProfitsSecured,
+		MaxLossAvoided:          fp.protectionMetrics.MaxLossAvoided,
+		AvgResponseTime:         fp.protectionMetrics.AvgResponseTime,
+		ProtectionAccuracy:      fp.protectionMetrics.ProtectionAccuracy,
+		FalsePositiveRate:       fp.protectionMetrics.FalsePositiveRate,
+		SystemUptime:            fp.protectionMetrics.SystemUptime,
+		LastEmergencyTest:       fp.protectionMetrics.LastEmergencyTest,
+		LastUpdated:             fp.protectionMetrics.LastUpdated,
+	}
 	return &metrics
 }
 

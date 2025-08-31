@@ -46,7 +46,13 @@ type OptimizerHandler struct {
 func NewOptimizerHandler(db *database.DB, redis cache.Cacher, metrics *monitor.MetricsCollector) *OptimizerHandler {
 	// 新增：使用工厂创建优化器实例
 	factory := optimizer.NewFactory()
-	orchestrator := factory.CreateOrchestrator(db.DB)
+	var orchestrator *optimizer.Orchestrator
+	if db != nil && db.DB != nil {
+		orchestrator = factory.CreateOrchestrator(db.DB)
+	} else {
+		// Create a mock orchestrator when database is not available
+		orchestrator = factory.CreateOrchestrator(nil)
+	}
 
 	return &OptimizerHandler{
 		db:        db,

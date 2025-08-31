@@ -162,6 +162,22 @@ const (
 	TaskPerformanceUpdate
 )
 
+// String returns the string representation of TaskType
+func (tt TaskType) String() string {
+	switch tt {
+	case TaskStrategyEvaluation:
+		return "STRATEGY_EVALUATION"
+	case TaskStrategyCleanup:
+		return "STRATEGY_CLEANUP"
+	case TaskResourceRebalance:
+		return "RESOURCE_REBALANCE"
+	case TaskPerformanceUpdate:
+		return "PERFORMANCE_UPDATE"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 // NewMultiStrategyManager 创建多策略管理器
 func NewMultiStrategyManager(config *MultiStrategyManagerConfig) *MultiStrategyManager {
 	if config == nil {
@@ -431,7 +447,7 @@ func (msm *MultiStrategyManager) runTaskProcessingLoop() {
 		// 创建自动化任务
 		automationTask := concurrent.NewAutomationTask(
 			task.ID,
-			fmt.Sprintf("ScheduledTask_%s", task.Type),
+			fmt.Sprintf("ScheduledTask_%s", task.Type.String()),
 			task.Priority,
 			30*time.Minute, // 默认超时
 			task.Executor,

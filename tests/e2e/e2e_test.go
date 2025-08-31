@@ -1,9 +1,9 @@
 package e2e
 
 import (
-	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -23,11 +23,11 @@ func TestEndToEndWorkflow(t *testing.T) {
 	defer suite.TearDown()
 
 	// 创建HTTP客户端
-	client := &http.Client{
+	_ = &http.Client{
 		Timeout: 30 * time.Second,
 	}
 
-	baseURL := "http://localhost:8080" // 假设服务运行在8080端口
+	_ = "http://localhost:8080" // 假设服务运行在8080端口
 
 	t.Run("complete trading workflow", func(t *testing.T) {
 		suite.Logger.Info("Starting end-to-end trading workflow test")
@@ -35,14 +35,14 @@ func TestEndToEndWorkflow(t *testing.T) {
 		// 1. 创建策略
 		suite.Logger.Info("Step 1: Creating strategy")
 		strategyData := testutils.NewMockData().GenerateStrategy()
-		
+
 		// 这里应该发送HTTP请求到实际的API
 		// 由于我们没有运行的服务器，我们模拟这个过程
 		suite.Logger.Info("Strategy created", "strategy", strategyData)
 
 		// 2. 配置策略参数
 		suite.Logger.Info("Step 2: Configuring strategy parameters")
-		
+
 		// 验证参数有效性
 		if params, ok := strategyData["parameters"].(map[string]interface{}); ok {
 			for key, value := range params {
@@ -52,20 +52,20 @@ func TestEndToEndWorkflow(t *testing.T) {
 
 		// 3. 运行回测
 		suite.Logger.Info("Step 3: Running backtest")
-		
+
 		backtestResult := map[string]interface{}{
-			"total_return":   0.15,
-			"sharpe_ratio":   1.8,
-			"max_drawdown":   0.08,
-			"win_rate":       0.65,
-			"trade_count":    150,
+			"total_return": 0.15,
+			"sharpe_ratio": 1.8,
+			"max_drawdown": 0.08,
+			"win_rate":     0.65,
+			"trade_count":  150,
 		}
-		
+
 		suite.Logger.Info("Backtest completed", "result", backtestResult)
 
 		// 4. 参数优化
 		suite.Logger.Info("Step 4: Running parameter optimization")
-		
+
 		optimizationResult := map[string]interface{}{
 			"best_params": map[string]interface{}{
 				"ma_short": 15,
@@ -74,46 +74,46 @@ func TestEndToEndWorkflow(t *testing.T) {
 			"best_score": 2.1,
 			"iterations": 100,
 		}
-		
+
 		suite.Logger.Info("Optimization completed", "result", optimizationResult)
 
 		// 5. 风险检查
 		suite.Logger.Info("Step 5: Performing risk checks")
-		
+
 		riskCheck := map[string]interface{}{
 			"risk_level":     "medium",
 			"max_drawdown":   0.12,
 			"position_limit": 50000,
 			"leverage_limit": 5,
 		}
-		
+
 		suite.Logger.Info("Risk check completed", "result", riskCheck)
 
 		// 6. 策略部署
 		suite.Logger.Info("Step 6: Deploying strategy")
-		
+
 		deploymentResult := map[string]interface{}{
 			"status":      "deployed",
 			"environment": "paper_trading",
 			"start_time":  time.Now(),
 		}
-		
+
 		suite.Logger.Info("Strategy deployed", "result", deploymentResult)
 
 		// 7. 监控策略运行
 		suite.Logger.Info("Step 7: Monitoring strategy execution")
-		
+
 		// 模拟监控一段时间
 		for i := 0; i < 5; i++ {
 			time.Sleep(100 * time.Millisecond)
-			
+
 			monitoringData := map[string]interface{}{
 				"timestamp":     time.Now(),
-				"pnl":          testutils.NewMockData().RandomFloat(-100, 200),
-				"open_orders":  testutils.NewMockData().RandomInt(0, 5),
+				"pnl":           testutils.NewMockData().RandomFloat(-100, 200),
+				"open_orders":   testutils.NewMockData().RandomInt(0, 5),
 				"filled_orders": testutils.NewMockData().RandomInt(0, 10),
 			}
-			
+
 			suite.Logger.Info("Monitoring update", "data", monitoringData)
 		}
 
@@ -188,7 +188,8 @@ func TestUserJourneyE2E(t *testing.T) {
 			"username": userData["username"],
 			"password": userData["password"],
 		}
-		
+		_ = loginData
+
 		// 模拟登录响应
 		loginResponse := map[string]interface{}{
 			"token":      "jwt-token-here",
@@ -231,17 +232,17 @@ func TestUserJourneyE2E(t *testing.T) {
 		// 5. 运行回测
 		suite.Logger.Info("Step 5: Running backtest")
 		backtestConfig := map[string]interface{}{
-			"start_date": "2024-01-01",
-			"end_date":   "2024-01-31",
+			"start_date":      "2024-01-01",
+			"end_date":        "2024-01-31",
 			"initial_capital": 10000,
 		}
-		
+
 		backtestResult := map[string]interface{}{
-			"total_return":   0.12,
-			"sharpe_ratio":   1.6,
-			"max_drawdown":   0.06,
-			"win_rate":       0.62,
-			"trade_count":    45,
+			"total_return": 0.12,
+			"sharpe_ratio": 1.6,
+			"max_drawdown": 0.06,
+			"win_rate":     0.62,
+			"trade_count":  45,
 		}
 		suite.Logger.Info("Backtest completed", "config", backtestConfig, "result", backtestResult)
 
@@ -249,9 +250,9 @@ func TestUserJourneyE2E(t *testing.T) {
 		suite.Logger.Info("Step 6: Reviewing results and deploying")
 		if backtestResult["sharpe_ratio"].(float64) > 1.5 {
 			deploymentConfig := map[string]interface{}{
-				"mode":           "paper_trading",
+				"mode":            "paper_trading",
 				"initial_capital": 5000,
-				"max_drawdown":   0.1,
+				"max_drawdown":    0.1,
 			}
 			suite.Logger.Info("Strategy deployed to paper trading", "config", deploymentConfig)
 		}
@@ -272,9 +273,9 @@ func TestUserJourneyE2E(t *testing.T) {
 			"type": "custom",
 			"code": "// Custom strategy implementation",
 			"parameters": map[string]interface{}{
-				"lookback_period": 14,
+				"lookback_period":    14,
 				"momentum_threshold": 0.02,
-				"risk_per_trade": 0.01,
+				"risk_per_trade":     0.01,
 			},
 		}
 		suite.Logger.Info("Custom strategy created", "strategy", customStrategy)
@@ -282,7 +283,7 @@ func TestUserJourneyE2E(t *testing.T) {
 		// 3. 批量回测
 		suite.Logger.Info("Step 3: Running batch backtests")
 		symbols := []string{"BTCUSDT", "ETHUSDT", "ADAUSDT"}
-		
+
 		for _, symbol := range symbols {
 			backtestResult := map[string]interface{}{
 				"symbol":       symbol,
@@ -296,16 +297,16 @@ func TestUserJourneyE2E(t *testing.T) {
 		// 4. 参数优化
 		suite.Logger.Info("Step 4: Running parameter optimization")
 		optimizationConfig := map[string]interface{}{
-			"method": "bayesian",
+			"method":     "bayesian",
 			"iterations": 200,
-			"objective": "calmar_ratio",
+			"objective":  "calmar_ratio",
 		}
-		
+
 		optimizationResult := map[string]interface{}{
 			"best_params": map[string]interface{}{
-				"lookback_period": 12,
+				"lookback_period":    12,
 				"momentum_threshold": 0.025,
-				"risk_per_trade": 0.015,
+				"risk_per_trade":     0.015,
 			},
 			"improvement": 0.15,
 		}
@@ -314,9 +315,9 @@ func TestUserJourneyE2E(t *testing.T) {
 		// 5. 风险分析
 		suite.Logger.Info("Step 5: Performing risk analysis")
 		riskAnalysis := map[string]interface{}{
-			"var_95": 0.08,
+			"var_95":             0.08,
 			"expected_shortfall": 0.12,
-			"correlation_risk": 0.65,
+			"correlation_risk":   0.65,
 			"concentration_risk": 0.3,
 		}
 		suite.Logger.Info("Risk analysis completed", "analysis", riskAnalysis)
@@ -324,10 +325,10 @@ func TestUserJourneyE2E(t *testing.T) {
 		// 6. 部署到生产
 		suite.Logger.Info("Step 6: Deploying to production")
 		productionConfig := map[string]interface{}{
-			"mode": "live_trading",
+			"mode":               "live_trading",
 			"capital_allocation": 25000,
-			"max_positions": 5,
-			"emergency_stop": true,
+			"max_positions":      5,
+			"emergency_stop":     true,
 		}
 		suite.Logger.Info("Strategy deployed to production", "config", productionConfig)
 
@@ -359,11 +360,11 @@ func TestSystemReliabilityE2E(t *testing.T) {
 		testFunc := func() error {
 			// 模拟API调用
 			mockData := testutils.NewMockData()
-			
+
 			// 随机选择操作
 			operations := []string{"get_strategies", "create_order", "get_positions", "run_backtest"}
 			operation := mockData.RandomChoice(operations)
-			
+
 			// 模拟操作延迟
 			switch operation {
 			case "get_strategies":
@@ -441,14 +442,14 @@ func TestSystemReliabilityE2E(t *testing.T) {
 
 		for _, scenario := range scenarios {
 			t.Run(scenario.name, func(t *testing.T) {
-				suite.Logger.Info("Testing failure scenario", 
+				suite.Logger.Info("Testing failure scenario",
 					"scenario", scenario.name,
 					"description", scenario.description,
 				)
 
 				// 运行场景测试
 				err := scenario.testFunc()
-				
+
 				// 记录结果
 				if err != nil {
 					suite.Logger.Warn("Scenario produced expected error", "error", err)
@@ -489,7 +490,7 @@ func TestDataIntegrityE2E(t *testing.T) {
 			}
 
 			if retrievedStrategy["id"] != strategyID {
-				t.Errorf("Data inconsistency in %s: expected ID %s, got %s", 
+				t.Errorf("Data inconsistency in %s: expected ID %s, got %s",
 					service, strategyID, retrievedStrategy["id"])
 			}
 
@@ -507,9 +508,9 @@ func TestDataIntegrityE2E(t *testing.T) {
 					"ma_short": 20 + index,
 					"ma_long":  50 + index*2,
 				}
-				
-				suite.Logger.Info("Concurrent modification", 
-					"index", index, 
+
+				suite.Logger.Info("Concurrent modification",
+					"index", index,
 					"params", newParams,
 				)
 			}(i)
@@ -541,7 +542,7 @@ func TestDataIntegrityE2E(t *testing.T) {
 		suite.Logger.Info("Starting transaction", "id", transactionID)
 
 		for i, step := range transactionSteps {
-			suite.Logger.Info("Executing transaction step", 
+			suite.Logger.Info("Executing transaction step",
 				"step", i+1,
 				"name", step.step,
 				"description", step.description,
@@ -549,7 +550,7 @@ func TestDataIntegrityE2E(t *testing.T) {
 
 			if step.shouldFail {
 				suite.Logger.Error("Transaction step failed", "step", step.step)
-				
+
 				// 模拟回滚操作
 				suite.Logger.Info("Rolling back transaction", "id", transactionID)
 				for j := i - 1; j >= 0; j-- {
@@ -611,7 +612,7 @@ func TestSecurityE2E(t *testing.T) {
 		}
 
 		for _, test := range maliciousInputs {
-			suite.Logger.Info("Testing malicious input", 
+			suite.Logger.Info("Testing malicious input",
 				"type", test.name,
 				"input_length", len(test.input),
 			)

@@ -1209,7 +1209,7 @@ func (ic *IntelligenceController) generateAdjustmentRecommendations(config *Opti
 // executeAdjustments 执行调整
 func (ic *IntelligenceController) executeAdjustments(adjustments []AdjustmentRecommendation) {
 	for _, adj := range adjustments {
-		log.Printf("Executing adjustment: %s %s %.4f %s (Expected PnL: %.4f)",
+		log.Printf("Executing adjustment: %s %.4f %s %s (Expected PnL: %.4f)",
 			adj.Action, adj.Quantity, adj.Symbol, adj.Reason, adj.ExpectedPnL)
 
 		// 在实际实现中，这里会调用交易执行模块

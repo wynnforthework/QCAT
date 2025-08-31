@@ -363,10 +363,10 @@ func TestStopLossAdjuster_GetMetrics(t *testing.T) {
 
 // Helper functions for testing
 
-func createTestStopLossAdjuster(t *testing.T) *StopLossAdjuster {
+func createTestStopLossAdjuster(_ *testing.T) *StopLossAdjuster {
 	cfg := &config.Config{}
-	db := &database.DB{}
-	accountManager := &account.Manager{}
+	var db *database.DB                 // Use nil for testing
+	var accountManager *account.Manager // Use nil for testing
 
 	return NewStopLossAdjuster(cfg, db, accountManager)
 }
@@ -419,11 +419,11 @@ func TestGetATRMultiplier(t *testing.T) {
 		percentile float64
 		expected   float64
 	}{
-		{90, 3.0},  // Very high volatility
-		{70, 2.4},  // High volatility
-		{50, 2.0},  // Normal volatility
-		{30, 1.6},  // Low volatility
-		{10, 1.2},  // Very low volatility
+		{90, 3.0}, // Very high volatility
+		{70, 2.4}, // High volatility
+		{50, 2.0}, // Normal volatility
+		{30, 1.6}, // Low volatility
+		{10, 1.2}, // Very low volatility
 	}
 
 	for _, test := range tests {
@@ -440,11 +440,11 @@ func TestGetRVMultiplier(t *testing.T) {
 		percentile float64
 		expected   float64
 	}{
-		{90, 3.0},  // Very high volatility
-		{70, 2.4},  // High volatility
-		{50, 2.0},  // Normal volatility
-		{30, 1.6},  // Low volatility
-		{10, 1.2},  // Very low volatility
+		{90, 3.0}, // Very high volatility
+		{70, 2.4}, // High volatility
+		{50, 2.0}, // Normal volatility
+		{30, 1.6}, // Low volatility
+		{10, 1.2}, // Very low volatility
 	}
 
 	for _, test := range tests {

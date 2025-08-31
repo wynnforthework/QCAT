@@ -446,6 +446,36 @@ func Load(configPath string) (*Config, error) {
 	return &config, nil
 }
 
+// ValidateConfig 验证配置的有效性
+func ValidateConfig(config *Config) error {
+	if config == nil {
+		return fmt.Errorf("config cannot be nil")
+	}
+
+	// 验证服务器配置
+	if config.Server.Port <= 0 || config.Server.Port > 65535 {
+		return fmt.Errorf("invalid server port: %d", config.Server.Port)
+	}
+
+	// 验证数据库配置
+	if config.Database.Host == "" {
+		return fmt.Errorf("database host cannot be empty")
+	}
+	if config.Database.Port <= 0 || config.Database.Port > 65535 {
+		return fmt.Errorf("invalid database port: %d", config.Database.Port)
+	}
+
+	// 验证交易所配置
+	if config.Exchange.APIKey == "" {
+		return fmt.Errorf("exchange API key cannot be empty")
+	}
+	if config.Exchange.APISecret == "" {
+		return fmt.Errorf("exchange API secret cannot be empty")
+	}
+
+	return nil
+}
+
 // overrideWithEnv overrides configuration with environment variables
 func (c *Config) overrideWithEnv(env *EnvManager) {
 	// App configuration

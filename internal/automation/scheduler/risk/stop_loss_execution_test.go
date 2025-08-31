@@ -391,24 +391,24 @@ func TestStopLossPerformanceTracker_CalculateCurrentEffectiveness(t *testing.T) 
 
 	// Test case 1: Profitable position
 	position1 := &shared.Position{
-		CurrentPrice:   51000.0,
-		UnrealizedPnL:  1000.0,
+		CurrentPrice:  51000.0,
+		UnrealizedPnL: 1000.0,
 	}
 	effectiveness1 := tracker.calculateCurrentEffectiveness(tracking, position1)
 	assert.Greater(t, effectiveness1, 0.5) // Should be above neutral
 
 	// Test case 2: Loss position
 	position2 := &shared.Position{
-		CurrentPrice:   50000.0,
-		UnrealizedPnL:  -800.0,
+		CurrentPrice:  50000.0,
+		UnrealizedPnL: -800.0,
 	}
 	effectiveness2 := tracker.calculateCurrentEffectiveness(tracking, position2)
 	assert.Less(t, effectiveness2, 0.5) // Should be below neutral
 
 	// Test case 3: Position close to stop loss
 	position3 := &shared.Position{
-		CurrentPrice:   49600.0, // Very close to stop loss
-		UnrealizedPnL:  100.0,
+		CurrentPrice:  49600.0, // Very close to stop loss
+		UnrealizedPnL: 100.0,
 	}
 	effectiveness3 := tracker.calculateCurrentEffectiveness(tracking, position3)
 	assert.Less(t, effectiveness3, 0.6) // Should be penalized for being close to stop loss
@@ -441,10 +441,10 @@ func createTestStopLossExecutorWithMock(t *testing.T) (*StopLossExecutor, sqlmoc
 	return executor, mock
 }
 
-func createTestPerformanceTracker(t *testing.T) *StopLossPerformanceTracker {
-	db := &database.DB{}
+func createTestPerformanceTracker(_ *testing.T) *StopLossPerformanceTracker {
+	// Use nil database for testing
 	return &StopLossPerformanceTracker{
-		db:                db,
+		db:                nil,
 		metrics:           make(map[string]interface{}),
 		adjustmentHistory: make([]AdjustmentPerformance, 0),
 	}

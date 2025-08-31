@@ -1,8 +1,8 @@
 package config
 
 import (
+	"context"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -42,9 +42,9 @@ redis:
 	configPath := suite.CreateTempFile("config.yaml", configContent)
 
 	// 测试加载配置
-	config, err := LoadConfig(configPath)
+	config, err := Load(configPath)
 	suite.Logger.Info("Loading config", "path", configPath)
-	
+
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
@@ -83,7 +83,7 @@ database:
 
 	configPath := suite.CreateTempFile("config.yaml", configContent)
 
-	config, err := LoadConfig(configPath)
+	config, err := Load(configPath)
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
@@ -114,7 +114,17 @@ func TestValidateConfig(t *testing.T) {
 				},
 				Server: ServerConfig{
 					Port: 8080,
-					Host: "localhost",
+				},
+				Database: DatabaseConfig{
+					Host:     "localhost",
+					Port:     5432,
+					DBName:   "qcat_test",
+					User:     "test",
+					Password: "test",
+				},
+				Exchange: ExchangeConfig{
+					APIKey:    "test_key",
+					APISecret: "test_secret",
 				},
 			},
 			expectError: false,
@@ -124,7 +134,6 @@ func TestValidateConfig(t *testing.T) {
 			config: &Config{
 				Server: ServerConfig{
 					Port: -1,
-					Host: "localhost",
 				},
 			},
 			expectError: true,
@@ -166,20 +175,19 @@ server:
 	configPath := suite.CreateTempFile("config.yaml", configContent)
 
 	// 创建配置监听器
-	watcher, err := NewConfigWatcher(configPath)
-	if err != nil {
-		t.Fatalf("Failed to create config watcher: %v", err)
-	}
+	watcher := NewConfigWatcher(configPath, 1*time.Second)
 	defer watcher.Stop()
 
 	// 设置变更回调
 	changed := false
-	watcher.OnChange(func(config *Config) {
+	watcher.AddCallback(func(config *AlgorithmConfig) error {
 		changed = true
+		return nil
 	})
 
 	// 启动监听
-	err = watcher.Start()
+	ctx := context.Background()
+	err := watcher.Start(ctx)
 	if err != nil {
 		t.Fatalf("Failed to start config watcher: %v", err)
 	}

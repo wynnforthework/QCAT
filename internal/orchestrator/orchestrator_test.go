@@ -1,7 +1,6 @@
 package orchestrator
 
 import (
-	"context"
 	"testing"
 	"time"
 )
@@ -15,7 +14,7 @@ func TestNewOrchestrator(t *testing.T) {
 	// Check that default services are configured
 	services := orch.GetServiceStatus()
 	expectedServices := []string{"optimizer", "ingestor", "trader"}
-	
+
 	for _, serviceName := range expectedServices {
 		if _, exists := services[serviceName]; !exists {
 			t.Errorf("Expected service %s to be configured", serviceName)

@@ -13,8 +13,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// NewTestRiskMonitor creates a test risk monitor instance
-func NewTestRiskMonitor() *RiskMonitor {
+// createTestRiskMonitor creates a test risk monitor instance
+func createTestRiskMonitor() *RiskMonitor {
 	// Create minimal test configuration
 	cfg := &config.Config{}
 
@@ -28,7 +28,7 @@ func NewTestRiskMonitor() *RiskMonitor {
 }
 
 func TestNewRiskMonitor(t *testing.T) {
-	rm := NewTestRiskMonitor()
+	rm := createTestRiskMonitor()
 
 	assert.NotNil(t, rm)
 	assert.NotNil(t, rm.config)
@@ -41,7 +41,7 @@ func TestNewRiskMonitor(t *testing.T) {
 }
 
 func TestRiskMonitor_CheckMarginRatio(t *testing.T) {
-	rm := NewTestRiskMonitor()
+	rm := createTestRiskMonitor()
 	ctx := context.Background()
 
 	status, err := rm.CheckMarginRatio(ctx)
@@ -57,7 +57,7 @@ func TestRiskMonitor_CheckMarginRatio(t *testing.T) {
 }
 
 func TestRiskMonitor_DetermineMarginRiskLevel(t *testing.T) {
-	rm := NewTestRiskMonitor()
+	rm := createTestRiskMonitor()
 
 	tests := []struct {
 		name         string
@@ -95,7 +95,7 @@ func TestRiskMonitor_DetermineMarginRiskLevel(t *testing.T) {
 }
 
 func TestRiskMonitor_GenerateMarginRecommendations(t *testing.T) {
-	rm := NewTestRiskMonitor()
+	rm := createTestRiskMonitor()
 
 	tests := []struct {
 		name         string
@@ -143,7 +143,7 @@ func TestRiskMonitor_GenerateMarginRecommendations(t *testing.T) {
 }
 
 func TestRiskMonitor_CalculateConcentrationRisk(t *testing.T) {
-	rm := NewTestRiskMonitor()
+	rm := createTestRiskMonitor()
 
 	tests := []struct {
 		name      string
@@ -189,7 +189,7 @@ func TestRiskMonitor_CalculateConcentrationRisk(t *testing.T) {
 }
 
 func TestRiskMonitor_CalculateSymbolLiquidityRisk(t *testing.T) {
-	rm := NewTestRiskMonitor()
+	rm := createTestRiskMonitor()
 
 	tests := []struct {
 		name     string
@@ -222,7 +222,7 @@ func TestRiskMonitor_CalculateSymbolLiquidityRisk(t *testing.T) {
 }
 
 func TestRiskMonitor_DetectVolatilitySpike(t *testing.T) {
-	rm := NewTestRiskMonitor()
+	rm := createTestRiskMonitor()
 
 	tests := []struct {
 		name        string
@@ -269,7 +269,7 @@ func TestRiskMonitor_DetectVolatilitySpike(t *testing.T) {
 }
 
 func TestRiskMonitor_DetectLiquidityDrop(t *testing.T) {
-	rm := NewTestRiskMonitor()
+	rm := createTestRiskMonitor()
 
 	tests := []struct {
 		name       string
@@ -316,7 +316,7 @@ func TestRiskMonitor_DetectLiquidityDrop(t *testing.T) {
 }
 
 func TestRiskMonitor_StartStop(t *testing.T) {
-	rm := NewTestRiskMonitor()
+	rm := createTestRiskMonitor()
 
 	// Initially not running
 	assert.False(t, rm.IsRunning())
@@ -333,7 +333,7 @@ func TestRiskMonitor_StartStop(t *testing.T) {
 }
 
 func TestRiskMonitor_GetMetrics(t *testing.T) {
-	rm := NewTestRiskMonitor()
+	rm := createTestRiskMonitor()
 
 	// Initially empty metrics
 	metrics := rm.GetMetrics()
@@ -358,7 +358,7 @@ func TestRiskMonitor_GetMetrics(t *testing.T) {
 
 // Benchmark tests
 func BenchmarkRiskMonitor_CalculateConcentrationRisk(b *testing.B) {
-	rm := NewTestRiskMonitor()
+	rm := createTestRiskMonitor()
 
 	// Create test positions
 	positions := make([]shared.Position, 100)
@@ -376,7 +376,7 @@ func BenchmarkRiskMonitor_CalculateConcentrationRisk(b *testing.B) {
 }
 
 func BenchmarkRiskMonitor_DetectVolatilitySpike(b *testing.B) {
-	rm := NewTestRiskMonitor()
+	rm := createTestRiskMonitor()
 
 	// Create test market data
 	marketData := make([]MarketData, 50)
