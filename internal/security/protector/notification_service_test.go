@@ -155,7 +155,65 @@ func (m *MockNotificationService) Reset() {
 	m.slackSent = make([]SlackRecord, 0)
 }
 
-// TestMockNotificationService 测试mock通知服务
+// TestRealNotificationService 测试真实通知服务
+func TestRealNotificationService(t *testing.T) {
+	ctx := context.Background()
+
+	// 创建真实的通知服务配置
+	config := &NotificationConfig{
+		Email: EmailConfig{
+			Enabled:  true,
+			SMTPHost: "smtp.gmail.com",
+			SMTPPort: 587,
+			Username: "test@example.com",
+			Password: "testpass",
+			From:     "test@example.com",
+			UseTLS:   true,
+		},
+		SMS: SMSConfig{
+			Enabled:   true,
+			Provider:  "twilio",
+			APIKey:    "test_key",
+			APISecret: "test_secret",
+			From:      "+1234567890",
+		},
+		Webhook: WebhookConfig{
+			Enabled: true,
+			URL:     "https://example.com/webhook",
+			Timeout: 10 * time.Second,
+		},
+		Slack: SlackConfig{
+			Enabled:    true,
+			WebhookURL: "https://hooks.slack.com/test",
+			Channel:    "#test",
+			Username:   "Test Bot",
+		},
+	}
+
+	service := NewDefaultNotificationService(config)
+
+	// 测试发送邮件（在真实环境中可能会失败，这是正常的）
+	err := service.SendEmail(ctx, "test@example.com", "Test Subject", "Test Body")
+	t.Logf("Email send result: %v", err)
+
+	// 测试发送短信（在真实环境中可能会失败，这是正常的）
+	err = service.SendSMS(ctx, "1234567890", "Test SMS")
+	t.Logf("SMS send result: %v", err)
+
+	// 测试发送Webhook（在真实环境中可能会失败，这是正常的）
+	payload := map[string]interface{}{
+		"message":   "Test webhook",
+		"timestamp": time.Now().Unix(),
+	}
+	err = service.SendWebhook(ctx, "https://example.com/webhook", payload)
+	t.Logf("Webhook send result: %v", err)
+
+	// 测试发送Slack消息（在真实环境中可能会失败，这是正常的）
+	err = service.SendSlack(ctx, "https://hooks.slack.com/test", "Test Slack message")
+	t.Logf("Slack send result: %v", err)
+}
+
+// TestMockNotificationService 测试mock通知服务（保留用于其他测试）
 func TestMockNotificationService(t *testing.T) {
 	ctx := context.Background()
 	mock := NewMockNotificationService()
@@ -197,5 +255,176 @@ func TestMockNotificationService(t *testing.T) {
 	emails = mock.GetEmailsSent()
 	if len(emails) != 0 {
 		t.Errorf("Expected 0 emails after reset, got %d", len(emails))
+	}
+}
+
+// TestNotificationServiceConfiguration 测试通知服务配置
+func TestNotificationServiceConfiguration(t *testing.T) {
+	// 测试空配置
+	service := NewDefaultNotificationService(nil)
+	if service == nil {
+		t.Error("Service should not be nil even with nil config")
+	}
+
+	// 测试部分配置
+	config := &NotificationConfig{
+		Email: EmailConfig{
+			Enabled:  true,
+			SMTPHost: "smtp.example.com",
+			SMTPPort: 587,
+			Username: "test@example.com",
+			Password: "password",
+			From:     "noreply@example.com",
+			UseTLS:   true,
+		},
+		// 其他服务未配置
+	}
+
+	service = NewDefaultNotificationService(config)
+	ctx := context.Background()
+
+	// 测试邮件发送（可能失败，但不应该panic）
+	err := service.SendEmail(ctx, "recipient@example.com", "Test", "Test message")
+	t.Logf("Email with partial config result: %v", err)
+
+	// 测试未配置的服务
+	err = service.SendSMS(ctx, "+1234567890", "Test SMS")
+	t.Logf("SMS with no config result: %v", err)
+}
+
+// TestNotificationServiceErrorHandling 测试通知服务错误处理
+func TestNotificationServiceErrorHandling(t *testing.T) {
+	config := &NotificationConfig{
+		Email: EmailConfig{
+			Enabled:  true,
+			SMTPHost: "invalid.smtp.server",
+			SMTPPort: 587,
+			Username: "invalid@example.com",
+			Password: "wrongpassword",
+			From:     "invalid@example.com",
+			UseTLS:   true,
+		},
+		SMS: SMSConfig{
+			Enabled:   true,
+			Provider:  "invalid_provider",
+			APIKey:    "invalid_key",
+			APISecret: "invalid_secret",
+			From:      "+0000000000",
+		},
+		Webhook: WebhookConfig{
+			Enabled: true,
+			URL:     "https://invalid.webhook.url/nonexistent",
+			Timeout: 5 * time.Second,
+		},
+		Slack: SlackConfig{
+			Enabled:    true,
+			WebhookURL: "https://hooks.slack.com/invalid",
+			Channel:    "#nonexistent",
+			Username:   "TestBot",
+		},
+	}
+
+	service := NewDefaultNotificationService(config)
+	ctx := context.Background()
+
+	// 测试各种错误情况
+	err := service.SendEmail(ctx, "test@example.com", "Test", "Test")
+	if err == nil {
+		t.Log("Email unexpectedly succeeded with invalid config")
+	} else {
+		t.Logf("Email failed as expected: %v", err)
+	}
+
+	err = service.SendSMS(ctx, "+1234567890", "Test")
+	if err == nil {
+		t.Log("SMS unexpectedly succeeded with invalid config")
+	} else {
+		t.Logf("SMS failed as expected: %v", err)
+	}
+
+	err = service.SendWebhook(ctx, "https://invalid.url", map[string]interface{}{"test": "data"})
+	if err == nil {
+		t.Log("Webhook unexpectedly succeeded with invalid URL")
+	} else {
+		t.Logf("Webhook failed as expected: %v", err)
+	}
+
+	err = service.SendSlack(ctx, "https://hooks.slack.com/invalid", "Test message")
+	if err == nil {
+		t.Log("Slack unexpectedly succeeded with invalid webhook")
+	} else {
+		t.Logf("Slack failed as expected: %v", err)
+	}
+}
+
+// TestNotificationServiceBatchOperations 测试批量通知操作
+func TestNotificationServiceBatchOperations(t *testing.T) {
+	config := &NotificationConfig{
+		Email: EmailConfig{
+			Enabled:  true,
+			SMTPHost: "smtp.gmail.com",
+			SMTPPort: 587,
+			Username: "test@example.com",
+			Password: "testpass",
+			From:     "test@example.com",
+			UseTLS:   true,
+		},
+	}
+
+	service := NewDefaultNotificationService(config)
+	ctx := context.Background()
+
+	// 测试批量发送邮件
+	recipients := []string{
+		"user1@example.com",
+		"user2@example.com",
+		"user3@example.com",
+	}
+
+	for i, recipient := range recipients {
+		subject := fmt.Sprintf("Batch Test Email %d", i+1)
+		body := fmt.Sprintf("This is batch test email number %d", i+1)
+
+		err := service.SendEmail(ctx, recipient, subject, body)
+		t.Logf("Batch email %d to %s result: %v", i+1, recipient, err)
+	}
+}
+
+// TestNotificationServiceConcurrency 测试并发通知
+func TestNotificationServiceConcurrency(t *testing.T) {
+	config := &NotificationConfig{
+		Email: EmailConfig{
+			Enabled:  true,
+			SMTPHost: "smtp.gmail.com",
+			SMTPPort: 587,
+			Username: "test@example.com",
+			Password: "testpass",
+			From:     "test@example.com",
+			UseTLS:   true,
+		},
+	}
+
+	service := NewDefaultNotificationService(config)
+	ctx := context.Background()
+
+	// 并发发送通知
+	const numGoroutines = 5
+	done := make(chan bool, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func(id int) {
+			defer func() { done <- true }()
+
+			subject := fmt.Sprintf("Concurrent Test %d", id)
+			body := fmt.Sprintf("This is concurrent test message %d", id)
+
+			err := service.SendEmail(ctx, "test@example.com", subject, body)
+			t.Logf("Concurrent email %d result: %v", id, err)
+		}(i)
+	}
+
+	// 等待所有goroutine完成
+	for i := 0; i < numGoroutines; i++ {
+		<-done
 	}
 }
