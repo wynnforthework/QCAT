@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"qcat/internal/exchange"
-	"qcat/internal/types"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -110,7 +109,7 @@ func TestAPISignature(t *testing.T) {
 
 // TestGetServerTime tests server time retrieval
 func TestGetServerTime(t *testing.T) {
-	// Create mock server
+	// Create test server that simulates Binance API
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v3/time" {
 			w.Header().Set("Content-Type", "application/json")
@@ -140,7 +139,7 @@ func TestGetServerTime(t *testing.T) {
 
 // TestGetExchangeInfo tests exchange information retrieval
 func TestGetExchangeInfo(t *testing.T) {
-	// Create mock server
+	// Create test server that simulates Binance API
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v3/exchangeInfo" {
 			w.Header().Set("Content-Type", "application/json")
@@ -185,7 +184,7 @@ func TestGetExchangeInfo(t *testing.T) {
 
 // TestGetTicker tests ticker data retrieval
 func TestGetTicker(t *testing.T) {
-	// Create mock server
+	// Create test server that simulates Binance API
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v3/ticker/24hr" {
 			w.Header().Set("Content-Type", "application/json")
@@ -237,7 +236,7 @@ func TestGetTicker(t *testing.T) {
 
 // TestGetKlines tests kline data retrieval
 func TestGetKlines(t *testing.T) {
-	// Create mock server
+	// Create test server that simulates Binance API
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v3/klines" {
 			w.Header().Set("Content-Type", "application/json")
@@ -290,7 +289,7 @@ func TestGetKlines(t *testing.T) {
 
 // TestAPIError tests API error handling
 func TestAPIError(t *testing.T) {
-	// Create mock server that returns an error
+	// Create test server that simulates Binance API error response
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
@@ -507,7 +506,7 @@ func TestClientInterface(t *testing.T) {
 
 	// Test that client implements expected interface methods
 	assert.NotNil(t, client)
-	
+
 	// Test basic client properties
 	assert.NotNil(t, client.config)
 	assert.NotNil(t, client.httpClient)
