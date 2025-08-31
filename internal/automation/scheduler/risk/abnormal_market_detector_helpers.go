@@ -12,10 +12,10 @@ import (
 
 // OrderBook represents order book data
 type OrderBook struct {
-	Symbol    string      `json:"symbol"`
+	Symbol    string       `json:"symbol"`
 	Bids      []PriceLevel `json:"bids"`
 	Asks      []PriceLevel `json:"asks"`
-	Timestamp time.Time   `json:"timestamp"`
+	Timestamp time.Time    `json:"timestamp"`
 }
 
 // PriceLevel represents a price level in the order book
@@ -38,7 +38,7 @@ func (amd *AbnormalMarketDetector) getActiveSymbols(ctx context.Context) ([]stri
 		WHERE timestamp > NOW() - INTERVAL '1 hour'
 		ORDER BY symbol
 	`
-	
+
 	rows, err := amd.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func (amd *AbnormalMarketDetector) getRecentPrices(ctx context.Context, symbol s
 		ORDER BY timestamp DESC 
 		LIMIT $2
 	`
-	
+
 	rows, err := amd.db.QueryContext(ctx, query, symbol, periods)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func (amd *AbnormalMarketDetector) getCurrentOrderBook(ctx context.Context, symb
 		ORDER BY price DESC 
 		LIMIT 20
 	`
-	
+
 	bidsRows, err := amd.db.QueryContext(ctx, bidsQuery, symbol)
 	if err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func (amd *AbnormalMarketDetector) getCurrentOrderBook(ctx context.Context, symb
 		ORDER BY price ASC 
 		LIMIT 20
 	`
-	
+
 	asksRows, err := amd.db.QueryContext(ctx, asksQuery, symbol)
 	if err != nil {
 		return nil, err
@@ -157,7 +157,7 @@ func (amd *AbnormalMarketDetector) getHistoricalLiquidity(ctx context.Context, s
 		ORDER BY timestamp DESC 
 		LIMIT $2
 	`
-	
+
 	rows, err := amd.db.QueryContext(ctx, query, symbol, periods)
 	if err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func (amd *AbnormalMarketDetector) getCorrelationPairs(ctx context.Context) ([][
 		AND p2.status = 'ACTIVE'
 		LIMIT 10
 	`
-	
+
 	rows, err := amd.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
@@ -207,9 +207,9 @@ func (amd *AbnormalMarketDetector) getCorrelationPairs(ctx context.Context) ([][
 	// Add some default major pairs if no positions exist
 	if len(pairs) == 0 {
 		pairs = [][]string{
-			{"BTC/USDT", "ETH/USDT"},
-			{"BTC/USDT", "BNB/USDT"},
-			{"ETH/USDT", "BNB/USDT"},
+			{"BTCUSDT", "ETHUSDT"},
+			{"BTCUSDT", "BNBUSDT"},
+			{"ETHUSDT", "BNBUSDT"},
 		}
 	}
 
@@ -224,21 +224,21 @@ func (amd *AbnormalMarketDetector) calculateLiquidityMetric(orderBook *OrderBook
 
 	// Calculate total volume in top 5 levels on each side
 	var bidVolume, askVolume float64
-	
+
 	maxLevels := 5
 	if len(orderBook.Bids) < maxLevels {
 		maxLevels = len(orderBook.Bids)
 	}
-	
+
 	for i := 0; i < maxLevels && i < len(orderBook.Bids); i++ {
 		bidVolume += orderBook.Bids[i].Quantity
 	}
-	
+
 	maxLevels = 5
 	if len(orderBook.Asks) < maxLevels {
 		maxLevels = len(orderBook.Asks)
 	}
-	
+
 	for i := 0; i < maxLevels && i < len(orderBook.Asks); i++ {
 		askVolume += orderBook.Asks[i].Quantity
 	}
@@ -295,7 +295,7 @@ func (amd *AbnormalMarketDetector) determineVolatilitySeverity(volRatio float64)
 func (amd *AbnormalMarketDetector) determineLiquiditySeverity(liquidityRatio, bidAskSpread float64) shared.AlertSeverity {
 	// Lower liquidity ratio means worse liquidity
 	// Higher bid-ask spread means worse liquidity
-	
+
 	if liquidityRatio <= 0.2 || bidAskSpread >= 0.05 {
 		return shared.AlertSeverityCritical
 	} else if liquidityRatio <= 0.4 || bidAskSpread >= 0.03 {
@@ -461,12 +461,12 @@ func (amd *AbnormalMarketDetector) haltNewPositions(ctx context.Context) error {
 		SET value = 'true' 
 		WHERE key = 'halt_new_positions'
 	`
-	
+
 	_, err := amd.db.ExecContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to halt new positions: %v", err)
 	}
-	
+
 	log.Printf("New positions halted due to circuit breaker activation")
 	return nil
 }
@@ -476,14 +476,14 @@ func (amd *AbnormalMarketDetector) reducePositionSizes(ctx context.Context) erro
 	// This would integrate with position management system
 	// For now, just log the action
 	log.Printf("Position size reduction triggered by circuit breaker")
-	
+
 	// Update system setting to trigger position reduction
 	query := `
 		UPDATE system_settings 
 		SET value = 'true' 
 		WHERE key = 'reduce_position_sizes'
 	`
-	
+
 	_, err := amd.db.ExecContext(ctx, query)
 	return err
 }
@@ -491,13 +491,13 @@ func (amd *AbnormalMarketDetector) reducePositionSizes(ctx context.Context) erro
 // activateEmergencyHedging activates emergency hedging mechanisms
 func (amd *AbnormalMarketDetector) activateEmergencyHedging(ctx context.Context) error {
 	log.Printf("Emergency hedging activated by circuit breaker")
-	
+
 	query := `
 		UPDATE system_settings 
 		SET value = 'true' 
 		WHERE key = 'emergency_hedging_active'
 	`
-	
+
 	_, err := amd.db.ExecContext(ctx, query)
 	return err
 }
@@ -509,12 +509,12 @@ func (amd *AbnormalMarketDetector) limitNewPositions(ctx context.Context) error 
 		SET value = '0.5' 
 		WHERE key = 'max_position_size_multiplier'
 	`
-	
+
 	_, err := amd.db.ExecContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("failed to limit new positions: %v", err)
 	}
-	
+
 	log.Printf("New position limits activated")
 	return nil
 }
@@ -522,24 +522,24 @@ func (amd *AbnormalMarketDetector) limitNewPositions(ctx context.Context) error 
 // tightenRiskParameters tightens risk management parameters
 func (amd *AbnormalMarketDetector) tightenRiskParameters(ctx context.Context) error {
 	log.Printf("Risk parameters tightened by circuit breaker")
-	
+
 	// Reduce maximum leverage
 	query1 := `
 		UPDATE system_settings 
 		SET value = CAST((CAST(value AS FLOAT) * 0.7) AS TEXT)
 		WHERE key = 'max_leverage'
 	`
-	
+
 	// Tighten stop loss
 	query2 := `
 		UPDATE system_settings 
 		SET value = CAST((CAST(value AS FLOAT) * 0.8) AS TEXT)
 		WHERE key = 'stop_loss_percentage'
 	`
-	
+
 	_, err1 := amd.db.ExecContext(ctx, query1)
 	_, err2 := amd.db.ExecContext(ctx, query2)
-	
+
 	if err1 != nil {
 		return err1
 	}
@@ -549,13 +549,13 @@ func (amd *AbnormalMarketDetector) tightenRiskParameters(ctx context.Context) er
 // activateProtectiveMeasures activates general protective measures
 func (amd *AbnormalMarketDetector) activateProtectiveMeasures(ctx context.Context) error {
 	log.Printf("Protective measures activated")
-	
+
 	query := `
 		UPDATE system_settings 
 		SET value = 'true' 
 		WHERE key = 'protective_measures_active'
 	`
-	
+
 	_, err := amd.db.ExecContext(ctx, query)
 	return err
 }
@@ -563,13 +563,13 @@ func (amd *AbnormalMarketDetector) activateProtectiveMeasures(ctx context.Contex
 // increaseMonitoringFrequency increases monitoring frequency
 func (amd *AbnormalMarketDetector) increaseMonitoringFrequency(ctx context.Context) error {
 	log.Printf("Monitoring frequency increased")
-	
+
 	query := `
 		UPDATE system_settings 
 		SET value = '30' 
 		WHERE key = 'monitoring_interval_seconds'
 	`
-	
+
 	_, err := amd.db.ExecContext(ctx, query)
 	return err
 }
@@ -577,13 +577,13 @@ func (amd *AbnormalMarketDetector) increaseMonitoringFrequency(ctx context.Conte
 // notifyRiskManagers sends notifications to risk managers
 func (amd *AbnormalMarketDetector) notifyRiskManagers(ctx context.Context) error {
 	log.Printf("Risk managers notified of circuit breaker activation")
-	
+
 	// Insert notification record
 	query := `
 		INSERT INTO notifications (type, severity, message, created_at)
 		VALUES ('CIRCUIT_BREAKER', 'CRITICAL', 'Circuit breaker activated due to abnormal market conditions', NOW())
 	`
-	
+
 	_, err := amd.db.ExecContext(ctx, query)
 	return err
 }

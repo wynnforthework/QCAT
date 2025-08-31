@@ -96,7 +96,7 @@ export function RiskDashboard() {
 
   const positionRisks: PositionRisk[] = [
     {
-      symbol: 'BTC/USDT',
+      symbol: 'BTCUSDT',
       exposure: 45000,
       maxExposure: 100000,
       var95: 2500,
@@ -105,7 +105,7 @@ export function RiskDashboard() {
       liquidationPrice: 28000
     },
     {
-      symbol: 'ETH/USDT',
+      symbol: 'ETHUSDT',
       exposure: 25000,
       maxExposure: 50000,
       var95: 1800,

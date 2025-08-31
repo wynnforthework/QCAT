@@ -234,7 +234,7 @@ export default function StrategiesPage() {
               <div>
                 <div className="text-sm text-muted-foreground mb-1">交易对:</div>
                 <div className="flex flex-wrap gap-1">
-                  {(strategy.symbols || ['BTC/USDT', 'ETH/USDT']).map((symbol) => (
+                  {(strategy.symbols || ['BTCUSDT', 'ETHUSDT']).map((symbol) => (
                     <Badge key={symbol} variant="secondary" className="text-xs">
                       {symbol}
                     </Badge>

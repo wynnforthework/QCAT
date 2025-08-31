@@ -29,7 +29,7 @@ func TestCircuitBreakerConfig(t *testing.T) {
 
 func TestVolatilityAlert(t *testing.T) {
 	alert := VolatilityAlert{
-		Symbol:          "BTC/USDT",
+		Symbol:          "BTCUSDT",
 		CurrentVol:      0.05,
 		HistoricalVol:   0.02,
 		VolRatio:        2.5,
@@ -38,7 +38,7 @@ func TestVolatilityAlert(t *testing.T) {
 		Recommendations: []string{"Reduce position sizes", "Monitor closely"},
 	}
 
-	assert.Equal(t, "BTC/USDT", alert.Symbol)
+	assert.Equal(t, "BTCUSDT", alert.Symbol)
 	assert.Equal(t, 0.05, alert.CurrentVol)
 	assert.Equal(t, 0.02, alert.HistoricalVol)
 	assert.Equal(t, 2.5, alert.VolRatio)
@@ -48,7 +48,7 @@ func TestVolatilityAlert(t *testing.T) {
 
 func TestLiquidityAlert(t *testing.T) {
 	alert := LiquidityAlert{
-		Symbol:              "ETH/USDT",
+		Symbol:              "ETHUSDT",
 		CurrentLiquidity:    5.0,
 		HistoricalLiquidity: 15.0,
 		LiquidityRatio:      0.33,
@@ -58,7 +58,7 @@ func TestLiquidityAlert(t *testing.T) {
 		Recommendations:     []string{"Use limit orders", "Reduce order sizes"},
 	}
 
-	assert.Equal(t, "ETH/USDT", alert.Symbol)
+	assert.Equal(t, "ETHUSDT", alert.Symbol)
 	assert.Equal(t, 5.0, alert.CurrentLiquidity)
 	assert.Equal(t, 15.0, alert.HistoricalLiquidity)
 	assert.Equal(t, 0.33, alert.LiquidityRatio)
@@ -69,7 +69,7 @@ func TestLiquidityAlert(t *testing.T) {
 
 func TestCorrelationAlert(t *testing.T) {
 	alert := CorrelationAlert{
-		AssetPairs:      []string{"BTC/USDT", "ETH/USDT"},
+		AssetPairs:      []string{"BTCUSDT", "ETHUSDT"},
 		CurrentCorr:     0.2,
 		HistoricalCorr:  0.8,
 		CorrChange:      0.6,
@@ -79,8 +79,8 @@ func TestCorrelationAlert(t *testing.T) {
 	}
 
 	assert.Len(t, alert.AssetPairs, 2)
-	assert.Contains(t, alert.AssetPairs, "BTC/USDT")
-	assert.Contains(t, alert.AssetPairs, "ETH/USDT")
+	assert.Contains(t, alert.AssetPairs, "BTCUSDT")
+	assert.Contains(t, alert.AssetPairs, "ETHUSDT")
 	assert.Equal(t, 0.2, alert.CurrentCorr)
 	assert.Equal(t, 0.8, alert.HistoricalCorr)
 	assert.Equal(t, 0.6, alert.CorrChange)
@@ -93,7 +93,7 @@ func TestPositionScalingConfig(t *testing.T) {
 		ScalingFactor:   0.7,
 		MaxReduction:    0.5,
 		MinPositionSize: 100.0,
-		ExcludedSymbols: []string{"BTC/USDT", "ETH/USDT"},
+		ExcludedSymbols: []string{"BTCUSDT", "ETHUSDT"},
 		Priority:        "HIGH_RISK",
 		ExecutionMethod: "GRADUAL",
 	}
@@ -113,8 +113,8 @@ func TestEmergencyHedgingConfig(t *testing.T) {
 		MaxHedgeSize:     100000.0,
 		HedgeMethod:      "FUTURES",
 		Correlations: map[string]float64{
-			"BTC/USDT": -0.8,
-			"ETH/USDT": -0.7,
+			"BTCUSDT": -0.8,
+			"ETHUSDT": -0.7,
 		},
 	}
 
@@ -122,8 +122,8 @@ func TestEmergencyHedgingConfig(t *testing.T) {
 	assert.Len(t, config.HedgeInstruments, 2)
 	assert.Equal(t, 100000.0, config.MaxHedgeSize)
 	assert.Equal(t, "FUTURES", config.HedgeMethod)
-	assert.Equal(t, -0.8, config.Correlations["BTC/USDT"])
-	assert.Equal(t, -0.7, config.Correlations["ETH/USDT"])
+	assert.Equal(t, -0.8, config.Correlations["BTCUSDT"])
+	assert.Equal(t, -0.7, config.Correlations["ETHUSDT"])
 }
 
 func TestFundingRateConfig(t *testing.T) {
@@ -131,7 +131,7 @@ func TestFundingRateConfig(t *testing.T) {
 		PositiveThreshold: 0.01,
 		NegativeThreshold: -0.01,
 		AdjustmentFactor:  0.2,
-		MonitoringPairs:   []string{"BTC/USDT", "ETH/USDT"},
+		MonitoringPairs:   []string{"BTCUSDT", "ETHUSDT"},
 	}
 
 	assert.Equal(t, 0.01, config.PositiveThreshold)
@@ -143,7 +143,7 @@ func TestFundingRateConfig(t *testing.T) {
 func TestScaledPositionInfo(t *testing.T) {
 	info := ScaledPositionInfo{
 		PositionID:      "pos123",
-		Symbol:          "BTC/USDT",
+		Symbol:          "BTCUSDT",
 		OriginalSize:    1.0,
 		NewSize:         0.7,
 		ReductionAmount: 0.3,
@@ -153,7 +153,7 @@ func TestScaledPositionInfo(t *testing.T) {
 	}
 
 	assert.Equal(t, "pos123", info.PositionID)
-	assert.Equal(t, "BTC/USDT", info.Symbol)
+	assert.Equal(t, "BTCUSDT", info.Symbol)
 	assert.Equal(t, 1.0, info.OriginalSize)
 	assert.Equal(t, 0.7, info.NewSize)
 	assert.Equal(t, 0.3, info.ReductionAmount)
@@ -168,7 +168,7 @@ func TestHedgePositionInfo(t *testing.T) {
 		Instrument:     "BTC_PERP",
 		HedgeSize:      0.5,
 		HedgePrice:     51000.0,
-		TargetAsset:    "BTC/USDT",
+		TargetAsset:    "BTCUSDT",
 		HedgeRatio:     0.3,
 		ExpectedOffset: 15000.0,
 		Status:         "ACTIVE",
@@ -178,7 +178,7 @@ func TestHedgePositionInfo(t *testing.T) {
 	assert.Equal(t, "BTC_PERP", info.Instrument)
 	assert.Equal(t, 0.5, info.HedgeSize)
 	assert.Equal(t, 51000.0, info.HedgePrice)
-	assert.Equal(t, "BTC/USDT", info.TargetAsset)
+	assert.Equal(t, "BTCUSDT", info.TargetAsset)
 	assert.Equal(t, 0.3, info.HedgeRatio)
 	assert.Equal(t, 15000.0, info.ExpectedOffset)
 	assert.Equal(t, "ACTIVE", info.Status)
@@ -186,7 +186,7 @@ func TestHedgePositionInfo(t *testing.T) {
 
 func TestFundingRateAdjustment(t *testing.T) {
 	adjustment := FundingRateAdjustment{
-		Symbol:          "BTC/USDT",
+		Symbol:          "BTCUSDT",
 		CurrentFunding:  0.015,
 		ThresholdType:   "POSITIVE",
 		OriginalSize:    1.0,
@@ -195,7 +195,7 @@ func TestFundingRateAdjustment(t *testing.T) {
 		Rationale:       "High positive funding rate",
 	}
 
-	assert.Equal(t, "BTC/USDT", adjustment.Symbol)
+	assert.Equal(t, "BTCUSDT", adjustment.Symbol)
 	assert.Equal(t, 0.015, adjustment.CurrentFunding)
 	assert.Equal(t, "POSITIVE", adjustment.ThresholdType)
 	assert.Equal(t, 1.0, adjustment.OriginalSize)
@@ -206,7 +206,7 @@ func TestFundingRateAdjustment(t *testing.T) {
 
 func TestOrderBook(t *testing.T) {
 	orderBook := OrderBook{
-		Symbol: "BTC/USDT",
+		Symbol: "BTCUSDT",
 		Bids: []PriceLevel{
 			{Price: 50000.0, Quantity: 1.0},
 			{Price: 49990.0, Quantity: 0.5},
@@ -218,7 +218,7 @@ func TestOrderBook(t *testing.T) {
 		Timestamp: time.Now(),
 	}
 
-	assert.Equal(t, "BTC/USDT", orderBook.Symbol)
+	assert.Equal(t, "BTCUSDT", orderBook.Symbol)
 	assert.Len(t, orderBook.Bids, 2)
 	assert.Len(t, orderBook.Asks, 2)
 	assert.Equal(t, 50000.0, orderBook.Bids[0].Price)
@@ -231,8 +231,8 @@ func TestPortfolioExposure(t *testing.T) {
 	exposure := PortfolioExposure{
 		TotalExposure: 100000.0,
 		AssetExposures: map[string]float64{
-			"BTC/USDT": 60000.0,
-			"ETH/USDT": 40000.0,
+			"BTCUSDT": 60000.0,
+			"ETHUSDT": 40000.0,
 		},
 		SectorExposures: map[string]float64{
 			"CRYPTO": 100000.0,
@@ -245,8 +245,8 @@ func TestPortfolioExposure(t *testing.T) {
 	}
 
 	assert.Equal(t, 100000.0, exposure.TotalExposure)
-	assert.Equal(t, 60000.0, exposure.AssetExposures["BTC/USDT"])
-	assert.Equal(t, 40000.0, exposure.AssetExposures["ETH/USDT"])
+	assert.Equal(t, 60000.0, exposure.AssetExposures["BTCUSDT"])
+	assert.Equal(t, 40000.0, exposure.AssetExposures["ETHUSDT"])
 	assert.Equal(t, 2.5, exposure.LeverageRatio)
 	assert.Equal(t, 0.52, exposure.ConcentrationRisk)
 }
@@ -334,13 +334,13 @@ func TestGenerateVolatilityRecommendations(t *testing.T) {
 	detector := &AbnormalMarketDetector{}
 
 	// Test critical recommendations
-	recommendations := detector.generateVolatilityRecommendations("BTC/USDT", 5.0, shared.AlertSeverityCritical)
+	recommendations := detector.generateVolatilityRecommendations("BTCUSDT", 5.0, shared.AlertSeverityCritical)
 	assert.NotEmpty(t, recommendations)
 	assert.Contains(t, recommendations[0], "URGENT")
 	assert.Contains(t, recommendations[0], "5.0x normal")
 
 	// Test high severity recommendations
-	recommendations = detector.generateVolatilityRecommendations("ETH/USDT", 3.0, shared.AlertSeverityHigh)
+	recommendations = detector.generateVolatilityRecommendations("ETHUSDT", 3.0, shared.AlertSeverityHigh)
 	assert.NotEmpty(t, recommendations)
 	assert.Contains(t, recommendations[0], "High volatility")
 	assert.Contains(t, recommendations[0], "3.0x normal")
@@ -350,13 +350,13 @@ func TestGenerateLiquidityRecommendations(t *testing.T) {
 	detector := &AbnormalMarketDetector{}
 
 	// Test critical recommendations
-	recommendations := detector.generateLiquidityRecommendations("BTC/USDT", 0.2, shared.AlertSeverityCritical)
+	recommendations := detector.generateLiquidityRecommendations("BTCUSDT", 0.2, shared.AlertSeverityCritical)
 	assert.NotEmpty(t, recommendations)
 	assert.Contains(t, recommendations[0], "CRITICAL")
 	assert.Contains(t, recommendations[0], "20.0% of normal")
 
 	// Test medium severity recommendations
-	recommendations = detector.generateLiquidityRecommendations("ETH/USDT", 0.6, shared.AlertSeverityMedium)
+	recommendations = detector.generateLiquidityRecommendations("ETHUSDT", 0.6, shared.AlertSeverityMedium)
 	assert.NotEmpty(t, recommendations)
 	assert.Contains(t, recommendations[0], "Reduced liquidity")
 	assert.Contains(t, recommendations[0], "60.0% of normal")
@@ -365,13 +365,13 @@ func TestGenerateLiquidityRecommendations(t *testing.T) {
 func TestGenerateCorrelationRecommendations(t *testing.T) {
 	detector := &AbnormalMarketDetector{}
 
-	pair := []string{"BTC/USDT", "ETH/USDT"}
+	pair := []string{"BTCUSDT", "ETHUSDT"}
 
 	// Test critical recommendations
 	recommendations := detector.generateCorrelationRecommendations(pair, 0.7, shared.AlertSeverityCritical)
 	assert.NotEmpty(t, recommendations)
 	assert.Contains(t, recommendations[0], "CRITICAL")
-	assert.Contains(t, recommendations[0], "BTC/USDT/ETH/USDT")
+	assert.Contains(t, recommendations[0], "BTCUSDT/ETHUSDT")
 	assert.Contains(t, recommendations[0], "70.0% change")
 
 	// Test medium severity recommendations
