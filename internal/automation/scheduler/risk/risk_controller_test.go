@@ -179,8 +179,8 @@ func TestRiskController_SelectPositionsForReduction(t *testing.T) {
 
 	// Calculate total reduction value
 	totalReductionValue := 0.0
-	for _, reduction := range reductions {
-		totalReductionValue += reduction.Size * positions[0].CurrentPrice // Use Size field instead of ReductionAmount
+	for _, pos := range reductions {
+		totalReductionValue += pos.Size * pos.CurrentPrice
 	}
 
 	// Should be approximately 30% of total portfolio value

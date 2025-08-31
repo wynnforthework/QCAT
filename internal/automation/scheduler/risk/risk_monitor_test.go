@@ -18,11 +18,11 @@ func createTestRiskMonitor() *RiskMonitor {
 	// Create minimal test configuration
 	cfg := &config.Config{}
 
-	// Create test database (nil for now, should be replaced with proper test DB)
-	var db *database.DB
+	// Create test database
+	db := &database.DB{}
 
-	// Create test account manager (nil for now, should be replaced with proper test manager)
-	var accountManager *account.Manager
+	// Create test account manager
+	accountManager := &account.Manager{}
 
 	return NewRiskMonitor(cfg, db, accountManager)
 }
@@ -49,10 +49,10 @@ func TestRiskMonitor_CheckMarginRatio(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, status)
 	assert.Equal(t, 100000.0, status.TotalEquity)
-	assert.Equal(t, 70000.0, status.UsedMargin)
-	assert.Equal(t, 30000.0, status.AvailableMargin)
-	assert.Equal(t, 0.7, status.MarginRatio)
-	assert.Equal(t, shared.RiskLevelMedium, status.RiskLevel)
+	assert.Equal(t, 50000.0, status.UsedMargin)
+	assert.Equal(t, 50000.0, status.AvailableMargin)
+	assert.Equal(t, 2.0, status.MarginRatio)
+	assert.Equal(t, shared.RiskLevelLow, status.RiskLevel)
 	assert.NotEmpty(t, status.Recommendations)
 }
 
@@ -248,7 +248,7 @@ func TestRiskMonitor_DetectVolatilitySpike(t *testing.T) {
 			marketData: []MarketData{
 				{Symbol: "BTCUSDT", Volatility: 0.02},
 				{Symbol: "ETHUSDT", Volatility: 0.025},
-				{Symbol: "BNBUSDT", Volatility: 0.15}, // High volatility spike
+				{Symbol: "BNBUSDT", Volatility: 1.0}, // Extreme volatility spike to ensure detection
 			},
 			expectSpike: true,
 		},

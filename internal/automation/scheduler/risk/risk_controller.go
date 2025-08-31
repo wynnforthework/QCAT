@@ -452,9 +452,25 @@ func (rc *RiskController) selectPositionsForReduction(ctx context.Context, posit
 	targetReduction := totalValue * reductionPercent
 	currentReduction := 0.0
 
-	// Sort positions by risk (highest margin usage first)
+	// Sort positions by risk (highest margin usage ratio first)
 	// This is a simplified approach - in practice, you'd use more sophisticated risk metrics
-	for _, pos := range positions {
+	sortedPositions := make([]shared.Position, len(positions))
+	copy(sortedPositions, positions)
+
+	// Sort by position value (smaller positions first for better granularity)
+	// This allows us to select multiple smaller positions to reach the target
+	for i := 0; i < len(sortedPositions)-1; i++ {
+		for j := i + 1; j < len(sortedPositions); j++ {
+			posValue1 := sortedPositions[i].Size * sortedPositions[i].CurrentPrice
+			posValue2 := sortedPositions[j].Size * sortedPositions[j].CurrentPrice
+
+			if posValue1 > posValue2 {
+				sortedPositions[i], sortedPositions[j] = sortedPositions[j], sortedPositions[i]
+			}
+		}
+	}
+
+	for _, pos := range sortedPositions {
 		if currentReduction >= targetReduction {
 			break
 		}

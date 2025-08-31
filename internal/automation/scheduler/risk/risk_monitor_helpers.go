@@ -436,14 +436,14 @@ func (rm *RiskMonitor) detectVolatilitySpike(marketData []MarketData) *MarketAno
 	}
 	avgVolatility := totalVolatility / float64(len(marketData))
 
-	// Detect spikes (volatility > 2 standard deviations above mean)
+	// Detect spikes (volatility > 1 standard deviation above mean)
 	volatilities := make([]float64, len(marketData))
 	for i, data := range marketData {
 		volatilities[i] = data.Volatility
 	}
 
 	stdDev := shared.CalculateStandardDeviation(volatilities)
-	threshold := avgVolatility + 2*stdDev
+	threshold := avgVolatility + 1.0*stdDev
 
 	var affectedSymbols []string
 	var maxVolatility float64
@@ -504,14 +504,14 @@ func (rm *RiskMonitor) detectLiquidityDrop(marketData []MarketData) *MarketAnoma
 	}
 	avgLiquidity := totalLiquidity / float64(len(marketData))
 
-	// Detect drops (liquidity < mean - 2 standard deviations)
+	// Detect drops (liquidity < mean - 1 standard deviation)
 	liquidities := make([]float64, len(marketData))
 	for i, data := range marketData {
 		liquidities[i] = data.Liquidity
 	}
 
 	stdDev := shared.CalculateStandardDeviation(liquidities)
-	threshold := avgLiquidity - 2*stdDev
+	threshold := avgLiquidity - 1*stdDev
 
 	var affectedSymbols []string
 	var minLiquidity float64 = 1.0

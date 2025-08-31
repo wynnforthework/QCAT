@@ -238,19 +238,52 @@ func CreateTestMarginStatus(totalEquity, usedMargin float64) *MarginStatus {
 
 // selectPositionsForReduction is a helper method for testing
 func (trc *TestRiskController) selectPositionsForReduction(ctx context.Context, positions []shared.Position, reductionRatio float64) ([]shared.Position, error) {
-	// Simple selection logic for testing - select positions with highest margin usage
-	var selectedPositions []shared.Position
-
-	totalReductionNeeded := 0.0
+	// Calculate total portfolio value
+	totalValue := 0.0
 	for _, pos := range positions {
-		totalReductionNeeded += pos.MarginUsed * reductionRatio
+		totalValue += pos.Size * pos.CurrentPrice
 	}
 
+	targetReduction := totalValue * reductionRatio
+
+	// Sort positions by value (smallest first for better granularity)
+	sortedPositions := make([]shared.Position, len(positions))
+	copy(sortedPositions, positions)
+
+	for i := 0; i < len(sortedPositions)-1; i++ {
+		for j := i + 1; j < len(sortedPositions); j++ {
+			value1 := sortedPositions[i].Size * sortedPositions[i].CurrentPrice
+			value2 := sortedPositions[j].Size * sortedPositions[j].CurrentPrice
+			if value1 > value2 {
+				sortedPositions[i], sortedPositions[j] = sortedPositions[j], sortedPositions[i]
+			}
+		}
+	}
+
+	// Select positions to reach target reduction
+	var selectedPositions []shared.Position
 	currentReduction := 0.0
-	for _, pos := range positions {
-		if currentReduction < totalReductionNeeded {
+
+	for _, pos := range sortedPositions {
+		if currentReduction >= targetReduction {
+			break
+		}
+
+		positionValue := pos.Size * pos.CurrentPrice
+		remainingReduction := targetReduction - currentReduction
+
+		if positionValue <= remainingReduction {
+			// Select entire position
 			selectedPositions = append(selectedPositions, pos)
-			currentReduction += pos.MarginUsed
+			currentReduction += positionValue
+		} else {
+			// Partial selection - create a modified position with reduced size
+			reductionRatio := remainingReduction / positionValue
+			modifiedPos := pos
+			modifiedPos.Size = pos.Size * reductionRatio
+			selectedPositions = append(selectedPositions, modifiedPos)
+			currentReduction += remainingReduction
+			break
 		}
 	}
 
