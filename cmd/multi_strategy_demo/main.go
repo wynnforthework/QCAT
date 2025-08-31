@@ -17,7 +17,7 @@ func main() {
 	log.Println("启动多策略工作流系统演示程序...")
 
 	// 创建系统
-	system, err := workflow.NewMultiStrategyWorkflowSystem(nil)
+	system, err := workflow.NewMultiStrategyWorkflowSystem(nil, nil)
 	if err != nil {
 		log.Fatalf("Failed to create multi-strategy workflow system: %v", err)
 	}

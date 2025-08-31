@@ -1,7 +1,120 @@
 # Code Scan Report
 
+## ./internal\alerting\channels_test.go
+- Line 184: **mock** → `// MockAlertChannel implements AlertChannel interface for testing`
+- Line 185: **mock** → `type MockAlertChannel struct {`
+- Line 193: **mock** → `func (m *MockAlertChannel) GetName() string {`
+- Line 197: **mock** → `func (m *MockAlertChannel) IsEnabled() bool {`
+- Line 201: **mock** → `func (m *MockAlertChannel) Send(ctx context.Context, alert *Alert) error {`
+
 ## ./internal\api\api_test.go
 - Line 79: **mock** → `// Create test strategy data directly instead of using mock generator`
+
+## ./internal\api\handlers.go
+- Line 54: **mock** → `// Create a mock orchestrator when database is not available`
+- Line 2823: **TODO** → `"drawdown":    0.0, // TODO: Implement calculateCurrentDrawdown`
+- Line 2824: **TODO** → `"maxDrawdown": 0.0, // TODO: Implement calculateMaxDrawdown`
+
+## ./internal\automation\executor\executors.go
+- Line 711: **TODO** → `// TODO: Implement strategy manager integration when available`
+- Line 786: **TODO** → `// TODO: Implement strategy manager integration when available`
+- Line 1954: **TODO** → `// TODO: Implement strategy instance integration when available`
+- Line 7881: **TODO** → `// TODO: Implement scheduler integration when available`
+
+## ./internal\automation\scheduler\position\layered_position_test.go
+- Line 14: **mock** → `// Mock implementations for testing`
+- Line 15: **mock** → `type mockExchangeClient struct{}`
+- Line 17: **mock** → `func (m *mockExchangeClient) GetCurrentPrice(ctx context.Context, symbol string) (float64, error) {`
+- Line 21: **mock** → `func (m *mockExchangeClient) GetHistoricalPrices(ctx context.Context, symbol string, period time.Duration) ([]float64, error) {`
+- Line 22: **mock** → `// Return mock historical prices`
+- Line 28: **mock** → `func (m *mockExchangeClient) GetExchangeInfo(ctx context.Context) (*exchange.ExchangeInfo, error) {`
+- Line 31: **mock** → `func (m *mockExchangeClient) GetSymbolInfo(ctx context.Context, symbol string) (*exchange.SymbolInfo, error) {`
+- Line 34: **mock** → `func (m *mockExchangeClient) GetServerTime(ctx context.Context) (time.Time, error) {`
+- Line 37: **mock** → `func (m *mockExchangeClient) GetAccountBalance(ctx context.Context) (map[string]*exchange.AccountBalance, error) {`
+- Line 40: **mock** → `func (m *mockExchangeClient) GetPositions(ctx context.Context) ([]*exchange.Position, error) {`
+- Line 43: **mock** → `func (m *mockExchangeClient) GetPosition(ctx context.Context, symbol string) (*exchange.Position, error) {`
+- Line 46: **mock** → `func (m *mockExchangeClient) GetLeverage(ctx context.Context, symbol string) (int, error) {`
+- Line 49: **mock** → `func (m *mockExchangeClient) SetLeverage(ctx context.Context, symbol string, leverage int) error {`
+- Line 52: **mock** → `func (m *mockExchangeClient) SetMarginType(ctx context.Context, symbol string, marginType exchange.MarginType) error {`
+- Line 55: **mock** → `func (m *mockExchangeClient) PlaceOrder(ctx context.Context, req *exchange.OrderRequest) (*exchange.OrderResponse, error) {`
+- Line 58: **mock** → `func (m *mockExchangeClient) CancelOrder(ctx context.Context, req *exchange.OrderCancelRequest) (*exchange.OrderResponse, error) {`
+- Line 61: **mock** → `func (m *mockExchangeClient) CancelAllOrders(ctx context.Context, symbol string) error { return nil }`
+- Line 62: **mock** → `func (m *mockExchangeClient) GetOrder(ctx context.Context, symbol, orderID string) (*exchange.Order, error) {`
+- Line 65: **mock** → `func (m *mockExchangeClient) GetOpenOrders(ctx context.Context, symbol string) ([]*exchange.Order, error) {`
+- Line 68: **mock** → `func (m *mockExchangeClient) GetOrderHistory(ctx context.Context, symbol string, startTime, endTime time.Time) ([]*exchange.Order, error) {`
+- Line 71: **mock** → `func (m *mockExchangeClient) GetRiskLimits(ctx context.Context, symbol string) (*exchange.RiskLimits, error) {`
+- Line 74: **mock** → `func (m *mockExchangeClient) GetMarginInfo(ctx context.Context) (*exchange.MarginInfo, error) {`
+- Line 77: **mock** → `func (m *mockExchangeClient) SetRiskLimits(ctx context.Context, symbol string, limits *exchange.RiskLimits) error {`
+- Line 80: **mock** → `func (m *mockExchangeClient) GetPositionByID(ctx context.Context, positionID string) (*exchange.Position, error) {`
+- Line 83: **mock** → `func (m *mockExchangeClient) GetSymbolPrice(ctx context.Context, symbol string) (float64, error) {`
+- Line 86: **mock** → `func (m *mockExchangeClient) GetAccount(ctx context.Context) (*exchange.Account, error) {`
+- Line 89: **mock** → `func (m *mockExchangeClient) GetTicker(ctx context.Context, symbol string) (*exchange.Ticker, error) {`
+- Line 92: **mock** → `func (m *mockExchangeClient) GetOrderBook(ctx context.Context, symbol string, limit int) (*exchange.OrderBook, error) {`
+- Line 95: **mock** → `func (m *mockExchangeClient) GetAccountSnapshots(ctx context.Context, days int) ([]*exchange.AccountSnapshot, error) {`
+- Line 98: **mock** → `func (m *mockExchangeClient) Get24HrStats(ctx context.Context, symbol string) (*exchange.Stats24Hr, error) {`
+- Line 102: **mock** → `func newMockDB() *database.DB {`
+- Line 107: **mock** → `type mockLogger struct{}`
+- Line 109: **mock** → `func (m *mockLogger) Trace(msg string, fields ...interface{})                {}`
+- Line 110: **mock** → `func (m *mockLogger) Debug(msg string, fields ...interface{})                {}`
+- Line 111: **mock** → `func (m *mockLogger) Info(msg string, fields ...interface{})                 {}`
+- Line 112: **mock** → `func (m *mockLogger) Warn(msg string, fields ...interface{})                 {}`
+- Line 113: **mock** → `func (m *mockLogger) Error(msg string, fields ...interface{})                {}`
+- Line 114: **mock** → `func (m *mockLogger) Fatal(msg string, fields ...interface{})                {}`
+- Line 115: **mock** → `func (m *mockLogger) Panic(msg string, fields ...interface{})                {}`
+- Line 116: **mock** → `func (m *mockLogger) WithField(key string, value interface{}) logger.Logger  { return m }`
+- Line 117: **mock** → `func (m *mockLogger) WithFields(fields map[string]interface{}) logger.Logger { return m }`
+- Line 118: **mock** → `func (m *mockLogger) WithContext(ctx context.Context) logger.Logger          { return m }`
+- Line 119: **mock** → `func (m *mockLogger) SetLevel(level logger.LogLevel)                         {}`
+- Line 120: **mock** → `func (m *mockLogger) GetLevel() logger.LogLevel                              { return logger.LevelInfo }`
+- Line 122: **mock** → `type mockConfig struct {`
+- Line 126: **mock** → `func newMockConfig() *mockConfig {`
+- Line 127: **mock** → `return &mockConfig{`
+- Line 147: **mock** → `func (m *mockConfig) Get(key string) interface{} {`
+- Line 151: **mock** → `func (m *mockConfig) GetString(key string) string {`
+- Line 158: **mock** → `func (m *mockConfig) GetInt(key string) int {`
+- Line 165: **mock** → `func (m *mockConfig) GetFloat64(key string) float64 {`
+- Line 172: **mock** → `func (m *mockConfig) GetBool(key string) bool {`
+- Line 179: **mock** → `func (m *mockConfig) GetDuration(key string) time.Duration {`
+- Line 186: **mock** → `func (m *mockConfig) Set(key string, value interface{}) error {`
+- Line 191: **mock** → `func (m *mockConfig) Reload() error {`
+- Line 197: **mock** → `db := newMockDB()`
+- Line 198: **mock** → `exchangeClient := &mockExchangeClient{}`
+- Line 199: **mock** → `logger := &mockLogger{}`
+- Line 200: **mock** → `config := newMockConfig()`
+- Line 276: **mock** → `db := newMockDB()`
+- Line 277: **mock** → `exchangeClient := &mockExchangeClient{}`
+- Line 278: **mock** → `logger := &mockLogger{}`
+- Line 279: **mock** → `config := newMockConfig()`
+- Line 387: **mock** → `db := newMockDB()`
+- Line 388: **mock** → `exchangeClient := &mockExchangeClient{}`
+- Line 389: **mock** → `logger := &mockLogger{}`
+- Line 390: **mock** → `config := newMockConfig()`
+- Line 398: **mock** → `// Create mock volatility analysis`
+- Line 438: **mock** → `currentPrice := 100.0 // Mock current price`
+- Line 461: **mock** → `db := newMockDB()`
+- Line 462: **mock** → `exchangeClient := &mockExchangeClient{}`
+- Line 463: **mock** → `logger := &mockLogger{}`
+- Line 464: **mock** → `config := newMockConfig()`
+- Line 559: **mock** → `db := newMockDB()`
+- Line 560: **mock** → `exchangeClient := &mockExchangeClient{}`
+- Line 561: **mock** → `logger := &mockLogger{}`
+- Line 562: **mock** → `config := newMockConfig()`
+- Line 660: **mock** → `db := newMockDB()`
+- Line 661: **mock** → `exchangeClient := &mockExchangeClient{}`
+- Line 662: **mock** → `logger := &mockLogger{}`
+- Line 663: **mock** → `config := newMockConfig()`
+- Line 778: **mock** → `db := newMockDB()`
+- Line 779: **mock** → `exchangeClient := &mockExchangeClient{}`
+- Line 780: **mock** → `logger := &mockLogger{}`
+- Line 781: **mock** → `config := newMockConfig()`
+- Line 932: **mock** → `db := newMockDB()`
+- Line 933: **mock** → `exchangeClient := &mockExchangeClient{}`
+- Line 934: **mock** → `logger := &mockLogger{}`
+- Line 935: **mock** → `config := newMockConfig()`
+- Line 953: **mock** → `db := newMockDB()`
+- Line 954: **mock** → `exchangeClient := &mockExchangeClient{}`
+- Line 955: **mock** → `logger := &mockLogger{}`
+- Line 956: **mock** → `config := newMockConfig()`
 
 ## ./internal\automation\scheduler\risk\risk_controller_test.go
 - Line 37: **mock** → `action, err := testRC.triggerPositionReductionMocked(ctx, marginStatus, 0.3)`
@@ -9,23 +122,212 @@
 - Line 82: **mock** → `action, err := testRC.triggerLeverageReductionMocked(ctx, targetLeverage)`
 - Line 203: **mock** → `_, err := testRC.triggerEmergencyStopMocked(ctx, "Test emergency")`
 
+## ./internal\automation\scheduler\risk\risk_monitor.go
+- Line 98: **mock** → `// Use reflection or simple field checks to determine if it's a test mock`
+- Line 114: **mock** → `// Return mock data for testing environment`
+- Line 127: **mock** → `Recommendations: []string{"Account manager unavailable - using mock data"},`
+
+## ./internal\automation\scheduler\risk\stop_loss_adjuster.go
+- Line 466: **mock** → `// Return mock adjustments for testing`
+
+## ./internal\automation\scheduler\risk\stop_loss_adjuster_test.go
+- Line 13: **mock** → `"github.com/DATA-DOG/go-sqlmock"`
+- Line 53: **mock** → `adjuster, mock := createTestStopLossAdjusterWithMock(t)`
+- Line 59: **mock** → `// Mock OHLC data query`
+- Line 60: **mock** → `ohlcRows := sqlmock.NewRows([]string{"timestamp", "open_price", "high_price", "low_price", "close_price", "volume"})`
+- Line 71: **mock** → `mock.ExpectQuery("SELECT timestamp, open_price, high_price, low_price, close_price, volume FROM market_data").`
+- Line 75: **mock** → `// Mock position query`
+- Line 76: **mock** → `positionRows := sqlmock.NewRows([]string{`
+- Line 83: **mock** → `mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").`
+- Line 94: **mock** → `assert.NoError(t, mock.ExpectationsWereMet())`
+- Line 98: **mock** → `adjuster, mock := createTestStopLossAdjusterWithMock(t)`
+- Line 104: **mock** → `// Mock price data query`
+- Line 105: **mock** → `priceRows := sqlmock.NewRows([]string{"close_price"})`
+- Line 109: **mock** → `mock.ExpectQuery("SELECT close_price FROM market_data").`
+- Line 113: **mock** → `// Mock position query`
+- Line 114: **mock** → `positionRows := sqlmock.NewRows([]string{`
+- Line 121: **mock** → `mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").`
+- Line 132: **mock** → `assert.NoError(t, mock.ExpectationsWereMet())`
+- Line 136: **mock** → `adjuster, mock := createTestStopLossAdjusterWithMock(t)`
+- Line 141: **mock** → `// Mock market data query for regime analysis`
+- Line 142: **mock** → `marketRows := sqlmock.NewRows([]string{"close_price", "volume", "timestamp"})`
+- Line 150: **mock** → `mock.ExpectQuery("SELECT close_price, volume, timestamp FROM market_data").`
+- Line 165: **mock** → `assert.NoError(t, mock.ExpectationsWereMet())`
+- Line 169: **mock** → `adjuster, mock := createTestStopLossAdjusterWithMock(t)`
+- Line 197: **mock** → `// Mock database updates`
+- Line 198: **mock** → `mock.ExpectExec("UPDATE positions SET stop_loss = \\?, updated_at = CURRENT_TIMESTAMP").`
+- Line 200: **mock** → `WillReturnResult(sqlmock.NewResult(1, 1))`
+- Line 202: **mock** → `mock.ExpectExec("INSERT INTO stop_loss_adjustments").`
+- Line 204: **mock** → `WillReturnResult(sqlmock.NewResult(1, 1))`
+- Line 206: **mock** → `mock.ExpectExec("UPDATE positions SET stop_loss = \\?, updated_at = CURRENT_TIMESTAMP").`
+- Line 208: **mock** → `WillReturnResult(sqlmock.NewResult(1, 1))`
+- Line 210: **mock** → `mock.ExpectExec("INSERT INTO stop_loss_adjustments").`
+- Line 212: **mock** → `WillReturnResult(sqlmock.NewResult(1, 1))`
+- Line 223: **mock** → `// In test mode, database queries are bypassed, so we don't verify mock expectations`
+- Line 224: **mock** → `// assert.NoError(t, mock.ExpectationsWereMet())`
+- Line 228: **mock** → `adjuster, mock := createTestStopLossAdjusterWithMock(t)`
+- Line 242: **mock** → `// Mock OHLC data for ATR calculation`
+- Line 243: **mock** → `ohlcRows := sqlmock.NewRows([]string{"timestamp", "open_price", "high_price", "low_price", "close_price", "volume"})`
+- Line 254: **mock** → `mock.ExpectQuery("SELECT timestamp, open_price, high_price, low_price, close_price, volume FROM market_data").`
+- Line 258: **mock** → `// Mock position query for ATR calculation`
+- Line 259: **mock** → `positionRows1 := sqlmock.NewRows([]string{`
+- Line 266: **mock** → `mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").`
+- Line 270: **mock** → `// Mock price data for RV calculation`
+- Line 271: **mock** → `priceRows := sqlmock.NewRows([]string{"close_price"})`
+- Line 275: **mock** → `mock.ExpectQuery("SELECT close_price FROM market_data").`
+- Line 279: **mock** → `// Mock position query for RV calculation`
+- Line 280: **mock** → `positionRows2 := sqlmock.NewRows([]string{`
+- Line 287: **mock** → `mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").`
+- Line 291: **mock** → `// Mock market data for regime analysis`
+- Line 292: **mock** → `marketRows := sqlmock.NewRows([]string{"close_price", "volume", "timestamp"})`
+- Line 300: **mock** → `mock.ExpectQuery("SELECT close_price, volume, timestamp FROM market_data WHERE symbol IN \\('BTCUSDT', 'ETHUSDT'\\) ORDER BY timestamp DESC LIMIT 100").`
+- Line 309: **mock** → `// In test mode, database queries are bypassed, so we don't verify mock expectations`
+- Line 310: **mock** → `// assert.NoError(t, mock.ExpectationsWereMet())`
+- Line 314: **mock** → `adjuster, mock := createTestStopLossAdjusterWithMock(t)`
+- Line 319: **mock** → `// Mock active positions query`
+- Line 320: **mock** → `positionsRows := sqlmock.NewRows([]string{`
+- Line 330: **mock** → `mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").`
+- Line 333: **mock** → `// Mock calculations for each position (simplified - would need full mock setup)`
+- Line 341: **mock** → `// We expect 0 adjustments because the mocked calculations will fail`
+- Line 374: **mock** → `func createTestStopLossAdjusterWithMock(t *testing.T) (*StopLossAdjuster, sqlmock.Sqlmock) {`
+- Line 375: **mock** → `// Create mock database`
+- Line 376: **mock** → `mockDB, mock, err := sqlmock.New()`
+- Line 380: **mock** → `db := &database.DB{DB: mockDB}`
+- Line 386: **mock** → `return adjuster, mock`
+
+## ./internal\automation\scheduler\risk\stop_loss_execution.go
+- Line 480: **mock** → `// Return mock price for testing`
+
+## ./internal\automation\scheduler\risk\stop_loss_execution_test.go
+- Line 13: **mock** → `"github.com/DATA-DOG/go-sqlmock"`
+- Line 53: **mock** → `executor, mock := createTestStopLossExecutorWithMock(t)`
+- Line 58: **mock** → `// Mock current price query for performance tracking`
+- Line 59: **mock** → `priceRows := sqlmock.NewRows([]string{"close_price"}).AddRow(51000.0)`
+- Line 60: **mock** → `mock.ExpectQuery("SELECT close_price FROM market_data WHERE symbol = \\? ORDER BY timestamp DESC LIMIT 1").`
+- Line 64: **mock** → `// Mock performance tracking insert`
+- Line 65: **mock** → `mock.ExpectExec("INSERT INTO stop_loss_performance").`
+- Line 66: **mock** → `WillReturnResult(sqlmock.NewResult(1, 1))`
+- Line 68: **mock** → `// Mock the stop loss update query (this happens first)`
+- Line 69: **mock** → `mock.ExpectExec("UPDATE positions SET stop_loss = \\?, updated_at = CURRENT_TIMESTAMP WHERE id = \\? AND status = 'ACTIVE'").`
+- Line 71: **mock** → `WillReturnResult(sqlmock.NewResult(1, 1))`
+- Line 73: **mock** → `// Mock active positions query for GenerateStopLossAdjustments (this happens second)`
+- Line 74: **mock** → `positionsRows := sqlmock.NewRows([]string{`
+- Line 81: **mock** → `mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").`
+- Line 84: **mock** → `// In test mode, GenerateStopLossAdjustments returns mock data`
+- Line 96: **mock** → `executor, _ := createTestStopLossExecutorWithMock(t)`
+- Line 112: **mock** → `// No mock expectations needed`
+- Line 125: **mock** → `// In test mode, database queries are bypassed, so we don't verify mock expectations`
+- Line 126: **mock** → `// assert.NoError(t, mock.ExpectationsWereMet())`
+- Line 194: **mock** → `tracker, mock := createTestPerformanceTrackerWithMock(t)`
+- Line 207: **mock** → `// Mock current price query`
+- Line 208: **mock** → `mock.ExpectQuery("SELECT close_price FROM market_data").`
+- Line 210: **mock** → `WillReturnRows(sqlmock.NewRows([]string{"close_price"}).AddRow(51000.0))`
+- Line 212: **mock** → `// Mock performance record insertion`
+- Line 213: **mock** → `mock.ExpectExec("INSERT INTO stop_loss_performance").`
+- Line 214: **mock** → `WillReturnResult(sqlmock.NewResult(1, 1))`
+- Line 232: **mock** → `assert.NoError(t, mock.ExpectationsWereMet())`
+- Line 236: **mock** → `tracker, mock := createTestPerformanceTrackerWithMock(t)`
+- Line 241: **mock** → `// Mock active tracking records query`
+- Line 242: **mock** → `trackingRows := sqlmock.NewRows([]string{`
+- Line 253: **mock** → `mock.ExpectQuery("SELECT adjustment_id, position_id, symbol").`
+- Line 256: **mock** → `// Mock position status query (position still active)`
+- Line 257: **mock** → `positionRows := sqlmock.NewRows([]string{`
+- Line 264: **mock** → `mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").`
+- Line 268: **mock** → `// Mock performance update`
+- Line 269: **mock** → `mock.ExpectExec("UPDATE stop_loss_performance").`
+- Line 270: **mock** → `WillReturnResult(sqlmock.NewResult(1, 1))`
+- Line 272: **mock** → `// Mock aggregate metrics calculation`
+- Line 273: **mock** → `statsRows := sqlmock.NewRows([]string{`
+- Line 277: **mock** → `mock.ExpectQuery("SELECT COUNT\\(\\*\\) as total_adjustments").`
+- Line 285: **mock** → `assert.NoError(t, mock.ExpectationsWereMet())`
+- Line 428: **mock** → `func createTestStopLossExecutorWithMock(t *testing.T) (*StopLossExecutor, sqlmock.Sqlmock) {`
+- Line 429: **mock** → `// Create mock database`
+- Line 430: **mock** → `mockDB, mock, err := sqlmock.New()`
+- Line 435: **mock** → `db := &database.DB{DB: mockDB}`
+- Line 439: **mock** → `executor.adjuster.db = db         // Update adjuster's db to use mock`
+- Line 442: **mock** → `return executor, mock`
+- Line 454: **mock** → `func createTestPerformanceTrackerWithMock(t *testing.T) (*StopLossPerformanceTracker, sqlmock.Sqlmock) {`
+- Line 455: **mock** → `// Create mock database`
+- Line 456: **mock** → `mockDB, mock, err := sqlmock.New()`
+- Line 459: **mock** → `db := &database.DB{DB: mockDB}`
+- Line 466: **mock** → `return tracker, mock`
+
 ## ./internal\automation\scheduler\risk\test_helpers.go
-- Line 20: **mock** → `// TestDatabase provides mock database functionality for testing`
-- Line 66: **mock** → `// Create mock database connection`
-- Line 67: **mock** → `db := &database.DB{} // This would be properly mocked in real implementation`
-- Line 84: **mock** → `// triggerPositionReductionMocked provides a mock implementation for testing`
-- Line 85: **mock** → `func (trc *TestRiskController) triggerPositionReductionMocked(ctx context.Context, marginStatus *shared.MarginStatus, reductionRatio float64) (*RiskAction, error) {`
-- Line 86: **mock** → `// Create a mock risk action`
-- Line 116: **mock** → `// triggerEmergencyStopMocked provides a mock implementation for testing`
-- Line 117: **mock** → `func (trc *TestRiskController) triggerEmergencyStopMocked(ctx context.Context, reason string) (*RiskAction, error) {`
-- Line 118: **mock** → `// Create a mock risk action`
+- Line 19: **mock** → `// TestDatabase provides mock database functionality for testing`
+- Line 64: **mock** → `// Create mock database connection`
+- Line 65: **mock** → `db := &database.DB{} // This would be properly mocked in real implementation`
+- Line 82: **mock** → `// triggerPositionReductionMocked provides a mock implementation for testing`
+- Line 83: **mock** → `func (trc *TestRiskController) triggerPositionReductionMocked(ctx context.Context, marginStatus *MarginStatus, reductionRatio float64) (*RiskAction, error) {`
+- Line 84: **mock** → `// Create a mock risk action`
+- Line 115: **mock** → `// triggerEmergencyStopMocked provides a mock implementation for testing`
+- Line 116: **mock** → `func (trc *TestRiskController) triggerEmergencyStopMocked(ctx context.Context, reason string) (*RiskAction, error) {`
+- Line 117: **mock** → `// Create a mock risk action`
 - Line 150: **mock** → `// triggerLeverageReductionMocked provides a mock implementation for testing`
 - Line 151: **mock** → `func (trc *TestRiskController) triggerLeverageReductionMocked(ctx context.Context, targetLeverage float64) (*RiskAction, error) {`
 - Line 152: **mock** → `// Create a mock risk action`
-- Line 201: **mock** → `// Start starts the risk controller (mock implementation)`
-- Line 203: **mock** → `// Mock implementation - just return success`
-- Line 207: **mock** → `// Stop stops the risk controller (mock implementation)`
-- Line 209: **mock** → `// Mock implementation - just return success`
+- Line 202: **mock** → `// Start starts the risk controller (mock implementation)`
+- Line 204: **mock** → `// Mock implementation - just return success`
+- Line 208: **mock** → `// Stop stops the risk controller (mock implementation)`
+- Line 210: **mock** → `// Mock implementation - just return success`
+
+## ./internal\automation\scheduler\risk\test_mocks.go
+- Line 51: **mock** → `// QueryContext mock implementation`
+- Line 54: **mock** → `// In a real implementation, this would parse the query and return appropriate mock data`
+- Line 58: **mock** → `// ExecContext mock implementation`
+- Line 131: **mock** → `db:            nil, // We'll mock database operations`
+- Line 141: **mock** → `// MockRiskController creates a RiskController for testing with mocked database operations`
+- Line 142: **mock** → `type MockRiskController struct {`
+- Line 148: **mock** → `func (mrc *MockRiskController) getCurrentPositions(ctx context.Context) ([]shared.Position, error) {`
+- Line 153: **mock** → `func (mrc *MockRiskController) executePositionReduction(ctx context.Context, reduction PositionReduction) error {`
+- Line 165: **mock** → `func (mrc *MockRiskController) executeEmergencyClose(ctx context.Context, position shared.Position) error {`
+- Line 177: **mock** → `func (mrc *MockRiskController) cancelAllPendingOrders(ctx context.Context) error {`
+- Line 184: **mock** → `func (mrc *MockRiskController) getHighLeveragePositions(ctx context.Context, maxLeverage float64) ([]shared.Position, error) {`
+- Line 195: **mock** → `func (mrc *MockRiskController) recordActionInDatabase(ctx context.Context, action RiskAction) error {`
+- Line 201: **mock** → `func (mrc *MockRiskController) recordAction(action RiskAction) {`
+- Line 213: **mock** → `// triggerPositionReductionMocked is a mocked version of TriggerPositionReduction for testing`
+- Line 214: **mock** → `func (mrc *MockRiskController) triggerPositionReductionMocked(ctx context.Context, marginStatus *MarginStatus, reductionPercent float64) (*RiskAction, error) {`
+- Line 232: **mock** → `// Get positions from mock data`
+- Line 247: **mock** → `// Execute position reductions using mock`
+- Line 282: **mock** → `// triggerEmergencyStopMocked is a mocked version of TriggerEmergencyStop for testing`
+- Line 283: **mock** → `func (mrc *MockRiskController) triggerEmergencyStopMocked(ctx context.Context, reason string) (*RiskAction, error) {`
+- Line 303: **mock** → `// Get all active positions from mock data`
+- Line 306: **mock** → `// Close all positions using mock`
+- Line 320: **mock** → `// Cancel all pending orders using mock`
+- Line 345: **mock** → `// triggerLeverageReductionMocked is a mocked version of TriggerLeverageReduction for testing`
+- Line 346: **mock** → `func (mrc *MockRiskController) triggerLeverageReductionMocked(ctx context.Context, targetLeverage float64) (*RiskAction, error) {`
+- Line 362: **mock** → `// Get positions with high leverage from mock data`
+- Line 374: **mock** → `// Reduce leverage for each position using mock`
+
+## ./internal\automation\scheduler\shared\shared_test.go
+- Line 375: **mock** → `assert.NotNil(t, tf.mocks)`
+- Line 379: **mock** → `t.Run("Mock management", func(t *testing.T) {`
+- Line 382: **mock** → `mockDB := NewMockDatabase()`
+- Line 383: **mock** → `tf.SetMock("database", mockDB)`
+- Line 385: **mock** → `retrieved := tf.GetMock("database")`
+- Line 386: **mock** → `assert.Equal(t, mockDB, retrieved)`
+- Line 402: **mock** → `func TestMockDatabase(t *testing.T) {`
+- Line 403: **mock** → `t.Run("NewMockDatabase", func(t *testing.T) {`
+- Line 404: **mock** → `mockDB := NewMockDatabase()`
+- Line 405: **mock** → `assert.NotNil(t, mockDB)`
+- Line 406: **mock** → `assert.NotNil(t, mockDB.queries)`
+- Line 410: **mock** → `mockDB := NewMockDatabase()`
+- Line 417: **mock** → `mockDB.SetQueryResult("SELECT * FROM test", results)`
+- Line 419: **mock** → `storedResults := mockDB.queries["SELECT * FROM test"]`
+- Line 424: **mock** → `func TestMockExchangeAPI(t *testing.T) {`
+- Line 425: **mock** → `t.Run("NewMockExchangeAPI", func(t *testing.T) {`
+- Line 426: **mock** → `mockAPI := NewMockExchangeAPI()`
+- Line 427: **mock** → `assert.NotNil(t, mockAPI)`
+- Line 428: **mock** → `assert.NotNil(t, mockAPI.positions)`
+- Line 429: **mock** → `assert.NotNil(t, mockAPI.marketData)`
+- Line 430: **mock** → `assert.NotNil(t, mockAPI.orderHistory)`
+- Line 434: **mock** → `mockAPI := NewMockExchangeAPI()`
+- Line 445: **mock** → `mockAPI.SetPositions(positions)`
+- Line 447: **mock** → `mockAPI.On("GetPositions", context.Background()).Return(nil)`
+- Line 449: **mock** → `retrieved, err := mockAPI.GetPositions(context.Background())`
+- Line 455: **mock** → `mockAPI := NewMockExchangeAPI()`
+- Line 462: **mock** → `mockAPI.SetMarketData("BTCUSDT", marketData)`
+- Line 463: **mock** → `mockAPI.On("GetMarketData", context.Background(), "BTCUSDT").Return(nil)`
+- Line 465: **mock** → `retrieved, err := mockAPI.GetMarketData(context.Background(), "BTCUSDT")`
 
 ## ./internal\automation\scheduler\shared\testing.go
 - Line 13: **mock** → `"github.com/stretchr/testify/mock"`
@@ -137,81 +439,227 @@
 - Line 404: **mock** → `func (mmc *MockMetricsCollector) GetTimerValues(name string) []time.Duration {`
 - Line 544: **mock** → `func (ah *AssertionHelpers) AssertMetricsRecorded(collector *MockMetricsCollector, metricName string) {`
 
-## ./internal\operations\healing\self_healing_system.go
-- Line 2982: **TODO** → `// TODO: 基于历史数据计算平均时间`
-- Line 2990: **TODO** → `// TODO: 计算实际的正常运行时间百分比`
-- Line 3096: **TODO** → `// TODO: 实现从实际监控系统获取指标`
-- Line 3097: **TODO** → `// TODO 集成Prometheus、InfluxDB等监控系统`
-- Line 3101: **TODO** → `// TODO: 从监控系统获取API响应时间`
-- Line 3104: **TODO** → `// TODO: 从监控系统获取错误率`
-- Line 3107: **TODO** → `// TODO: 从监控系统获取连接成功率`
-- Line 3110: **TODO** → `// TODO: 从监控系统获取API超时率`
-- Line 3113: **TODO** → `// TODO: 从监控系统获取CPU使用率`
-- Line 3116: **TODO** → `// TODO: 从监控系统获取内存使用率`
-- Line 3119: **TODO** → `// TODO: 从监控系统获取磁盘使用率`
+## ./internal\cache\fallback_test.go
+- Line 11: **mock** → `// Create a mock Redis cache that will fail`
+- Line 12: **mock** → `mockRedis := &MockRedisCache{`
+- Line 22: **mock** → `cm := NewCacheManager(mockRedis, nil, config)`
+- Line 44: **mock** → `mockRedis.shouldFail = true`
+- Line 113: **mock** → `mockRedis := &MockRedisCache{`
+- Line 119: **mock** → `cm := NewCacheManager(mockRedis, nil, config)`
+- Line 180: **mock** → `// MockRedisCache is a mock implementation for testing`
+- Line 181: **mock** → `type MockRedisCache struct {`
+- Line 186: **mock** → `func (m *MockRedisCache) Get(ctx context.Context, key string, dest interface{}) error {`
+- Line 188: **mock** → `return fmt.Errorf("mock Redis failure")`
+- Line 210: **mock** → `func (m *MockRedisCache) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {`
+- Line 212: **mock** → `return fmt.Errorf("mock Redis failure")`
+- Line 219: **mock** → `func (m *MockRedisCache) Delete(ctx context.Context, key string) error {`
+- Line 221: **mock** → `return fmt.Errorf("mock Redis failure")`
+- Line 228: **mock** → `func (m *MockRedisCache) Exists(ctx context.Context, key string) (bool, error) {`
+- Line 230: **mock** → `return false, fmt.Errorf("mock Redis failure")`
+- Line 237: **mock** → `func (m *MockRedisCache) Close() error {`
+- Line 242: **mock** → `func (m *MockRedisCache) HGet(ctx context.Context, key, field string, dest interface{}) error {`
+- Line 246: **mock** → `func (m *MockRedisCache) HSet(ctx context.Context, key, field string, value interface{}) error {`
+- Line 250: **mock** → `func (m *MockRedisCache) HGetAll(ctx context.Context, key string) (map[string]string, error) {`
+- Line 254: **mock** → `func (m *MockRedisCache) HDel(ctx context.Context, key string, fields ...string) error {`
+- Line 258: **mock** → `func (m *MockRedisCache) LPush(ctx context.Context, key string, values ...interface{}) error {`
+- Line 262: **mock** → `func (m *MockRedisCache) RPush(ctx context.Context, key string, values ...interface{}) error {`
+- Line 266: **mock** → `func (m *MockRedisCache) LPop(ctx context.Context, key string, dest interface{}) error {`
+- Line 270: **mock** → `func (m *MockRedisCache) RPop(ctx context.Context, key string, dest interface{}) error {`
+- Line 274: **mock** → `func (m *MockRedisCache) LRange(ctx context.Context, key string, start, stop int64) ([]string, error) {`
+- Line 278: **mock** → `func (m *MockRedisCache) SAdd(ctx context.Context, key string, members ...interface{}) error {`
+- Line 282: **mock** → `func (m *MockRedisCache) SRem(ctx context.Context, key string, members ...interface{}) error {`
+- Line 286: **mock** → `func (m *MockRedisCache) SMembers(ctx context.Context, key string) ([]string, error) {`
+- Line 290: **mock** → `func (m *MockRedisCache) SIsMember(ctx context.Context, key string, member interface{}) (bool, error) {`
+- Line 294: **mock** → `func (m *MockRedisCache) ZAdd(ctx context.Context, key string, score float64, member interface{}) error {`
+- Line 298: **mock** → `func (m *MockRedisCache) ZRange(ctx context.Context, key string, start, stop int64) ([]string, error) {`
+- Line 302: **mock** → `func (m *MockRedisCache) ZRangeByScore(ctx context.Context, key string, min, max string) ([]string, error) {`
+- Line 306: **mock** → `func (m *MockRedisCache) ZRem(ctx context.Context, key string, members ...interface{}) error {`
+- Line 310: **mock** → `func (m *MockRedisCache) Expire(ctx context.Context, key string, expiration time.Duration) error {`
+- Line 314: **mock** → `func (m *MockRedisCache) TTL(ctx context.Context, key string) (time.Duration, error) {`
+- Line 318: **mock** → `func (m *MockRedisCache) Flush(ctx context.Context) error {`
+- Line 323: **mock** → `func (m *MockRedisCache) SetFundingRate(ctx context.Context, symbol string, rate interface{}, expiration time.Duration) error {`
+- Line 327: **mock** → `func (m *MockRedisCache) GetFundingRate(ctx context.Context, symbol string, dest interface{}) error {`
+- Line 331: **mock** → `func (m *MockRedisCache) SetIndexPrice(ctx context.Context, symbol string, price interface{}, expiration time.Duration) error {`
+- Line 335: **mock** → `func (m *MockRedisCache) GetIndexPrice(ctx context.Context, symbol string, dest interface{}) error {`
+- Line 339: **mock** → `func (m *MockRedisCache) CheckRateLimit(ctx context.Context, key string, limit int, window time.Duration) (bool, error) {`
+- Line 343: **mock** → `func (m *MockRedisCache) SetOrderBook(ctx context.Context, symbol string, snapshot interface{}, expiration time.Duration) error {`
+- Line 347: **mock** → `func (m *MockRedisCache) GetOrderBook(ctx context.Context, symbol string, dest interface{}) error {`
 
-## ./internal\security\protector\exchange_provider.go
-- Line 499: **mock** → `// MockExchangeProvider 模拟交易所数据提供者（用于测试）`
-- Line 500: **mock** → `type MockExchangeProvider struct {`
-- Line 506: **mock** → `// NewMockExchangeProvider 创建模拟交易所数据提供者`
-- Line 507: **mock** → `func NewMockExchangeProvider() *MockExchangeProvider {`
-- Line 508: **mock** → `return &MockExchangeProvider{`
-- Line 536: **mock** → `func (m *MockExchangeProvider) IsHealthy() bool {`
-- Line 541: **mock** → `func (m *MockExchangeProvider) GetFundData(ctx context.Context) (*ExchangeFundData, error) {`
-- Line 549: **mock** → `func (m *MockExchangeProvider) GetPositions(ctx context.Context) ([]*Position, error) {`
-- Line 557: **mock** → `func (m *MockExchangeProvider) GetHistoricalReturns(ctx context.Context, days int) ([]float64, error) {`
-- Line 572: **mock** → `func (m *MockExchangeProvider) GetHistoricalEquity(ctx context.Context, days int) ([]float64, error) {`
-- Line 590: **mock** → `func (m *MockExchangeProvider) GetSymbolPrice(ctx context.Context, symbol string) (float64, error) {`
-- Line 610: **mock** → `func (m *MockExchangeProvider) GetOrderBookDepth(ctx context.Context, symbol string) (*OrderBookDepth, error) {`
-- Line 635: **mock** → `func (m *MockExchangeProvider) GetTradingVolume(ctx context.Context, symbol string, period string) (float64, error) {`
-- Line 645: **mock** → `func (m *MockExchangeProvider) SetHealthy(healthy bool) {`
-- Line 650: **mock** → `func (m *MockExchangeProvider) SetFundData(data *ExchangeFundData) {`
-- Line 655: **mock** → `func (m *MockExchangeProvider) SetPositions(positions []*Position) {`
+## ./internal\exchange\binance\client_test.go
+- Line 113: **mock** → `// Create mock server`
+- Line 143: **mock** → `// Create mock server`
+- Line 188: **mock** → `// Create mock server`
+- Line 240: **mock** → `// Create mock server`
+- Line 293: **mock** → `// Create mock server that returns an error`
 
-## ./internal\security\protector\notification_service.go
-- Line 256: **mock** → `// MockNotificationService 模拟通知服务（用于测试）`
-- Line 257: **mock** → `type MockNotificationService struct {`
-- Line 294: **mock** → `// NewMockNotificationService 创建模拟通知服务`
-- Line 295: **mock** → `func NewMockNotificationService() *MockNotificationService {`
-- Line 296: **mock** → `return &MockNotificationService{`
-- Line 306: **mock** → `func (m *MockNotificationService) SendEmail(ctx context.Context, to, subject, body string) error {`
-- Line 308: **mock** → `return fmt.Errorf("mock email failure")`
-- Line 318: **mock** → `log.Printf("Mock email sent to %s: %s", to, subject)`
-- Line 323: **mock** → `func (m *MockNotificationService) SendSMS(ctx context.Context, phone, message string) error {`
-- Line 325: **mock** → `return fmt.Errorf("mock SMS failure")`
-- Line 334: **mock** → `log.Printf("Mock SMS sent to %s: %s", phone, message)`
-- Line 339: **mock** → `func (m *MockNotificationService) SendWebhook(ctx context.Context, url string, payload interface{}) error {`
-- Line 341: **mock** → `return fmt.Errorf("mock webhook failure")`
-- Line 350: **mock** → `log.Printf("Mock webhook sent to %s", url)`
-- Line 355: **mock** → `func (m *MockNotificationService) SendSlack(ctx context.Context, webhook, message string) error {`
-- Line 357: **mock** → `return fmt.Errorf("mock Slack failure")`
-- Line 366: **mock** → `log.Printf("Mock Slack message sent: %s", message)`
-- Line 371: **mock** → `func (m *MockNotificationService) SetShouldFail(shouldFail bool) {`
-- Line 376: **mock** → `func (m *MockNotificationService) GetEmailsSent() []EmailRecord {`
-- Line 381: **mock** → `func (m *MockNotificationService) GetSMSSent() []SMSRecord {`
-- Line 386: **mock** → `func (m *MockNotificationService) GetWebhooksSent() []WebhookRecord {`
-- Line 391: **mock** → `func (m *MockNotificationService) GetSlackSent() []SlackRecord {`
-- Line 396: **mock** → `func (m *MockNotificationService) Reset() {`
+## ./internal\exchange\pnl\executor.go
+- Line 311: **TODO** → `// TODO: Implement proper order cancellation logic`
 
-## ./internal\security\protector\wallet_service.go
-- Line 351: **mock** → `// MockWalletService 模拟钱包服务（用于测试）`
-- Line 352: **mock** → `type MockWalletService struct {`
-- Line 358: **mock** → `// NewMockWalletService 创建模拟钱包服务`
-- Line 359: **mock** → `func NewMockWalletService() *MockWalletService {`
-- Line 360: **mock** → `return &MockWalletService{`
-- Line 368: **mock** → `func (m *MockWalletService) InitiateTransfer(ctx context.Context, request *TransferRequest) (*TransferResponse, error) {`
-- Line 370: **mock** → `return nil, fmt.Errorf("mock transfer failure")`
-- Line 377: **mock** → `return nil, fmt.Errorf("random mock transfer failure")`
-- Line 381: **mock** → `transferID := fmt.Sprintf("MOCK_TXF_%d", time.Now().Unix())`
-- Line 405: **mock** → `log.Printf("Mock transfer initiated: %s", transferID)`
-- Line 410: **mock** → `func (m *MockWalletService) GetTransferStatus(ctx context.Context, transferID string) (*TransferStatus, error) {`
-- Line 419: **mock** → `func (m *MockWalletService) CancelTransfer(ctx context.Context, transferID string) error {`
-- Line 429: **mock** → `func (m *MockWalletService) GetTransferHistory(ctx context.Context, limit int) ([]*TransferRecord, error) {`
-- Line 445: **mock** → `func (m *MockWalletService) ValidateAddress(address string) error {`
-- Line 453: **mock** → `func (m *MockWalletService) EstimateTransferFee(ctx context.Context, amount float64, toAddress string) (float64, error) {`
-- Line 458: **mock** → `func (m *MockWalletService) SetShouldFail(shouldFail bool) {`
-- Line 463: **mock** → `func (m *MockWalletService) SetFailureRate(rate float64) {`
-- Line 468: **mock** → `func (m *MockWalletService) GetTransfers() map[string]*TransferStatus {`
+## ./internal\exchange\pnl\service.go
+- Line 252: **TODO** → `// TODO: Implement GetAccountBalances method in exchange interface`
+- Line 261: **TODO** → `// TODO: Fix UpdateBalance method signature`
+- Line 499: **TODO** → `"calculator_status": "active", // TODO: Implement GetCurrentStatus method`
+
+## ./internal\orchestrator\scheduler_test.go
+- Line 47: **mock** → `// Create mock handler`
+- Line 48: **mock** → `mockHandler := &MockTaskHandler{`
+- Line 53: **mock** → `scheduler.RegisterHandler(TaskTypeMarketHealth, mockHandler)`
+- Line 61: **mock** → `assert.Equal(t, mockHandler, handler)`
+- Line 70: **mock** → `mockHandler := &MockTaskHandler{`
+- Line 73: **mock** → `scheduler.RegisterHandler(TaskTypeMarketHealth, mockHandler)`
+- Line 208: **mock** → `// Create mock handler`
+- Line 209: **mock** → `mockHandler := &MockTaskHandler{`
+- Line 212: **mock** → `scheduler.RegisterHandler(TaskTypeMarketHealth, mockHandler)`
+- Line 238: **mock** → `assert.True(t, mockHandler.executeCalled)`
+- Line 239: **mock** → `assert.Equal(t, task, mockHandler.lastTask)`
+- Line 300: **mock** → `// MockTaskHandler implements TaskHandler interface for testing`
+- Line 301: **mock** → `type MockTaskHandler struct {`
+- Line 309: **mock** → `func (m *MockTaskHandler) Execute(ctx context.Context, task *Task) error {`
+- Line 318: **mock** → `func (m *MockTaskHandler) GetName() string {`
+- Line 322: **mock** → `func (m *MockTaskHandler) Reset() {`
+
+## ./internal\security\protector\exchange_provider_test.go
+- Line 10: **mock** → `// MockExchangeProvider 模拟交易所数据提供者（用于测试）`
+- Line 11: **mock** → `type MockExchangeProvider struct {`
+- Line 17: **mock** → `// NewMockExchangeProvider 创建模拟交易所数据提供者`
+- Line 18: **mock** → `func NewMockExchangeProvider() *MockExchangeProvider {`
+- Line 19: **mock** → `return &MockExchangeProvider{`
+- Line 47: **mock** → `func (m *MockExchangeProvider) IsHealthy() bool {`
+- Line 52: **mock** → `func (m *MockExchangeProvider) GetFundData(ctx context.Context) (*ExchangeFundData, error) {`
+- Line 60: **mock** → `func (m *MockExchangeProvider) GetPositions(ctx context.Context) ([]*Position, error) {`
+- Line 68: **mock** → `func (m *MockExchangeProvider) GetHistoricalReturns(ctx context.Context, days int) ([]float64, error) {`
+- Line 83: **mock** → `func (m *MockExchangeProvider) GetHistoricalEquity(ctx context.Context, days int) ([]float64, error) {`
+- Line 101: **mock** → `func (m *MockExchangeProvider) GetSymbolPrice(ctx context.Context, symbol string) (float64, error) {`
+- Line 121: **mock** → `func (m *MockExchangeProvider) GetOrderBookDepth(ctx context.Context, symbol string) (*OrderBookDepth, error) {`
+- Line 146: **mock** → `func (m *MockExchangeProvider) GetTradingVolume(ctx context.Context, symbol string, period string) (float64, error) {`
+- Line 156: **mock** → `func (m *MockExchangeProvider) SetHealthy(healthy bool) {`
+- Line 161: **mock** → `func (m *MockExchangeProvider) SetFundData(data *ExchangeFundData) {`
+- Line 166: **mock** → `func (m *MockExchangeProvider) SetPositions(positions []*Position) {`
+- Line 170: **mock** → `// TestMockExchangeProvider 测试mock交易所提供者`
+- Line 171: **mock** → `func TestMockExchangeProvider(t *testing.T) {`
+- Line 173: **mock** → `mock := NewMockExchangeProvider()`
+- Line 176: **mock** → `if !mock.IsHealthy() {`
+- Line 177: **mock** → `t.Error("Expected mock to be healthy")`
+- Line 181: **mock** → `fundData, err := mock.GetFundData(ctx)`
+- Line 190: **mock** → `positions, err := mock.GetPositions(ctx)`
+- Line 199: **mock** → `mock.SetHealthy(false)`
+- Line 200: **mock** → `_, err = mock.GetFundData(ctx)`
+
+## ./internal\security\protector\fund_protector_test.go
+- Line 22: **mock** → `exchangeProvider := NewMockExchangeProvider()`
+- Line 23: **mock** → `mockNotificationService := NewMockNotificationService()`
+- Line 24: **mock** → `mockWalletService := NewMockWalletService()`
+- Line 25: **mock** → `var mockExchange exchange.Exchange`
+- Line 26: **mock** → `var mockDAOManager dao.DAOManager`
+- Line 28: **mock** → `fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, mockNotificationService, mockWalletService)`
+- Line 48: **mock** → `provider := NewMockExchangeProvider()`
+- Line 52: **mock** → `t.Error("Mock provider should be healthy")`
+- Line 93: **mock** → `service := NewMockNotificationService()`
+- Line 140: **mock** → `service := NewMockWalletService()`
+- Line 202: **mock** → `exchangeProvider := NewMockExchangeProvider()`
+- Line 203: **mock** → `notificationService := NewMockNotificationService()`
+- Line 204: **mock** → `walletService := NewMockWalletService()`
+- Line 205: **mock** → `var mockExchange exchange.Exchange`
+- Line 206: **mock** → `var mockDAOManager dao.DAOManager`
+- Line 208: **mock** → `fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)`
+- Line 249: **mock** → `exchangeProvider := NewMockExchangeProvider()`
+- Line 250: **mock** → `notificationService := NewMockNotificationService()`
+- Line 251: **mock** → `walletService := NewMockWalletService()`
+- Line 252: **mock** → `var mockExchange exchange.Exchange`
+- Line 253: **mock** → `var mockDAOManager dao.DAOManager`
+- Line 255: **mock** → `fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)`
+- Line 312: **mock** → `exchangeProvider := NewMockExchangeProvider()`
+- Line 313: **mock** → `notificationService := NewMockNotificationService()`
+- Line 314: **mock** → `walletService := NewMockWalletService()`
+- Line 315: **mock** → `var mockExchange exchange.Exchange`
+- Line 316: **mock** → `var mockDAOManager dao.DAOManager`
+- Line 318: **mock** → `fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)`
+- Line 354: **mock** → `exchangeProvider := NewMockExchangeProvider()`
+- Line 355: **mock** → `notificationService := NewMockNotificationService()`
+- Line 356: **mock** → `walletService := NewMockWalletService()`
+- Line 357: **mock** → `var mockExchange exchange.Exchange`
+- Line 358: **mock** → `var mockDAOManager dao.DAOManager`
+- Line 360: **mock** → `fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)`
+- Line 396: **mock** → `exchangeProvider := NewMockExchangeProvider()`
+- Line 397: **mock** → `notificationService := NewMockNotificationService()`
+- Line 398: **mock** → `walletService := NewMockWalletService()`
+- Line 399: **mock** → `var mockExchange exchange.Exchange`
+- Line 400: **mock** → `var mockDAOManager dao.DAOManager`
+- Line 402: **mock** → `fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)`
+- Line 441: **mock** → `exchangeProvider := NewMockExchangeProvider()`
+- Line 442: **mock** → `notificationService := NewMockNotificationService()`
+- Line 443: **mock** → `walletService := NewMockWalletService()`
+- Line 444: **mock** → `var mockExchange exchange.Exchange`
+- Line 445: **mock** → `var mockDAOManager dao.DAOManager`
+- Line 447: **mock** → `fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)`
+
+## ./internal\security\protector\notification_service_test.go
+- Line 11: **mock** → `// MockNotificationService 模拟通知服务（用于测试）`
+- Line 12: **mock** → `type MockNotificationService struct {`
+- Line 49: **mock** → `// NewMockNotificationService 创建模拟通知服务`
+- Line 50: **mock** → `func NewMockNotificationService() *MockNotificationService {`
+- Line 51: **mock** → `return &MockNotificationService{`
+- Line 61: **mock** → `func (m *MockNotificationService) SendEmail(ctx context.Context, to, subject, body string) error {`
+- Line 63: **mock** → `return fmt.Errorf("mock email failure")`
+- Line 73: **mock** → `log.Printf("Mock email sent to %s: %s", to, subject)`
+- Line 78: **mock** → `func (m *MockNotificationService) SendSMS(ctx context.Context, phone, message string) error {`
+- Line 80: **mock** → `return fmt.Errorf("mock SMS failure")`
+- Line 89: **mock** → `log.Printf("Mock SMS sent to %s: %s", phone, message)`
+- Line 94: **mock** → `func (m *MockNotificationService) SendWebhook(ctx context.Context, url string, payload interface{}) error {`
+- Line 96: **mock** → `return fmt.Errorf("mock webhook failure")`
+- Line 105: **mock** → `log.Printf("Mock webhook sent to %s", url)`
+- Line 110: **mock** → `func (m *MockNotificationService) SendSlack(ctx context.Context, webhook, message string) error {`
+- Line 112: **mock** → `return fmt.Errorf("mock Slack failure")`
+- Line 121: **mock** → `log.Printf("Mock Slack message sent: %s", message)`
+- Line 126: **mock** → `func (m *MockNotificationService) SetShouldFail(shouldFail bool) {`
+- Line 131: **mock** → `func (m *MockNotificationService) GetEmailsSent() []EmailRecord {`
+- Line 136: **mock** → `func (m *MockNotificationService) GetSMSSent() []SMSRecord {`
+- Line 141: **mock** → `func (m *MockNotificationService) GetWebhooksSent() []WebhookRecord {`
+- Line 146: **mock** → `func (m *MockNotificationService) GetSlackSent() []SlackRecord {`
+- Line 151: **mock** → `func (m *MockNotificationService) Reset() {`
+- Line 158: **mock** → `// TestMockNotificationService 测试mock通知服务`
+- Line 159: **mock** → `func TestMockNotificationService(t *testing.T) {`
+- Line 161: **mock** → `mock := NewMockNotificationService()`
+- Line 164: **mock** → `err := mock.SendEmail(ctx, "test@example.com", "Test Subject", "Test Body")`
+- Line 169: **mock** → `emails := mock.GetEmailsSent()`
+- Line 178: **mock** → `err = mock.SendSMS(ctx, "1234567890", "Test SMS")`
+- Line 183: **mock** → `sms := mock.GetSMSSent()`
+- Line 189: **mock** → `mock.SetShouldFail(true)`
+- Line 190: **mock** → `err = mock.SendEmail(ctx, "test@example.com", "Test", "Test")`
+- Line 196: **mock** → `mock.Reset()`
+- Line 197: **mock** → `emails = mock.GetEmailsSent()`
+
+## ./internal\security\protector\wallet_service_test.go
+- Line 13: **mock** → `// MockWalletService 模拟钱包服务（用于测试）`
+- Line 14: **mock** → `type MockWalletService struct {`
+- Line 20: **mock** → `// NewMockWalletService 创建模拟钱包服务`
+- Line 21: **mock** → `func NewMockWalletService() *MockWalletService {`
+- Line 22: **mock** → `return &MockWalletService{`
+- Line 30: **mock** → `func (m *MockWalletService) InitiateTransfer(ctx context.Context, request *TransferRequest) (*TransferResponse, error) {`
+- Line 32: **mock** → `return nil, fmt.Errorf("mock transfer failure")`
+- Line 39: **mock** → `return nil, fmt.Errorf("random mock transfer failure")`
+- Line 43: **mock** → `transferID := fmt.Sprintf("MOCK_TXF_%d", time.Now().Unix())`
+- Line 67: **mock** → `log.Printf("Mock transfer initiated: %s", transferID)`
+- Line 72: **mock** → `func (m *MockWalletService) GetTransferStatus(ctx context.Context, transferID string) (*TransferStatus, error) {`
+- Line 81: **mock** → `func (m *MockWalletService) CancelTransfer(ctx context.Context, transferID string) error {`
+- Line 91: **mock** → `func (m *MockWalletService) GetTransferHistory(ctx context.Context, limit int) ([]*TransferRecord, error) {`
+- Line 107: **mock** → `func (m *MockWalletService) ValidateAddress(address string) error {`
+- Line 115: **mock** → `func (m *MockWalletService) EstimateTransferFee(ctx context.Context, amount float64, toAddress string) (float64, error) {`
+- Line 120: **mock** → `func (m *MockWalletService) SetShouldFail(shouldFail bool) {`
+- Line 125: **mock** → `func (m *MockWalletService) SetFailureRate(rate float64) {`
+- Line 130: **mock** → `func (m *MockWalletService) GetTransfers() map[string]*TransferStatus {`
+- Line 134: **mock** → `// TestMockWalletService 测试mock钱包服务`
+- Line 135: **mock** → `func TestMockWalletService(t *testing.T) {`
+- Line 137: **mock** → `mock := NewMockWalletService()`
+- Line 149: **mock** → `response, err := mock.InitiateTransfer(ctx, request)`
+- Line 158: **mock** → `status, err := mock.GetTransferStatus(ctx, response.TransferID)`
+- Line 167: **mock** → `err = mock.CancelTransfer(ctx, response.TransferID)`
+- Line 173: **mock** → `status, _ = mock.GetTransferStatus(ctx, response.TransferID)`
+- Line 179: **mock** → `mock.SetShouldFail(true)`
+- Line 180: **mock** → `_, err = mock.InitiateTransfer(ctx, request)`
+- Line 186: **mock** → `mock.SetShouldFail(false)`
+- Line 187: **mock** → `err = mock.ValidateAddress("short")`
+- Line 192: **mock** → `err = mock.ValidateAddress("0x1234567890abcdef")`
 
 ## ./internal\strategy\unified_service.go
 - Line 365: **mock** → `// 如果没有数据库连接，返回空结果而不是 mock 数据`
@@ -224,29 +672,8 @@
 - Line 248: **mock** → `// 删除了 getMockStrategies 方法，不再使用 mock 数据`
 - Line 250: **mock** → `// 删除了所有 mock 方法，不再使用 mock 数据`
 
-## ./internal\strategy\generator\analyzer.go
-- Line 390: **mock** → `// generateMockPriceData 生成模拟价格数据`
-- Line 391: **mock** → `func (ma *MarketAnalyzer) generateMockPriceData(symbol string, timeRange time.Duration, startTime, endTime time.Time) []PricePoint {`
-
 ## ./internal\strategy\generator\analyzer_test.go
-- Line 69: **mock** → `func TestMarketAnalyzer_GenerateMockPriceData(t *testing.T) {`
-- Line 77: **mock** → `priceData := analyzer.generateMockPriceData(symbol, timeRange, startTime, endTime)`
-
-## ./internal\strategy\optimizer\optimizer_test.go
-- Line 16: **mock** → `mockData := testutils.NewMockData()`
-- Line 51: **mock** → `historicalData := generateMockHistoricalData(1000)`
-- Line 117: **mock** → `Returns:        generateMockReturns(150),`
-- Line 225: **mock** → `historicalData := generateMockHistoricalData(500)`
-- Line 240: **mock** → `func generateMockHistoricalData(count int) []MarketData {`
-- Line 241: **mock** → `mockData := testutils.NewMockData()`
-- Line 247: **mock** → `change := mockData.RandomFloat(-0.05, 0.05)`
-- Line 252: **mock** → `Open:      basePrice * (1 + mockData.RandomFloat(-0.01, 0.01)),`
-- Line 253: **mock** → `High:      basePrice * (1 + mockData.RandomFloat(0, 0.02)),`
-- Line 254: **mock** → `Low:       basePrice * (1 + mockData.RandomFloat(-0.02, 0)),`
-- Line 256: **mock** → `Volume:    mockData.RandomFloat(100, 1000),`
-- Line 263: **mock** → `func generateMockReturns(count int) []float64 {`
-- Line 264: **mock** → `mockData := testutils.NewMockData()`
-- Line 269: **mock** → `returns[i] = mockData.RandomFloat(-0.05, 0.05)`
+- Line 69: **mock** → `// TestMarketAnalyzer_GenerateMockPriceData 测试已删除，因为不再使用mock数据生成`
 
 ## ./internal\strategy\optimizer\orchestrator_test.go
 - Line 143: **mock** → `// Create a mock orchestrator without database connection`
@@ -258,36 +685,74 @@
 - Line 465: **mock** → `func (s *AutomatedSandboxService) createMockExchange(config *TestConfiguration) exchange.Exchange {`
 
 ## ./internal\testutils\testutils.go
-- Line 98: **mock** → `suite.setupMockDB()`
-- Line 105: **mock** → `suite.setupMockCache()`
-- Line 131: **mock** → `s.setupMockDB()`
-- Line 138: **mock** → `s.setupMockDB()`
-- Line 146: **mock** → `s.setupMockDB()`
-- Line 158: **mock** → `// setupMockDB 设置模拟数据库`
-- Line 159: **mock** → `func (s *TestSuite) setupMockDB() {`
-- Line 201: **mock** → `s.setupMockCache()`
-- Line 209: **mock** → `s.setupMockCache()`
-- Line 221: **mock** → `// setupMockCache 设置模拟缓存`
-- Line 222: **mock** → `func (s *TestSuite) setupMockCache() {`
-- Line 349: **mock** → `// MockData 模拟数据生成器`
-- Line 350: **mock** → `type MockData struct {`
-- Line 354: **mock** → `// NewMockData 创建模拟数据生成器`
-- Line 355: **mock** → `func NewMockData() *MockData {`
-- Line 356: **mock** → `return &MockData{`
-- Line 362: **mock** → `func (m *MockData) RandomString(length int) string {`
-- Line 372: **mock** → `func (m *MockData) RandomInt(min, max int) int {`
-- Line 377: **mock** → `func (m *MockData) RandomFloat(min, max float64) float64 {`
-- Line 382: **mock** → `func (m *MockData) RandomBool() bool {`
-- Line 387: **mock** → `func (m *MockData) RandomChoice(choices []string) string {`
-- Line 392: **mock** → `func (m *MockData) GenerateStrategy() map[string]interface{} {`
-- Line 419: **mock** → `func (m *MockData) GenerateOrder() map[string]interface{} {`
+- Line 100: **mock** → `suite.setupMockDB()`
+- Line 107: **mock** → `suite.setupMockCache()`
+- Line 133: **mock** → `s.setupMockDB()`
+- Line 140: **mock** → `s.setupMockDB()`
+- Line 148: **mock** → `s.setupMockDB()`
+- Line 160: **mock** → `// setupMockDB 设置模拟数据库`
+- Line 161: **mock** → `func (s *TestSuite) setupMockDB() {`
+- Line 203: **mock** → `s.setupMockCache()`
+- Line 211: **mock** → `s.setupMockCache()`
+- Line 223: **mock** → `// setupMockCache 设置模拟缓存`
+- Line 224: **mock** → `func (s *TestSuite) setupMockCache() {`
+- Line 351: **mock** → `// MockData 模拟数据生成器`
+- Line 352: **mock** → `type MockData struct {`
+- Line 356: **mock** → `// NewMockData 创建模拟数据生成器`
+- Line 357: **mock** → `func NewMockData() *MockData {`
+- Line 358: **mock** → `return &MockData{`
+- Line 364: **mock** → `func (m *MockData) RandomString(length int) string {`
+- Line 374: **mock** → `func (m *MockData) RandomInt(min, max int) int {`
+- Line 379: **mock** → `func (m *MockData) RandomFloat(min, max float64) float64 {`
+- Line 384: **mock** → `func (m *MockData) RandomBool() bool {`
+- Line 389: **mock** → `func (m *MockData) RandomChoice(choices []string) string {`
+- Line 394: **mock** → `func (m *MockData) GenerateStrategy() map[string]interface{} {`
+- Line 421: **mock** → `func (m *MockData) GenerateOrder() map[string]interface{} {`
+
+## ./internal\trading\dryrun\simulator_test.go
+- Line 11: **mock** → `// MockMarketDataProvider 模拟市场数据提供者`
+- Line 12: **mock** → `type MockMarketDataProvider struct{}`
+- Line 14: **mock** → `func (m *MockMarketDataProvider) GetPrice(symbol string) (float64, error) {`
+- Line 61: **mock** → `mockProvider := &MockMarketDataProvider{}`
+- Line 63: **mock** → `simulator, err := NewTradingSimulator(config, mockProvider)`
+- Line 117: **mock** → `mockProvider := &MockMarketDataProvider{}`
+- Line 119: **mock** → `simulator, err := NewTradingSimulator(config, mockProvider)`
+- Line 154: **mock** → `mockProvider := &MockMarketDataProvider{}`
+- Line 156: **mock** → `simulator, err := NewTradingSimulator(config, mockProvider)`
+- Line 225: **mock** → `mockProvider := &MockMarketDataProvider{}`
+- Line 227: **mock** → `simulator, err := NewTradingSimulator(config, mockProvider)`
+- Line 288: **mock** → `mockProvider := &MockMarketDataProvider{}`
+- Line 290: **mock** → `simulator, err := NewTradingSimulator(config, mockProvider)`
+- Line 322: **mock** → `mockProvider := &MockMarketDataProvider{}`
+- Line 324: **mock** → `simulator, err := NewTradingSimulator(config, mockProvider)`
 
 ## ./internal\workflow\executors.go
-- Line 27: **mock** → `// MockExecutor 模拟执行器（用于测试）`
-- Line 28: **mock** → `type MockExecutor struct {`
-- Line 34: **mock** → `// NewMockExecutor 创建模拟执行器`
-- Line 35: **mock** → `func NewMockExecutor(name string, executionTime time.Duration, simulateFailure bool) *MockExecutor {`
-- Line 36: **mock** → `return &MockExecutor{`
-- Line 51: **mock** → `func (me *MockExecutor) Execute(ctx context.Context, params map[string]interface{}) (interface{}, error) {`
-- Line 355: **mock** → `executors[id] = NewMockExecutor(name, execTime, false)`
+- Line 1161: **mock** → `rawData = dce.generateMockMarketData(timeRange)`
+- Line 1163: **mock** → `rawData = dce.generateMockTradingData(timeRange)`
+- Line 1165: **mock** → `rawData = dce.generateMockAccountData(timeRange)`
+- Line 1173: **mock** → `// generateMockMarketData 生成模拟市场数据`
+- Line 1174: **mock** → `func (dce *DataCleaningExecutor) generateMockMarketData(timeRange map[string]time.Time) []map[string]interface{} {`
+- Line 1213: **mock** → `// generateMockTradingData 生成模拟交易数据`
+- Line 1214: **mock** → `func (dce *DataCleaningExecutor) generateMockTradingData(timeRange map[string]time.Time) []map[string]interface{} {`
+- Line 1237: **mock** → `// generateMockAccountData 生成模拟账户数据`
+- Line 1238: **mock** → `func (dce *DataCleaningExecutor) generateMockAccountData(timeRange map[string]time.Time) []map[string]interface{} {`
+
+## ./internal\workflow\executors_test.go
+- Line 11: **mock** → `// MockExecutor 模拟执行器（用于测试）`
+- Line 12: **mock** → `type MockExecutor struct {`
+- Line 18: **mock** → `// NewMockExecutor 创建模拟执行器`
+- Line 19: **mock** → `func NewMockExecutor(name string, executionTime time.Duration, simulateFailure bool) *MockExecutor {`
+- Line 20: **mock** → `return &MockExecutor{`
+- Line 35: **mock** → `func (me *MockExecutor) Execute(ctx context.Context, params map[string]interface{}) (interface{}, error) {`
+- Line 77: **mock** → `// TestMockExecutor 测试mock执行器`
+- Line 78: **mock** → `func TestMockExecutor(t *testing.T) {`
+- Line 81: **mock** → `// 创建mock执行器`
+- Line 82: **mock** → `executor := NewMockExecutor("测试执行器", 100*time.Millisecond, false)`
+- Line 111: **mock** → `failureExecutor := NewMockExecutor("失败执行器", 50*time.Millisecond, true)`
+- Line 132: **mock** → `// TestMockExecutorResourceRequirements 测试资源需求`
+- Line 133: **mock** → `func TestMockExecutorResourceRequirements(t *testing.T) {`
+- Line 134: **mock** → `executor := NewMockExecutor("资源测试", time.Second, false)`
+- Line 150: **mock** → `// TestMockExecutorName 测试执行器名称`
+- Line 151: **mock** → `func TestMockExecutorName(t *testing.T) {`
+- Line 153: **mock** → `executor := NewMockExecutor(name, time.Second, false)`
 
