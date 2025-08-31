@@ -4,21 +4,30 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"qcat/internal/emergency"
+
+	"github.com/gin-gonic/gin"
 )
 
 // EmergencyHandler 紧急停止处理器
 type EmergencyHandler struct {
-	db          *sql.DB
+	db           *sql.DB
 	emergencyMgr *emergency.EmergencyStopManager
 }
 
 // NewEmergencyHandler 创建紧急停止处理器
 func NewEmergencyHandler(db *sql.DB) *EmergencyHandler {
+	var emergencyMgr *emergency.EmergencyStopManager
+	if db != nil {
+		emergencyMgr = emergency.NewEmergencyStopManager(db)
+	} else {
+		// 当数据库不可用时，创建一个基本的紧急停止管理器
+		emergencyMgr = emergency.NewEmergencyStopManagerWithoutDB()
+	}
+
 	return &EmergencyHandler{
-		db:          db,
-		emergencyMgr: emergency.NewEmergencyStopManager(db),
+		db:           db,
+		emergencyMgr: emergencyMgr,
 	}
 }
 

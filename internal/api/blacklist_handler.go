@@ -18,9 +18,17 @@ type BlacklistHandler struct {
 
 // NewBlacklistHandler 创建黑名单处理器
 func NewBlacklistHandler(db *sql.DB) *BlacklistHandler {
+	var gatekeeper *validation.StrategyGatekeeper
+	if db != nil {
+		gatekeeper = validation.NewStrategyGatekeeperWithDB(db)
+	} else {
+		// 当数据库不可用时，创建不依赖数据库的守门员
+		gatekeeper = validation.NewStrategyGatekeeper()
+	}
+
 	return &BlacklistHandler{
 		db:         db,
-		gatekeeper: validation.NewStrategyGatekeeperWithDB(db),
+		gatekeeper: gatekeeper,
 	}
 }
 
@@ -184,6 +192,22 @@ func (h *BlacklistHandler) CheckBlacklist(c *gin.Context) {
 
 	ctx := c.Request.Context()
 
+	// 如果数据库不可用，使用内存中的黑名单检查
+	if h.db == nil {
+		// 使用守门员的内存黑名单检查
+		isBlacklisted := h.gatekeeper.IsBlacklisted(strategyID)
+		c.JSON(http.StatusOK, Response{
+			Success: true,
+			Data: map[string]interface{}{
+				"strategy_id":    strategyID,
+				"is_blacklisted": isBlacklisted,
+				"source":         "memory",
+				"message":        "Database unavailable, using memory cache",
+			},
+		})
+		return
+	}
+
 	query := `
 		SELECT id, strategy_id, reason, blocked_at, blocked_by, permanent, expires_at
 		FROM strategy_blacklist
@@ -235,6 +259,15 @@ func (h *BlacklistHandler) CheckBlacklist(c *gin.Context) {
 // ClearExpiredEntries 清理过期的黑名单条目
 func (h *BlacklistHandler) ClearExpiredEntries(c *gin.Context) {
 	ctx := c.Request.Context()
+
+	// 如果数据库不可用，返回适当的响应
+	if h.db == nil {
+		c.JSON(http.StatusServiceUnavailable, Response{
+			Success: false,
+			Error:   "Database unavailable, cannot clear expired entries",
+		})
+		return
+	}
 
 	query := `
 		DELETE FROM strategy_blacklist

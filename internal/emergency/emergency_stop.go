@@ -37,6 +37,15 @@ func NewEmergencyStopManager(db *sql.DB) *EmergencyStopManager {
 	}
 }
 
+// NewEmergencyStopManagerWithoutDB 创建不依赖数据库的紧急停止管理器
+func NewEmergencyStopManagerWithoutDB() *EmergencyStopManager {
+	return &EmergencyStopManager{
+		db:             nil,
+		gatekeeper:     validation.NewStrategyGatekeeper(), // 使用不依赖数据库的守门员
+		processManager: stability.NewProcessManager(),
+	}
+}
+
 // NewEmergencyStopManagerWithDeps 创建带依赖的紧急停止管理器
 func NewEmergencyStopManagerWithDeps(db *sql.DB, processManager *stability.ProcessManager,
 	orchestrator *orchestrator.Orchestrator, orderManager *order.Manager, exchange exchange.Exchange) *EmergencyStopManager {

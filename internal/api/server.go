@@ -489,6 +489,25 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	}
 
 	// Initialize handlers with dependencies
+	// Handle database-dependent handlers safely
+	var blacklistHandler *BlacklistHandler
+	var emergencyHandler *EmergencyHandler
+	var workflowHandler *WorkflowHandler
+	var concurrentHandler *ConcurrentHandler
+
+	if db != nil {
+		blacklistHandler = NewBlacklistHandler(db.DB)
+		emergencyHandler = NewEmergencyHandler(db.DB)
+		workflowHandler = NewWorkflowHandler(db.DB)
+		concurrentHandler = NewConcurrentHandler(db.DB)
+	} else {
+		// Create handlers with nil database - they should handle this gracefully
+		blacklistHandler = NewBlacklistHandler(nil)
+		emergencyHandler = NewEmergencyHandler(nil)
+		workflowHandler = NewWorkflowHandler(nil)
+		concurrentHandler = NewConcurrentHandler(nil)
+	}
+
 	server.handlers = &Handlers{
 		Optimizer:          NewOptimizerHandler(db, redis, metricsCollector),
 		Strategy:           NewStrategyHandler(db, redis, metricsCollector),
@@ -507,10 +526,10 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		Trading:            NewTradingHandler(db, metricsCollector),
 		Automation:         NewAutomationHandler(db, metricsCollector, automationSystem),
 		StrategyValidation: NewStrategyValidationHandler(),
-		Blacklist:          NewBlacklistHandler(db.DB),
-		Emergency:          NewEmergencyHandler(db.DB),
-		Workflow:           NewWorkflowHandler(db.DB),
-		Concurrent:         NewConcurrentHandler(db.DB),
+		Blacklist:          blacklistHandler,
+		Emergency:          emergencyHandler,
+		Workflow:           workflowHandler,
+		Concurrent:         concurrentHandler,
 		ResultSharing:      NewResultSharingHandler(db, redis, metricsCollector),
 		Settings:           NewSettingsHandler(),
 	}

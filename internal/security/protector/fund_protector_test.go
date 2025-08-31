@@ -247,12 +247,12 @@ func TestEmergencyProtocol(t *testing.T) {
 	}
 
 	exchangeProvider := NewMockExchangeProvider()
-	mockNotificationService := NewMockNotificationService()
+	notificationService := NewMockNotificationService()
 	walletService := NewMockWalletService()
 	var mockExchange exchange.Exchange
 	var mockDAOManager dao.DAOManager
 
-	fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, mockNotificationService, walletService)
+	fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
 	if err != nil {
 		t.Fatalf("Failed to create fund protector: %v", err)
 	}
@@ -289,12 +289,12 @@ func TestEmergencyProtocol(t *testing.T) {
 	}
 
 	// 验证通知被发送
-	emails := mockNotificationService.GetEmailsSent()
+	emails := notificationService.GetEmailsSent()
 	if len(emails) == 0 {
 		t.Error("Expected emergency email to be sent")
 	}
 
-	sms := mockNotificationService.GetSMSSent()
+	sms := notificationService.GetSMSSent()
 	if len(sms) == 0 {
 		t.Error("Expected emergency SMS to be sent")
 	}
