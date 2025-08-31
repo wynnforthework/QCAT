@@ -17,10 +17,10 @@ import (
 // IntelligenceController 智能化控制器 - 统一管理所有智能化模块
 type IntelligenceController struct {
 	config               *config.Config
-	dynamicOptimizer     *position.DynamicOptimizer
+	dynamicOptimizer     *position.DynamicPositionOptimizer
 	marketRegimeDetector *position.MarketRegimeDetector
-	smartExecutor        *trading.SmartExecutor
-	profitMaximizer      *optimization.ProfitMaximizer
+	smartExecutor        *trading.SmartTradingExecutor
+	profitMaximizer      *optimization.ProfitMaximizationEngine
 
 	// 运行状态
 	ctx       context.Context
@@ -126,25 +126,28 @@ func NewIntelligenceController(cfg *config.Config) (*IntelligenceController, err
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// 初始化各个智能化模块
-	dynamicOptimizer, err := position.NewDynamicOptimizer(cfg)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("failed to create dynamic optimizer: %w", err)
+	// 初始化动态优化器
+	optimizerConfig := &position.OptimizerConfig{
+		MaxPosition:          0.2,
+		MinPosition:          0.01,
+		TargetVolatility:     0.15,
+		RiskBudgetLimit:      0.1,
+		OptimizationInterval: "15m",
+		KellyMultiplier:      0.25,
+		VolatilityLookback:   20,
+		ConfidenceLevel:      0.95,
 	}
+	dynamicOptimizer := position.NewDynamicPositionOptimizer(optimizerConfig)
 
-	marketRegimeDetector, err := position.NewMarketRegimeDetector(cfg)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("failed to create market regime detector: %w", err)
-	}
+	// 初始化市场状态检测器
+	marketRegimeDetector := position.NewMarketRegimeDetector()
 
-	smartExecutor, err := trading.NewSmartExecutor(cfg)
-	if err != nil {
-		cancel()
-		return nil, fmt.Errorf("failed to create smart executor: %w", err)
-	}
+	// 初始化智能执行器 - 需要 exchange 和 config
+	var smartExecutor *trading.SmartTradingExecutor = nil
 
-	profitMaximizer, err := optimization.NewProfitMaximizer(cfg)
+	// 初始化利润最大化器 - 需要实现构造函数
+	var profitMaximizer *optimization.ProfitMaximizationEngine = nil
+	var err error
 	if err != nil {
 		cancel()
 		return nil, fmt.Errorf("failed to create profit maximizer: %w", err)

@@ -11,8 +11,8 @@ import (
 	"qcat/internal/exchange"
 	"qcat/internal/intelligence/position"
 	"qcat/internal/intelligence/trading"
-	"qcat/internal/market"
 	"qcat/internal/strategy"
+	"qcat/internal/types"
 )
 
 // ProfitMaximizationEngine 全局利润最大化决策引擎
@@ -218,8 +218,8 @@ func NewProfitMaximizationEngine(
 
 // MaximizeProfit 执行全局利润最大化
 func (pme *ProfitMaximizationEngine) MaximizeProfit(ctx context.Context,
-	portfolio *exchange.Portfolio,
-	marketData map[string]*market.MarketData,
+	positions []*exchange.Position,
+	marketData map[string]*types.Kline,
 	strategies []*strategy.Strategy) (*OptimizationResult, error) {
 
 	pme.mu.Lock()
@@ -228,7 +228,7 @@ func (pme *ProfitMaximizationEngine) MaximizeProfit(ctx context.Context,
 	startTime := time.Now()
 
 	// 1. 分析当前组合状态
-	currentState, err := pme.analyzeCurrentState(portfolio, marketData, strategies)
+	currentState, err := pme.analyzeCurrentState(positions, marketData, strategies)
 	if err != nil {
 		return nil, fmt.Errorf("current state analysis failed: %w", err)
 	}
@@ -268,7 +268,7 @@ func (pme *ProfitMaximizationEngine) MaximizeProfit(ctx context.Context,
 
 	// 7. 生成执行计划
 	executionPlan, err := pme.generateExecutionPlan(
-		portfolio, costOptimizedAllocation, costAnalysis)
+		positions, costOptimizedAllocation, costAnalysis)
 	if err != nil {
 		return nil, fmt.Errorf("execution plan generation failed: %w", err)
 	}
@@ -332,13 +332,19 @@ func (pme *ProfitMaximizationEngine) ExecuteOptimizationPlan(ctx context.Context
 
 // analyzeCurrentState 分析当前组合状态
 func (pme *ProfitMaximizationEngine) analyzeCurrentState(
-	portfolio *exchange.Portfolio,
-	marketData map[string]*market.MarketData,
+	positions []*exchange.Position,
+	marketData map[string]*types.Kline,
 	strategies []*strategy.Strategy) (*PortfolioState, error) {
 
+	// 计算总价值和现金余额
+	totalValue := 0.0
+	for _, pos := range positions {
+		totalValue += pos.Size * pos.MarkPrice
+	}
+
 	state := &PortfolioState{
-		TotalValue:  portfolio.TotalValue,
-		CashBalance: portfolio.CashBalance,
+		TotalValue:  totalValue,
+		CashBalance: 0.0, // 简化处理，实际应从账户余额获取
 		Positions:   make(map[string]*PositionState),
 		Strategies:  make(map[string]*StrategyState),
 		MarketData:  marketData,
@@ -346,35 +352,38 @@ func (pme *ProfitMaximizationEngine) analyzeCurrentState(
 	}
 
 	// 分析仓位状态
-	for _, allocation := range portfolio.Allocations {
+	for _, pos := range positions {
+		marketValue := pos.Size * pos.MarkPrice
+		weight := marketValue / totalValue
+
 		posState := &PositionState{
-			Symbol:        allocation.Symbol,
-			Quantity:      allocation.Quantity,
-			MarketValue:   allocation.MarketValue,
-			Weight:        allocation.Weight,
-			UnrealizedPnL: allocation.UnrealizedPnL,
+			Symbol:        pos.Symbol,
+			Quantity:      pos.Size,
+			MarketValue:   marketValue,
+			Weight:        weight,
+			UnrealizedPnL: pos.UnrealizedPnL,
 		}
 
 		// 计算额外指标
-		if data, exists := marketData[allocation.Symbol]; exists {
+		if data, exists := marketData[pos.Symbol]; exists {
 			posState.Volatility = pme.calculateVolatility(data)
 			posState.Beta = pme.calculateBeta(data)
 			posState.LiquidityScore = pme.calculateLiquidityScore(data)
 		}
 
-		state.Positions[allocation.Symbol] = posState
+		state.Positions[pos.Symbol] = posState
 	}
 
 	// 分析策略状态
-	for _, strat := range strategies {
+	for i, _ := range strategies {
 		stratState := &StrategyState{
-			ID:          strat.ID,
-			Name:        strat.Name,
-			Performance: strat.Performance,
-			RiskMetrics: strat.RiskMetrics,
-			IsActive:    strat.IsActive,
+			ID:          fmt.Sprintf("strategy_%d", i),
+			Name:        fmt.Sprintf("Strategy_%d", i),
+			Performance: nil, // 简化处理，实际应从策略获取
+			RiskMetrics: nil, // 简化处理，实际应从策略获取
+			IsActive:    true,
 		}
-		state.Strategies[strat.ID] = stratState
+		state.Strategies[stratState.ID] = stratState
 	}
 
 	return state, nil
@@ -383,7 +392,7 @@ func (pme *ProfitMaximizationEngine) analyzeCurrentState(
 // buildObjectiveFunction 构建目标函数
 func (pme *ProfitMaximizationEngine) buildObjectiveFunction(
 	currentState *PortfolioState,
-	marketData map[string]*market.MarketData) (*ObjectiveFunction, error) {
+	marketData map[string]*types.Kline) (*ObjectiveFunction, error) {
 
 	// 根据市场状态动态调整目标函数
 	marketRegime := pme.detectMarketRegime(marketData)
@@ -424,12 +433,12 @@ func (pme *ProfitMaximizationEngine) buildObjectiveFunction(
 
 // PortfolioState 组合状态
 type PortfolioState struct {
-	TotalValue  float64                       `json:"total_value"`
-	CashBalance float64                       `json:"cash_balance"`
-	Positions   map[string]*PositionState     `json:"positions"`
-	Strategies  map[string]*StrategyState     `json:"strategies"`
-	MarketData  map[string]*market.MarketData `json:"market_data"`
-	Timestamp   time.Time                     `json:"timestamp"`
+	TotalValue  float64                   `json:"total_value"`
+	CashBalance float64                   `json:"cash_balance"`
+	Positions   map[string]*PositionState `json:"positions"`
+	Strategies  map[string]*StrategyState `json:"strategies"`
+	MarketData  map[string]*types.Kline   `json:"market_data"`
+	Timestamp   time.Time                 `json:"timestamp"`
 }
 
 // PositionState 仓位状态
@@ -446,11 +455,11 @@ type PositionState struct {
 
 // StrategyState 策略状态
 type StrategyState struct {
-	ID          string                       `json:"id"`
-	Name        string                       `json:"name"`
-	Performance *strategy.PerformanceMetrics `json:"performance"`
-	RiskMetrics *strategy.RiskMetrics        `json:"risk_metrics"`
-	IsActive    bool                         `json:"is_active"`
+	ID          string      `json:"id"`
+	Name        string      `json:"name"`
+	Performance interface{} `json:"performance"`  // 简化处理，实际应使用具体类型
+	RiskMetrics interface{} `json:"risk_metrics"` // 简化处理，实际应使用具体类型
+	IsActive    bool        `json:"is_active"`
 }
 
 // 辅助组件实现
@@ -661,14 +670,20 @@ func (pme *ProfitMaximizationEngine) buildOptimizationConstraints(
 }
 
 func (pme *ProfitMaximizationEngine) generateExecutionPlan(
-	portfolio *exchange.Portfolio,
+	positions []*exchange.Position,
 	targetAllocation map[string]float64,
 	costAnalysis *CostAnalysis) (*ExecutionPlan, error) {
 
 	var orders []*RebalanceOrder
 
+	// 计算总价值
+	totalValue := 0.0
+	for _, pos := range positions {
+		totalValue += pos.Size * pos.MarkPrice
+	}
+
 	for symbol, targetWeight := range targetAllocation {
-		currentWeight := pme.getCurrentWeight(portfolio, symbol)
+		currentWeight := pme.getCurrentWeightFromPositions(positions, symbol)
 
 		if math.Abs(targetWeight-currentWeight) > 0.01 { // 1%阈值
 			action := ActionMaintain
@@ -683,7 +698,7 @@ func (pme *ProfitMaximizationEngine) generateExecutionPlan(
 				Action:        action,
 				CurrentWeight: currentWeight,
 				TargetWeight:  targetWeight,
-				Quantity:      (targetWeight - currentWeight) * portfolio.TotalValue,
+				Quantity:      (targetWeight - currentWeight) * totalValue,
 				Urgency:       trading.UrgencyMedium,
 			}
 
@@ -699,19 +714,30 @@ func (pme *ProfitMaximizationEngine) generateExecutionPlan(
 	}, nil
 }
 
-func (pme *ProfitMaximizationEngine) getCurrentWeight(portfolio *exchange.Portfolio, symbol string) float64 {
-	for _, allocation := range portfolio.Allocations {
-		if allocation.Symbol == symbol {
-			return allocation.Weight
+func (pme *ProfitMaximizationEngine) getCurrentWeightFromPositions(positions []*exchange.Position, symbol string) float64 {
+	totalValue := 0.0
+	symbolValue := 0.0
+
+	for _, pos := range positions {
+		posValue := pos.Size * pos.MarkPrice
+		totalValue += posValue
+
+		if pos.Symbol == symbol {
+			symbolValue = posValue
 		}
 	}
-	return 0
+
+	if totalValue == 0 {
+		return 0.0
+	}
+
+	return symbolValue / totalValue
 }
 
 func (pme *ProfitMaximizationEngine) forecastPerformance(
 	allocation map[string]float64,
 	riskMetrics *RiskMetrics,
-	marketData map[string]*market.MarketData) (*PerformanceForecast, error) {
+	marketData map[string]*types.Kline) (*PerformanceForecast, error) {
 
 	return &PerformanceForecast{
 		ExpectedReturn1M:    riskMetrics.ExpectedReturn / 12,
@@ -764,22 +790,22 @@ func (pme *ProfitMaximizationEngine) calculateObjectiveValue(
 	return utility
 }
 
-func (pme *ProfitMaximizationEngine) detectMarketRegime(marketData map[string]*market.MarketData) string {
+func (pme *ProfitMaximizationEngine) detectMarketRegime(marketData map[string]*types.Kline) string {
 	// 简化的市场状态检测
 	return "normal_market"
 }
 
-func (pme *ProfitMaximizationEngine) calculateVolatility(data *market.MarketData) float64 {
+func (pme *ProfitMaximizationEngine) calculateVolatility(data *types.Kline) float64 {
 	// 简化的波动率计算
 	return 0.2
 }
 
-func (pme *ProfitMaximizationEngine) calculateBeta(data *market.MarketData) float64 {
+func (pme *ProfitMaximizationEngine) calculateBeta(data *types.Kline) float64 {
 	// 简化的Beta计算
 	return 1.0
 }
 
-func (pme *ProfitMaximizationEngine) calculateLiquidityScore(data *market.MarketData) float64 {
+func (pme *ProfitMaximizationEngine) calculateLiquidityScore(data *types.Kline) float64 {
 	// 简化的流动性评分
 	return 0.8
 }

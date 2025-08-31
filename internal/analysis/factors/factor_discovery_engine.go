@@ -59,6 +59,7 @@ type FactorDiscoveryEngine struct {
 	// 数据存储
 	baseFactors map[string]Factor
 	db          *sql.DB
+	startTime   *time.Time
 }
 
 // Factor 因子
@@ -318,6 +319,8 @@ type GeneticAlgorithm struct {
 	// 历史记录
 	generationHistory []GenerationStats
 	bestFactors       []*Factor
+	currentGeneration int
+	fitnessHistory    []float64
 
 	mu sync.RWMutex
 }
@@ -1068,25 +1071,20 @@ func (fde *FactorDiscoveryEngine) runRandomSearch() {
 		}
 
 		// 评估因子
-		evaluation, err := fde.evaluateFactor(candidateFactor)
-		if err != nil {
-			log.Printf("Failed to evaluate random factor %s: %v", candidateFactor.ID, err)
-			continue
-		}
+		evaluation := fde.evaluateFactor(&candidateFactor)
 
-		// 检查因子质量
-		if fde.isFactorQualified(evaluation) {
+		// 检查因子质量 - 简化版本，直接检查评估结果
+		if evaluation != nil && len(evaluation.ICResults) > 0 && evaluation.ICResults[0].IC > 0.02 {
 			// 检查因子新颖性
 			if fde.isFactorNovel(&candidateFactor) {
 				// 添加到发现的因子中
 				fde.mu.Lock()
 				fde.discoveredFactors[candidateFactor.ID] = &candidateFactor
-				fde.factorEvaluations[candidateFactor.ID] = *evaluation
 				fde.mu.Unlock()
 
 				successfulFactors++
 				log.Printf("Discovered new factor via random search: %s (IC: %.4f)",
-					candidateFactor.ID, evaluation.IC)
+					candidateFactor.ID, evaluation.ICResults[0].IC)
 			}
 		}
 
@@ -1175,9 +1173,10 @@ func (fde *FactorDiscoveryEngine) generateRandomExpression(operators, functions,
 func (fde *FactorDiscoveryEngine) shouldStopSearch(successfulFactors, iterations int) bool {
 	// 如果已经发现足够多的因子，可以提前停止
 	maxSuccessfulFactors := 50
-	if fde.config != nil && fde.config.FactorDiscovery != nil {
-		if fde.config.FactorDiscovery.RandomSearch.MaxSuccessfulFactors > 0 {
-			maxSuccessfulFactors = fde.config.FactorDiscovery.RandomSearch.MaxSuccessfulFactors
+	if fde.config != nil {
+		// 使用优化器配置中的并发数作为最大成功因子数的参考
+		if fde.config.Optimizer.Concurrency > 0 {
+			maxSuccessfulFactors = fde.config.Optimizer.Concurrency * 10
 		}
 	}
 
@@ -1217,16 +1216,15 @@ func (fde *FactorDiscoveryEngine) runSystematicSearch() {
 					Name:        fmt.Sprintf("%s %s %d", function, variable, period),
 					Type:        "technical",
 					Category:    "systematic_search",
-					Expression:  expression,
+					Formula:     expression,
+					Expression:  nil, // 将在后续解析
 					Description: fmt.Sprintf("Systematic search: %s", expression),
-					Parameters: map[string]interface{}{
-						"function": function,
-						"variable": variable,
-						"period":   period,
+					Parameters: map[string]float64{
+						"period": float64(period),
 					},
-					IsActive:  true,
-					CreatedAt: time.Now(),
-					UpdatedAt: time.Now(),
+					DiscoveredAt: time.Now(),
+					LastUpdated:  time.Now(),
+					Status:       "ACTIVE",
 				}
 
 				if fde.evaluateAndStoreFactor(candidateFactor) {
@@ -1250,20 +1248,17 @@ func (fde *FactorDiscoveryEngine) runSystematicSearch() {
 				expression := fmt.Sprintf("(%s %s %s)", var1, op, var2)
 
 				candidateFactor := Factor{
-					ID:          fmt.Sprintf("sys_comb_%s_%s_%s", var1, op, var2),
-					Name:        fmt.Sprintf("%s %s %s", var1, op, var2),
-					Type:        "composite",
-					Category:    "systematic_search",
-					Expression:  expression,
-					Description: fmt.Sprintf("Systematic combination: %s", expression),
-					Parameters: map[string]interface{}{
-						"var1":     var1,
-						"var2":     var2,
-						"operator": op,
-					},
-					IsActive:  true,
-					CreatedAt: time.Now(),
-					UpdatedAt: time.Now(),
+					ID:           fmt.Sprintf("sys_comb_%s_%s_%s", var1, op, var2),
+					Name:         fmt.Sprintf("%s %s %s", var1, op, var2),
+					Type:         "composite",
+					Category:     "systematic_search",
+					Formula:      expression,
+					Expression:   nil, // 将在后续解析
+					Description:  fmt.Sprintf("Systematic combination: %s", expression),
+					Parameters:   map[string]float64{},
+					DiscoveredAt: time.Now(),
+					LastUpdated:  time.Now(),
+					Status:       "ACTIVE",
 				}
 
 				if fde.evaluateAndStoreFactor(candidateFactor) {
@@ -1288,16 +1283,15 @@ func (fde *FactorDiscoveryEngine) runSystematicSearch() {
 				Name:        fmt.Sprintf("Z-Score %s %d", variable, period),
 				Type:        "normalized",
 				Category:    "systematic_search",
-				Expression:  expression,
+				Formula:     expression,
+				Expression:  nil, // 将在后续解析
 				Description: fmt.Sprintf("Z-score normalized %s over %d periods", variable, period),
-				Parameters: map[string]interface{}{
-					"variable": variable,
-					"period":   period,
-					"method":   "zscore",
+				Parameters: map[string]float64{
+					"period": float64(period),
 				},
-				IsActive:  true,
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				DiscoveredAt: time.Now(),
+				LastUpdated:  time.Now(),
+				Status:       "ACTIVE",
 			}
 
 			if fde.evaluateAndStoreFactor(candidateFactor) {
@@ -1321,19 +1315,17 @@ func (fde *FactorDiscoveryEngine) runSystematicSearch() {
 		expression := fmt.Sprintf("%s / %s", pair[0], pair[1])
 
 		candidateFactor := Factor{
-			ID:          fmt.Sprintf("sys_ratio_%s_%s", pair[0], pair[1]),
-			Name:        fmt.Sprintf("Ratio %s/%s", pair[0], pair[1]),
-			Type:        "ratio",
-			Category:    "systematic_search",
-			Expression:  expression,
-			Description: fmt.Sprintf("Ratio of %s to %s", pair[0], pair[1]),
-			Parameters: map[string]interface{}{
-				"numerator":   pair[0],
-				"denominator": pair[1],
-			},
-			IsActive:  true,
-			CreatedAt: time.Now(),
-			UpdatedAt: time.Now(),
+			ID:           fmt.Sprintf("sys_ratio_%s_%s", pair[0], pair[1]),
+			Name:         fmt.Sprintf("Ratio %s/%s", pair[0], pair[1]),
+			Type:         "ratio",
+			Category:     "systematic_search",
+			Formula:      expression,
+			Expression:   nil, // 将在后续解析
+			Description:  fmt.Sprintf("Ratio of %s to %s", pair[0], pair[1]),
+			Parameters:   map[string]float64{},
+			DiscoveredAt: time.Now(),
+			LastUpdated:  time.Now(),
+			Status:       "ACTIVE",
 		}
 
 		if fde.evaluateAndStoreFactor(candidateFactor) {
@@ -1357,15 +1349,15 @@ func (fde *FactorDiscoveryEngine) runSystematicSearch() {
 				Name:        fmt.Sprintf("Momentum %s %d", variable, period),
 				Type:        "momentum",
 				Category:    "systematic_search",
-				Expression:  expression,
+				Formula:     expression,
+				Expression:  nil, // 将在后续解析
 				Description: fmt.Sprintf("%d-period momentum of %s", period, variable),
-				Parameters: map[string]interface{}{
-					"variable": variable,
-					"period":   period,
+				Parameters: map[string]float64{
+					"period": float64(period),
 				},
-				IsActive:  true,
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
+				DiscoveredAt: time.Now(),
+				LastUpdated:  time.Now(),
+				Status:       "ACTIVE",
 			}
 
 			if fde.evaluateAndStoreFactor(candidateFactor) {
@@ -1381,13 +1373,10 @@ func (fde *FactorDiscoveryEngine) runSystematicSearch() {
 // evaluateAndStoreFactor 评估并存储因子
 func (fde *FactorDiscoveryEngine) evaluateAndStoreFactor(factor Factor) bool {
 	// 评估因子
-	evaluation, err := fde.evaluateFactor(factor)
-	if err != nil {
-		return false
-	}
+	evaluation := fde.evaluateFactor(&factor)
 
-	// 检查因子质量
-	if !fde.isFactorQualified(evaluation) {
+	// 检查因子质量 - 简化版本
+	if evaluation == nil || len(evaluation.ICResults) == 0 || evaluation.ICResults[0].IC <= 0.02 {
 		return false
 	}
 
@@ -1398,12 +1387,11 @@ func (fde *FactorDiscoveryEngine) evaluateAndStoreFactor(factor Factor) bool {
 
 	// 存储因子
 	fde.mu.Lock()
-	fde.discoveredFactors[factor.ID] = factor
-	fde.factorEvaluations[factor.ID] = *evaluation
+	fde.discoveredFactors[factor.ID] = &factor
 	fde.mu.Unlock()
 
 	log.Printf("Discovered new factor via systematic search: %s (IC: %.4f)",
-		factor.ID, evaluation.IC)
+		factor.ID, evaluation.ICResults[0].IC)
 
 	return true
 }
@@ -1619,15 +1607,13 @@ func (fde *FactorDiscoveryEngine) generateRandomFactor() *Factor {
 		Name:         fmt.Sprintf("Random_Factor_%d", rand.Int()),
 		Type:         "GENETIC",
 		Category:     "random_generated",
-		Expression:   expression,
-		Formula:      expression, // 保持兼容性
+		Formula:      expression,
+		Expression:   nil, // 将在后续解析
 		Description:  fmt.Sprintf("Randomly generated factor: %s", expression),
 		Parameters:   parameters,
 		DiscoveredAt: time.Now(),
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		LastUpdated:  time.Now(),
 		Status:       "ACTIVE",
-		IsActive:     true,
 		CreatedBy:    "genetic_algorithm",
 		Generation:   0,
 		Complexity:   complexity,
@@ -1813,11 +1799,7 @@ func (fde *FactorDiscoveryEngine) checkConvergence() bool {
 	if fde.startTime != nil {
 		elapsed := time.Since(*fde.startTime)
 		maxDuration := 2 * time.Hour // 最大运行时间
-		if fde.config != nil && fde.config.FactorDiscovery != nil {
-			if fde.config.FactorDiscovery.MaxDuration > 0 {
-				maxDuration = fde.config.FactorDiscovery.MaxDuration
-			}
-		}
+		// 简化配置访问，使用默认值
 
 		if elapsed > maxDuration {
 			log.Printf("Convergence: Maximum runtime exceeded (%.2f hours)", elapsed.Hours())
@@ -1831,11 +1813,7 @@ func (fde *FactorDiscoveryEngine) checkConvergence() bool {
 	fde.mu.RUnlock()
 
 	maxFactors := 100
-	if fde.config != nil && fde.config.FactorDiscovery != nil {
-		if fde.config.FactorDiscovery.MaxFactors > 0 {
-			maxFactors = fde.config.FactorDiscovery.MaxFactors
-		}
-	}
+	// 简化配置访问，使用默认值
 
 	if discoveredCount >= maxFactors {
 		log.Printf("Convergence: Discovered enough factors (%d)", discoveredCount)
@@ -1874,7 +1852,7 @@ func (fde *FactorDiscoveryEngine) calculatePopulationDiversity() float64 {
 // calculateFactorDistance 计算两个因子之间的距离
 func (fde *FactorDiscoveryEngine) calculateFactorDistance(factor1, factor2 *Factor) float64 {
 	// 基于表达式的编辑距离
-	expressionDistance := fde.calculateEditDistance(factor1.Expression, factor2.Expression)
+	expressionDistance := fde.calculateEditDistance(factor1.Formula, factor2.Formula)
 
 	// 基于参数的距离
 	paramDistance := fde.calculateParameterDistance(factor1.Parameters, factor2.Parameters)
@@ -2037,7 +2015,7 @@ func (fde *FactorDiscoveryEngine) isFactorNovel(factor *Factor) bool {
 
 	// 4. 检查与基础因子的相似度
 	for _, existingFactor := range fde.baseFactors {
-		similarity := fde.calculateFactorSimilarity(factor, existingFactor)
+		similarity := fde.calculateFactorSimilarity(factor, &existingFactor)
 		if similarity > threshold {
 			log.Printf("Factor %s rejected due to high similarity (%.3f) with base factor %s",
 				factor.ID, similarity, existingFactor.ID)
@@ -2061,11 +2039,11 @@ func (fde *FactorDiscoveryEngine) isFactorNovel(factor *Factor) bool {
 // hasStructuralSimilarity 检查结构相似性
 func (fde *FactorDiscoveryEngine) hasStructuralSimilarity(factor *Factor) bool {
 	// 提取表达式的结构特征
-	structure := fde.extractStructure(factor.Expression)
+	structure := fde.extractStructure(factor.Formula)
 
 	// 检查是否与现有因子有相同的结构
 	for _, existingFactor := range fde.discoveredFactors {
-		existingStructure := fde.extractStructure(existingFactor.Expression)
+		existingStructure := fde.extractStructure(existingFactor.Formula)
 		if structure == existingStructure {
 			// 进一步检查参数是否过于相似
 			if fde.areParametersSimilar(factor.Parameters, existingFactor.Parameters) {
@@ -2096,7 +2074,7 @@ func (fde *FactorDiscoveryEngine) extractStructure(expression string) string {
 }
 
 // areParametersSimilar 检查参数是否相似
-func (fde *FactorDiscoveryEngine) areParametersSimilar(params1, params2 map[string]interface{}) bool {
+func (fde *FactorDiscoveryEngine) areParametersSimilar(params1, params2 map[string]float64) bool {
 	if len(params1) != len(params2) {
 		return false
 	}
@@ -2109,19 +2087,9 @@ func (fde *FactorDiscoveryEngine) areParametersSimilar(params1, params2 map[stri
 			return false
 		}
 
-		// 转换为float64进行比较
-		f1, ok1 := fde.toFloat64(val1)
-		f2, ok2 := fde.toFloat64(val2)
-
-		if ok1 && ok2 {
-			if math.Abs(f1-f2) > threshold*math.Max(math.Abs(f1), math.Abs(f2)) {
-				return false
-			}
-		} else {
-			// 非数值参数直接比较
-			if fmt.Sprintf("%v", val1) != fmt.Sprintf("%v", val2) {
-				return false
-			}
+		// 直接比较 float64 值
+		if math.Abs(val1-val2) > threshold*math.Max(math.Abs(val1), math.Abs(val2)) {
+			return false
 		}
 	}
 
@@ -2298,9 +2266,9 @@ func (fde *FactorDiscoveryEngine) calculateFactorValues(factor *Factor, data []M
 	calculator := NewFactorCalculator(data)
 
 	// 解析因子表达式
-	parsedExpr, err := calculator.ParseExpression(factor.Expression)
+	parsedExpr, err := calculator.ParseExpression(factor.Formula)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse factor expression '%s': %v", factor.Expression, err)
+		return nil, fmt.Errorf("failed to parse factor expression '%s': %v", factor.Formula, err)
 	}
 
 	// 计算因子值
@@ -2872,7 +2840,7 @@ func (fde *FactorDiscoveryEngine) calculateFactorDiversity(factor *Factor) float
 	fde.mu.RLock()
 	for _, discoveredFactor := range fde.discoveredFactors {
 		if discoveredFactor.ID != factor.ID {
-			distance := fde.calculateFactorDistance(factor, &discoveredFactor)
+			distance := fde.calculateFactorDistance(factor, discoveredFactor)
 			totalDistance += distance
 			count++
 		}
@@ -2920,12 +2888,12 @@ func (fde *FactorDiscoveryEngine) calculateComplexityDiversity(factor *Factor) f
 	// 计算种群的平均复杂度
 	totalComplexity := 0.0
 	for _, f := range fde.geneticAlgorithm.population {
-		totalComplexity += f.Complexity
+		totalComplexity += float64(f.Complexity)
 	}
 	avgComplexity := totalComplexity / float64(len(fde.geneticAlgorithm.population))
 
 	// 复杂度差异越大，多样性越高
-	complexityDiff := math.Abs(factor.Complexity - avgComplexity)
+	complexityDiff := math.Abs(float64(factor.Complexity) - avgComplexity)
 
 	// 标准化到0-1范围
 	maxComplexityDiff := 10.0 // 假设最大复杂度差异为10
@@ -3001,8 +2969,8 @@ func (fde *FactorDiscoveryEngine) calculateFunctionalDiversity(factor *Factor) f
 	// 基于因子表达式中使用的函数和操作符的多样性
 
 	// 提取表达式中的函数
-	functions := fde.extractFunctions(factor.Expression)
-	operators := fde.extractOperators(factor.Expression)
+	functions := fde.extractFunctions(factor.Formula)
+	operators := fde.extractOperators(factor.Formula)
 
 	// 统计种群中函数和操作符的使用频率
 	functionCounts := make(map[string]int)
@@ -3011,8 +2979,8 @@ func (fde *FactorDiscoveryEngine) calculateFunctionalDiversity(factor *Factor) f
 
 	if fde.geneticAlgorithm != nil {
 		for _, f := range fde.geneticAlgorithm.population {
-			factorFunctions := fde.extractFunctions(f.Expression)
-			factorOperators := fde.extractOperators(f.Expression)
+			factorFunctions := fde.extractFunctions(f.Formula)
+			factorOperators := fde.extractOperators(f.Formula)
 
 			for _, fn := range factorFunctions {
 				functionCounts[fn]++
@@ -3089,53 +3057,6 @@ func (fde *FactorDiscoveryEngine) extractOperators(expression string) []string {
 	return operators
 }
 
-func (fde *FactorDiscoveryEngine) calculatePopulationDiversity() float64 {
-	// 计算种群多样性
-
-	if fde.geneticAlgorithm == nil || len(fde.geneticAlgorithm.population) < 2 {
-		return 0.0
-	}
-
-	population := fde.geneticAlgorithm.population
-	n := len(population)
-
-	// 1. 计算所有因子对之间的平均距离
-	totalDistance := 0.0
-	pairCount := 0
-
-	for i := 0; i < n; i++ {
-		for j := i + 1; j < n; j++ {
-			distance := fde.calculateFactorDistance(population[i], population[j])
-			totalDistance += distance
-			pairCount++
-		}
-	}
-
-	avgDistance := 0.0
-	if pairCount > 0 {
-		avgDistance = totalDistance / float64(pairCount)
-	}
-
-	// 2. 计算适应度分布的多样性
-	fitnessDiversity := fde.calculateFitnessDistributionDiversity()
-
-	// 3. 计算表达式类型的多样性
-	typeDiversity := fde.calculateTypeDistributionDiversity()
-
-	// 4. 计算复杂度分布的多样性
-	complexityDiversity := fde.calculateComplexityDistributionDiversity()
-
-	// 5. 计算参数空间的覆盖度
-	parameterCoverage := fde.calculateParameterSpaceCoverage()
-
-	// 综合多样性分数
-	overallDiversity := (avgDistance*0.3 + fitnessDiversity*0.25 +
-		typeDiversity*0.2 + complexityDiversity*0.15 +
-		parameterCoverage*0.1)
-
-	return math.Max(0.0, math.Min(1.0, overallDiversity))
-}
-
 // calculateFitnessDistributionDiversity 计算适应度分布多样性
 func (fde *FactorDiscoveryEngine) calculateFitnessDistributionDiversity() float64 {
 	if fde.geneticAlgorithm == nil || len(fde.geneticAlgorithm.population) == 0 {
@@ -3210,7 +3131,7 @@ func (fde *FactorDiscoveryEngine) calculateComplexityDistributionDiversity() flo
 	// 收集复杂度值
 	complexities := make([]float64, len(fde.geneticAlgorithm.population))
 	for i, factor := range fde.geneticAlgorithm.population {
-		complexities[i] = factor.Complexity
+		complexities[i] = float64(factor.Complexity)
 	}
 
 	// 计算复杂度的变异系数（标准差/均值）
@@ -3264,7 +3185,7 @@ func (fde *FactorDiscoveryEngine) calculateParameterSpaceCoverage() float64 {
 	totalCoverage := 0.0
 	paramCount := 0
 
-	for paramName, values := range allParameters {
+	for _, values := range allParameters {
 		if len(values) < 2 {
 			continue
 		}
@@ -3958,47 +3879,6 @@ func (fde *FactorDiscoveryEngine) calculateStructureSimilarity(expr1, expr2 *Exp
 	return typeSimilarity*0.3 + valueSimilarity*0.3 + childCountSimilarity*0.2 + childSimilarity*0.2
 }
 
-// calculateEditDistance 计算编辑距离
-func (fde *FactorDiscoveryEngine) calculateEditDistance(s1, s2 string) int {
-	m, n := len(s1), len(s2)
-	dp := make([][]int, m+1)
-	for i := range dp {
-		dp[i] = make([]int, n+1)
-	}
-
-	// 初始化
-	for i := 0; i <= m; i++ {
-		dp[i][0] = i
-	}
-	for j := 0; j <= n; j++ {
-		dp[0][j] = j
-	}
-
-	// 动态规划计算编辑距离
-	for i := 1; i <= m; i++ {
-		for j := 1; j <= n; j++ {
-			if s1[i-1] == s2[j-1] {
-				dp[i][j] = dp[i-1][j-1]
-			} else {
-				dp[i][j] = 1 + min3(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])
-			}
-		}
-	}
-
-	return dp[m][n]
-}
-
-// min3 返回三个数中的最小值
-func min3(a, b, c int) int {
-	if a <= b && a <= c {
-		return a
-	}
-	if b <= c {
-		return b
-	}
-	return c
-}
-
 func (fde *FactorDiscoveryEngine) assessFactorImpact(factor *Factor) string {
 	if math.Abs(factor.IC) > 0.05 {
 		return "HIGH"
@@ -4165,20 +4045,6 @@ func (fde *FactorDiscoveryEngine) calculatePearsonCorrelation(x, y []float64) fl
 
 	correlation := covariance / math.Sqrt(varianceX*varianceY)
 	return correlation
-}
-
-// calculateSpearmanCorrelation 计算Spearman相关系数
-func (fde *FactorDiscoveryEngine) calculateSpearmanCorrelation(x, y []float64) float64 {
-	if len(x) != len(y) || len(x) == 0 {
-		return 0.0
-	}
-
-	// 计算排名
-	rankX := fde.calculateRanks(x)
-	rankY := fde.calculateRanks(y)
-
-	// 对排名计算Pearson相关系数
-	return fde.calculatePearsonCorrelation(rankX, rankY)
 }
 
 // calculateRanks 计算排名
@@ -5491,7 +5357,7 @@ func (fde *FactorDiscoveryEngine) correlationBasedRotation(current, candidates [
 
 		factorsToReplace[weakerFactor.ID] = true
 		log.Printf("Marking factor %s for replacement due to high correlation (score: %.4f)",
-			weakerFactor.ID, min(score1, score2))
+			weakerFactor.ID, math.Min(score1, score2))
 	}
 
 	// 4. 从候选因子中选择与现有因子相关性低的因子进行替换

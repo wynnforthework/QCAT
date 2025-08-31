@@ -3261,11 +3261,11 @@ func (shs *SelfHealingSystem) getMetricValue(metricName string) (float64, error)
 		// 基于响应时间计算超时率
 		responseTimeMs := float64(shs.systemHealth.ResponseTime.Milliseconds())
 		if responseTimeMs > 5000 { // 5秒超时
-			return 0.1 // 10%超时率
+			return 0.1, nil // 10%超时率
 		} else if responseTimeMs > 2000 { // 2秒
-			return 0.05 // 5%超时率
+			return 0.05, nil // 5%超时率
 		}
-		return 0.01 // 1%超时率
+		return 0.01, nil // 1%超时率
 
 	case "cpu_usage":
 		// 从监控系统获取CPU使用率

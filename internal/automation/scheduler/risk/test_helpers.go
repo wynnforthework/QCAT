@@ -80,7 +80,7 @@ func NewTestRiskController() *TestRiskController {
 }
 
 // triggerPositionReductionMocked provides a mock implementation for testing
-func (trc *TestRiskController) triggerPositionReductionMocked(ctx context.Context, marginStatus *shared.MarginStatus, reductionRatio float64) (*RiskAction, error) {
+func (trc *TestRiskController) triggerPositionReductionMocked(ctx context.Context, marginStatus *MarginStatus, reductionRatio float64) (*RiskAction, error) {
 	// Create a mock risk action
 	action := &RiskAction{
 		ID:         shared.GenerateID("risk_action"),
@@ -212,14 +212,27 @@ func (trc *TestRiskController) Stop() error {
 }
 
 // CreateTestMarginStatus creates a test margin status for testing
-func CreateTestMarginStatus(totalEquity, usedMargin float64) *shared.MarginStatus {
-	return &shared.MarginStatus{
-		TotalEquity: totalEquity,
-		UsedMargin:  usedMargin,
-		FreeMargin:  totalEquity - usedMargin,
-		MarginRatio: usedMargin / totalEquity,
-		MarginLevel: totalEquity / usedMargin,
-		LastUpdated: time.Now(),
+func CreateTestMarginStatus(totalEquity, usedMargin float64) *MarginStatus {
+	marginRatio := usedMargin / totalEquity
+	var riskLevel shared.RiskLevel
+
+	if marginRatio >= 0.85 {
+		riskLevel = shared.RiskLevelCritical
+	} else if marginRatio >= 0.7 {
+		riskLevel = shared.RiskLevelHigh
+	} else if marginRatio >= 0.5 {
+		riskLevel = shared.RiskLevelMedium
+	} else {
+		riskLevel = shared.RiskLevelLow
+	}
+
+	return &MarginStatus{
+		TotalEquity:     totalEquity,
+		UsedMargin:      usedMargin,
+		AvailableMargin: totalEquity - usedMargin,
+		MarginRatio:     marginRatio,
+		RiskLevel:       riskLevel,
+		Timestamp:       time.Now(),
 	}
 }
 

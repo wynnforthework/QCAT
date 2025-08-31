@@ -2,74 +2,72 @@ package position
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"sync"
 	"time"
 
-	"qcat/internal/config"
 	"qcat/internal/exchange"
 	"qcat/internal/market"
-	"qcat/internal/monitor"
+	"qcat/internal/types"
 )
 
 // DynamicPositionOptimizer 智能仓位动态优化器
 // 集成Kelly公式、Black-Litterman模型和风险预算管理
 type DynamicPositionOptimizer struct {
-	kellyCalculator       *KellyCalculator
-	blackLitterman        *BlackLittermanModel
-	riskBudgetManager     *RiskBudgetManager
-	marketRegimeDetector  *MarketRegimeDetector
-	volatilityPredictor   *VolatilityPredictor
-	
-	config                *OptimizerConfig
-	mu                    sync.RWMutex
-	
+	kellyCalculator      *KellyCalculator
+	blackLitterman       *BlackLittermanModel
+	riskBudgetManager    *RiskBudgetManager
+	marketRegimeDetector *MarketRegimeDetector
+	volatilityPredictor  *VolatilityPredictor
+
+	config *OptimizerConfig
+	mu     sync.RWMutex
+
 	// 缓存数据
-	positionCache         map[string]*OptimalPosition
-	lastOptimization      time.Time
-	optimizationInterval  time.Duration
+	positionCache        map[string]*OptimalPosition
+	lastOptimization     time.Time
+	optimizationInterval time.Duration
 }
 
 // OptimizerConfig 优化器配置
 type OptimizerConfig struct {
-	MaxPosition           float64   `yaml:"max_position"`           // 最大仓位比例
-	MinPosition           float64   `yaml:"min_position"`           // 最小仓位比例
-	TargetVolatility      float64   `yaml:"target_volatility"`      // 目标波动率
-	RiskBudgetLimit       float64   `yaml:"risk_budget_limit"`      // 风险预算限制
-	OptimizationInterval  string    `yaml:"optimization_interval"`  // 优化间隔
-	KellyMultiplier       float64   `yaml:"kelly_multiplier"`       // Kelly系数调节器
-	VolatilityLookback    int       `yaml:"volatility_lookback"`    // 波动率回看期
-	ConfidenceLevel       float64   `yaml:"confidence_level"`       // 置信水平
+	MaxPosition          float64 `yaml:"max_position"`          // 最大仓位比例
+	MinPosition          float64 `yaml:"min_position"`          // 最小仓位比例
+	TargetVolatility     float64 `yaml:"target_volatility"`     // 目标波动率
+	RiskBudgetLimit      float64 `yaml:"risk_budget_limit"`     // 风险预算限制
+	OptimizationInterval string  `yaml:"optimization_interval"` // 优化间隔
+	KellyMultiplier      float64 `yaml:"kelly_multiplier"`      // Kelly系数调节器
+	VolatilityLookback   int     `yaml:"volatility_lookback"`   // 波动率回看期
+	ConfidenceLevel      float64 `yaml:"confidence_level"`      // 置信水平
 }
 
 // OptimalPosition 最优仓位结果
 type OptimalPosition struct {
-	Symbol              string    `json:"symbol"`
-	TargetWeight        float64   `json:"target_weight"`
-	CurrentWeight       float64   `json:"current_weight"`
-	OptimalSize         float64   `json:"optimal_size"`
-	RiskContribution    float64   `json:"risk_contribution"`
-	ExpectedReturn      float64   `json:"expected_return"`
-	KellyFraction       float64   `json:"kelly_fraction"`
-	VolatilityForecast  float64   `json:"volatility_forecast"`
-	MarketRegime        string    `json:"market_regime"`
-	RebalanceSignal     string    `json:"rebalance_signal"`
-	OptimizationTime    time.Time `json:"optimization_time"`
+	Symbol             string    `json:"symbol"`
+	TargetWeight       float64   `json:"target_weight"`
+	CurrentWeight      float64   `json:"current_weight"`
+	OptimalSize        float64   `json:"optimal_size"`
+	RiskContribution   float64   `json:"risk_contribution"`
+	ExpectedReturn     float64   `json:"expected_return"`
+	KellyFraction      float64   `json:"kelly_fraction"`
+	VolatilityForecast float64   `json:"volatility_forecast"`
+	MarketRegime       string    `json:"market_regime"`
+	RebalanceSignal    string    `json:"rebalance_signal"`
+	OptimizationTime   time.Time `json:"optimization_time"`
 }
 
 // MarketRegime 市场状态
 type MarketRegime string
 
 const (
-	RegimeTrending    MarketRegime = "trending"
-	RegimeRanging     MarketRegime = "ranging"
-	RegimeVolatile    MarketRegime = "volatile"
-	RegimeCalm        MarketRegime = "calm"
-	RegimeBullish     MarketRegime = "bullish"
-	RegimeBearish     MarketRegime = "bearish"
-	RegimeUncertain   MarketRegime = "uncertain"
-	RegimeCrisis      MarketRegime = "crisis"
+	RegimeTrending  MarketRegime = "trending"
+	RegimeRanging   MarketRegime = "ranging"
+	RegimeVolatile  MarketRegime = "volatile"
+	RegimeCalm      MarketRegime = "calm"
+	RegimeBullish   MarketRegime = "bullish"
+	RegimeBearish   MarketRegime = "bearish"
+	RegimeUncertain MarketRegime = "uncertain"
+	RegimeCrisis    MarketRegime = "crisis"
 )
 
 // NewDynamicPositionOptimizer 创建动态仓位优化器
@@ -78,7 +76,7 @@ func NewDynamicPositionOptimizer(config *OptimizerConfig) *DynamicPositionOptimi
 	if interval == 0 {
 		interval = 15 * time.Minute // 默认15分钟
 	}
-	
+
 	return &DynamicPositionOptimizer{
 		kellyCalculator:      NewKellyCalculator(config.KellyMultiplier),
 		blackLitterman:       NewBlackLittermanModel(),
@@ -92,38 +90,38 @@ func NewDynamicPositionOptimizer(config *OptimizerConfig) *DynamicPositionOptimi
 }
 
 // OptimizePortfolio 优化整个投资组合的仓位
-func (dpo *DynamicPositionOptimizer) OptimizePortfolio(ctx context.Context, 
-	portfolio *exchange.Portfolio, marketData map[string]*market.MarketData) (*PortfolioOptimization, error) {
-	
+func (dpo *DynamicPositionOptimizer) OptimizePortfolio(ctx context.Context,
+	positions []*exchange.Position, marketData map[string]*types.Kline) (*PortfolioOptimization, error) {
+
 	dpo.mu.Lock()
 	defer dpo.mu.Unlock()
-	
+
 	// 检查是否需要重新优化
 	if time.Since(dpo.lastOptimization) < dpo.optimizationInterval {
 		return dpo.getCachedOptimization(), nil
 	}
-	
+
 	// 1. 市场状态识别
 	regimes := dpo.detectMarketRegimes(marketData)
-	
+
 	// 2. 波动率预测
 	volatilityForecasts := dpo.predictVolatilities(marketData)
-	
+
 	// 3. 期望收益估计 (Black-Litterman)
 	expectedReturns := dpo.estimateExpectedReturns(marketData, regimes)
-	
+
 	// 4. Kelly最优仓位计算
 	kellyPositions := dpo.calculateKellyPositions(expectedReturns, volatilityForecasts)
-	
+
 	// 5. 风险预算约束
 	riskAdjustedPositions := dpo.applyRiskBudgetConstraints(kellyPositions, volatilityForecasts)
-	
+
 	// 6. 市场状态调整
 	finalPositions := dpo.adjustForMarketRegime(riskAdjustedPositions, regimes)
-	
+
 	// 7. 生成重平衡信号
-	rebalanceSignals := dpo.generateRebalanceSignals(portfolio, finalPositions)
-	
+	rebalanceSignals := dpo.generateRebalanceSignals(positions, finalPositions)
+
 	result := &PortfolioOptimization{
 		OptimalPositions:    finalPositions,
 		RebalanceSignals:    rebalanceSignals,
@@ -133,86 +131,86 @@ func (dpo *DynamicPositionOptimizer) OptimizePortfolio(ctx context.Context,
 		OptimizationTime:    time.Now(),
 		RiskMetrics:         dpo.calculateRiskMetrics(finalPositions, volatilityForecasts),
 	}
-	
+
 	// 更新缓存
 	dpo.updatePositionCache(finalPositions)
 	dpo.lastOptimization = time.Now()
-	
+
 	return result, nil
 }
 
 // detectMarketRegimes 检测市场状态
-func (dpo *DynamicPositionOptimizer) detectMarketRegimes(marketData map[string]*market.MarketData) map[string]MarketRegime {
+func (dpo *DynamicPositionOptimizer) detectMarketRegimes(marketData map[string]*types.Kline) map[string]MarketRegime {
 	regimes := make(map[string]MarketRegime)
-	
+
 	for symbol, data := range marketData {
 		regime := dpo.marketRegimeDetector.DetectRegime(data)
 		regimes[symbol] = regime
 	}
-	
+
 	return regimes
 }
 
 // predictVolatilities 预测波动率
-func (dpo *DynamicPositionOptimizer) predictVolatilities(marketData map[string]*market.MarketData) map[string]float64 {
+func (dpo *DynamicPositionOptimizer) predictVolatilities(marketData map[string]*types.Kline) map[string]float64 {
 	forecasts := make(map[string]float64)
-	
+
 	for symbol, data := range marketData {
 		volatility := dpo.volatilityPredictor.PredictVolatility(data)
 		forecasts[symbol] = volatility
 	}
-	
+
 	return forecasts
 }
 
 // estimateExpectedReturns 使用Black-Litterman模型估计期望收益
 func (dpo *DynamicPositionOptimizer) estimateExpectedReturns(
-	marketData map[string]*market.MarketData, 
+	marketData map[string]*types.Kline,
 	regimes map[string]MarketRegime) map[string]float64 {
-	
+
 	// 市场均衡收益
 	equilibriumReturns := dpo.blackLitterman.CalculateEquilibriumReturns(marketData)
-	
+
 	// 基于市场状态的观点调整
 	views := dpo.generateMarketViews(regimes, marketData)
-	
+
 	// Black-Litterman调整
 	adjustedReturns := dpo.blackLitterman.AdjustReturns(equilibriumReturns, views)
-	
+
 	return adjustedReturns
 }
 
 // calculateKellyPositions 计算Kelly最优仓位
 func (dpo *DynamicPositionOptimizer) calculateKellyPositions(
-	expectedReturns map[string]float64, 
+	expectedReturns map[string]float64,
 	volatilities map[string]float64) map[string]float64 {
-	
+
 	positions := make(map[string]float64)
-	
+
 	for symbol, expectedReturn := range expectedReturns {
 		volatility, exists := volatilities[symbol]
 		if !exists {
 			continue
 		}
-		
+
 		kellyFraction := dpo.kellyCalculator.CalculateOptimalFraction(expectedReturn, volatility)
 		positions[symbol] = kellyFraction
 	}
-	
+
 	return positions
 }
 
 // applyRiskBudgetConstraints 应用风险预算约束
 func (dpo *DynamicPositionOptimizer) applyRiskBudgetConstraints(
-	positions map[string]float64, 
+	positions map[string]float64,
 	volatilities map[string]float64) map[string]float64 {
-	
+
 	// 计算风险贡献
 	riskContributions := dpo.riskBudgetManager.CalculateRiskContributions(positions, volatilities)
-	
+
 	// 应用风险预算约束
 	adjustedPositions := dpo.riskBudgetManager.ApplyRiskBudget(positions, riskContributions)
-	
+
 	// 应用仓位限制
 	for symbol, position := range adjustedPositions {
 		if position > dpo.config.MaxPosition {
@@ -225,30 +223,30 @@ func (dpo *DynamicPositionOptimizer) applyRiskBudgetConstraints(
 			adjustedPositions[symbol] = -dpo.config.MinPosition
 		}
 	}
-	
+
 	return adjustedPositions
 }
 
 // adjustForMarketRegime 根据市场状态调整仓位
 func (dpo *DynamicPositionOptimizer) adjustForMarketRegime(
-	positions map[string]float64, 
+	positions map[string]float64,
 	regimes map[string]MarketRegime) map[string]*OptimalPosition {
-	
+
 	optimalPositions := make(map[string]*OptimalPosition)
-	
+
 	for symbol, position := range positions {
 		regime := regimes[symbol]
 		adjustedPosition := dpo.applyRegimeAdjustment(position, regime)
-		
+
 		optimalPositions[symbol] = &OptimalPosition{
-			Symbol:         symbol,
-			TargetWeight:   adjustedPosition,
-			OptimalSize:    adjustedPosition,
-			MarketRegime:   string(regime),
+			Symbol:           symbol,
+			TargetWeight:     adjustedPosition,
+			OptimalSize:      adjustedPosition,
+			MarketRegime:     string(regime),
 			OptimizationTime: time.Now(),
 		}
 	}
-	
+
 	return optimalPositions
 }
 
@@ -272,17 +270,17 @@ func (dpo *DynamicPositionOptimizer) applyRegimeAdjustment(position float64, reg
 
 // generateRebalanceSignals 生成重平衡信号
 func (dpo *DynamicPositionOptimizer) generateRebalanceSignals(
-	portfolio *exchange.Portfolio, 
+	positions []*exchange.Position,
 	optimalPositions map[string]*OptimalPosition) map[string]string {
-	
+
 	signals := make(map[string]string)
-	
+
 	for symbol, optimal := range optimalPositions {
-		current := dpo.getCurrentWeight(portfolio, symbol)
+		current := dpo.getCurrentWeightFromPositions(positions, symbol)
 		optimal.CurrentWeight = current
-		
+
 		deviation := math.Abs(optimal.TargetWeight - current)
-		
+
 		if deviation > 0.05 { // 5%阈值
 			if optimal.TargetWeight > current {
 				signals[symbol] = "INCREASE"
@@ -292,11 +290,32 @@ func (dpo *DynamicPositionOptimizer) generateRebalanceSignals(
 		} else {
 			signals[symbol] = "HOLD"
 		}
-		
+
 		optimal.RebalanceSignal = signals[symbol]
 	}
-	
+
 	return signals
+}
+
+// getCurrentWeightFromPositions 从持仓列表中计算当前权重
+func (dpo *DynamicPositionOptimizer) getCurrentWeightFromPositions(positions []*exchange.Position, symbol string) float64 {
+	totalValue := 0.0
+	symbolValue := 0.0
+
+	for _, pos := range positions {
+		posValue := pos.Size * pos.MarkPrice
+		totalValue += posValue
+
+		if pos.Symbol == symbol {
+			symbolValue = posValue
+		}
+	}
+
+	if totalValue == 0 {
+		return 0.0
+	}
+
+	return symbolValue / totalValue
 }
 
 // KellyCalculator Kelly公式计算器
@@ -315,18 +334,18 @@ func (kc *KellyCalculator) CalculateOptimalFraction(expectedReturn, volatility f
 	if volatility <= 0 {
 		return 0
 	}
-	
+
 	// Kelly公式: f* = (μ - r) / σ²
 	// 这里r假设为0（无风险利率）
 	kellyFraction := expectedReturn / (volatility * volatility)
-	
+
 	// 应用保守系数
 	return kellyFraction * kc.multiplier
 }
 
 // BlackLittermanModel Black-Litterman模型
 type BlackLittermanModel struct {
-	tau        float64 // 不确定性参数
+	tau          float64 // 不确定性参数
 	riskAversion float64 // 风险厌恶参数
 }
 
@@ -337,18 +356,19 @@ func NewBlackLittermanModel() *BlackLittermanModel {
 	}
 }
 
-func (bl *BlackLittermanModel) CalculateEquilibriumReturns(marketData map[string]*market.MarketData) map[string]float64 {
+func (bl *BlackLittermanModel) CalculateEquilibriumReturns(marketData map[string]*types.Kline) map[string]float64 {
 	// 简化实现：基于历史收益率计算均衡收益
 	returns := make(map[string]float64)
-	
+
 	for symbol, data := range marketData {
-		if len(data.Klines) > 0 {
-			// 计算年化收益率
-			annualizedReturn := bl.calculateAnnualizedReturn(data.Klines)
+		// 基于单个 K 线数据计算简化的年化收益率
+		if data.Close > 0 && data.Open > 0 {
+			dailyReturn := (data.Close - data.Open) / data.Open
+			annualizedReturn := dailyReturn * 365 // 简化的年化计算
 			returns[symbol] = annualizedReturn
 		}
 	}
-	
+
 	return returns
 }
 
@@ -356,22 +376,22 @@ func (bl *BlackLittermanModel) calculateAnnualizedReturn(klines []*market.Kline)
 	if len(klines) < 2 {
 		return 0
 	}
-	
+
 	// 简单的对数收益率计算
 	start := klines[0].Close
 	end := klines[len(klines)-1].Close
-	
+
 	if start <= 0 {
 		return 0
 	}
-	
+
 	return math.Log(end/start) * 365 / float64(len(klines))
 }
 
 func (bl *BlackLittermanModel) AdjustReturns(equilibriumReturns map[string]float64, views map[string]float64) map[string]float64 {
 	// 简化的Black-Litterman调整
 	adjustedReturns := make(map[string]float64)
-	
+
 	for symbol, equilibrium := range equilibriumReturns {
 		view, hasView := views[symbol]
 		if hasView {
@@ -382,17 +402,17 @@ func (bl *BlackLittermanModel) AdjustReturns(equilibriumReturns map[string]float
 			adjustedReturns[symbol] = equilibrium
 		}
 	}
-	
+
 	return adjustedReturns
 }
 
 // generateMarketViews 生成市场观点
 func (dpo *DynamicPositionOptimizer) generateMarketViews(
-	regimes map[string]MarketRegime, 
-	marketData map[string]*market.MarketData) map[string]float64 {
-	
+	regimes map[string]MarketRegime,
+	marketData map[string]*types.Kline) map[string]float64 {
+
 	views := make(map[string]float64)
-	
+
 	for symbol, regime := range regimes {
 		switch regime {
 		case RegimeBullish:
@@ -407,7 +427,7 @@ func (dpo *DynamicPositionOptimizer) generateMarketViews(
 			views[symbol] = 0.02 // 默认2%年化收益
 		}
 	}
-	
+
 	return views
 }
 
@@ -431,16 +451,7 @@ type RiskMetrics struct {
 	ConcentrationRisk   float64 `json:"concentration_risk"`
 }
 
-// 辅助方法
-func (dpo *DynamicPositionOptimizer) getCurrentWeight(portfolio *exchange.Portfolio, symbol string) float64 {
-	// 从投资组合获取当前权重
-	for _, allocation := range portfolio.Allocations {
-		if allocation.Symbol == symbol {
-			return allocation.Weight
-		}
-	}
-	return 0
-}
+// 辅助方法已移至上方的 getCurrentWeightFromPositions
 
 func (dpo *DynamicPositionOptimizer) updatePositionCache(positions map[string]*OptimalPosition) {
 	for symbol, position := range positions {
@@ -456,27 +467,27 @@ func (dpo *DynamicPositionOptimizer) getCachedOptimization() *PortfolioOptimizat
 }
 
 func (dpo *DynamicPositionOptimizer) calculateRiskMetrics(
-	positions map[string]*OptimalPosition, 
+	positions map[string]*OptimalPosition,
 	volatilities map[string]float64) *RiskMetrics {
-	
+
 	// 简化的风险指标计算
 	var portfolioVol, concentration float64
 	totalWeight := 0.0
-	
+
 	for symbol, position := range positions {
 		weight := math.Abs(position.TargetWeight)
 		totalWeight += weight
-		
+
 		if vol, exists := volatilities[symbol]; exists {
 			portfolioVol += weight * weight * vol * vol
 		}
-		
+
 		// 集中度风险 (赫芬达尔指数)
 		concentration += weight * weight
 	}
-	
+
 	portfolioVol = math.Sqrt(portfolioVol)
-	
+
 	return &RiskMetrics{
 		PortfolioVolatility: portfolioVol,
 		ConcentrationRisk:   concentration,
