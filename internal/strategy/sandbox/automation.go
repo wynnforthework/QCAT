@@ -150,8 +150,8 @@ func (s *AutomatedSandboxService) StartAutomatedTest(ctx context.Context, strate
 
 	s.testResults[testID] = result
 
-	// 创建模拟交易所
-	mockExchange := s.createMockExchange(testConfig)
+	// 创建纸上交易所（用于沙盒测试）
+	paperExchange := s.createPaperExchange(testConfig)
 
 	// 创建策略实例
 	strategyInstance, err := s.createStrategyInstance(strategyConfig)
@@ -162,7 +162,7 @@ func (s *AutomatedSandboxService) StartAutomatedTest(ctx context.Context, strate
 	}
 
 	// 创建沙盒
-	sandbox := NewSandbox(strategyInstance, strategyConfig.Params, mockExchange)
+	sandbox := NewSandbox(strategyInstance, strategyConfig.Params, paperExchange)
 	s.activeSandboxes[testID] = sandbox
 
 	// 启动沙盒测试
@@ -461,8 +461,8 @@ func (s *AutomatedSandboxService) generateRecommendation(result *TestResult) str
 	}
 }
 
-// createMockExchange 创建模拟交易所
-func (s *AutomatedSandboxService) createMockExchange(config *TestConfiguration) exchange.Exchange {
+// createPaperExchange 创建纸上交易所（用于沙盒测试）
+func (s *AutomatedSandboxService) createPaperExchange(config *TestConfiguration) exchange.Exchange {
 	// 创建初始余额
 	initialBalance := map[string]float64{
 		"USDT": 100000.0, // 10万USDT用于测试
