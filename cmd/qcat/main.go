@@ -11,6 +11,7 @@ import (
 	"qcat/internal/api"
 	"qcat/internal/config"
 	"qcat/internal/orchestrator"
+	"qcat/internal/strategy/workflow"
 )
 
 func main() {
@@ -48,11 +49,28 @@ func main() {
 		log.Fatalf("Failed to start automation system: %v", err)
 	}
 
-	// TODO: Initialize dual-loop system later after fixing dependencies
+	// Initialize multi-strategy workflow system with auto-start
+	log.Println("🔄 Starting Multi-Strategy Workflow System...")
+	db := server.GetDB()
+	if db != nil && db.DB != nil {
+		multiStrategySystem, err := workflow.NewMultiStrategyWorkflowSystem(nil, db.DB)
+		if err != nil {
+			log.Printf("Warning: Failed to create multi-strategy workflow system: %v", err)
+		} else {
+			if err := multiStrategySystem.Start(); err != nil {
+				log.Printf("Warning: Failed to start multi-strategy workflow system: %v", err)
+			} else {
+				log.Println("✅ Multi-Strategy Workflow System started with auto-start enabled!")
+			}
+		}
+	} else {
+		log.Println("⚠️  Database not available, multi-strategy system will run in limited mode")
+	}
+
 	log.Println("✅ Automation system started successfully!")
 	log.Println("   📊 26 automation features initialized")
 	log.Println("   🔧 13 critical features enabled by default")
-	log.Println("   🔄 Dual-loop system will be enabled in next version")
+	log.Println("   🔄 Multi-strategy auto-start system enabled")
 
 	// Add orchestrator handler to server
 	orchHandler := api.NewOrchestratorHandler(orch)

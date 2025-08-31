@@ -23,6 +23,7 @@ import (
 	"qcat/internal/security"
 	"qcat/internal/stability"
 	"qcat/internal/strategy"
+	"qcat/internal/strategy/optimizer"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -85,6 +86,7 @@ type Handlers struct {
 	Concurrent         *ConcurrentHandler
 	ResultSharing      *ResultSharingHandler
 	Settings           *SettingsHandler
+	AutoStart          *AutoStartHandler
 }
 
 // RateLimiter 速率限制器结构
@@ -256,7 +258,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	var redis cache.Cacher
 	var err error
 
-	// Try to connect to database, but don't fail if unavailable
+	// Try to connect to database
 	db, err = database.NewConnection(&database.Config{
 		Host:            cfg.Database.Host,
 		Port:            cfg.Database.Port,
@@ -435,8 +437,21 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		exchangeClient := binance.NewClient(exchangeConfig, rateLimiter)
 
 		// Create account manager
-		accountManager = account.NewManager(db.DB, redis, exchangeClient)
-		log.Printf("Account manager initialized successfully")
+		log.Printf("Debug: db=%v, redis=%v, exchangeClient=%v", db != nil, redis != nil, exchangeClient != nil)
+		if db != nil && db.DB != nil && exchangeClient != nil && redis != nil {
+			accountManager = account.NewManager(db.DB, redis, exchangeClient)
+			log.Printf("Account manager initialized successfully")
+		} else {
+			dbStatus := "nil"
+			if db != nil {
+				if db.DB != nil {
+					dbStatus = "ok"
+				} else {
+					dbStatus = "db.DB is nil"
+				}
+			}
+			log.Printf("Warning: Account manager not initialized due to missing dependencies (db: %s, redis: %v, exchange: %v)", dbStatus, redis != nil, exchangeClient != nil)
+		}
 	} else {
 		log.Printf("Warning: Binance API credentials not configured, running in demo mode")
 	}
@@ -460,11 +475,22 @@ func NewServer(cfg *config.Config) (*Server, error) {
 			exchangeClient = binance.NewClient(exchangeConfig, rateLimiter)
 		}
 
+		// Create optimizer factory
+		var optimizerFactory *optimizer.Factory
+		if db != nil && db.DB != nil {
+			optimizerFactory = optimizer.NewFactory()
+		}
+
 		// Create automation system (but don't start it here - will be started in main.go)
+		// 即使没有数据库也要创建自动化系统，它会在无数据库模式下运行
 		automationSystem = automation.NewAutomationSystem(
-			cfg, db, exchangeClient, accountManager, metricsCollector, nil,
+			cfg, db, exchangeClient, accountManager, metricsCollector, optimizerFactory,
 		)
-		log.Printf("Automation system initialized successfully (will be started by main)")
+		if automationSystem != nil {
+			log.Printf("Automation system initialized successfully (will be started by main)")
+		} else {
+			log.Printf("Warning: Failed to initialize automation system")
+		}
 	} else {
 		log.Printf("Warning: Automation system not initialized due to missing dependencies")
 	}
@@ -532,6 +558,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		Concurrent:         concurrentHandler,
 		ResultSharing:      NewResultSharingHandler(db, redis, metricsCollector),
 		Settings:           NewSettingsHandler(),
+		AutoStart:          NewAutoStartHandler(db),
 	}
 
 	// Store security components for middleware
@@ -578,8 +605,8 @@ func (s *Server) setupRoutes() {
 		s.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	}
 
-	// Basic metrics endpoint (always available)
-	s.router.GET("/metrics", func(c *gin.Context) {
+	// Basic health endpoint (always available)
+	s.router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":    "ok",
 			"timestamp": time.Now().UTC(),
@@ -640,6 +667,21 @@ func (s *Server) setupRoutes() {
 				strategy.POST("/:id/start", s.handlers.Strategy.StartStrategy)
 				strategy.POST("/:id/stop", s.handlers.Strategy.StopStrategy)
 				strategy.POST("/:id/backtest", s.handlers.Strategy.RunBacktest)
+
+				// Auto-start routes
+				if s.handlers.AutoStart != nil {
+					strategy.PUT("/:id/auto-start", s.handlers.AutoStart.UpdateStrategyAutoStart)
+				}
+			}
+
+			// Auto-start management routes
+			if s.handlers.AutoStart != nil {
+				autoStart := protected.Group("/auto-start")
+				{
+					autoStart.GET("/strategies", s.handlers.AutoStart.GetAutoStartStrategies)
+					autoStart.GET("/stats", s.handlers.AutoStart.GetAutoStartStats)
+					autoStart.POST("/trigger", s.handlers.AutoStart.TriggerAutoStart)
+				}
 			}
 
 			// Blacklist routes (all protected)
@@ -836,8 +878,8 @@ func (s *Server) setupRoutes() {
 		ws.GET("/alerts", s.handlers.WebSocket.AlertsStream)
 	}
 
-	// Health check
-	s.router.GET("/health", func(c *gin.Context) {
+	// Detailed health check endpoint (removed duplicate /health route)
+	s.router.GET("/health/detailed", func(c *gin.Context) {
 		// Check database health
 		dbHealth := "ok"
 		if s.db != nil {

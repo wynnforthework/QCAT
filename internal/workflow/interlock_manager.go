@@ -61,13 +61,14 @@ type TimeWindow struct {
 
 // InterlockRequest 互锁请求
 type InterlockRequest struct {
-	ID          string          `json:"id"`
-	FunctionID  int             `json:"function_id"`
-	RuleID      string          `json:"rule_id"`
-	RequestedAt time.Time       `json:"requested_at"`
-	Timeout     time.Duration   `json:"timeout"`
-	Priority    int             `json:"priority"`
-	Context     context.Context `json:"-"`
+	ID          string               `json:"id"`
+	FunctionID  int                  `json:"function_id"`
+	RuleID      string               `json:"rule_id"`
+	RequestedAt time.Time            `json:"requested_at"`
+	Timeout     time.Duration        `json:"timeout"`
+	Priority    int                  `json:"priority"`
+	Context     context.Context      `json:"-"`
+	resultChan  chan *InterlockGrant `json:"-"` // 用于通知授权结果
 }
 
 // InterlockGrant 互锁授权
@@ -240,6 +241,7 @@ func (im *InterlockManager) RequestLock(functionID int, ruleID string, timeout t
 		RequestedAt: time.Now(),
 		Timeout:     timeout,
 		Priority:    rule.Priority,
+		resultChan:  make(chan *InterlockGrant, 1),
 	}
 
 	im.requests[request.ID] = request
@@ -276,6 +278,11 @@ func (im *InterlockManager) tryGrantLock(request *InterlockRequest) *InterlockGr
 	im.mu.Lock()
 	defer im.mu.Unlock()
 
+	return im.tryGrantLockUnsafe(request)
+}
+
+// tryGrantLockUnsafe 尝试授权锁（不获取锁，调用者必须已持有锁）
+func (im *InterlockManager) tryGrantLockUnsafe(request *InterlockRequest) *InterlockGrant {
 	rule := im.rules[request.RuleID]
 
 	// 检查时间窗口
@@ -340,8 +347,10 @@ func (im *InterlockManager) ReleaseLock(grantID string) error {
 	log.Printf("释放互锁: 功能 %d, 规则 %s, 授权 %s",
 		grant.FunctionID, grant.RuleID, grantID)
 
-	// 处理等待队列
-	go im.processWaitQueue()
+	// 在释放锁之后处理等待队列
+	defer func() {
+		go im.processWaitQueue()
+	}()
 
 	return nil
 }
@@ -389,31 +398,36 @@ func (im *InterlockManager) getActiveGrantCount(ruleID string) int {
 
 // waitForGrant 等待授权
 func (im *InterlockManager) waitForGrant(request *InterlockRequest) (*InterlockGrant, error) {
+	// 创建一个通道来接收授权结果
+	resultChan := make(chan *InterlockGrant, 1)
+
+	// 将结果通道存储在请求中
+	im.mu.Lock()
+	if im.requests[request.ID] != nil {
+		im.requests[request.ID].resultChan = resultChan
+	}
+	im.mu.Unlock()
+
 	timeout := time.After(request.Timeout)
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
 
-	for {
-		select {
-		case <-timeout:
-			// 超时，从队列中移除请求
-			im.removeFromWaitQueue(request.ID)
-
-			im.statsMu.Lock()
-			im.stats.TimeoutRequests++
-			im.statsMu.Unlock()
-
-			im.emitEvent("request_timeout", request.RuleID, request.ID, request)
-
-			return nil, fmt.Errorf("request timeout after %v", request.Timeout)
-
-		case <-ticker.C:
-			// 定期检查是否可以授权
-			if grant := im.tryGrantLock(request); grant != nil {
-				im.removeFromWaitQueue(request.ID)
-				return grant, nil
-			}
+	select {
+	case grant := <-resultChan:
+		if grant != nil {
+			return grant, nil
 		}
+		return nil, fmt.Errorf("request failed")
+
+	case <-timeout:
+		// 超时，从队列中移除请求
+		im.removeFromWaitQueue(request.ID)
+
+		im.statsMu.Lock()
+		im.stats.TimeoutRequests++
+		im.statsMu.Unlock()
+
+		im.emitEvent("request_timeout", request.RuleID, request.ID, request)
+
+		return nil, fmt.Errorf("request timeout after %v", request.Timeout)
 	}
 }
 
@@ -462,10 +476,21 @@ func (im *InterlockManager) processWaitQueue() {
 	for i := 0; i < len(im.waitQueue); i++ {
 		request := im.waitQueue[i]
 
-		if grant := im.tryGrantLock(request); grant != nil {
+		if grant := im.tryGrantLockUnsafe(request); grant != nil {
 			// 从队列中移除
 			im.waitQueue = append(im.waitQueue[:i], im.waitQueue[i+1:]...)
 			i-- // 调整索引
+
+			// 通知等待的goroutine
+			if request.resultChan != nil {
+				select {
+				case request.resultChan <- grant:
+					// 通知成功
+				default:
+					// 通道已关闭或满了，记录警告
+					log.Printf("警告: 无法通知授权结果给请求 %s", request.ID)
+				}
+			}
 		}
 	}
 
@@ -518,6 +543,14 @@ func (im *InterlockManager) emitEvent(eventType, ruleID, requestID string, data 
 		Data:      data,
 		Timestamp: time.Now(),
 	}
+
+	// 安全地发送事件，处理通道关闭的情况
+	defer func() {
+		if r := recover(); r != nil {
+			// 通道已关闭，忽略panic
+			log.Printf("警告: 互锁事件通道已关闭，丢弃事件: %s", eventType)
+		}
+	}()
 
 	select {
 	case im.eventChan <- event:

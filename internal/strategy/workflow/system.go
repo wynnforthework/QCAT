@@ -2,12 +2,14 @@ package workflow
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"sync"
 	"time"
 
 	"qcat/internal/events"
+	"qcat/internal/strategy/autostart"
 	"qcat/internal/workflow/interfaces"
 )
 
@@ -19,9 +21,13 @@ type MultiStrategyWorkflowSystem struct {
 	tradingWorkflowEngine interfaces.WorkflowEngineInterface
 	strategyPool          *TradingStrategyPool
 	factorSyncService     *FactorSyncService
+	autoStartService      *autostart.AutoStartService
 
 	// 事件系统
 	eventBus *events.EventBus
+
+	// 数据库连接
+	db *sql.DB
 
 	// 配置
 	config *SystemConfig
@@ -90,7 +96,7 @@ type SystemStats struct {
 }
 
 // NewMultiStrategyWorkflowSystem 创建多策略工作流系统
-func NewMultiStrategyWorkflowSystem(config *SystemConfig) (*MultiStrategyWorkflowSystem, error) {
+func NewMultiStrategyWorkflowSystem(config *SystemConfig, db *sql.DB) (*MultiStrategyWorkflowSystem, error) {
 	if config == nil {
 		config = GetDefaultSystemConfig()
 	}
@@ -117,19 +123,24 @@ func NewMultiStrategyWorkflowSystem(config *SystemConfig) (*MultiStrategyWorkflo
 	var tradingWorkflowEngine interfaces.WorkflowEngineInterface = nil
 	// 注意：这里暂时设为nil，需要在系统启动时通过SetTradingWorkflowEngine注入
 
+	// 创建自动启动服务
+	autoStartService := autostart.NewAutoStartService(db, autostart.GetDefaultAutoStartConfig())
+
 	system := &MultiStrategyWorkflowSystem{
 		multiStrategyManager:  multiStrategyManager,
 		evolutionManager:      evolutionManager,
 		tradingWorkflowEngine: tradingWorkflowEngine,
 		strategyPool:          strategyPool,
 		factorSyncService:     factorSyncService,
+		autoStartService:      autoStartService,
 		eventBus:              eventBus,
 		config:                config,
 		ctx:                   ctx,
 		cancel:                cancel,
+		db:                    db,
 		stats: &SystemStats{
 			StartTime:       time.Now(),
-			ComponentsTotal: 5, // 五个主要组件
+			ComponentsTotal: 6, // 六个主要组件（包括自动启动服务）
 			LastUpdateTime:  time.Now(),
 		},
 	}
@@ -180,6 +191,17 @@ func (msws *MultiStrategyWorkflowSystem) Start() error {
 			return fmt.Errorf("failed to start trading workflow engine: %w", err)
 		}
 		msws.stats.ComponentsRunning++
+	}
+
+	// 启动自动启动服务
+	if msws.autoStartService != nil {
+
+		if err := msws.autoStartService.Start(); err != nil {
+			log.Printf("Warning: failed to start auto-start service: %v", err)
+		} else {
+			msws.stats.ComponentsRunning++
+			log.Println("策略自动启动服务已启动")
+		}
 	}
 
 	// 启动监控循环

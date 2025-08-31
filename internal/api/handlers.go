@@ -17,6 +17,7 @@ import (
 	"qcat/internal/database"
 	"qcat/internal/exchange/account"
 	"qcat/internal/monitor"
+	"qcat/internal/strategy/autostart"
 	"qcat/internal/strategy/lifecycle"
 	"qcat/internal/strategy/optimizer"
 	"qcat/internal/strategy/validation"
@@ -4864,4 +4865,217 @@ func (h *StrategyHandler) getDetailedStatusMessage(status string, updatedAt time
 	}
 
 	return "Unknown status"
+}
+
+// AutoStartHandler 自动启动处理器
+type AutoStartHandler struct {
+	db      *database.DB
+	service *autostart.AutoStartService
+}
+
+// NewAutoStartHandler 创建自动启动处理器
+func NewAutoStartHandler(db *database.DB) *AutoStartHandler {
+	service := autostart.NewAutoStartService(db.DB, autostart.GetDefaultAutoStartConfig())
+	return &AutoStartHandler{
+		db:      db,
+		service: service,
+	}
+}
+
+// UpdateStrategyAutoStart 更新策略自动启动设置
+func (h *AutoStartHandler) UpdateStrategyAutoStart(c *gin.Context) {
+	strategyID := c.Param("id")
+	if strategyID == "" {
+		c.JSON(http.StatusBadRequest, Response{
+			Success: false,
+			Error:   "Strategy ID is required",
+		})
+		return
+	}
+
+	var req struct {
+		AutoStart       bool `json:"auto_start"`
+		StartupPriority int  `json:"startup_priority"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, Response{
+			Success: false,
+			Error:   "Invalid request body: " + err.Error(),
+		})
+		return
+	}
+
+	// 验证优先级范围
+	if req.StartupPriority < 1 || req.StartupPriority > 100 {
+		c.JSON(http.StatusBadRequest, Response{
+			Success: false,
+			Error:   "Startup priority must be between 1 and 100",
+		})
+		return
+	}
+
+	// 更新数据库
+	query := `
+		UPDATE strategies
+		SET auto_start = $1, startup_priority = $2, updated_at = $3
+		WHERE id = $4
+	`
+
+	result, err := h.db.DB.Exec(query, req.AutoStart, req.StartupPriority, time.Now(), strategyID)
+	if err != nil {
+		log.Printf("Failed to update strategy auto-start settings: %v", err)
+		c.JSON(http.StatusInternalServerError, Response{
+			Success: false,
+			Error:   "Failed to update auto-start settings",
+		})
+		return
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		c.JSON(http.StatusNotFound, Response{
+			Success: false,
+			Error:   "Strategy not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Message: "Auto-start settings updated successfully",
+		Data: map[string]interface{}{
+			"strategy_id":      strategyID,
+			"auto_start":       req.AutoStart,
+			"startup_priority": req.StartupPriority,
+		},
+	})
+}
+
+// GetAutoStartStrategies 获取自动启动策略列表
+func (h *AutoStartHandler) GetAutoStartStrategies(c *gin.Context) {
+	query := `
+		SELECT id, name, type, status, enabled, auto_start,
+		       startup_priority, last_auto_start, is_running,
+		       created_at, updated_at
+		FROM strategies
+		WHERE auto_start = true
+		ORDER BY startup_priority ASC, name ASC
+	`
+
+	rows, err := h.db.DB.Query(query)
+	if err != nil {
+		log.Printf("Failed to query auto-start strategies: %v", err)
+		c.JSON(http.StatusInternalServerError, Response{
+			Success: false,
+			Error:   "Failed to query auto-start strategies",
+		})
+		return
+	}
+	defer rows.Close()
+
+	var strategies []map[string]interface{}
+	for rows.Next() {
+		var strategy struct {
+			ID              string         `json:"id"`
+			Name            string         `json:"name"`
+			Type            string         `json:"type"`
+			Status          string         `json:"status"`
+			Enabled         bool           `json:"enabled"`
+			AutoStart       bool           `json:"auto_start"`
+			StartupPriority int            `json:"startup_priority"`
+			LastAutoStart   sql.NullTime   `json:"last_auto_start"`
+			IsRunning       bool           `json:"is_running"`
+			CreatedAt       time.Time      `json:"created_at"`
+			UpdatedAt       time.Time      `json:"updated_at"`
+		}
+
+		err := rows.Scan(
+			&strategy.ID, &strategy.Name, &strategy.Type, &strategy.Status,
+			&strategy.Enabled, &strategy.AutoStart, &strategy.StartupPriority,
+			&strategy.LastAutoStart, &strategy.IsRunning,
+			&strategy.CreatedAt, &strategy.UpdatedAt,
+		)
+		if err != nil {
+			log.Printf("Failed to scan strategy row: %v", err)
+			continue
+		}
+
+		strategyMap := map[string]interface{}{
+			"id":               strategy.ID,
+			"name":             strategy.Name,
+			"type":             strategy.Type,
+			"status":           strategy.Status,
+			"enabled":          strategy.Enabled,
+			"auto_start":       strategy.AutoStart,
+			"startup_priority": strategy.StartupPriority,
+			"is_running":       strategy.IsRunning,
+			"created_at":       strategy.CreatedAt,
+			"updated_at":       strategy.UpdatedAt,
+		}
+
+		if strategy.LastAutoStart.Valid {
+			strategyMap["last_auto_start"] = strategy.LastAutoStart.Time
+		} else {
+			strategyMap["last_auto_start"] = nil
+		}
+
+		strategies = append(strategies, strategyMap)
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data: map[string]interface{}{
+			"strategies": strategies,
+			"total":      len(strategies),
+		},
+	})
+}
+
+// GetAutoStartStats 获取自动启动统计信息
+func (h *AutoStartHandler) GetAutoStartStats(c *gin.Context) {
+	if h.service == nil {
+		c.JSON(http.StatusServiceUnavailable, Response{
+			Success: false,
+			Error:   "Auto-start service not available",
+		})
+		return
+	}
+
+	stats := h.service.GetStats()
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data:    stats,
+	})
+}
+
+// TriggerAutoStart 手动触发自动启动
+func (h *AutoStartHandler) TriggerAutoStart(c *gin.Context) {
+	if h.service == nil {
+		c.JSON(http.StatusServiceUnavailable, Response{
+			Success: false,
+			Error:   "Auto-start service not available",
+		})
+		return
+	}
+
+	if !h.service.IsRunning() {
+		c.JSON(http.StatusServiceUnavailable, Response{
+			Success: false,
+			Error:   "Auto-start service is not running",
+		})
+		return
+	}
+
+	// 在后台触发自动启动
+	go func() {
+		if err := h.service.Start(); err != nil {
+			log.Printf("Manual auto-start trigger failed: %v", err)
+		}
+	}()
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Message: "Auto-start triggered successfully",
+	})
 }

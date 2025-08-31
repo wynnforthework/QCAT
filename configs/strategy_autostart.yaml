@@ -1,0 +1,95 @@
+# 策略自动启动配置
+strategy_autostart:
+  # 基本配置
+  enabled: true                    # 是否启用自动启动
+  startup_delay: "30s"            # 系统启动后延迟时间
+  max_concurrent_startups: 3       # 最大并发启动数
+  startup_timeout: "2m"           # 单个策略启动超时
+  
+  # 重试配置
+  max_retries: 2                  # 最大重试次数
+  retry_delay: "10s"              # 重试延迟
+  retry_backoff: 2.0              # 重试退避倍数
+  
+  # 验证配置
+  require_validation: true        # 是否需要验证
+  skip_failed_validation: true    # 跳过验证失败的策略
+  
+  # 安全配置
+  max_auto_start_per_batch: 3     # 每批最大自动启动数
+  batch_interval: "5s"            # 批次间隔
+  
+  # 策略选择配置
+  strategy_selection:
+    # 优先级配置
+    priority_levels:
+      high: 10      # 高优先级 (1-20)
+      medium: 50    # 中优先级 (21-80)
+      low: 100      # 低优先级 (81-100)
+    
+    # 过滤条件
+    filters:
+      min_performance_threshold: 0.05    # 最小性能阈值 5%
+      max_drawdown_threshold: 0.15       # 最大回撤阈值 15%
+      min_sharpe_ratio: 0.5              # 最小夏普比率
+      exclude_new_strategies_days: 7     # 排除新策略天数
+      
+    # 风险控制
+    risk_control:
+      max_high_risk_strategies: 2        # 最多高风险策略数
+      max_total_risk_exposure: 0.3       # 最大总风险敞口
+      require_risk_assessment: true      # 需要风险评估
+  
+  # 监控配置
+  monitoring:
+    startup_monitoring_duration: "10m"  # 启动后监控时长
+    health_check_interval: "30s"        # 健康检查间隔
+    auto_stop_on_failure: true          # 失败时自动停止
+    
+  # 日志配置
+  logging:
+    log_level: "info"                   # 日志级别
+    log_startup_details: true           # 记录启动详情
+    log_performance_metrics: true       # 记录性能指标
+    
+# 策略启动顺序配置
+startup_sequence:
+  # 第一批：核心策略（高优先级）
+  batch_1:
+    priority_range: [1, 20]
+    max_strategies: 2
+    startup_delay: "0s"
+    
+  # 第二批：辅助策略（中优先级）
+  batch_2:
+    priority_range: [21, 80]
+    max_strategies: 3
+    startup_delay: "30s"
+    
+  # 第三批：实验策略（低优先级）
+  batch_3:
+    priority_range: [81, 100]
+    max_strategies: 5
+    startup_delay: "60s"
+
+# 故障恢复配置
+failure_recovery:
+  # 自动重启配置
+  auto_restart:
+    enabled: true
+    max_restart_attempts: 3
+    restart_delay: "1m"
+    restart_backoff: 2.0
+    
+  # 故障转移配置
+  failover:
+    enabled: true
+    backup_strategies: []           # 备用策略ID列表
+    failover_threshold: 3           # 故障转移阈值
+    
+  # 降级策略
+  degradation:
+    enabled: true
+    reduce_position_size: true      # 减少仓位大小
+    increase_stop_loss: true        # 增加止损
+    disable_new_positions: false    # 禁用新仓位

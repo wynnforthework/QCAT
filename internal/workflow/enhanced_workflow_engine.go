@@ -96,10 +96,24 @@ func NewEnhancedWorkflowEngine(maxConcurrency int) *EnhancedWorkflowEngine {
 	// 初始化互锁规则
 	engine.initializeInterlockRules()
 
+	// 注册默认执行器
+	engine.registerDefaultExecutors()
+
 	// 启动事件处理器
 	go engine.processEvents()
 
 	return engine
+}
+
+// registerDefaultExecutors 注册默认执行器
+func (ewe *EnhancedWorkflowEngine) registerDefaultExecutors() {
+	executors := CreateDefaultExecutors()
+	for id, executor := range executors {
+		if err := ewe.RegisterExecutor(id, executor); err != nil {
+			log.Printf("注册执行器失败: 功能 %d - %v", id, err)
+		}
+	}
+	log.Printf("已注册 %d 个默认执行器", len(executors))
 }
 
 // initializeResourcePools 初始化资源池
