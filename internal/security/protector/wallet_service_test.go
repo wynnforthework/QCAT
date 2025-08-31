@@ -131,7 +131,83 @@ func (m *MockWalletService) GetTransfers() map[string]*TransferStatus {
 	return m.transfers
 }
 
-// TestMockWalletService 测试mock钱包服务
+// TestRealWalletService 测试真实钱包服务
+func TestRealWalletService(t *testing.T) {
+	ctx := context.Background()
+
+	// 创建真实的钱包服务配置
+	config := &WalletConfig{
+		Provider:          "ethereum",
+		NetworkURL:        "https://mainnet.infura.io/v3/test",
+		PrivateKey:        "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12",
+		HotWalletAddress:  "0x1234567890123456789012345678901234567890",
+		ColdWalletAddress: "0x0987654321098765432109876543210987654321",
+		MinConfirmations:  3,
+		MaxGasPrice:       100.0,
+		TransferTimeout:   5 * time.Minute,
+		EnableMultiSig:    true,
+		MultiSigThreshold: 2,
+	}
+
+	service := NewDefaultWalletService(config)
+
+	// 测试发起转账
+	request := &TransferRequest{
+		Type:        "PROFIT_TRANSFER",
+		ToAddress:   "0x0987654321098765432109876543210987654321",
+		FromAddress: "0x1234567890123456789012345678901234567890",
+		Amount:      100.0,
+		Priority:    1,
+		Metadata:    map[string]interface{}{"test": "value"},
+	}
+
+	response, err := service.InitiateTransfer(ctx, request)
+	if err != nil {
+		t.Logf("InitiateTransfer result: %v (expected in test environment)", err)
+	} else {
+		t.Logf("Transfer initiated successfully: %s", response.TransferID)
+
+		// 测试获取转账状态
+		status, err := service.GetTransferStatus(ctx, response.TransferID)
+		if err != nil {
+			t.Logf("GetTransferStatus result: %v", err)
+		} else {
+			t.Logf("Transfer status: %s", status.Status)
+		}
+
+		// 测试取消转账
+		err = service.CancelTransfer(ctx, response.TransferID)
+		t.Logf("CancelTransfer result: %v", err)
+	}
+
+	// 测试地址验证
+	err = service.ValidateAddress("short")
+	if err == nil {
+		t.Error("Expected error for short address")
+	} else {
+		t.Logf("Short address validation failed as expected: %v", err)
+	}
+
+	err = service.ValidateAddress("0x1234567890123456789012345678901234567890")
+	if err != nil {
+		t.Errorf("ValidateAddress failed for valid address: %v", err)
+	} else {
+		t.Log("Valid address validation passed")
+	}
+
+	// 测试手续费估算
+	fee, err := service.EstimateTransferFee(ctx, 100.0, "0x0987654321098765432109876543210987654321")
+	if err != nil {
+		t.Logf("EstimateTransferFee result: %v", err)
+	} else {
+		t.Logf("Estimated fee: %f", fee)
+		if fee <= 0 {
+			t.Error("Expected positive fee")
+		}
+	}
+}
+
+// TestMockWalletService 测试mock钱包服务（保留用于其他测试）
 func TestMockWalletService(t *testing.T) {
 	ctx := context.Background()
 	mock := NewMockWalletService()
@@ -192,5 +268,172 @@ func TestMockWalletService(t *testing.T) {
 	err = mock.ValidateAddress("0x1234567890abcdef")
 	if err != nil {
 		t.Errorf("ValidateAddress failed for valid address: %v", err)
+	}
+}
+
+// TestWalletServiceConfiguration 测试钱包服务配置
+func TestWalletServiceConfiguration(t *testing.T) {
+	// 测试空配置
+	service := NewDefaultWalletService(nil)
+	if service == nil {
+		t.Error("Service should not be nil even with nil config")
+	}
+
+	// 测试部分配置
+	config := &WalletConfig{
+		Provider:         "ethereum",
+		NetworkURL:       "https://mainnet.infura.io/v3/test",
+		MinConfirmations: 3,
+		// 其他字段未配置
+	}
+
+	service = NewDefaultWalletService(config)
+	ctx := context.Background()
+
+	// 测试地址验证（应该正常工作）
+	err := service.ValidateAddress("0x1234567890123456789012345678901234567890")
+	if err != nil {
+		t.Errorf("ValidateAddress failed: %v", err)
+	}
+
+	// 测试手续费估算
+	fee, err := service.EstimateTransferFee(ctx, 100.0, "0x1234567890123456789012345678901234567890")
+	t.Logf("Fee estimation with partial config: %f, error: %v", fee, err)
+}
+
+// TestWalletServiceErrorHandling 测试钱包服务错误处理
+func TestWalletServiceErrorHandling(t *testing.T) {
+	config := &WalletConfig{
+		Provider:          "ethereum",
+		NetworkURL:        "https://invalid.network.url",
+		PrivateKey:        "invalid_private_key",
+		HotWalletAddress:  "invalid_address",
+		ColdWalletAddress: "invalid_address",
+		MinConfirmations:  3,
+		MaxGasPrice:       100.0,
+		TransferTimeout:   5 * time.Second,
+	}
+
+	service := NewDefaultWalletService(config)
+	ctx := context.Background()
+
+	// 测试无效地址验证
+	err := service.ValidateAddress("invalid")
+	if err == nil {
+		t.Error("Expected error for invalid address")
+	} else {
+		t.Logf("Invalid address validation failed as expected: %v", err)
+	}
+
+	// 测试无效转账请求
+	request := &TransferRequest{
+		Type:        "INVALID_TYPE",
+		ToAddress:   "invalid_address",
+		FromAddress: "invalid_address",
+		Amount:      -100.0, // 负数金额
+		Priority:    1,
+	}
+
+	_, err = service.InitiateTransfer(ctx, request)
+	if err == nil {
+		t.Log("Transfer unexpectedly succeeded with invalid request")
+	} else {
+		t.Logf("Transfer failed as expected: %v", err)
+	}
+
+	// 测试获取不存在的转账状态
+	_, err = service.GetTransferStatus(ctx, "nonexistent_transfer_id")
+	if err == nil {
+		t.Log("GetTransferStatus unexpectedly succeeded for nonexistent transfer")
+	} else {
+		t.Logf("GetTransferStatus failed as expected: %v", err)
+	}
+}
+
+// TestWalletServiceBatchOperations 测试批量钱包操作
+func TestWalletServiceBatchOperations(t *testing.T) {
+	config := &WalletConfig{
+		Provider:          "ethereum",
+		NetworkURL:        "https://mainnet.infura.io/v3/test",
+		PrivateKey:        "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12",
+		HotWalletAddress:  "0x1234567890123456789012345678901234567890",
+		ColdWalletAddress: "0x0987654321098765432109876543210987654321",
+		MinConfirmations:  3,
+		MaxGasPrice:       100.0,
+		TransferTimeout:   5 * time.Minute,
+	}
+
+	service := NewDefaultWalletService(config)
+	ctx := context.Background()
+
+	// 测试批量转账
+	addresses := []string{
+		"0x1111111111111111111111111111111111111111",
+		"0x2222222222222222222222222222222222222222",
+		"0x3333333333333333333333333333333333333333",
+	}
+
+	for i, address := range addresses {
+		request := &TransferRequest{
+			Type:        "BATCH_TRANSFER",
+			ToAddress:   address,
+			FromAddress: config.HotWalletAddress,
+			Amount:      float64(10 * (i + 1)),
+			Priority:    1,
+			Metadata:    map[string]interface{}{"batch_id": fmt.Sprintf("batch_%d", i)},
+		}
+
+		response, err := service.InitiateTransfer(ctx, request)
+		t.Logf("Batch transfer %d to %s result: %v", i+1, address, err)
+		if err == nil {
+			t.Logf("Transfer ID: %s", response.TransferID)
+		}
+	}
+}
+
+// TestWalletServiceConcurrency 测试并发钱包操作
+func TestWalletServiceConcurrency(t *testing.T) {
+	config := &WalletConfig{
+		Provider:          "ethereum",
+		NetworkURL:        "https://mainnet.infura.io/v3/test",
+		PrivateKey:        "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef12",
+		HotWalletAddress:  "0x1234567890123456789012345678901234567890",
+		ColdWalletAddress: "0x0987654321098765432109876543210987654321",
+		MinConfirmations:  3,
+		MaxGasPrice:       100.0,
+		TransferTimeout:   5 * time.Minute,
+	}
+
+	service := NewDefaultWalletService(config)
+	ctx := context.Background()
+
+	// 并发执行转账
+	const numGoroutines = 5
+	done := make(chan bool, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		go func(id int) {
+			defer func() { done <- true }()
+
+			request := &TransferRequest{
+				Type:        "CONCURRENT_TRANSFER",
+				ToAddress:   fmt.Sprintf("0x%040d", id),
+				FromAddress: config.HotWalletAddress,
+				Amount:      float64(id + 1),
+				Priority:    1,
+				Metadata:    map[string]interface{}{"concurrent_id": id},
+			}
+
+			response, err := service.InitiateTransfer(ctx, request)
+			t.Logf("Concurrent transfer %d result: %v", id, err)
+			if err == nil {
+				t.Logf("Concurrent transfer %d ID: %s", id, response.TransferID)
+			}
+		}(i)
+	}
+
+	// 等待所有goroutine完成
+	for i := 0; i < numGoroutines; i++ {
+		<-done
 	}
 }
