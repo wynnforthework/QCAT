@@ -1,9 +1,9 @@
 @echo off
 echo =========================================
-echo  Killing processes on ports 8081, 8082, 3000
+echo  Killing processes on ports 8081, 8082, 3000, 3001
 echo =========================================
 
-for %%p in (8081 8082 3000) do (
+for %%p in (8081 8082 3000 3001) do (
     echo Checking port %%p ...
     for /f "tokens=5" %%a in ('netstat -ano ^| findstr :%%p') do (
         echo Killing PID %%a on port %%p ...

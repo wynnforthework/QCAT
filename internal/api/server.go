@@ -29,6 +29,8 @@ import (
 	"github.com/gorilla/websocket"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+
+	_ "qcat/docs" // Import generated docs
 )
 
 // Global metrics collector to avoid duplicate registration
@@ -501,18 +503,10 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	// Note: Automation system startup moved to main.go to prevent duplicate initialization
 
 	// Initialize workflow system for unified strategy service
-	var unifiedStrategyHandler *UnifiedStrategyHandler
-	if db != nil {
-		// Import the workflow package
-		// workflowSystem, err := workflow.NewMultiStrategyWorkflowSystem(nil)
-		// if err != nil {
-		//     log.Printf("Warning: Failed to create workflow system: %v", err)
-		// }
-
-		// Create unified strategy service (without workflow system for now)
-		unifiedService := strategy.NewUnifiedStrategyService(db, redis, metricsCollector, nil)
-		unifiedStrategyHandler = NewUnifiedStrategyHandler(unifiedService)
-	}
+	// Always create UnifiedStrategy handler to ensure routes are registered
+	// The service will handle database unavailability gracefully
+	unifiedService := strategy.NewUnifiedStrategyService(db, redis, metricsCollector, nil)
+	unifiedStrategyHandler := NewUnifiedStrategyHandler(unifiedService)
 
 	// Initialize handlers with dependencies
 	// Handle database-dependent handlers safely

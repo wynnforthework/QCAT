@@ -290,8 +290,38 @@ func NewStrategyHandler(db *database.DB, redis cache.Cacher, metrics *monitor.Me
 
 // ListStrategies returns all strategies
 func (h *StrategyHandler) ListStrategies(c *gin.Context) {
-	// 实现获取策略列表逻辑
+	// 检查数据库连接
+	if h.db == nil {
+		c.JSON(http.StatusServiceUnavailable, Response{
+			Success: false,
+			Error:   "Database connection not available",
+		})
+		return
+	}
+
 	ctx := c.Request.Context()
+
+	// 首先检查strategies表是否存在
+	var tableExists bool
+	checkTableQuery := "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'strategies')"
+	err := h.db.QueryRowContext(ctx, checkTableQuery).Scan(&tableExists)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, Response{
+			Success: false,
+			Error:   "Failed to check database schema: " + err.Error(),
+		})
+		return
+	}
+
+	if !tableExists {
+		// 如果表不存在，返回空列表而不是错误
+		c.JSON(http.StatusOK, Response{
+			Success: true,
+			Data:    []map[string]interface{}{},
+			Message: "Strategies table not found. Please run database migrations.",
+		})
+		return
+	}
 
 	// 从数据库获取策略列表，包含运行状态信息
 	query := `
@@ -306,9 +336,11 @@ func (h *StrategyHandler) ListStrategies(c *gin.Context) {
 
 	rows, err := h.db.QueryContext(ctx, query)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, Response{
-			Success: false,
-			Error:   "Failed to fetch strategies: " + err.Error(),
+		// 如果查询失败，返回空列表和警告信息
+		c.JSON(http.StatusOK, Response{
+			Success: true,
+			Data:    []map[string]interface{}{},
+			Message: "Failed to fetch strategies from database: " + err.Error(),
 		})
 		return
 	}

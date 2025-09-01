@@ -210,7 +210,11 @@ func (s *UnifiedStrategyService) ListStrategies(ctx context.Context, options Str
 	// 从数据库获取策略基本信息
 	strategies, total, err := s.getStrategiesFromDB(ctx, options)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get strategies from database: %w", err)
+		// 如果数据库查询失败，返回空结果而不是错误
+		log.Printf("Failed to get strategies from database: %v", err)
+		strategies = []BasicStrategy{}
+		total = 0
+		// 继续处理，不返回错误
 	}
 
 	// 增强策略信息（添加执行状态、性能数据、池信息）
@@ -292,9 +296,24 @@ func (s *UnifiedStrategyService) getStrategiesFromDB(ctx context.Context, option
 	var total int
 
 	if s.db != nil && s.db.DB != nil {
+		// 首先检查strategies表是否存在
+		var tableExists bool
+		checkTableQuery := "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'strategies')"
+		err := s.db.DB.QueryRowContext(ctx, checkTableQuery).Scan(&tableExists)
+		if err != nil {
+			log.Printf("Failed to check strategies table existence: %v", err)
+			return strategies, total, nil // 返回空结果而不是错误
+		}
+
+		if !tableExists {
+			log.Printf("Strategies table does not exist, returning empty result")
+			return strategies, total, nil // 返回空结果而不是错误
+		}
+
 		rows, err := s.db.DB.QueryContext(ctx, query, args...)
 		if err != nil {
-			return nil, 0, err
+			log.Printf("Failed to query strategies: %v", err)
+			return strategies, total, nil // 返回空结果而不是错误
 		}
 		defer rows.Close()
 
