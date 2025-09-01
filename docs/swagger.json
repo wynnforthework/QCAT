@@ -208,6 +208,189 @@
                     }
                 }
             }
+        },
+        "/api/v1/dashboard": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取系统概览和关键指标",
+                "produces": ["application/json"],
+                "tags": ["仪表盘"],
+                "summary": "获取仪表盘数据",
+                "responses": {
+                    "200": {
+                        "description": "仪表盘数据",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/api/v1/portfolio/overview": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取投资组合的整体状态和收益情况",
+                "produces": ["application/json"],
+                "tags": ["投资组合"],
+                "summary": "获取投资组合概览",
+                "responses": {
+                    "200": {
+                        "description": "投资组合概览",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/api/v1/risk/overview": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取系统整体风险状况",
+                "produces": ["application/json"],
+                "tags": ["风险管理"],
+                "summary": "获取风险概览",
+                "responses": {
+                    "200": {
+                        "description": "风险概览",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/api/v1/market/data": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取实时市场行情数据",
+                "produces": ["application/json"],
+                "tags": ["市场数据"],
+                "summary": "获取市场数据",
+                "responses": {
+                    "200": {
+                        "description": "市场数据",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/api/v1/trading/activity": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取最近的交易活动记录",
+                "produces": ["application/json"],
+                "tags": ["交易活动"],
+                "summary": "获取交易活动",
+                "responses": {
+                    "200": {
+                        "description": "交易活动",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/api/v1/metrics/system": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取系统性能和资源使用情况",
+                "produces": ["application/json"],
+                "tags": ["系统监控"],
+                "summary": "获取系统指标",
+                "responses": {
+                    "200": {
+                        "description": "系统指标",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/api/v1/audit/logs": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取系统操作的审计日志",
+                "produces": ["application/json"],
+                "tags": ["审计日志"],
+                "summary": "获取审计日志",
+                "responses": {
+                    "200": {
+                        "description": "审计日志",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/api/v1/cache/status": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取缓存系统的运行状态",
+                "produces": ["application/json"],
+                "tags": ["缓存管理"],
+                "summary": "获取缓存状态",
+                "responses": {
+                    "200": {
+                        "description": "缓存状态",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/api/v1/automation/status": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取自动化系统的运行状态",
+                "produces": ["application/json"],
+                "tags": ["自动化系统"],
+                "summary": "获取自动化状态",
+                "responses": {
+                    "200": {
+                        "description": "自动化状态",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/api/v1/orchestrator/status": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取系统编排器的运行状态",
+                "produces": ["application/json"],
+                "tags": ["系统编排"],
+                "summary": "获取编排器状态",
+                "responses": {
+                    "200": {
+                        "description": "编排器状态",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/api/v1/settings": {
+            "get": {
+                "description": "获取当前系统配置设置",
+                "produces": ["application/json"],
+                "tags": ["系统设置"],
+                "summary": "获取系统设置",
+                "responses": {
+                    "200": {
+                        "description": "系统设置",
+                        "schema": {"type": "object"}
+                    }
+                }
+            },
+            "put": {
+                "description": "更新系统配置设置",
+                "consumes": ["application/json"],
+                "produces": ["application/json"],
+                "tags": ["系统设置"],
+                "summary": "更新系统设置",
+                "parameters": [{
+                    "name": "body",
+                    "in": "body",
+                    "required": true,
+                    "schema": {"type": "object"}
+                }],
+                "responses": {
+                    "200": {
+                        "description": "设置更新成功",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
         }
     },
     "securityDefinitions": {
