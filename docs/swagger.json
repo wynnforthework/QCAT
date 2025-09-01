@@ -359,6 +359,306 @@
                 }
             }
         },
+        "/auto-start/strategies": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取配置为自动启动的策略列表",
+                "produces": ["application/json"],
+                "tags": ["自动启动"],
+                "summary": "获取自动启动策略",
+                "responses": {
+                    "200": {
+                        "description": "自动启动策略列表",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/auto-start/stats": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取自动启动的执行统计信息",
+                "produces": ["application/json"],
+                "tags": ["自动启动"],
+                "summary": "获取自动启动统计",
+                "responses": {
+                    "200": {
+                        "description": "自动启动统计",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/blacklist/": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取策略黑名单列表",
+                "produces": ["application/json"],
+                "tags": ["黑名单管理"],
+                "summary": "获取黑名单列表",
+                "responses": {
+                    "200": {
+                        "description": "黑名单列表",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/workflow/dependency-graph": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取工作流依赖图",
+                "produces": ["application/json"],
+                "tags": ["工作流"],
+                "summary": "获取依赖图",
+                "responses": {
+                    "200": {
+                        "description": "工作流依赖图",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/workflow/results": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取工作流执行结果",
+                "produces": ["application/json"],
+                "tags": ["工作流"],
+                "summary": "获取执行结果",
+                "responses": {
+                    "200": {
+                        "description": "工作流执行结果",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/workflow/status": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取工作流状态",
+                "produces": ["application/json"],
+                "tags": ["工作流"],
+                "summary": "获取工作流状态",
+                "responses": {
+                    "200": {
+                        "description": "工作流状态",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/workflow/validate": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "验证工作流配置",
+                "produces": ["application/json"],
+                "tags": ["工作流"],
+                "summary": "工作流验证",
+                "responses": {
+                    "200": {
+                        "description": "验证结果",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/workflow/enabled": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取启用的工作流功能",
+                "produces": ["application/json"],
+                "tags": ["工作流"],
+                "summary": "获取启用的功能",
+                "responses": {
+                    "200": {
+                        "description": "启用的功能列表",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/concurrent/pools": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取并发线程池状态",
+                "produces": ["application/json"],
+                "tags": ["并发管理"],
+                "summary": "获取线程池状态",
+                "responses": {
+                    "200": {
+                        "description": "线程池状态",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/concurrent/monitor": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取并发监控统计",
+                "produces": ["application/json"],
+                "tags": ["并发管理"],
+                "summary": "获取监控统计",
+                "responses": {
+                    "200": {
+                        "description": "监控统计",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/emergency/status": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取紧急停止状态",
+                "produces": ["application/json"],
+                "tags": ["紧急停止"],
+                "summary": "获取紧急停止状态",
+                "responses": {
+                    "200": {
+                        "description": "紧急停止状态",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/emergency/history": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取紧急停止历史记录",
+                "produces": ["application/json"],
+                "tags": ["紧急停止"],
+                "summary": "获取紧急停止历史",
+                "responses": {
+                    "200": {
+                        "description": "紧急停止历史",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/memory/stats": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取系统内存使用统计",
+                "produces": ["application/json"],
+                "tags": ["系统稳定性"],
+                "summary": "获取内存统计",
+                "responses": {
+                    "200": {
+                        "description": "内存统计",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/network/connections": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取网络连接状态",
+                "produces": ["application/json"],
+                "tags": ["系统稳定性"],
+                "summary": "获取网络连接",
+                "responses": {
+                    "200": {
+                        "description": "网络连接状态",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/health/status": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取系统健康状态",
+                "produces": ["application/json"],
+                "tags": ["系统稳定性"],
+                "summary": "获取健康状态",
+                "responses": {
+                    "200": {
+                        "description": "健康状态",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/health/checks": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "执行系统健康检查",
+                "produces": ["application/json"],
+                "tags": ["系统稳定性"],
+                "summary": "获取健康检查",
+                "responses": {
+                    "200": {
+                        "description": "健康检查结果",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/validation/strategies": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取策略验证状态",
+                "produces": ["application/json"],
+                "tags": ["策略验证"],
+                "summary": "获取策略验证状态",
+                "responses": {
+                    "200": {
+                        "description": "策略验证状态",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/validation/problems": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取策略验证问题",
+                "produces": ["application/json"],
+                "tags": ["策略验证"],
+                "summary": "获取策略问题",
+                "responses": {
+                    "200": {
+                        "description": "策略验证问题",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/optimizer/tasks": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取优化任务列表",
+                "produces": ["application/json"],
+                "tags": ["优化器"],
+                "summary": "获取优化任务列表",
+                "responses": {
+                    "200": {
+                        "description": "优化任务列表",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
+        "/shared-results": {
+            "get": {
+                "security": [{"BearerAuth": []}],
+                "description": "获取分享的结果列表",
+                "produces": ["application/json"],
+                "tags": ["结果分享"],
+                "summary": "获取分享结果",
+                "responses": {
+                    "200": {
+                        "description": "分享结果列表",
+                        "schema": {"type": "object"}
+                    }
+                }
+            }
+        },
         "/settings": {
             "get": {
                 "description": "获取当前系统配置设置",
