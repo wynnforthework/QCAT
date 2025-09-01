@@ -173,6 +173,9 @@ func (ec *EmergencyCloser) getSymbolsWithOpenOrders(ctx context.Context) ([]stri
 
 // closePosition closes a single position using market order
 func (ec *EmergencyCloser) closePosition(ctx context.Context, position *exchange.Position) error {
+	// 标准化交易对符号
+	normalizedSymbol := normalizeSymbol(position.Symbol)
+
 	// Determine the side for closing the position
 	var side string
 	closeQuantity := math.Abs(position.Size)
@@ -184,9 +187,6 @@ func (ec *EmergencyCloser) closePosition(ctx context.Context, position *exchange
 		// Short position - buy to close
 		side = "BUY"
 	}
-
-	// Normalize symbol to ensure it's in the correct format for the exchange
-	normalizedSymbol := normalizeSymbol(position.Symbol)
 
 	// Create market order to close position
 	orderReq := &exchange.OrderRequest{
@@ -275,18 +275,25 @@ func main() {
 func normalizeSymbol(symbol string) string {
 	// 移除常见的分隔符和后缀
 	normalized := strings.ToUpper(symbol)
+	original := normalized
 
 	// 处理格式如 "ETH/USDT:USDT" -> "ETHUSDT"
 	if strings.Contains(normalized, "/") {
 		parts := strings.Split(normalized, "/")
 		if len(parts) >= 2 {
-			base := parts[0]
-			quote := parts[1]
+			base := strings.TrimSpace(parts[0])
+			quote := strings.TrimSpace(parts[1])
+
 			// 移除冒号后的部分，如 "USDT:USDT" -> "USDT"
 			if strings.Contains(quote, ":") {
-				quote = strings.Split(quote, ":")[0]
+				quoteParts := strings.Split(quote, ":")
+				quote = strings.TrimSpace(quoteParts[0])
 			}
-			normalized = base + quote
+
+			// 验证base和quote不为空
+			if base != "" && quote != "" {
+				normalized = base + quote
+			}
 		}
 	}
 
@@ -299,7 +306,60 @@ func normalizeSymbol(symbol string) string {
 	// 移除其他特殊字符
 	normalized = strings.ReplaceAll(normalized, ":", "")
 	normalized = strings.ReplaceAll(normalized, ".", "")
+	normalized = strings.ReplaceAll(normalized, " ", "")
 
-	log.Printf("Symbol normalized: %s -> %s", symbol, normalized)
+	// 验证结果格式
+	if !isValidSymbolFormat(normalized) {
+		log.Printf("Warning: Symbol format may be invalid after normalization: %s -> %s", original, normalized)
+		// 尝试修复常见问题
+		normalized = fixCommonSymbolIssues(normalized)
+	}
+
+	log.Printf("Symbol normalized: %s -> %s", original, normalized)
 	return normalized
+}
+
+// isValidSymbolFormat 验证符号格式是否有效
+func isValidSymbolFormat(symbol string) bool {
+	// 基本长度检查
+	if len(symbol) < 6 || len(symbol) > 20 {
+		return false
+	}
+
+	// 检查是否只包含字母和数字
+	for _, r := range symbol {
+		if !((r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')) {
+			return false
+		}
+	}
+
+	// 检查是否以常见的计价货币结尾
+	commonQuotes := []string{"USDT", "USDC", "BTC", "ETH", "BNB", "BUSD"}
+	for _, quote := range commonQuotes {
+		if strings.HasSuffix(symbol, quote) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// fixCommonSymbolIssues 修复常见的符号问题
+func fixCommonSymbolIssues(symbol string) string {
+	// 移除重复的USDT
+	if strings.Contains(symbol, "USDTUSDT") {
+		symbol = strings.ReplaceAll(symbol, "USDTUSDT", "USDT")
+	}
+
+	// 移除重复的BTC
+	if strings.Contains(symbol, "BTCBTC") {
+		symbol = strings.ReplaceAll(symbol, "BTCBTC", "BTC")
+	}
+
+	// 移除重复的ETH
+	if strings.Contains(symbol, "ETHETH") {
+		symbol = strings.ReplaceAll(symbol, "ETHETH", "ETH")
+	}
+
+	return symbol
 }
