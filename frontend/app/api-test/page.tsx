@@ -1092,7 +1092,7 @@ const API_ENDPOINTS: ApiEndpoint[] = [
 
   // 系统稳定性
   {
-    id: 'memory-stats',
+    id: 'memory-stats-stability',
     name: '内存统计',
     method: 'GET',
     path: '/api/v1/memory/stats',
