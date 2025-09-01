@@ -1,629 +1,150 @@
 # 开发修复清单（来自 report.md）
 
 
-## ./internal\api\api_test.go
-- [ ] `./internal\api\api_test.go:79` — **mock** — // Create test strategy data directly instead of using mock generator
 
-## ./internal\api\handlers.go
-- [ ] `./internal\api\handlers.go:54` — **mock** — // Create a mock orchestrator when database is not available
+## ./internal\security\protector\fund_protector_test.go ✅ COMPLETED
+- [x] `./internal\security\protector\fund_protector_test.go:22` — **mock** — exchangeProvider := NewMockExchangeProvider()
+- [x] `./internal\security\protector\fund_protector_test.go:23` — **mock** — mockNotificationService := NewMockNotificationService()
+- [x] `./internal\security\protector\fund_protector_test.go:24` — **mock** — mockWalletService := NewMockWalletService()
+- [x] `./internal\security\protector\fund_protector_test.go:25` — **mock** — var mockExchange exchange.Exchange
+- [x] `./internal\security\protector\fund_protector_test.go:26` — **mock** — var mockDAOManager dao.DAOManager
+- [x] `./internal\security\protector\fund_protector_test.go:28` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, mockNotificationService, mockWalletService)
+- [x] `./internal\security\protector\fund_protector_test.go:48` — **mock** — provider := NewMockExchangeProvider()
+- [x] `./internal\security\protector\fund_protector_test.go:52` — **mock** — t.Error("Mock provider should be healthy")
+- [x] `./internal\security\protector\fund_protector_test.go:93` — **mock** — service := NewMockNotificationService()
+- [x] `./internal\security\protector\fund_protector_test.go:140` — **mock** — service := NewMockWalletService()
+- [x] `./internal\security\protector\fund_protector_test.go:202` — **mock** — exchangeProvider := NewMockExchangeProvider()
+- [x] `./internal\security\protector\fund_protector_test.go:203` — **mock** — notificationService := NewMockNotificationService()
+- [x] `./internal\security\protector\fund_protector_test.go:204` — **mock** — walletService := NewMockWalletService()
+- [x] `./internal\security\protector\fund_protector_test.go:205` — **mock** — var mockExchange exchange.Exchange
+- [x] `./internal\security\protector\fund_protector_test.go:206` — **mock** — var mockDAOManager dao.DAOManager
+- [x] `./internal\security\protector\fund_protector_test.go:208` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
+- [x] `./internal\security\protector\fund_protector_test.go:249` — **mock** — exchangeProvider := NewMockExchangeProvider()
+- [x] `./internal\security\protector\fund_protector_test.go:250` — **mock** — notificationService := NewMockNotificationService()
+- [x] `./internal\security\protector\fund_protector_test.go:251` — **mock** — walletService := NewMockWalletService()
+- [x] `./internal\security\protector\fund_protector_test.go:252` — **mock** — var mockExchange exchange.Exchange
+- [x] `./internal\security\protector\fund_protector_test.go:253` — **mock** — var mockDAOManager dao.DAOManager
+- [x] `./internal\security\protector\fund_protector_test.go:255` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
+- [x] `./internal\security\protector\fund_protector_test.go:312` — **mock** — exchangeProvider := NewMockExchangeProvider()
+- [x] `./internal\security\protector\fund_protector_test.go:313` — **mock** — notificationService := NewMockNotificationService()
+- [x] `./internal\security\protector\fund_protector_test.go:314` — **mock** — walletService := NewMockWalletService()
+- [x] `./internal\security\protector\fund_protector_test.go:315` — **mock** — var mockExchange exchange.Exchange
+- [x] `./internal\security\protector\fund_protector_test.go:316` — **mock** — var mockDAOManager dao.DAOManager
+- [x] `./internal\security\protector\fund_protector_test.go:318` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
+- [x] `./internal\security\protector\fund_protector_test.go:354` — **mock** — exchangeProvider := NewMockExchangeProvider()
+- [x] `./internal\security\protector\fund_protector_test.go:355` — **mock** — notificationService := NewMockNotificationService()
+- [x] `./internal\security\protector\fund_protector_test.go:356` — **mock** — walletService := NewMockWalletService()
+- [x] `./internal\security\protector\fund_protector_test.go:357` — **mock** — var mockExchange exchange.Exchange
+- [x] `./internal\security\protector\fund_protector_test.go:358` — **mock** — var mockDAOManager dao.DAOManager
+- [x] `./internal\security\protector\fund_protector_test.go:360` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
+- [x] `./internal\security\protector\fund_protector_test.go:396` — **mock** — exchangeProvider := NewMockExchangeProvider()
+- [x] `./internal\security\protector\fund_protector_test.go:397` — **mock** — notificationService := NewMockNotificationService()
+- [x] `./internal\security\protector\fund_protector_test.go:398` — **mock** — walletService := NewMockWalletService()
+- [x] `./internal\security\protector\fund_protector_test.go:399` — **mock** — var mockExchange exchange.Exchange
+- [x] `./internal\security\protector\fund_protector_test.go:400` — **mock** — var mockDAOManager dao.DAOManager
+- [x] `./internal\security\protector\fund_protector_test.go:402` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
+- [x] `./internal\security\protector\fund_protector_test.go:441` — **mock** — exchangeProvider := NewMockExchangeProvider()
+- [x] `./internal\security\protector\fund_protector_test.go:442` — **mock** — notificationService := NewMockNotificationService()
+- [x] `./internal\security\protector\fund_protector_test.go:443` — **mock** — walletService := NewMockWalletService()
+- [x] `./internal\security\protector\fund_protector_test.go:444` — **mock** — var mockExchange exchange.Exchange
+- [x] `./internal\security\protector\fund_protector_test.go:445` — **mock** — var mockDAOManager dao.DAOManager
+- [x] `./internal\security\protector\fund_protector_test.go:447` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
 
-## ./internal\automation\executor\executors.go
-- [ ] `./internal\automation\executor\executors.go:711` — **TODO** — // TODO: Implement strategy manager integration when available
-- [ ] `./internal\automation\executor\executors.go:786` — **TODO** — // TODO: Implement strategy manager integration when available
-- [ ] `./internal\automation\executor\executors.go:1954` — **TODO** — // TODO: Implement strategy instance integration when available
-- [ ] `./internal\automation\executor\executors.go:7881` — **TODO** — // TODO: Implement scheduler integration when available
+## ./internal\security\protector\notification_service_test.go ✅ COMPLETED
+- [x] `./internal\security\protector\notification_service_test.go:11` — **mock** — // MockNotificationService 模拟通知服务（用于测试）
+- [x] `./internal\security\protector\notification_service_test.go:12` — **mock** — type MockNotificationService struct {
+- [x] `./internal\security\protector\notification_service_test.go:49` — **mock** — // NewMockNotificationService 创建模拟通知服务
+- [x] `./internal\security\protector\notification_service_test.go:50` — **mock** — func NewMockNotificationService() *MockNotificationService {
+- [x] `./internal\security\protector\notification_service_test.go:51` — **mock** — return &MockNotificationService{
+- [x] `./internal\security\protector\notification_service_test.go:61` — **mock** — func (m *MockNotificationService) SendEmail(ctx context.Context, to, subject, body string) error {
+- [x] `./internal\security\protector\notification_service_test.go:63` — **mock** — return fmt.Errorf("mock email failure")
+- [x] `./internal\security\protector\notification_service_test.go:73` — **mock** — log.Printf("Mock email sent to %s: %s", to, subject)
+- [x] `./internal\security\protector\notification_service_test.go:78` — **mock** — func (m *MockNotificationService) SendSMS(ctx context.Context, phone, message string) error {
+- [x] `./internal\security\protector\notification_service_test.go:80` — **mock** — return fmt.Errorf("mock SMS failure")
+- [x] `./internal\security\protector\notification_service_test.go:89` — **mock** — log.Printf("Mock SMS sent to %s: %s", phone, message)
+- [x] `./internal\security\protector\notification_service_test.go:94` — **mock** — func (m *MockNotificationService) SendWebhook(ctx context.Context, url string, payload interface{}) error {
+- [x] `./internal\security\protector\notification_service_test.go:96` — **mock** — return fmt.Errorf("mock webhook failure")
+- [x] `./internal\security\protector\notification_service_test.go:105` — **mock** — log.Printf("Mock webhook sent to %s", url)
+- [x] `./internal\security\protector\notification_service_test.go:110` — **mock** — func (m *MockNotificationService) SendSlack(ctx context.Context, webhook, message string) error {
+- [x] `./internal\security\protector\notification_service_test.go:112` — **mock** — return fmt.Errorf("mock Slack failure")
+- [x] `./internal\security\protector\notification_service_test.go:121` — **mock** — log.Printf("Mock Slack message sent: %s", message)
+- [x] `./internal\security\protector\notification_service_test.go:126` — **mock** — func (m *MockNotificationService) SetShouldFail(shouldFail bool) {
+- [x] `./internal\security\protector\notification_service_test.go:131` — **mock** — func (m *MockNotificationService) GetEmailsSent() []EmailRecord {
+- [x] `./internal\security\protector\notification_service_test.go:136` — **mock** — func (m *MockNotificationService) GetSMSSent() []SMSRecord {
+- [x] `./internal\security\protector\notification_service_test.go:141` — **mock** — func (m *MockNotificationService) GetWebhooksSent() []WebhookRecord {
+- [x] `./internal\security\protector\notification_service_test.go:146` — **mock** — func (m *MockNotificationService) GetSlackSent() []SlackRecord {
+- [x] `./internal\security\protector\notification_service_test.go:151` — **mock** — func (m *MockNotificationService) Reset() {
+- [x] `./internal\security\protector\notification_service_test.go:158` — **mock** — // TestMockNotificationService 测试mock通知服务
+- [x] `./internal\security\protector\notification_service_test.go:159` — **mock** — func TestMockNotificationService(t *testing.T) {
+- [x] `./internal\security\protector\notification_service_test.go:161` — **mock** — mock := NewMockNotificationService()
+- [x] `./internal\security\protector\notification_service_test.go:164` — **mock** — err := mock.SendEmail(ctx, "test@example.com", "Test Subject", "Test Body")
+- [x] `./internal\security\protector\notification_service_test.go:169` — **mock** — emails := mock.GetEmailsSent()
+- [x] `./internal\security\protector\notification_service_test.go:178` — **mock** — err = mock.SendSMS(ctx, "1234567890", "Test SMS")
+- [x] `./internal\security\protector\notification_service_test.go:183` — **mock** — sms := mock.GetSMSSent()
+- [x] `./internal\security\protector\notification_service_test.go:189` — **mock** — mock.SetShouldFail(true)
+- [x] `./internal\security\protector\notification_service_test.go:190` — **mock** — err = mock.SendEmail(ctx, "test@example.com", "Test", "Test")
+- [x] `./internal\security\protector\notification_service_test.go:196` — **mock** — mock.Reset()
+- [x] `./internal\security\protector\notification_service_test.go:197` — **mock** — emails = mock.GetEmailsSent()
 
-## ./internal\automation\scheduler\risk\risk_controller_test.go
-- [ ] `./internal\automation\scheduler\risk\risk_controller_test.go:37` — **mock** — action, err := testRC.triggerPositionReductionMocked(ctx, marginStatus, 0.3)
-- [ ] `./internal\automation\scheduler\risk\risk_controller_test.go:57` — **mock** — action, err := testRC.triggerEmergencyStopMocked(ctx, reason)
-- [ ] `./internal\automation\scheduler\risk\risk_controller_test.go:82` — **mock** — action, err := testRC.triggerLeverageReductionMocked(ctx, targetLeverage)
-- [ ] `./internal\automation\scheduler\risk\risk_controller_test.go:203` — **mock** — _, err := testRC.triggerEmergencyStopMocked(ctx, "Test emergency")
+## ./internal\security\protector\wallet_service_test.go ✅ COMPLETED
+- [x] `./internal\security\protector\wallet_service_test.go:13` — **mock** — // MockWalletService 模拟钱包服务（用于测试）
+- [x] `./internal\security\protector\wallet_service_test.go:14` — **mock** — type MockWalletService struct {
+- [x] `./internal\security\protector\wallet_service_test.go:20` — **mock** — // NewMockWalletService 创建模拟钱包服务
+- [x] `./internal\security\protector\wallet_service_test.go:21` — **mock** — func NewMockWalletService() *MockWalletService {
+- [x] `./internal\security\protector\wallet_service_test.go:22` — **mock** — return &MockWalletService{
+- [x] `./internal\security\protector\wallet_service_test.go:30` — **mock** — func (m *MockWalletService) InitiateTransfer(ctx context.Context, request *TransferRequest) (*TransferResponse, error) {
+- [x] `./internal\security\protector\wallet_service_test.go:32` — **mock** — return nil, fmt.Errorf("mock transfer failure")
+- [x] `./internal\security\protector\wallet_service_test.go:39` — **mock** — return nil, fmt.Errorf("random mock transfer failure")
+- [x] `./internal\security\protector\wallet_service_test.go:43` — **mock** — transferID := fmt.Sprintf("MOCK_TXF_%d", time.Now().Unix())
+- [x] `./internal\security\protector\wallet_service_test.go:67` — **mock** — log.Printf("Mock transfer initiated: %s", transferID)
+- [x] `./internal\security\protector\wallet_service_test.go:72` — **mock** — func (m *MockWalletService) GetTransferStatus(ctx context.Context, transferID string) (*TransferStatus, error) {
+- [x] `./internal\security\protector\wallet_service_test.go:81` — **mock** — func (m *MockWalletService) CancelTransfer(ctx context.Context, transferID string) error {
+- [x] `./internal\security\protector\wallet_service_test.go:91` — **mock** — func (m *MockWalletService) GetTransferHistory(ctx context.Context, limit int) ([]*TransferRecord, error) {
+- [x] `./internal\security\protector\wallet_service_test.go:107` — **mock** — func (m *MockWalletService) ValidateAddress(address string) error {
+- [x] `./internal\security\protector\wallet_service_test.go:115` — **mock** — func (m *MockWalletService) EstimateTransferFee(ctx context.Context, amount float64, toAddress string) (float64, error) {
+- [x] `./internal\security\protector\wallet_service_test.go:120` — **mock** — func (m *MockWalletService) SetShouldFail(shouldFail bool) {
+- [x] `./internal\security\protector\wallet_service_test.go:125` — **mock** — func (m *MockWalletService) SetFailureRate(rate float64) {
+- [x] `./internal\security\protector\wallet_service_test.go:130` — **mock** — func (m *MockWalletService) GetTransfers() map[string]*TransferStatus {
+- [x] `./internal\security\protector\wallet_service_test.go:134` — **mock** — // TestMockWalletService 测试mock钱包服务
+- [x] `./internal\security\protector\wallet_service_test.go:135` — **mock** — func TestMockWalletService(t *testing.T) {
+- [x] `./internal\security\protector\wallet_service_test.go:137` — **mock** — mock := NewMockWalletService()
+- [x] `./internal\security\protector\wallet_service_test.go:149` — **mock** — response, err := mock.InitiateTransfer(ctx, request)
+- [x] `./internal\security\protector\wallet_service_test.go:158` — **mock** — status, err := mock.GetTransferStatus(ctx, response.TransferID)
+- [x] `./internal\security\protector\wallet_service_test.go:167` — **mock** — err = mock.CancelTransfer(ctx, response.TransferID)
+- [x] `./internal\security\protector\wallet_service_test.go:173` — **mock** — status, _ = mock.GetTransferStatus(ctx, response.TransferID)
+- [x] `./internal\security\protector\wallet_service_test.go:179` — **mock** — mock.SetShouldFail(true)
+- [x] `./internal\security\protector\wallet_service_test.go:180` — **mock** — _, err = mock.InitiateTransfer(ctx, request)
+- [x] `./internal\security\protector\wallet_service_test.go:186` — **mock** — mock.SetShouldFail(false)
+- [x] `./internal\security\protector\wallet_service_test.go:187` — **mock** — err = mock.ValidateAddress("short")
+- [x] `./internal\security\protector\wallet_service_test.go:192` — **mock** — err = mock.ValidateAddress("0x1234567890abcdef")
 
-## ./internal\automation\scheduler\risk\risk_monitor.go
-- [ ] `./internal\automation\scheduler\risk\risk_monitor.go:98` — **mock** — // Use reflection or simple field checks to determine if it's a test mock
-- [ ] `./internal\automation\scheduler\risk\risk_monitor.go:114` — **mock** — // Return mock data for testing environment
-- [ ] `./internal\automation\scheduler\risk\risk_monitor.go:127` — **mock** — Recommendations: []string{"Account manager unavailable - using mock data"},
 
-## ./internal\automation\scheduler\risk\stop_loss_adjuster.go
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster.go:466` — **mock** — // Return mock adjustments for testing
+## ./internal\workflow\executors.go ✅ COMPLETED
+- [x] `./internal\workflow\executors.go:1161` — **mock** — rawData = dce.generateMockMarketData(timeRange)
+- [x] `./internal\workflow\executors.go:1163` — **mock** — rawData = dce.generateMockTradingData(timeRange)
+- [x] `./internal\workflow\executors.go:1165` — **mock** — rawData = dce.generateMockAccountData(timeRange)
+- [x] `./internal\workflow\executors.go:1173` — **mock** — // generateMockMarketData 生成模拟市场数据
+- [x] `./internal\workflow\executors.go:1174` — **mock** — func (dce *DataCleaningExecutor) generateMockMarketData(timeRange map[string]time.Time) []map[string]interface{} {
+- [x] `./internal\workflow\executors.go:1213` — **mock** — // generateMockTradingData 生成模拟交易数据
+- [x] `./internal\workflow\executors.go:1214` — **mock** — func (dce *DataCleaningExecutor) generateMockTradingData(timeRange map[string]time.Time) []map[string]interface{} {
+- [x] `./internal\workflow\executors.go:1237` — **mock** — // generateMockAccountData 生成模拟账户数据
+- [x] `./internal\workflow\executors.go:1238` — **mock** — func (dce *DataCleaningExecutor) generateMockAccountData(timeRange map[string]time.Time) []map[string]interface{} {
 
-## ./internal\automation\scheduler\risk\stop_loss_adjuster_test.go
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:13` — **mock** — "github.com/DATA-DOG/go-sqlmock"
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:53` — **mock** — adjuster, mock := createTestStopLossAdjusterWithMock(t)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:59` — **mock** — // Mock OHLC data query
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:60` — **mock** — ohlcRows := sqlmock.NewRows([]string{"timestamp", "open_price", "high_price", "low_price", "close_price", "volume"})
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:71` — **mock** — mock.ExpectQuery("SELECT timestamp, open_price, high_price, low_price, close_price, volume FROM market_data").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:75` — **mock** — // Mock position query
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:76` — **mock** — positionRows := sqlmock.NewRows([]string{
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:83` — **mock** — mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:94` — **mock** — assert.NoError(t, mock.ExpectationsWereMet())
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:98` — **mock** — adjuster, mock := createTestStopLossAdjusterWithMock(t)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:104` — **mock** — // Mock price data query
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:105` — **mock** — priceRows := sqlmock.NewRows([]string{"close_price"})
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:109` — **mock** — mock.ExpectQuery("SELECT close_price FROM market_data").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:113` — **mock** — // Mock position query
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:114` — **mock** — positionRows := sqlmock.NewRows([]string{
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:121` — **mock** — mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:132` — **mock** — assert.NoError(t, mock.ExpectationsWereMet())
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:136` — **mock** — adjuster, mock := createTestStopLossAdjusterWithMock(t)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:141` — **mock** — // Mock market data query for regime analysis
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:142` — **mock** — marketRows := sqlmock.NewRows([]string{"close_price", "volume", "timestamp"})
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:150` — **mock** — mock.ExpectQuery("SELECT close_price, volume, timestamp FROM market_data").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:165` — **mock** — assert.NoError(t, mock.ExpectationsWereMet())
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:169` — **mock** — adjuster, mock := createTestStopLossAdjusterWithMock(t)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:197` — **mock** — // Mock database updates
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:198` — **mock** — mock.ExpectExec("UPDATE positions SET stop_loss = \\?, updated_at = CURRENT_TIMESTAMP").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:200` — **mock** — WillReturnResult(sqlmock.NewResult(1, 1))
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:202` — **mock** — mock.ExpectExec("INSERT INTO stop_loss_adjustments").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:204` — **mock** — WillReturnResult(sqlmock.NewResult(1, 1))
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:206` — **mock** — mock.ExpectExec("UPDATE positions SET stop_loss = \\?, updated_at = CURRENT_TIMESTAMP").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:208` — **mock** — WillReturnResult(sqlmock.NewResult(1, 1))
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:210` — **mock** — mock.ExpectExec("INSERT INTO stop_loss_adjustments").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:212` — **mock** — WillReturnResult(sqlmock.NewResult(1, 1))
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:223` — **mock** — // In test mode, database queries are bypassed, so we don't verify mock expectations
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:224` — **mock** — // assert.NoError(t, mock.ExpectationsWereMet())
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:228` — **mock** — adjuster, mock := createTestStopLossAdjusterWithMock(t)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:242` — **mock** — // Mock OHLC data for ATR calculation
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:243` — **mock** — ohlcRows := sqlmock.NewRows([]string{"timestamp", "open_price", "high_price", "low_price", "close_price", "volume"})
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:254` — **mock** — mock.ExpectQuery("SELECT timestamp, open_price, high_price, low_price, close_price, volume FROM market_data").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:258` — **mock** — // Mock position query for ATR calculation
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:259` — **mock** — positionRows1 := sqlmock.NewRows([]string{
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:266` — **mock** — mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:270` — **mock** — // Mock price data for RV calculation
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:271` — **mock** — priceRows := sqlmock.NewRows([]string{"close_price"})
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:275` — **mock** — mock.ExpectQuery("SELECT close_price FROM market_data").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:279` — **mock** — // Mock position query for RV calculation
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:280` — **mock** — positionRows2 := sqlmock.NewRows([]string{
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:287` — **mock** — mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:291` — **mock** — // Mock market data for regime analysis
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:292` — **mock** — marketRows := sqlmock.NewRows([]string{"close_price", "volume", "timestamp"})
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:300` — **mock** — mock.ExpectQuery("SELECT close_price, volume, timestamp FROM market_data WHERE symbol IN \\('BTCUSDT', 'ETHUSDT'\\) ORDER BY timestamp DESC LIMIT 100").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:309` — **mock** — // In test mode, database queries are bypassed, so we don't verify mock expectations
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:310` — **mock** — // assert.NoError(t, mock.ExpectationsWereMet())
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:314` — **mock** — adjuster, mock := createTestStopLossAdjusterWithMock(t)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:319` — **mock** — // Mock active positions query
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:320` — **mock** — positionsRows := sqlmock.NewRows([]string{
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:330` — **mock** — mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:333` — **mock** — // Mock calculations for each position (simplified - would need full mock setup)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:341` — **mock** — // We expect 0 adjustments because the mocked calculations will fail
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:374` — **mock** — func createTestStopLossAdjusterWithMock(t *testing.T) (*StopLossAdjuster, sqlmock.Sqlmock) {
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:375` — **mock** — // Create mock database
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:376` — **mock** — mockDB, mock, err := sqlmock.New()
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:380` — **mock** — db := &database.DB{DB: mockDB}
-- [ ] `./internal\automation\scheduler\risk\stop_loss_adjuster_test.go:386` — **mock** — return adjuster, mock
-
-## ./internal\automation\scheduler\risk\stop_loss_execution.go
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution.go:480` — **mock** — // Return mock price for testing
-
-## ./internal\automation\scheduler\risk\stop_loss_execution_test.go
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:13` — **mock** — "github.com/DATA-DOG/go-sqlmock"
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:53` — **mock** — executor, mock := createTestStopLossExecutorWithMock(t)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:58` — **mock** — // Mock current price query for performance tracking
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:59` — **mock** — priceRows := sqlmock.NewRows([]string{"close_price"}).AddRow(51000.0)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:60` — **mock** — mock.ExpectQuery("SELECT close_price FROM market_data WHERE symbol = \\? ORDER BY timestamp DESC LIMIT 1").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:64` — **mock** — // Mock performance tracking insert
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:65` — **mock** — mock.ExpectExec("INSERT INTO stop_loss_performance").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:66` — **mock** — WillReturnResult(sqlmock.NewResult(1, 1))
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:68` — **mock** — // Mock the stop loss update query (this happens first)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:69` — **mock** — mock.ExpectExec("UPDATE positions SET stop_loss = \\?, updated_at = CURRENT_TIMESTAMP WHERE id = \\? AND status = 'ACTIVE'").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:71` — **mock** — WillReturnResult(sqlmock.NewResult(1, 1))
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:73` — **mock** — // Mock active positions query for GenerateStopLossAdjustments (this happens second)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:74` — **mock** — positionsRows := sqlmock.NewRows([]string{
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:81` — **mock** — mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:84` — **mock** — // In test mode, GenerateStopLossAdjustments returns mock data
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:96` — **mock** — executor, _ := createTestStopLossExecutorWithMock(t)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:112` — **mock** — // No mock expectations needed
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:125` — **mock** — // In test mode, database queries are bypassed, so we don't verify mock expectations
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:126` — **mock** — // assert.NoError(t, mock.ExpectationsWereMet())
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:194` — **mock** — tracker, mock := createTestPerformanceTrackerWithMock(t)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:207` — **mock** — // Mock current price query
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:208` — **mock** — mock.ExpectQuery("SELECT close_price FROM market_data").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:210` — **mock** — WillReturnRows(sqlmock.NewRows([]string{"close_price"}).AddRow(51000.0))
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:212` — **mock** — // Mock performance record insertion
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:213` — **mock** — mock.ExpectExec("INSERT INTO stop_loss_performance").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:214` — **mock** — WillReturnResult(sqlmock.NewResult(1, 1))
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:232` — **mock** — assert.NoError(t, mock.ExpectationsWereMet())
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:236` — **mock** — tracker, mock := createTestPerformanceTrackerWithMock(t)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:241` — **mock** — // Mock active tracking records query
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:242` — **mock** — trackingRows := sqlmock.NewRows([]string{
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:253` — **mock** — mock.ExpectQuery("SELECT adjustment_id, position_id, symbol").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:256` — **mock** — // Mock position status query (position still active)
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:257` — **mock** — positionRows := sqlmock.NewRows([]string{
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:264` — **mock** — mock.ExpectQuery("SELECT id, symbol, side, size, entry_price, current_price").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:268` — **mock** — // Mock performance update
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:269` — **mock** — mock.ExpectExec("UPDATE stop_loss_performance").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:270` — **mock** — WillReturnResult(sqlmock.NewResult(1, 1))
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:272` — **mock** — // Mock aggregate metrics calculation
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:273` — **mock** — statsRows := sqlmock.NewRows([]string{
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:277` — **mock** — mock.ExpectQuery("SELECT COUNT\\(\\*\\) as total_adjustments").
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:285` — **mock** — assert.NoError(t, mock.ExpectationsWereMet())
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:428` — **mock** — func createTestStopLossExecutorWithMock(t *testing.T) (*StopLossExecutor, sqlmock.Sqlmock) {
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:429` — **mock** — // Create mock database
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:430` — **mock** — mockDB, mock, err := sqlmock.New()
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:435` — **mock** — db := &database.DB{DB: mockDB}
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:439` — **mock** — executor.adjuster.db = db         // Update adjuster's db to use mock
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:442` — **mock** — return executor, mock
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:454` — **mock** — func createTestPerformanceTrackerWithMock(t *testing.T) (*StopLossPerformanceTracker, sqlmock.Sqlmock) {
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:455` — **mock** — // Create mock database
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:456` — **mock** — mockDB, mock, err := sqlmock.New()
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:459` — **mock** — db := &database.DB{DB: mockDB}
-- [ ] `./internal\automation\scheduler\risk\stop_loss_execution_test.go:466` — **mock** — return tracker, mock
-
-## ./internal\automation\scheduler\risk\test_helpers.go
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:19` — **mock** — // TestDatabase provides mock database functionality for testing
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:64` — **mock** — // Create mock database connection
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:65` — **mock** — db := &database.DB{} // This would be properly mocked in real implementation
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:82` — **mock** — // triggerPositionReductionMocked provides a mock implementation for testing
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:83` — **mock** — func (trc *TestRiskController) triggerPositionReductionMocked(ctx context.Context, marginStatus *MarginStatus, reductionRatio float64) (*RiskAction, error) {
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:84` — **mock** — // Create a mock risk action
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:115` — **mock** — // triggerEmergencyStopMocked provides a mock implementation for testing
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:116` — **mock** — func (trc *TestRiskController) triggerEmergencyStopMocked(ctx context.Context, reason string) (*RiskAction, error) {
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:117` — **mock** — // Create a mock risk action
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:150` — **mock** — // triggerLeverageReductionMocked provides a mock implementation for testing
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:151` — **mock** — func (trc *TestRiskController) triggerLeverageReductionMocked(ctx context.Context, targetLeverage float64) (*RiskAction, error) {
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:152` — **mock** — // Create a mock risk action
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:202` — **mock** — // Start starts the risk controller (mock implementation)
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:204` — **mock** — // Mock implementation - just return success
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:208` — **mock** — // Stop stops the risk controller (mock implementation)
-- [ ] `./internal\automation\scheduler\risk\test_helpers.go:210` — **mock** — // Mock implementation - just return success
-
-## ./internal\automation\scheduler\risk\test_mocks.go
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:51` — **mock** — // QueryContext mock implementation
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:54` — **mock** — // In a real implementation, this would parse the query and return appropriate mock data
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:58` — **mock** — // ExecContext mock implementation
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:131` — **mock** — db:            nil, // We'll mock database operations
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:141` — **mock** — // MockRiskController creates a RiskController for testing with mocked database operations
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:142` — **mock** — type MockRiskController struct {
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:148` — **mock** — func (mrc *MockRiskController) getCurrentPositions(ctx context.Context) ([]shared.Position, error) {
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:153` — **mock** — func (mrc *MockRiskController) executePositionReduction(ctx context.Context, reduction PositionReduction) error {
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:165` — **mock** — func (mrc *MockRiskController) executeEmergencyClose(ctx context.Context, position shared.Position) error {
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:177` — **mock** — func (mrc *MockRiskController) cancelAllPendingOrders(ctx context.Context) error {
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:184` — **mock** — func (mrc *MockRiskController) getHighLeveragePositions(ctx context.Context, maxLeverage float64) ([]shared.Position, error) {
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:195` — **mock** — func (mrc *MockRiskController) recordActionInDatabase(ctx context.Context, action RiskAction) error {
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:201` — **mock** — func (mrc *MockRiskController) recordAction(action RiskAction) {
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:213` — **mock** — // triggerPositionReductionMocked is a mocked version of TriggerPositionReduction for testing
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:214` — **mock** — func (mrc *MockRiskController) triggerPositionReductionMocked(ctx context.Context, marginStatus *MarginStatus, reductionPercent float64) (*RiskAction, error) {
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:232` — **mock** — // Get positions from mock data
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:247` — **mock** — // Execute position reductions using mock
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:282` — **mock** — // triggerEmergencyStopMocked is a mocked version of TriggerEmergencyStop for testing
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:283` — **mock** — func (mrc *MockRiskController) triggerEmergencyStopMocked(ctx context.Context, reason string) (*RiskAction, error) {
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:303` — **mock** — // Get all active positions from mock data
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:306` — **mock** — // Close all positions using mock
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:320` — **mock** — // Cancel all pending orders using mock
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:345` — **mock** — // triggerLeverageReductionMocked is a mocked version of TriggerLeverageReduction for testing
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:346` — **mock** — func (mrc *MockRiskController) triggerLeverageReductionMocked(ctx context.Context, targetLeverage float64) (*RiskAction, error) {
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:362` — **mock** — // Get positions with high leverage from mock data
-- [ ] `./internal\automation\scheduler\risk\test_mocks.go:374` — **mock** — // Reduce leverage for each position using mock
-
-## ./internal\automation\scheduler\shared\shared_test.go
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:375` — **mock** — assert.NotNil(t, tf.mocks)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:379` — **mock** — t.Run("Mock management", func(t *testing.T) {
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:382` — **mock** — mockDB := NewMockDatabase()
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:383` — **mock** — tf.SetMock("database", mockDB)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:385` — **mock** — retrieved := tf.GetMock("database")
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:386` — **mock** — assert.Equal(t, mockDB, retrieved)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:402` — **mock** — func TestMockDatabase(t *testing.T) {
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:403` — **mock** — t.Run("NewMockDatabase", func(t *testing.T) {
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:404` — **mock** — mockDB := NewMockDatabase()
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:405` — **mock** — assert.NotNil(t, mockDB)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:406` — **mock** — assert.NotNil(t, mockDB.queries)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:410` — **mock** — mockDB := NewMockDatabase()
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:417` — **mock** — mockDB.SetQueryResult("SELECT * FROM test", results)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:419` — **mock** — storedResults := mockDB.queries["SELECT * FROM test"]
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:424` — **mock** — func TestMockExchangeAPI(t *testing.T) {
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:425` — **mock** — t.Run("NewMockExchangeAPI", func(t *testing.T) {
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:426` — **mock** — mockAPI := NewMockExchangeAPI()
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:427` — **mock** — assert.NotNil(t, mockAPI)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:428` — **mock** — assert.NotNil(t, mockAPI.positions)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:429` — **mock** — assert.NotNil(t, mockAPI.marketData)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:430` — **mock** — assert.NotNil(t, mockAPI.orderHistory)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:434` — **mock** — mockAPI := NewMockExchangeAPI()
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:445` — **mock** — mockAPI.SetPositions(positions)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:447` — **mock** — mockAPI.On("GetPositions", context.Background()).Return(nil)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:449` — **mock** — retrieved, err := mockAPI.GetPositions(context.Background())
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:455` — **mock** — mockAPI := NewMockExchangeAPI()
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:462` — **mock** — mockAPI.SetMarketData("BTCUSDT", marketData)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:463` — **mock** — mockAPI.On("GetMarketData", context.Background(), "BTCUSDT").Return(nil)
-- [ ] `./internal\automation\scheduler\shared\shared_test.go:465` — **mock** — retrieved, err := mockAPI.GetMarketData(context.Background(), "BTCUSDT")
-
-## ./internal\automation\scheduler\shared\testing.go
-- [ ] `./internal\automation\scheduler\shared\testing.go:13` — **mock** — "github.com/stretchr/testify/mock"
-- [ ] `./internal\automation\scheduler\shared\testing.go:20` — **mock** — mocks          map[string]interface{}
-- [ ] `./internal\automation\scheduler\shared\testing.go:30` — **mock** — mocks:        make(map[string]interface{}),
-- [ ] `./internal\automation\scheduler\shared\testing.go:55` — **mock** — // SetMock stores a mock object for later retrieval
-- [ ] `./internal\automation\scheduler\shared\testing.go:56` — **mock** — func (tf *TestFramework) SetMock(name string, mockObj interface{}) {
-- [ ] `./internal\automation\scheduler\shared\testing.go:60` — **mock** — tf.mocks[name] = mockObj
-- [ ] `./internal\automation\scheduler\shared\testing.go:63` — **mock** — // GetMock retrieves a stored mock object
-- [ ] `./internal\automation\scheduler\shared\testing.go:64` — **mock** — func (tf *TestFramework) GetMock(name string) interface{} {
-- [ ] `./internal\automation\scheduler\shared\testing.go:68` — **mock** — return tf.mocks[name]
-- [ ] `./internal\automation\scheduler\shared\testing.go:87` — **mock** — // MockDatabase provides a mock database for testing
-- [ ] `./internal\automation\scheduler\shared\testing.go:88` — **mock** — type MockDatabase struct {
-- [ ] `./internal\automation\scheduler\shared\testing.go:89` — **mock** — mock.Mock
-- [ ] `./internal\automation\scheduler\shared\testing.go:94` — **mock** — // NewMockDatabase creates a new mock database
-- [ ] `./internal\automation\scheduler\shared\testing.go:95` — **mock** — func NewMockDatabase() *MockDatabase {
-- [ ] `./internal\automation\scheduler\shared\testing.go:96` — **mock** — return &MockDatabase{
-- [ ] `./internal\automation\scheduler\shared\testing.go:101` — **mock** — // QueryContext mocks database query execution
-- [ ] `./internal\automation\scheduler\shared\testing.go:102` — **mock** — func (mdb *MockDatabase) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-- [ ] `./internal\automation\scheduler\shared\testing.go:106` — **mock** — mockArgs := mdb.Called(ctx, query, args)
-- [ ] `./internal\automation\scheduler\shared\testing.go:107` — **mock** — return mockArgs.Get(0).(*sql.Rows), mockArgs.Error(1)
-- [ ] `./internal\automation\scheduler\shared\testing.go:110` — **mock** — // QueryRowContext mocks database single row query
-- [ ] `./internal\automation\scheduler\shared\testing.go:111` — **mock** — func (mdb *MockDatabase) QueryRowContext(ctx context.Context, query string, args ...interface{}) *sql.Row {
-- [ ] `./internal\automation\scheduler\shared\testing.go:115` — **mock** — mockArgs := mdb.Called(ctx, query, args)
-- [ ] `./internal\automation\scheduler\shared\testing.go:116` — **mock** — return mockArgs.Get(0).(*sql.Row)
-- [ ] `./internal\automation\scheduler\shared\testing.go:119` — **mock** — // ExecContext mocks database execution
-- [ ] `./internal\automation\scheduler\shared\testing.go:120` — **mock** — func (mdb *MockDatabase) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-- [ ] `./internal\automation\scheduler\shared\testing.go:124` — **mock** — mockArgs := mdb.Called(ctx, query, args)
-- [ ] `./internal\automation\scheduler\shared\testing.go:125` — **mock** — return mockArgs.Get(0).(sql.Result), mockArgs.Error(1)
-- [ ] `./internal\automation\scheduler\shared\testing.go:129` — **mock** — func (mdb *MockDatabase) SetQueryResult(query string, results []map[string]interface{}) {
-- [ ] `./internal\automation\scheduler\shared\testing.go:136` — **mock** — // MockExchangeAPI provides a mock exchange API for testing
-- [ ] `./internal\automation\scheduler\shared\testing.go:137` — **mock** — type MockExchangeAPI struct {
-- [ ] `./internal\automation\scheduler\shared\testing.go:138` — **mock** — mock.Mock
-- [ ] `./internal\automation\scheduler\shared\testing.go:145` — **mock** — // NewMockExchangeAPI creates a new mock exchange API
-- [ ] `./internal\automation\scheduler\shared\testing.go:146` — **mock** — func NewMockExchangeAPI() *MockExchangeAPI {
-- [ ] `./internal\automation\scheduler\shared\testing.go:147` — **mock** — return &MockExchangeAPI{
-- [ ] `./internal\automation\scheduler\shared\testing.go:154` — **mock** — // GetPositions mocks getting positions from exchange
-- [ ] `./internal\automation\scheduler\shared\testing.go:155` — **mock** — func (mea *MockExchangeAPI) GetPositions(ctx context.Context) ([]Position, error) {
-- [ ] `./internal\automation\scheduler\shared\testing.go:159` — **mock** — mockArgs := mea.Called(ctx)
-- [ ] `./internal\automation\scheduler\shared\testing.go:160` — **mock** — return mea.positions, mockArgs.Error(0)
-- [ ] `./internal\automation\scheduler\shared\testing.go:163` — **mock** — // GetMarketData mocks getting market data from exchange
-- [ ] `./internal\automation\scheduler\shared\testing.go:164` — **mock** — func (mea *MockExchangeAPI) GetMarketData(ctx context.Context, symbol string) (map[string]interface{}, error) {
-- [ ] `./internal\automation\scheduler\shared\testing.go:168` — **mock** — mockArgs := mea.Called(ctx, symbol)
-- [ ] `./internal\automation\scheduler\shared\testing.go:170` — **mock** — return data.(map[string]interface{}), mockArgs.Error(0)
-- [ ] `./internal\automation\scheduler\shared\testing.go:172` — **mock** — return nil, mockArgs.Error(0)
-- [ ] `./internal\automation\scheduler\shared\testing.go:175` — **mock** — // PlaceOrder mocks placing an order
-- [ ] `./internal\automation\scheduler\shared\testing.go:176` — **mock** — func (mea *MockExchangeAPI) PlaceOrder(ctx context.Context, order map[string]interface{}) (string, error) {
-- [ ] `./internal\automation\scheduler\shared\testing.go:180` — **mock** — mockArgs := mea.Called(ctx, order)
-- [ ] `./internal\automation\scheduler\shared\testing.go:193` — **mock** — return orderID, mockArgs.Error(0)
-- [ ] `./internal\automation\scheduler\shared\testing.go:196` — **mock** — // SetPositions sets mock positions
-- [ ] `./internal\automation\scheduler\shared\testing.go:197` — **mock** — func (mea *MockExchangeAPI) SetPositions(positions []Position) {
-- [ ] `./internal\automation\scheduler\shared\testing.go:204` — **mock** — // SetMarketData sets mock market data
-- [ ] `./internal\automation\scheduler\shared\testing.go:205` — **mock** — func (mea *MockExchangeAPI) SetMarketData(symbol string, data map[string]interface{}) {
-- [ ] `./internal\automation\scheduler\shared\testing.go:213` — **mock** — func (mea *MockExchangeAPI) GetOrderHistory() []map[string]interface{} {
-- [ ] `./internal\automation\scheduler\shared\testing.go:222` — **mock** — // MockConfigProvider provides a mock configuration provider for testing
-- [ ] `./internal\automation\scheduler\shared\testing.go:223` — **mock** — type MockConfigProvider struct {
-- [ ] `./internal\automation\scheduler\shared\testing.go:224` — **mock** — mock.Mock
-- [ ] `./internal\automation\scheduler\shared\testing.go:229` — **mock** — // NewMockConfigProvider creates a new mock config provider
-- [ ] `./internal\automation\scheduler\shared\testing.go:230` — **mock** — func NewMockConfigProvider() *MockConfigProvider {
-- [ ] `./internal\automation\scheduler\shared\testing.go:231` — **mock** — return &MockConfigProvider{
-- [ ] `./internal\automation\scheduler\shared\testing.go:236` — **mock** — // Get mocks getting a configuration value
-- [ ] `./internal\automation\scheduler\shared\testing.go:237` — **mock** — func (mcp *MockConfigProvider) Get(key string) interface{} {
-- [ ] `./internal\automation\scheduler\shared\testing.go:241` — **mock** — mockArgs := mcp.Called(key)
-- [ ] `./internal\automation\scheduler\shared\testing.go:245` — **mock** — return mockArgs.Get(0)
-- [ ] `./internal\automation\scheduler\shared\testing.go:248` — **mock** — // GetString mocks getting a string configuration value
-- [ ] `./internal\automation\scheduler\shared\testing.go:249` — **mock** — func (mcp *MockConfigProvider) GetString(key string) string {
-- [ ] `./internal\automation\scheduler\shared\testing.go:257` — **mock** — // GetInt mocks getting an integer configuration value
-- [ ] `./internal\automation\scheduler\shared\testing.go:258` — **mock** — func (mcp *MockConfigProvider) GetInt(key string) int {
-- [ ] `./internal\automation\scheduler\shared\testing.go:266` — **mock** — // GetFloat64 mocks getting a float64 configuration value
-- [ ] `./internal\automation\scheduler\shared\testing.go:267` — **mock** — func (mcp *MockConfigProvider) GetFloat64(key string) float64 {
-- [ ] `./internal\automation\scheduler\shared\testing.go:275` — **mock** — // GetBool mocks getting a boolean configuration value
-- [ ] `./internal\automation\scheduler\shared\testing.go:276` — **mock** — func (mcp *MockConfigProvider) GetBool(key string) bool {
-- [ ] `./internal\automation\scheduler\shared\testing.go:284` — **mock** — // GetDuration mocks getting a duration configuration value
-- [ ] `./internal\automation\scheduler\shared\testing.go:285` — **mock** — func (mcp *MockConfigProvider) GetDuration(key string) time.Duration {
-- [ ] `./internal\automation\scheduler\shared\testing.go:293` — **mock** — // Set mocks setting a configuration value
-- [ ] `./internal\automation\scheduler\shared\testing.go:294` — **mock** — func (mcp *MockConfigProvider) Set(key string, value interface{}) error {
-- [ ] `./internal\automation\scheduler\shared\testing.go:298` — **mock** — mockArgs := mcp.Called(key, value)
-- [ ] `./internal\automation\scheduler\shared\testing.go:300` — **mock** — return mockArgs.Error(0)
-- [ ] `./internal\automation\scheduler\shared\testing.go:303` — **mock** — // Reload mocks reloading configuration
-- [ ] `./internal\automation\scheduler\shared\testing.go:304` — **mock** — func (mcp *MockConfigProvider) Reload() error {
-- [ ] `./internal\automation\scheduler\shared\testing.go:305` — **mock** — mockArgs := mcp.Called()
-- [ ] `./internal\automation\scheduler\shared\testing.go:306` — **mock** — return mockArgs.Error(0)
-- [ ] `./internal\automation\scheduler\shared\testing.go:310` — **mock** — func (mcp *MockConfigProvider) SetConfig(key string, value interface{}) {
-- [ ] `./internal\automation\scheduler\shared\testing.go:317` — **mock** — // MockMetricsCollector provides a mock metrics collector for testing
-- [ ] `./internal\automation\scheduler\shared\testing.go:318` — **mock** — type MockMetricsCollector struct {
-- [ ] `./internal\automation\scheduler\shared\testing.go:319` — **mock** — mock.Mock
-- [ ] `./internal\automation\scheduler\shared\testing.go:327` — **mock** — // NewMockMetricsCollector creates a new mock metrics collector
-- [ ] `./internal\automation\scheduler\shared\testing.go:328` — **mock** — func NewMockMetricsCollector() *MockMetricsCollector {
-- [ ] `./internal\automation\scheduler\shared\testing.go:329` — **mock** — return &MockMetricsCollector{
-- [ ] `./internal\automation\scheduler\shared\testing.go:337` — **mock** — // Counter mocks incrementing a counter metric
-- [ ] `./internal\automation\scheduler\shared\testing.go:338` — **mock** — func (mmc *MockMetricsCollector) Counter(name string, tags map[string]string) error {
-- [ ] `./internal\automation\scheduler\shared\testing.go:342` — **mock** — mockArgs := mmc.Called(name, tags)
-- [ ] `./internal\automation\scheduler\shared\testing.go:344` — **mock** — return mockArgs.Error(0)
-- [ ] `./internal\automation\scheduler\shared\testing.go:347` — **mock** — // Gauge mocks setting a gauge metric
-- [ ] `./internal\automation\scheduler\shared\testing.go:348` — **mock** — func (mmc *MockMetricsCollector) Gauge(name string, value float64, tags map[string]string) error {
-- [ ] `./internal\automation\scheduler\shared\testing.go:352` — **mock** — mockArgs := mmc.Called(name, value, tags)
-- [ ] `./internal\automation\scheduler\shared\testing.go:354` — **mock** — return mockArgs.Error(0)
-- [ ] `./internal\automation\scheduler\shared\testing.go:357` — **mock** — // Histogram mocks recording a histogram metric
-- [ ] `./internal\automation\scheduler\shared\testing.go:358` — **mock** — func (mmc *MockMetricsCollector) Histogram(name string, value float64, tags map[string]string) error {
-- [ ] `./internal\automation\scheduler\shared\testing.go:362` — **mock** — mockArgs := mmc.Called(name, value, tags)
-- [ ] `./internal\automation\scheduler\shared\testing.go:364` — **mock** — return mockArgs.Error(0)
-- [ ] `./internal\automation\scheduler\shared\testing.go:367` — **mock** — // Timer mocks recording a timer metric
-- [ ] `./internal\automation\scheduler\shared\testing.go:368` — **mock** — func (mmc *MockMetricsCollector) Timer(name string, duration time.Duration, tags map[string]string) error {
-- [ ] `./internal\automation\scheduler\shared\testing.go:372` — **mock** — mockArgs := mmc.Called(name, duration, tags)
-- [ ] `./internal\automation\scheduler\shared\testing.go:374` — **mock** — return mockArgs.Error(0)
-- [ ] `./internal\automation\scheduler\shared\testing.go:378` — **mock** — func (mmc *MockMetricsCollector) GetCounterValue(name string) int64 {
-- [ ] `./internal\automation\scheduler\shared\testing.go:386` — **mock** — func (mmc *MockMetricsCollector) GetGaugeValue(name string) float64 {
-- [ ] `./internal\automation\scheduler\shared\testing.go:394` — **mock** — func (mmc *MockMetricsCollector) GetHistogramValues(name string) []float64 {
-- [ ] `./internal\automation\scheduler\shared\testing.go:404` — **mock** — func (mmc *MockMetricsCollector) GetTimerValues(name string) []time.Duration {
-- [ ] `./internal\automation\scheduler\shared\testing.go:544` — **mock** — func (ah *AssertionHelpers) AssertMetricsRecorded(collector *MockMetricsCollector, metricName string) {
-
-## ./internal\cache\fallback_test.go
-- [ ] `./internal\cache\fallback_test.go:11` — **mock** — // Create a mock Redis cache that will fail
-- [ ] `./internal\cache\fallback_test.go:12` — **mock** — mockRedis := &MockRedisCache{
-- [ ] `./internal\cache\fallback_test.go:22` — **mock** — cm := NewCacheManager(mockRedis, nil, config)
-- [ ] `./internal\cache\fallback_test.go:44` — **mock** — mockRedis.shouldFail = true
-- [ ] `./internal\cache\fallback_test.go:113` — **mock** — mockRedis := &MockRedisCache{
-- [ ] `./internal\cache\fallback_test.go:119` — **mock** — cm := NewCacheManager(mockRedis, nil, config)
-- [ ] `./internal\cache\fallback_test.go:180` — **mock** — // MockRedisCache is a mock implementation for testing
-- [ ] `./internal\cache\fallback_test.go:181` — **mock** — type MockRedisCache struct {
-- [ ] `./internal\cache\fallback_test.go:186` — **mock** — func (m *MockRedisCache) Get(ctx context.Context, key string, dest interface{}) error {
-- [ ] `./internal\cache\fallback_test.go:188` — **mock** — return fmt.Errorf("mock Redis failure")
-- [ ] `./internal\cache\fallback_test.go:210` — **mock** — func (m *MockRedisCache) Set(ctx context.Context, key string, value interface{}, expiration time.Duration) error {
-- [ ] `./internal\cache\fallback_test.go:212` — **mock** — return fmt.Errorf("mock Redis failure")
-- [ ] `./internal\cache\fallback_test.go:219` — **mock** — func (m *MockRedisCache) Delete(ctx context.Context, key string) error {
-- [ ] `./internal\cache\fallback_test.go:221` — **mock** — return fmt.Errorf("mock Redis failure")
-- [ ] `./internal\cache\fallback_test.go:228` — **mock** — func (m *MockRedisCache) Exists(ctx context.Context, key string) (bool, error) {
-- [ ] `./internal\cache\fallback_test.go:230` — **mock** — return false, fmt.Errorf("mock Redis failure")
-- [ ] `./internal\cache\fallback_test.go:237` — **mock** — func (m *MockRedisCache) Close() error {
-- [ ] `./internal\cache\fallback_test.go:242` — **mock** — func (m *MockRedisCache) HGet(ctx context.Context, key, field string, dest interface{}) error {
-- [ ] `./internal\cache\fallback_test.go:246` — **mock** — func (m *MockRedisCache) HSet(ctx context.Context, key, field string, value interface{}) error {
-- [ ] `./internal\cache\fallback_test.go:250` — **mock** — func (m *MockRedisCache) HGetAll(ctx context.Context, key string) (map[string]string, error) {
-- [ ] `./internal\cache\fallback_test.go:254` — **mock** — func (m *MockRedisCache) HDel(ctx context.Context, key string, fields ...string) error {
-- [ ] `./internal\cache\fallback_test.go:258` — **mock** — func (m *MockRedisCache) LPush(ctx context.Context, key string, values ...interface{}) error {
-- [ ] `./internal\cache\fallback_test.go:262` — **mock** — func (m *MockRedisCache) RPush(ctx context.Context, key string, values ...interface{}) error {
-- [ ] `./internal\cache\fallback_test.go:266` — **mock** — func (m *MockRedisCache) LPop(ctx context.Context, key string, dest interface{}) error {
-- [ ] `./internal\cache\fallback_test.go:270` — **mock** — func (m *MockRedisCache) RPop(ctx context.Context, key string, dest interface{}) error {
-- [ ] `./internal\cache\fallback_test.go:274` — **mock** — func (m *MockRedisCache) LRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
-- [ ] `./internal\cache\fallback_test.go:278` — **mock** — func (m *MockRedisCache) SAdd(ctx context.Context, key string, members ...interface{}) error {
-- [ ] `./internal\cache\fallback_test.go:282` — **mock** — func (m *MockRedisCache) SRem(ctx context.Context, key string, members ...interface{}) error {
-- [ ] `./internal\cache\fallback_test.go:286` — **mock** — func (m *MockRedisCache) SMembers(ctx context.Context, key string) ([]string, error) {
-- [ ] `./internal\cache\fallback_test.go:290` — **mock** — func (m *MockRedisCache) SIsMember(ctx context.Context, key string, member interface{}) (bool, error) {
-- [ ] `./internal\cache\fallback_test.go:294` — **mock** — func (m *MockRedisCache) ZAdd(ctx context.Context, key string, score float64, member interface{}) error {
-- [ ] `./internal\cache\fallback_test.go:298` — **mock** — func (m *MockRedisCache) ZRange(ctx context.Context, key string, start, stop int64) ([]string, error) {
-- [ ] `./internal\cache\fallback_test.go:302` — **mock** — func (m *MockRedisCache) ZRangeByScore(ctx context.Context, key string, min, max string) ([]string, error) {
-- [ ] `./internal\cache\fallback_test.go:306` — **mock** — func (m *MockRedisCache) ZRem(ctx context.Context, key string, members ...interface{}) error {
-- [ ] `./internal\cache\fallback_test.go:310` — **mock** — func (m *MockRedisCache) Expire(ctx context.Context, key string, expiration time.Duration) error {
-- [ ] `./internal\cache\fallback_test.go:314` — **mock** — func (m *MockRedisCache) TTL(ctx context.Context, key string) (time.Duration, error) {
-- [ ] `./internal\cache\fallback_test.go:318` — **mock** — func (m *MockRedisCache) Flush(ctx context.Context) error {
-- [ ] `./internal\cache\fallback_test.go:323` — **mock** — func (m *MockRedisCache) SetFundingRate(ctx context.Context, symbol string, rate interface{}, expiration time.Duration) error {
-- [ ] `./internal\cache\fallback_test.go:327` — **mock** — func (m *MockRedisCache) GetFundingRate(ctx context.Context, symbol string, dest interface{}) error {
-- [ ] `./internal\cache\fallback_test.go:331` — **mock** — func (m *MockRedisCache) SetIndexPrice(ctx context.Context, symbol string, price interface{}, expiration time.Duration) error {
-- [ ] `./internal\cache\fallback_test.go:335` — **mock** — func (m *MockRedisCache) GetIndexPrice(ctx context.Context, symbol string, dest interface{}) error {
-- [ ] `./internal\cache\fallback_test.go:339` — **mock** — func (m *MockRedisCache) CheckRateLimit(ctx context.Context, key string, limit int, window time.Duration) (bool, error) {
-- [ ] `./internal\cache\fallback_test.go:343` — **mock** — func (m *MockRedisCache) SetOrderBook(ctx context.Context, symbol string, snapshot interface{}, expiration time.Duration) error {
-- [ ] `./internal\cache\fallback_test.go:347` — **mock** — func (m *MockRedisCache) GetOrderBook(ctx context.Context, symbol string, dest interface{}) error {
-
-## ./internal\exchange\binance\client_test.go
-- [ ] `./internal\exchange\binance\client_test.go:113` — **mock** — // Create mock server
-- [ ] `./internal\exchange\binance\client_test.go:143` — **mock** — // Create mock server
-- [ ] `./internal\exchange\binance\client_test.go:188` — **mock** — // Create mock server
-- [ ] `./internal\exchange\binance\client_test.go:240` — **mock** — // Create mock server
-- [ ] `./internal\exchange\binance\client_test.go:293` — **mock** — // Create mock server that returns an error
-
-## ./internal\exchange\pnl\executor.go
-- [ ] `./internal\exchange\pnl\executor.go:311` — **TODO** — // TODO: Implement proper order cancellation logic
-
-## ./internal\exchange\pnl\service.go
-- [ ] `./internal\exchange\pnl\service.go:252` — **TODO** — // TODO: Implement GetAccountBalances method in exchange interface
-- [ ] `./internal\exchange\pnl\service.go:261` — **TODO** — // TODO: Fix UpdateBalance method signature
-- [ ] `./internal\exchange\pnl\service.go:499` — **TODO** — "calculator_status": "active", // TODO: Implement GetCurrentStatus method
-
-## ./internal\orchestrator\scheduler_test.go
-- [ ] `./internal\orchestrator\scheduler_test.go:47` — **mock** — // Create mock handler
-- [ ] `./internal\orchestrator\scheduler_test.go:48` — **mock** — mockHandler := &MockTaskHandler{
-- [ ] `./internal\orchestrator\scheduler_test.go:53` — **mock** — scheduler.RegisterHandler(TaskTypeMarketHealth, mockHandler)
-- [ ] `./internal\orchestrator\scheduler_test.go:61` — **mock** — assert.Equal(t, mockHandler, handler)
-- [ ] `./internal\orchestrator\scheduler_test.go:70` — **mock** — mockHandler := &MockTaskHandler{
-- [ ] `./internal\orchestrator\scheduler_test.go:73` — **mock** — scheduler.RegisterHandler(TaskTypeMarketHealth, mockHandler)
-- [ ] `./internal\orchestrator\scheduler_test.go:208` — **mock** — // Create mock handler
-- [ ] `./internal\orchestrator\scheduler_test.go:209` — **mock** — mockHandler := &MockTaskHandler{
-- [ ] `./internal\orchestrator\scheduler_test.go:212` — **mock** — scheduler.RegisterHandler(TaskTypeMarketHealth, mockHandler)
-- [ ] `./internal\orchestrator\scheduler_test.go:238` — **mock** — assert.True(t, mockHandler.executeCalled)
-- [ ] `./internal\orchestrator\scheduler_test.go:239` — **mock** — assert.Equal(t, task, mockHandler.lastTask)
-- [ ] `./internal\orchestrator\scheduler_test.go:300` — **mock** — // MockTaskHandler implements TaskHandler interface for testing
-- [ ] `./internal\orchestrator\scheduler_test.go:301` — **mock** — type MockTaskHandler struct {
-- [ ] `./internal\orchestrator\scheduler_test.go:309` — **mock** — func (m *MockTaskHandler) Execute(ctx context.Context, task *Task) error {
-- [ ] `./internal\orchestrator\scheduler_test.go:318` — **mock** — func (m *MockTaskHandler) GetName() string {
-- [ ] `./internal\orchestrator\scheduler_test.go:322` — **mock** — func (m *MockTaskHandler) Reset() {
-
-## ./internal\security\protector\exchange_provider_test.go
-- [ ] `./internal\security\protector\exchange_provider_test.go:10` — **mock** — // MockExchangeProvider 模拟交易所数据提供者（用于测试）
-- [ ] `./internal\security\protector\exchange_provider_test.go:11` — **mock** — type MockExchangeProvider struct {
-- [ ] `./internal\security\protector\exchange_provider_test.go:17` — **mock** — // NewMockExchangeProvider 创建模拟交易所数据提供者
-- [ ] `./internal\security\protector\exchange_provider_test.go:18` — **mock** — func NewMockExchangeProvider() *MockExchangeProvider {
-- [ ] `./internal\security\protector\exchange_provider_test.go:19` — **mock** — return &MockExchangeProvider{
-- [ ] `./internal\security\protector\exchange_provider_test.go:47` — **mock** — func (m *MockExchangeProvider) IsHealthy() bool {
-- [ ] `./internal\security\protector\exchange_provider_test.go:52` — **mock** — func (m *MockExchangeProvider) GetFundData(ctx context.Context) (*ExchangeFundData, error) {
-- [ ] `./internal\security\protector\exchange_provider_test.go:60` — **mock** — func (m *MockExchangeProvider) GetPositions(ctx context.Context) ([]*Position, error) {
-- [ ] `./internal\security\protector\exchange_provider_test.go:68` — **mock** — func (m *MockExchangeProvider) GetHistoricalReturns(ctx context.Context, days int) ([]float64, error) {
-- [ ] `./internal\security\protector\exchange_provider_test.go:83` — **mock** — func (m *MockExchangeProvider) GetHistoricalEquity(ctx context.Context, days int) ([]float64, error) {
-- [ ] `./internal\security\protector\exchange_provider_test.go:101` — **mock** — func (m *MockExchangeProvider) GetSymbolPrice(ctx context.Context, symbol string) (float64, error) {
-- [ ] `./internal\security\protector\exchange_provider_test.go:121` — **mock** — func (m *MockExchangeProvider) GetOrderBookDepth(ctx context.Context, symbol string) (*OrderBookDepth, error) {
-- [ ] `./internal\security\protector\exchange_provider_test.go:146` — **mock** — func (m *MockExchangeProvider) GetTradingVolume(ctx context.Context, symbol string, period string) (float64, error) {
-- [ ] `./internal\security\protector\exchange_provider_test.go:156` — **mock** — func (m *MockExchangeProvider) SetHealthy(healthy bool) {
-- [ ] `./internal\security\protector\exchange_provider_test.go:161` — **mock** — func (m *MockExchangeProvider) SetFundData(data *ExchangeFundData) {
-- [ ] `./internal\security\protector\exchange_provider_test.go:166` — **mock** — func (m *MockExchangeProvider) SetPositions(positions []*Position) {
-- [ ] `./internal\security\protector\exchange_provider_test.go:170` — **mock** — // TestMockExchangeProvider 测试mock交易所提供者
-- [ ] `./internal\security\protector\exchange_provider_test.go:171` — **mock** — func TestMockExchangeProvider(t *testing.T) {
-- [ ] `./internal\security\protector\exchange_provider_test.go:173` — **mock** — mock := NewMockExchangeProvider()
-- [ ] `./internal\security\protector\exchange_provider_test.go:176` — **mock** — if !mock.IsHealthy() {
-- [ ] `./internal\security\protector\exchange_provider_test.go:177` — **mock** — t.Error("Expected mock to be healthy")
-- [ ] `./internal\security\protector\exchange_provider_test.go:181` — **mock** — fundData, err := mock.GetFundData(ctx)
-- [ ] `./internal\security\protector\exchange_provider_test.go:190` — **mock** — positions, err := mock.GetPositions(ctx)
-- [ ] `./internal\security\protector\exchange_provider_test.go:199` — **mock** — mock.SetHealthy(false)
-- [ ] `./internal\security\protector\exchange_provider_test.go:200` — **mock** — _, err = mock.GetFundData(ctx)
-
-## ./internal\security\protector\fund_protector_test.go
-- [ ] `./internal\security\protector\fund_protector_test.go:22` — **mock** — exchangeProvider := NewMockExchangeProvider()
-- [ ] `./internal\security\protector\fund_protector_test.go:23` — **mock** — mockNotificationService := NewMockNotificationService()
-- [ ] `./internal\security\protector\fund_protector_test.go:24` — **mock** — mockWalletService := NewMockWalletService()
-- [ ] `./internal\security\protector\fund_protector_test.go:25` — **mock** — var mockExchange exchange.Exchange
-- [ ] `./internal\security\protector\fund_protector_test.go:26` — **mock** — var mockDAOManager dao.DAOManager
-- [ ] `./internal\security\protector\fund_protector_test.go:28` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, mockNotificationService, mockWalletService)
-- [ ] `./internal\security\protector\fund_protector_test.go:48` — **mock** — provider := NewMockExchangeProvider()
-- [ ] `./internal\security\protector\fund_protector_test.go:52` — **mock** — t.Error("Mock provider should be healthy")
-- [ ] `./internal\security\protector\fund_protector_test.go:93` — **mock** — service := NewMockNotificationService()
-- [ ] `./internal\security\protector\fund_protector_test.go:140` — **mock** — service := NewMockWalletService()
-- [ ] `./internal\security\protector\fund_protector_test.go:202` — **mock** — exchangeProvider := NewMockExchangeProvider()
-- [ ] `./internal\security\protector\fund_protector_test.go:203` — **mock** — notificationService := NewMockNotificationService()
-- [ ] `./internal\security\protector\fund_protector_test.go:204` — **mock** — walletService := NewMockWalletService()
-- [ ] `./internal\security\protector\fund_protector_test.go:205` — **mock** — var mockExchange exchange.Exchange
-- [ ] `./internal\security\protector\fund_protector_test.go:206` — **mock** — var mockDAOManager dao.DAOManager
-- [ ] `./internal\security\protector\fund_protector_test.go:208` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
-- [ ] `./internal\security\protector\fund_protector_test.go:249` — **mock** — exchangeProvider := NewMockExchangeProvider()
-- [ ] `./internal\security\protector\fund_protector_test.go:250` — **mock** — notificationService := NewMockNotificationService()
-- [ ] `./internal\security\protector\fund_protector_test.go:251` — **mock** — walletService := NewMockWalletService()
-- [ ] `./internal\security\protector\fund_protector_test.go:252` — **mock** — var mockExchange exchange.Exchange
-- [ ] `./internal\security\protector\fund_protector_test.go:253` — **mock** — var mockDAOManager dao.DAOManager
-- [ ] `./internal\security\protector\fund_protector_test.go:255` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
-- [ ] `./internal\security\protector\fund_protector_test.go:312` — **mock** — exchangeProvider := NewMockExchangeProvider()
-- [ ] `./internal\security\protector\fund_protector_test.go:313` — **mock** — notificationService := NewMockNotificationService()
-- [ ] `./internal\security\protector\fund_protector_test.go:314` — **mock** — walletService := NewMockWalletService()
-- [ ] `./internal\security\protector\fund_protector_test.go:315` — **mock** — var mockExchange exchange.Exchange
-- [ ] `./internal\security\protector\fund_protector_test.go:316` — **mock** — var mockDAOManager dao.DAOManager
-- [ ] `./internal\security\protector\fund_protector_test.go:318` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
-- [ ] `./internal\security\protector\fund_protector_test.go:354` — **mock** — exchangeProvider := NewMockExchangeProvider()
-- [ ] `./internal\security\protector\fund_protector_test.go:355` — **mock** — notificationService := NewMockNotificationService()
-- [ ] `./internal\security\protector\fund_protector_test.go:356` — **mock** — walletService := NewMockWalletService()
-- [ ] `./internal\security\protector\fund_protector_test.go:357` — **mock** — var mockExchange exchange.Exchange
-- [ ] `./internal\security\protector\fund_protector_test.go:358` — **mock** — var mockDAOManager dao.DAOManager
-- [ ] `./internal\security\protector\fund_protector_test.go:360` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
-- [ ] `./internal\security\protector\fund_protector_test.go:396` — **mock** — exchangeProvider := NewMockExchangeProvider()
-- [ ] `./internal\security\protector\fund_protector_test.go:397` — **mock** — notificationService := NewMockNotificationService()
-- [ ] `./internal\security\protector\fund_protector_test.go:398` — **mock** — walletService := NewMockWalletService()
-- [ ] `./internal\security\protector\fund_protector_test.go:399` — **mock** — var mockExchange exchange.Exchange
-- [ ] `./internal\security\protector\fund_protector_test.go:400` — **mock** — var mockDAOManager dao.DAOManager
-- [ ] `./internal\security\protector\fund_protector_test.go:402` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
-- [ ] `./internal\security\protector\fund_protector_test.go:441` — **mock** — exchangeProvider := NewMockExchangeProvider()
-- [ ] `./internal\security\protector\fund_protector_test.go:442` — **mock** — notificationService := NewMockNotificationService()
-- [ ] `./internal\security\protector\fund_protector_test.go:443` — **mock** — walletService := NewMockWalletService()
-- [ ] `./internal\security\protector\fund_protector_test.go:444` — **mock** — var mockExchange exchange.Exchange
-- [ ] `./internal\security\protector\fund_protector_test.go:445` — **mock** — var mockDAOManager dao.DAOManager
-- [ ] `./internal\security\protector\fund_protector_test.go:447` — **mock** — fp, err := NewFundProtector(cfg, exchangeProvider, mockExchange, mockDAOManager, notificationService, walletService)
-
-## ./internal\security\protector\notification_service_test.go
-- [ ] `./internal\security\protector\notification_service_test.go:11` — **mock** — // MockNotificationService 模拟通知服务（用于测试）
-- [ ] `./internal\security\protector\notification_service_test.go:12` — **mock** — type MockNotificationService struct {
-- [ ] `./internal\security\protector\notification_service_test.go:49` — **mock** — // NewMockNotificationService 创建模拟通知服务
-- [ ] `./internal\security\protector\notification_service_test.go:50` — **mock** — func NewMockNotificationService() *MockNotificationService {
-- [ ] `./internal\security\protector\notification_service_test.go:51` — **mock** — return &MockNotificationService{
-- [ ] `./internal\security\protector\notification_service_test.go:61` — **mock** — func (m *MockNotificationService) SendEmail(ctx context.Context, to, subject, body string) error {
-- [ ] `./internal\security\protector\notification_service_test.go:63` — **mock** — return fmt.Errorf("mock email failure")
-- [ ] `./internal\security\protector\notification_service_test.go:73` — **mock** — log.Printf("Mock email sent to %s: %s", to, subject)
-- [ ] `./internal\security\protector\notification_service_test.go:78` — **mock** — func (m *MockNotificationService) SendSMS(ctx context.Context, phone, message string) error {
-- [ ] `./internal\security\protector\notification_service_test.go:80` — **mock** — return fmt.Errorf("mock SMS failure")
-- [ ] `./internal\security\protector\notification_service_test.go:89` — **mock** — log.Printf("Mock SMS sent to %s: %s", phone, message)
-- [ ] `./internal\security\protector\notification_service_test.go:94` — **mock** — func (m *MockNotificationService) SendWebhook(ctx context.Context, url string, payload interface{}) error {
-- [ ] `./internal\security\protector\notification_service_test.go:96` — **mock** — return fmt.Errorf("mock webhook failure")
-- [ ] `./internal\security\protector\notification_service_test.go:105` — **mock** — log.Printf("Mock webhook sent to %s", url)
-- [ ] `./internal\security\protector\notification_service_test.go:110` — **mock** — func (m *MockNotificationService) SendSlack(ctx context.Context, webhook, message string) error {
-- [ ] `./internal\security\protector\notification_service_test.go:112` — **mock** — return fmt.Errorf("mock Slack failure")
-- [ ] `./internal\security\protector\notification_service_test.go:121` — **mock** — log.Printf("Mock Slack message sent: %s", message)
-- [ ] `./internal\security\protector\notification_service_test.go:126` — **mock** — func (m *MockNotificationService) SetShouldFail(shouldFail bool) {
-- [ ] `./internal\security\protector\notification_service_test.go:131` — **mock** — func (m *MockNotificationService) GetEmailsSent() []EmailRecord {
-- [ ] `./internal\security\protector\notification_service_test.go:136` — **mock** — func (m *MockNotificationService) GetSMSSent() []SMSRecord {
-- [ ] `./internal\security\protector\notification_service_test.go:141` — **mock** — func (m *MockNotificationService) GetWebhooksSent() []WebhookRecord {
-- [ ] `./internal\security\protector\notification_service_test.go:146` — **mock** — func (m *MockNotificationService) GetSlackSent() []SlackRecord {
-- [ ] `./internal\security\protector\notification_service_test.go:151` — **mock** — func (m *MockNotificationService) Reset() {
-- [ ] `./internal\security\protector\notification_service_test.go:158` — **mock** — // TestMockNotificationService 测试mock通知服务
-- [ ] `./internal\security\protector\notification_service_test.go:159` — **mock** — func TestMockNotificationService(t *testing.T) {
-- [ ] `./internal\security\protector\notification_service_test.go:161` — **mock** — mock := NewMockNotificationService()
-- [ ] `./internal\security\protector\notification_service_test.go:164` — **mock** — err := mock.SendEmail(ctx, "test@example.com", "Test Subject", "Test Body")
-- [ ] `./internal\security\protector\notification_service_test.go:169` — **mock** — emails := mock.GetEmailsSent()
-- [ ] `./internal\security\protector\notification_service_test.go:178` — **mock** — err = mock.SendSMS(ctx, "1234567890", "Test SMS")
-- [ ] `./internal\security\protector\notification_service_test.go:183` — **mock** — sms := mock.GetSMSSent()
-- [ ] `./internal\security\protector\notification_service_test.go:189` — **mock** — mock.SetShouldFail(true)
-- [ ] `./internal\security\protector\notification_service_test.go:190` — **mock** — err = mock.SendEmail(ctx, "test@example.com", "Test", "Test")
-- [ ] `./internal\security\protector\notification_service_test.go:196` — **mock** — mock.Reset()
-- [ ] `./internal\security\protector\notification_service_test.go:197` — **mock** — emails = mock.GetEmailsSent()
-
-## ./internal\security\protector\wallet_service_test.go
-- [ ] `./internal\security\protector\wallet_service_test.go:13` — **mock** — // MockWalletService 模拟钱包服务（用于测试）
-- [ ] `./internal\security\protector\wallet_service_test.go:14` — **mock** — type MockWalletService struct {
-- [ ] `./internal\security\protector\wallet_service_test.go:20` — **mock** — // NewMockWalletService 创建模拟钱包服务
-- [ ] `./internal\security\protector\wallet_service_test.go:21` — **mock** — func NewMockWalletService() *MockWalletService {
-- [ ] `./internal\security\protector\wallet_service_test.go:22` — **mock** — return &MockWalletService{
-- [ ] `./internal\security\protector\wallet_service_test.go:30` — **mock** — func (m *MockWalletService) InitiateTransfer(ctx context.Context, request *TransferRequest) (*TransferResponse, error) {
-- [ ] `./internal\security\protector\wallet_service_test.go:32` — **mock** — return nil, fmt.Errorf("mock transfer failure")
-- [ ] `./internal\security\protector\wallet_service_test.go:39` — **mock** — return nil, fmt.Errorf("random mock transfer failure")
-- [ ] `./internal\security\protector\wallet_service_test.go:43` — **mock** — transferID := fmt.Sprintf("MOCK_TXF_%d", time.Now().Unix())
-- [ ] `./internal\security\protector\wallet_service_test.go:67` — **mock** — log.Printf("Mock transfer initiated: %s", transferID)
-- [ ] `./internal\security\protector\wallet_service_test.go:72` — **mock** — func (m *MockWalletService) GetTransferStatus(ctx context.Context, transferID string) (*TransferStatus, error) {
-- [ ] `./internal\security\protector\wallet_service_test.go:81` — **mock** — func (m *MockWalletService) CancelTransfer(ctx context.Context, transferID string) error {
-- [ ] `./internal\security\protector\wallet_service_test.go:91` — **mock** — func (m *MockWalletService) GetTransferHistory(ctx context.Context, limit int) ([]*TransferRecord, error) {
-- [ ] `./internal\security\protector\wallet_service_test.go:107` — **mock** — func (m *MockWalletService) ValidateAddress(address string) error {
-- [ ] `./internal\security\protector\wallet_service_test.go:115` — **mock** — func (m *MockWalletService) EstimateTransferFee(ctx context.Context, amount float64, toAddress string) (float64, error) {
-- [ ] `./internal\security\protector\wallet_service_test.go:120` — **mock** — func (m *MockWalletService) SetShouldFail(shouldFail bool) {
-- [ ] `./internal\security\protector\wallet_service_test.go:125` — **mock** — func (m *MockWalletService) SetFailureRate(rate float64) {
-- [ ] `./internal\security\protector\wallet_service_test.go:130` — **mock** — func (m *MockWalletService) GetTransfers() map[string]*TransferStatus {
-- [ ] `./internal\security\protector\wallet_service_test.go:134` — **mock** — // TestMockWalletService 测试mock钱包服务
-- [ ] `./internal\security\protector\wallet_service_test.go:135` — **mock** — func TestMockWalletService(t *testing.T) {
-- [ ] `./internal\security\protector\wallet_service_test.go:137` — **mock** — mock := NewMockWalletService()
-- [ ] `./internal\security\protector\wallet_service_test.go:149` — **mock** — response, err := mock.InitiateTransfer(ctx, request)
-- [ ] `./internal\security\protector\wallet_service_test.go:158` — **mock** — status, err := mock.GetTransferStatus(ctx, response.TransferID)
-- [ ] `./internal\security\protector\wallet_service_test.go:167` — **mock** — err = mock.CancelTransfer(ctx, response.TransferID)
-- [ ] `./internal\security\protector\wallet_service_test.go:173` — **mock** — status, _ = mock.GetTransferStatus(ctx, response.TransferID)
-- [ ] `./internal\security\protector\wallet_service_test.go:179` — **mock** — mock.SetShouldFail(true)
-- [ ] `./internal\security\protector\wallet_service_test.go:180` — **mock** — _, err = mock.InitiateTransfer(ctx, request)
-- [ ] `./internal\security\protector\wallet_service_test.go:186` — **mock** — mock.SetShouldFail(false)
-- [ ] `./internal\security\protector\wallet_service_test.go:187` — **mock** — err = mock.ValidateAddress("short")
-- [ ] `./internal\security\protector\wallet_service_test.go:192` — **mock** — err = mock.ValidateAddress("0x1234567890abcdef")
-
-## ./internal\strategy\unified_service.go
-- [ ] `./internal\strategy\unified_service.go:365` — **mock** — // 如果没有数据库连接，返回空结果而不是 mock 数据
-- [ ] `./internal\strategy\unified_service.go:422` — **mock** — // 如果没有数据库连接，返回错误而不是 mock 数据
-- [ ] `./internal\strategy\unified_service.go:475` — **mock** — // 如果没有从策略池获取到信息，使用默认值而不是 mock 数据
-
-## ./internal\strategy\unified_service_simple.go
-- [ ] `./internal\strategy\unified_service_simple.go:44` — **mock** — // 返回空策略列表，避免使用 mock 数据
-- [ ] `./internal\strategy\unified_service_simple.go:82` — **mock** — // 不使用 mock 数据，直接返回未找到错误
-- [ ] `./internal\strategy\unified_service_simple.go:248` — **mock** — // 删除了 getMockStrategies 方法，不再使用 mock 数据
-- [ ] `./internal\strategy\unified_service_simple.go:250` — **mock** — // 删除了所有 mock 方法，不再使用 mock 数据
-
-## ./internal\strategy\generator\analyzer_test.go
-- [ ] `./internal\strategy\generator\analyzer_test.go:69` — **mock** — // TestMarketAnalyzer_GenerateMockPriceData 测试已删除，因为不再使用mock数据生成
-
-## ./internal\strategy\optimizer\orchestrator_test.go
-- [ ] `./internal\strategy\optimizer\orchestrator_test.go:143` — **mock** — // Create a mock orchestrator without database connection
-
-## ./internal\strategy\sandbox\automation.go
-- [ ] `./internal\strategy\sandbox\automation.go:154` — **mock** — mockExchange := s.createMockExchange(testConfig)
-- [ ] `./internal\strategy\sandbox\automation.go:165` — **mock** — sandbox := NewSandbox(strategyInstance, strategyConfig.Params, mockExchange)
-- [ ] `./internal\strategy\sandbox\automation.go:464` — **mock** — // createMockExchange 创建模拟交易所
-- [ ] `./internal\strategy\sandbox\automation.go:465` — **mock** — func (s *AutomatedSandboxService) createMockExchange(config *TestConfiguration) exchange.Exchange {
-
-## ./internal\trading\dryrun\simulator_test.go
-- [ ] `./internal\trading\dryrun\simulator_test.go:11` — **mock** — // MockMarketDataProvider 模拟市场数据提供者
-- [ ] `./internal\trading\dryrun\simulator_test.go:12` — **mock** — type MockMarketDataProvider struct{}
-- [ ] `./internal\trading\dryrun\simulator_test.go:14` — **mock** — func (m *MockMarketDataProvider) GetPrice(symbol string) (float64, error) {
-- [ ] `./internal\trading\dryrun\simulator_test.go:61` — **mock** — mockProvider := &MockMarketDataProvider{}
-- [ ] `./internal\trading\dryrun\simulator_test.go:63` — **mock** — simulator, err := NewTradingSimulator(config, mockProvider)
-- [ ] `./internal\trading\dryrun\simulator_test.go:117` — **mock** — mockProvider := &MockMarketDataProvider{}
-- [ ] `./internal\trading\dryrun\simulator_test.go:119` — **mock** — simulator, err := NewTradingSimulator(config, mockProvider)
-- [ ] `./internal\trading\dryrun\simulator_test.go:154` — **mock** — mockProvider := &MockMarketDataProvider{}
-- [ ] `./internal\trading\dryrun\simulator_test.go:156` — **mock** — simulator, err := NewTradingSimulator(config, mockProvider)
-- [ ] `./internal\trading\dryrun\simulator_test.go:225` — **mock** — mockProvider := &MockMarketDataProvider{}
-- [ ] `./internal\trading\dryrun\simulator_test.go:227` — **mock** — simulator, err := NewTradingSimulator(config, mockProvider)
-- [ ] `./internal\trading\dryrun\simulator_test.go:288` — **mock** — mockProvider := &MockMarketDataProvider{}
-- [ ] `./internal\trading\dryrun\simulator_test.go:290` — **mock** — simulator, err := NewTradingSimulator(config, mockProvider)
-- [ ] `./internal\trading\dryrun\simulator_test.go:322` — **mock** — mockProvider := &MockMarketDataProvider{}
-- [ ] `./internal\trading\dryrun\simulator_test.go:324` — **mock** — simulator, err := NewTradingSimulator(config, mockProvider)
-
-## ./internal\workflow\executors.go
-- [ ] `./internal\workflow\executors.go:1161` — **mock** — rawData = dce.generateMockMarketData(timeRange)
-- [ ] `./internal\workflow\executors.go:1163` — **mock** — rawData = dce.generateMockTradingData(timeRange)
-- [ ] `./internal\workflow\executors.go:1165` — **mock** — rawData = dce.generateMockAccountData(timeRange)
-- [ ] `./internal\workflow\executors.go:1173` — **mock** — // generateMockMarketData 生成模拟市场数据
-- [ ] `./internal\workflow\executors.go:1174` — **mock** — func (dce *DataCleaningExecutor) generateMockMarketData(timeRange map[string]time.Time) []map[string]interface{} {
-- [ ] `./internal\workflow\executors.go:1213` — **mock** — // generateMockTradingData 生成模拟交易数据
-- [ ] `./internal\workflow\executors.go:1214` — **mock** — func (dce *DataCleaningExecutor) generateMockTradingData(timeRange map[string]time.Time) []map[string]interface{} {
-- [ ] `./internal\workflow\executors.go:1237` — **mock** — // generateMockAccountData 生成模拟账户数据
-- [ ] `./internal\workflow\executors.go:1238` — **mock** — func (dce *DataCleaningExecutor) generateMockAccountData(timeRange map[string]time.Time) []map[string]interface{} {
-
-## ./internal\workflow\executors_test.go
-- [ ] `./internal\workflow\executors_test.go:11` — **mock** — // MockExecutor 模拟执行器（用于测试）
-- [ ] `./internal\workflow\executors_test.go:12` — **mock** — type MockExecutor struct {
-- [ ] `./internal\workflow\executors_test.go:18` — **mock** — // NewMockExecutor 创建模拟执行器
-- [ ] `./internal\workflow\executors_test.go:19` — **mock** — func NewMockExecutor(name string, executionTime time.Duration, simulateFailure bool) *MockExecutor {
-- [ ] `./internal\workflow\executors_test.go:20` — **mock** — return &MockExecutor{
-- [ ] `./internal\workflow\executors_test.go:35` — **mock** — func (me *MockExecutor) Execute(ctx context.Context, params map[string]interface{}) (interface{}, error) {
-- [ ] `./internal\workflow\executors_test.go:77` — **mock** — // TestMockExecutor 测试mock执行器
-- [ ] `./internal\workflow\executors_test.go:78` — **mock** — func TestMockExecutor(t *testing.T) {
-- [ ] `./internal\workflow\executors_test.go:81` — **mock** — // 创建mock执行器
-- [ ] `./internal\workflow\executors_test.go:82` — **mock** — executor := NewMockExecutor("测试执行器", 100*time.Millisecond, false)
-- [ ] `./internal\workflow\executors_test.go:111` — **mock** — failureExecutor := NewMockExecutor("失败执行器", 50*time.Millisecond, true)
-- [ ] `./internal\workflow\executors_test.go:132` — **mock** — // TestMockExecutorResourceRequirements 测试资源需求
-- [ ] `./internal\workflow\executors_test.go:133` — **mock** — func TestMockExecutorResourceRequirements(t *testing.T) {
-- [ ] `./internal\workflow\executors_test.go:134` — **mock** — executor := NewMockExecutor("资源测试", time.Second, false)
-- [ ] `./internal\workflow\executors_test.go:150` — **mock** — // TestMockExecutorName 测试执行器名称
-- [ ] `./internal\workflow\executors_test.go:151` — **mock** — func TestMockExecutorName(t *testing.T) {
-- [ ] `./internal\workflow\executors_test.go:153` — **mock** — executor := NewMockExecutor(name, time.Second, false)
+## ./internal\workflow\executors_test.go ✅ COMPLETED
+- [x] `./internal\workflow\executors_test.go:11` — **mock** — // MockExecutor 模拟执行器（用于测试）
+- [x] `./internal\workflow\executors_test.go:12` — **mock** — type MockExecutor struct {
+- [x] `./internal\workflow\executors_test.go:18` — **mock** — // NewMockExecutor 创建模拟执行器
+- [x] `./internal\workflow\executors_test.go:19` — **mock** — func NewMockExecutor(name string, executionTime time.Duration, simulateFailure bool) *MockExecutor {
+- [x] `./internal\workflow\executors_test.go:20` — **mock** — return &MockExecutor{
+- [x] `./internal\workflow\executors_test.go:35` — **mock** — func (me *MockExecutor) Execute(ctx context.Context, params map[string]interface{}) (interface{}, error) {
+- [x] `./internal\workflow\executors_test.go:77` — **mock** — // TestMockExecutor 测试mock执行器
+- [x] `./internal\workflow\executors_test.go:78` — **mock** — func TestMockExecutor(t *testing.T) {
+- [x] `./internal\workflow\executors_test.go:81` — **mock** — // 创建mock执行器
+- [x] `./internal\workflow\executors_test.go:82` — **mock** — executor := NewMockExecutor("测试执行器", 100*time.Millisecond, false)
+- [x] `./internal\workflow\executors_test.go:111` — **mock** — failureExecutor := NewMockExecutor("失败执行器", 50*time.Millisecond, true)
+- [x] `./internal\workflow\executors_test.go:132` — **mock** — // TestMockExecutorResourceRequirements 测试资源需求
+- [x] `./internal\workflow\executors_test.go:133` — **mock** — func TestMockExecutorResourceRequirements(t *testing.T) {
+- [x] `./internal\workflow\executors_test.go:134` — **mock** — executor := NewMockExecutor("资源测试", time.Second, false)
+- [x] `./internal\workflow\executors_test.go:150` — **mock** — // TestMockExecutorName 测试执行器名称
+- [x] `./internal\workflow\executors_test.go:151` — **mock** — func TestMockExecutorName(t *testing.T) {
+- [x] `./internal\workflow\executors_test.go:153` — **mock** — executor := NewMockExecutor(name, time.Second, false)
