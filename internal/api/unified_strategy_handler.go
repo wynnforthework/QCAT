@@ -28,7 +28,7 @@ func NewUnifiedStrategyHandler(service *strategy.UnifiedStrategyService) *Unifie
 // @Tags strategy
 // @Accept json
 // @Produce json
-// @Param view query string false "视图类型" Enums(list,pool,execution,performance) default(list)
+// @Param view query string false "视图类型" Enums(list,pool,execution,performance,management) default(list)
 // @Param status query []string false "状态过滤"
 // @Param type query []string false "类型过滤"
 // @Param stage query []string false "阶段过滤"
@@ -165,19 +165,19 @@ func (h *UnifiedStrategyHandler) GetPoolOverview(c *gin.Context) {
 			"pending":  result.Summary.Pool.Pending,
 			"testing":  result.Summary.Pool.Testing,
 		},
-		Summary:      result.Summary,
+		Summary: result.Summary,
 		RecentActivity: []PoolActivity{
 			{
-				Type:        "strategy_enabled",
-				StrategyID:  "strategy_001",
-				Message:     "策略 动量策略Alpha 已启用",
-				Timestamp:   "2分钟前",
+				Type:       "strategy_enabled",
+				StrategyID: "strategy_001",
+				Message:    "策略 动量策略Alpha 已启用",
+				Timestamp:  "2分钟前",
 			},
 			{
-				Type:        "performance_update",
-				StrategyID:  "strategy_002",
-				Message:     "策略 均值回归策略Beta 性能更新",
-				Timestamp:   "5分钟前",
+				Type:       "performance_update",
+				StrategyID: "strategy_002",
+				Message:    "策略 均值回归策略Beta 性能更新",
+				Timestamp:  "5分钟前",
 			},
 		},
 		ResourceUsage: ResourceUsageInfo{
@@ -257,7 +257,7 @@ func (h *UnifiedStrategyHandler) GetExecutionOverview(c *gin.Context) {
 			Status:           "running",
 			ActiveStrategies: activeStrategies,
 			TotalStrategies:  len(result.Strategies),
-			Uptime:          "15天 8小时 32分钟",
+			Uptime:           "15天 8小时 32分钟",
 		},
 		Performance: ExecutionPerformanceInfo{
 			Latency:         avgLatency,
@@ -322,13 +322,13 @@ func (h *UnifiedStrategyHandler) GetRealtimeStatus(c *gin.Context) {
 	for _, strategy := range result.Strategies {
 		if strategy.Execution.IsRunning {
 			activeStrategies = append(activeStrategies, RealtimeStrategyInfo{
-				ID:           strategy.ID,
-				Name:         strategy.Name,
-				Status:       "running",
+				ID:            strategy.ID,
+				Name:          strategy.Name,
+				Status:        "running",
 				LastExecution: strategy.Execution.LastExecution.Format("15:04:05"),
-				SuccessRate:  strategy.Execution.SuccessRate,
-				Latency:      strategy.Execution.AvgLatency,
-				PNL:          strategy.Performance.PNL,
+				SuccessRate:   strategy.Execution.SuccessRate,
+				Latency:       strategy.Execution.AvgLatency,
+				PNL:           strategy.Performance.PNL,
 			})
 		}
 	}
@@ -370,11 +370,11 @@ func (h *UnifiedStrategyHandler) GetRealtimeStatus(c *gin.Context) {
 func (h *UnifiedStrategyHandler) GetWorkflowStatus(c *gin.Context) {
 	status := WorkflowStatusResponse{
 		System: WorkflowSystemInfo{
-			Status:              "running",
-			ActiveWorkflows:     10,
+			Status:               "running",
+			ActiveWorkflows:      10,
 			ConcurrentStrategies: 15,
-			EvolutionGeneration: 47,
-			Uptime:             "15天 8小时 32分钟",
+			EvolutionGeneration:  47,
+			Uptime:               "15天 8小时 32分钟",
 		},
 		Evolution: EvolutionInfo{
 			CurrentGeneration: 47,
@@ -413,10 +413,10 @@ func (h *UnifiedStrategyHandler) GetWorkflowStatus(c *gin.Context) {
 
 // PoolOverviewResponse 策略池概览响应
 type PoolOverviewResponse struct {
-	Distribution   map[string]interface{} `json:"distribution"`
-	Summary        strategy.StrategySummary  `json:"summary"`
-	RecentActivity []PoolActivity            `json:"recentActivity"`
-	ResourceUsage  ResourceUsageInfo         `json:"resourceUsage"`
+	Distribution   map[string]interface{}   `json:"distribution"`
+	Summary        strategy.StrategySummary `json:"summary"`
+	RecentActivity []PoolActivity           `json:"recentActivity"`
+	ResourceUsage  ResourceUsageInfo        `json:"resourceUsage"`
 }
 
 // PoolActivity 池活动
@@ -454,7 +454,7 @@ type ExecutionSystemInfo struct {
 	Status           string `json:"status"`
 	ActiveStrategies int    `json:"activeStrategies"`
 	TotalStrategies  int    `json:"totalStrategies"`
-	Uptime          string `json:"uptime"`
+	Uptime           string `json:"uptime"`
 }
 
 // ExecutionPerformanceInfo 执行性能信息
@@ -478,10 +478,10 @@ type ExecutionActivity struct {
 
 // RealtimeStatusResponse 实时状态响应
 type RealtimeStatusResponse struct {
-	Timestamp        string                  `json:"timestamp"`
-	ActiveStrategies []RealtimeStrategyInfo  `json:"activeStrategies"`
-	SystemMetrics    SystemMetrics           `json:"systemMetrics"`
-	Alerts           []SystemAlert           `json:"alerts"`
+	Timestamp        string                 `json:"timestamp"`
+	ActiveStrategies []RealtimeStrategyInfo `json:"activeStrategies"`
+	SystemMetrics    SystemMetrics          `json:"systemMetrics"`
+	Alerts           []SystemAlert          `json:"alerts"`
 }
 
 // RealtimeStrategyInfo 实时策略信息
@@ -510,10 +510,10 @@ type SystemAlert struct {
 
 // WorkflowStatusResponse 工作流状态响应
 type WorkflowStatusResponse struct {
-	System          WorkflowSystemInfo     `json:"system"`
-	Evolution       EvolutionInfo          `json:"evolution"`
-	Resources       WorkflowResourceInfo   `json:"resources"`
-	RecentWorkflows []WorkflowActivity     `json:"recentWorkflows"`
+	System          WorkflowSystemInfo   `json:"system"`
+	Evolution       EvolutionInfo        `json:"evolution"`
+	Resources       WorkflowResourceInfo `json:"resources"`
+	RecentWorkflows []WorkflowActivity   `json:"recentWorkflows"`
 }
 
 // WorkflowSystemInfo 工作流系统信息
@@ -522,7 +522,7 @@ type WorkflowSystemInfo struct {
 	ActiveWorkflows      int    `json:"activeWorkflows"`
 	ConcurrentStrategies int    `json:"concurrentStrategies"`
 	EvolutionGeneration  int    `json:"evolutionGeneration"`
-	Uptime              string `json:"uptime"`
+	Uptime               string `json:"uptime"`
 }
 
 // EvolutionInfo 进化信息

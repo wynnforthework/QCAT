@@ -177,7 +177,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
                     <span className="text-sm text-green-700 font-medium">系统运行中</span>
                   </div>
                   <Badge variant="outline" className="text-xs">
-                    v2.0.0
+                    v2.1.0
                   </Badge>
                 </div>
               </div>

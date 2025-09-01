@@ -18,7 +18,7 @@
     "host": "localhost:8082",
     "basePath": "/api/v1",
     "paths": {
-        "/api/v1/auth/login": {
+        "/auth/login": {
             "post": {
                 "description": "用户登录认证",
                 "consumes": [
@@ -93,7 +93,7 @@
                 }
             }
         },
-        "/api/v1/auth/profile": {
+        "/auth/profile": {
             "get": {
                 "security": [
                     {
@@ -140,7 +140,7 @@
                 }
             }
         },
-        "/api/v1/strategy": {
+        "/strategy": {
             "get": {
                 "security": [
                     {
@@ -176,7 +176,7 @@
                 }
             }
         },
-        "/api/v1/strategy/pool/overview": {
+        "/strategy/pool/overview": {
             "get": {
                 "security": [
                     {
@@ -209,7 +209,7 @@
                 }
             }
         },
-        "/api/v1/dashboard": {
+        "/dashboard": {
             "get": {
                 "security": [{"BearerAuth": []}],
                 "description": "获取系统概览和关键指标",
@@ -224,7 +224,7 @@
                 }
             }
         },
-        "/api/v1/portfolio/overview": {
+        "/portfolio/overview": {
             "get": {
                 "security": [{"BearerAuth": []}],
                 "description": "获取投资组合的整体状态和收益情况",
@@ -239,7 +239,7 @@
                 }
             }
         },
-        "/api/v1/risk/overview": {
+        "/risk/overview": {
             "get": {
                 "security": [{"BearerAuth": []}],
                 "description": "获取系统整体风险状况",
@@ -254,7 +254,7 @@
                 }
             }
         },
-        "/api/v1/market/data": {
+        "/market/data": {
             "get": {
                 "security": [{"BearerAuth": []}],
                 "description": "获取实时市场行情数据",
@@ -269,7 +269,7 @@
                 }
             }
         },
-        "/api/v1/trading/activity": {
+        "/trading/activity": {
             "get": {
                 "security": [{"BearerAuth": []}],
                 "description": "获取最近的交易活动记录",
@@ -284,7 +284,7 @@
                 }
             }
         },
-        "/api/v1/metrics/system": {
+        "/metrics/system": {
             "get": {
                 "security": [{"BearerAuth": []}],
                 "description": "获取系统性能和资源使用情况",
@@ -299,7 +299,7 @@
                 }
             }
         },
-        "/api/v1/audit/logs": {
+        "/audit/logs": {
             "get": {
                 "security": [{"BearerAuth": []}],
                 "description": "获取系统操作的审计日志",
@@ -314,7 +314,7 @@
                 }
             }
         },
-        "/api/v1/cache/status": {
+        "/cache/status": {
             "get": {
                 "security": [{"BearerAuth": []}],
                 "description": "获取缓存系统的运行状态",
@@ -329,7 +329,7 @@
                 }
             }
         },
-        "/api/v1/automation/status": {
+        "/automation/status": {
             "get": {
                 "security": [{"BearerAuth": []}],
                 "description": "获取自动化系统的运行状态",
@@ -344,7 +344,7 @@
                 }
             }
         },
-        "/api/v1/orchestrator/status": {
+        "/orchestrator/status": {
             "get": {
                 "security": [{"BearerAuth": []}],
                 "description": "获取系统编排器的运行状态",
@@ -359,7 +359,7 @@
                 }
             }
         },
-        "/api/v1/settings": {
+        "/settings": {
             "get": {
                 "description": "获取当前系统配置设置",
                 "produces": ["application/json"],

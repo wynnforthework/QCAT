@@ -657,9 +657,14 @@ func (s *Server) setupRoutes() {
 			// Strategy routes (all protected) - both read and modification routes
 			strategy := protected.Group("/strategy")
 			{
-				// Read routes
-				strategy.GET("", s.handlers.Strategy.ListStrategies)
-				strategy.GET("/:id", s.handlers.Strategy.GetStrategy)
+				// Read routes - use unified strategy handler if available
+				if s.handlers.UnifiedStrategy != nil {
+					strategy.GET("", s.handlers.UnifiedStrategy.ListStrategies)
+					strategy.GET("/:id", s.handlers.UnifiedStrategy.GetStrategy)
+				} else {
+					strategy.GET("", s.handlers.Strategy.ListStrategies)
+					strategy.GET("/:id", s.handlers.Strategy.GetStrategy)
+				}
 
 				// Pool overview routes
 				if s.handlers.UnifiedStrategy != nil {

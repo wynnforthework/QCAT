@@ -154,7 +154,7 @@ type StrategyListOptions struct {
 	PageSize int `json:"pageSize,omitempty"`
 
 	// 视图选项
-	View string `json:"view,omitempty"` // list, pool, execution, performance
+	View string `json:"view,omitempty"` // list, pool, execution, performance, management
 }
 
 // StrategyListResponse 策略列表响应
@@ -220,7 +220,7 @@ func (s *UnifiedStrategyService) ListStrategies(ctx context.Context, options Str
 	// 增强策略信息（添加执行状态、性能数据、池信息）
 	unifiedStrategies := make([]UnifiedStrategy, len(strategies))
 	for i, strategy := range strategies {
-		unified, err := s.enhanceStrategyInfo(ctx, strategy)
+		unified, err := s.enhanceStrategyInfoWithView(ctx, strategy, options.View)
 		if err != nil {
 			// 记录错误但不中断处理
 			s.metrics.RecordAPIError("strategy_enhancement", "enhancement_failed")
@@ -714,4 +714,135 @@ func (s *UnifiedStrategyService) getStrategyAvgLatency(strategyID string) float6
 	}
 
 	return avgLatency
+}
+
+// enhanceStrategyInfoWithView 根据视图类型增强策略信息
+func (s *UnifiedStrategyService) enhanceStrategyInfoWithView(ctx context.Context, basic BasicStrategy, view string) (UnifiedStrategy, error) {
+	unified := s.createBasicUnifiedStrategy(basic)
+
+	// 根据视图类型决定需要加载的信息
+	switch view {
+	case "management":
+		// 管理视图：重点关注策略的基本信息、状态、配置等
+		unified = s.enhanceForManagementView(ctx, unified, basic)
+	case "pool":
+		// 策略池视图：重点关注池状态、同步信息等
+		unified = s.enhanceForPoolView(ctx, unified, basic)
+	case "execution":
+		// 执行视图：重点关注执行状态、性能指标等
+		unified = s.enhanceForExecutionView(ctx, unified, basic)
+	case "performance":
+		// 性能视图：重点关注性能数据、收益指标等
+		unified = s.enhanceForPerformanceView(ctx, unified, basic)
+	default:
+		// 默认视图：加载所有信息
+		return s.enhanceStrategyInfo(ctx, basic)
+	}
+
+	return unified, nil
+}
+
+// enhanceForManagementView 为管理视图增强策略信息
+func (s *UnifiedStrategyService) enhanceForManagementView(ctx context.Context, unified UnifiedStrategy, basic BasicStrategy) UnifiedStrategy {
+	// 管理视图主要关注策略的基本管理信息
+
+	// 获取策略的运行状态
+	if s.strategyPool != nil {
+		if poolStrategy, err := s.strategyPool.GetStrategyInfo(basic.ID); err == nil {
+			unified.Execution.IsRunning = poolStrategy.IsActive && poolStrategy.TradingEnabled
+			unified.Execution.LastExecution = poolStrategy.LastUpdated
+
+			unified.Pool.PoolStatus = func() string {
+				if poolStrategy.TradingEnabled {
+					return "enabled"
+				}
+				return "disabled"
+			}()
+			unified.Pool.LastSync = poolStrategy.LastUpdated
+			unified.Pool.SyncStatus = "success"
+		}
+	}
+
+	// 获取基本的执行统计
+	unified.Execution.ExecutionCount = s.getStrategyExecutionCount(basic.ID)
+	unified.Execution.SuccessRate = s.getStrategySuccessRate(basic.ID)
+
+	// 设置生命周期信息
+	unified.Lifecycle = LifecycleInfo{
+		Stage:     basic.Stage,
+		Status:    basic.Status,
+		IsEnabled: basic.Status == "active",
+		CanStart:  basic.Status != "active",
+		CanStop:   basic.Status == "active",
+		CanEdit:   true,
+		CanDelete: basic.Status != "active",
+	}
+
+	return unified
+}
+
+// enhanceForPoolView 为策略池视图增强策略信息
+func (s *UnifiedStrategyService) enhanceForPoolView(ctx context.Context, unified UnifiedStrategy, basic BasicStrategy) UnifiedStrategy {
+	// 策略池视图主要关注池相关信息
+	if s.strategyPool != nil {
+		if poolStrategy, err := s.strategyPool.GetStrategyInfo(basic.ID); err == nil {
+			unified.Pool = PoolInfo{
+				PoolStatus: func() string {
+					if poolStrategy.TradingEnabled {
+						return "enabled"
+					}
+					return "disabled"
+				}(),
+				Priority:   "medium",
+				LastSync:   poolStrategy.LastUpdated,
+				SyncStatus: "success",
+			}
+
+			unified.Execution.IsRunning = poolStrategy.IsActive && poolStrategy.TradingEnabled
+		}
+	}
+
+	return unified
+}
+
+// enhanceForExecutionView 为执行视图增强策略信息
+func (s *UnifiedStrategyService) enhanceForExecutionView(ctx context.Context, unified UnifiedStrategy, basic BasicStrategy) UnifiedStrategy {
+	// 执行视图主要关注执行相关信息
+	if s.strategyPool != nil {
+		if poolStrategy, err := s.strategyPool.GetStrategyInfo(basic.ID); err == nil {
+			executionCount := s.getStrategyExecutionCount(basic.ID)
+			successRate := s.getStrategySuccessRate(basic.ID)
+			avgLatency := s.getStrategyAvgLatency(basic.ID)
+
+			unified.Execution = ExecutionInfo{
+				IsRunning:      poolStrategy.IsActive && poolStrategy.TradingEnabled,
+				LastExecution:  poolStrategy.LastUpdated,
+				ExecutionCount: executionCount,
+				SuccessRate:    successRate,
+				AvgLatency:     avgLatency,
+			}
+		}
+	}
+
+	return unified
+}
+
+// enhanceForPerformanceView 为性能视图增强策略信息
+func (s *UnifiedStrategyService) enhanceForPerformanceView(ctx context.Context, unified UnifiedStrategy, basic BasicStrategy) UnifiedStrategy {
+	// 性能视图主要关注性能数据
+	if s.strategyPool != nil {
+		if poolStrategy, err := s.strategyPool.GetStrategyInfo(basic.ID); err == nil {
+			if poolStrategy.Performance != nil {
+				unified.Performance = PerformanceInfo{
+					SharpeRatio:  poolStrategy.Performance.SharpeRatio,
+					TotalReturn:  poolStrategy.Performance.TotalReturn,
+					MaxDrawdown:  poolStrategy.Performance.MaxDrawdown,
+					WinRate:      poolStrategy.Performance.WinRate,
+					ProfitFactor: poolStrategy.Performance.ProfitFactor,
+				}
+			}
+		}
+	}
+
+	return unified
 }

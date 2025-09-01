@@ -1,0 +1,20 @@
+{
+  "id": "audit-1756721161954854600",
+  "timestamp": "2025-09-01T18:06:01.9548546+08:00",
+  "user_id": "7e5b116e-c912-4f1a-a1c9-61401d65f46f",
+  "action": "create_api_key",
+  "resource": "f5aea2abf19c2d2aebb5a1bfccff4f72",
+  "details": {
+    "expires_at": "2026-09-01T18:06:01.9548546+08:00",
+    "key_name": "Test API Key",
+    "permissions": [
+      "read",
+      "write"
+    ]
+  },
+  "ip_address": "",
+  "user_agent": "",
+  "success": true,
+  "hash": "b2bdf26ecdbf22f38d180c608c2936eb6e426c29e46f0cbf6b1d2b377b26ec20",
+  "prev_hash": "d139eef5ae3da0e3d4825ca562d4f37214508b8c2dded3b43c5dc7fd2ff879f6"
+}
