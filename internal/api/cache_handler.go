@@ -5,21 +5,19 @@ import (
 	"net/http"
 	"time"
 
-	"qcat/internal/cache"
 	"github.com/gin-gonic/gin"
+	"qcat/internal/cache"
 )
 
 // CacheHandler handles cache-related API requests
 type CacheHandler struct {
 	cacheManager *cache.CacheManager
-	healthChecker *cache.CacheHealthChecker
 }
 
 // NewCacheHandler creates a new cache handler
 func NewCacheHandler(cacheManager *cache.CacheManager) *CacheHandler {
 	return &CacheHandler{
-		cacheManager:  cacheManager,
-		healthChecker: cache.NewCacheHealthChecker(cacheManager),
+		cacheManager: cacheManager,
 	}
 }
 
@@ -42,20 +40,64 @@ func (h *CacheHandler) handleCacheStatus(c *gin.Context) {
 
 // handleCacheHealth returns comprehensive cache health information
 func (h *CacheHandler) handleCacheHealth(c *gin.Context) {
-	if h.healthChecker == nil {
+	if h.cacheManager == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error": "Cache health checker not available",
+			"error": "Cache manager not available",
 		})
 		return
 	}
 
-	healthReport := h.healthChecker.CheckHealth()
-	
+	// 执行简单的缓存健康检查
+	ctx := c.Request.Context()
+	testKey := "health_check_" + time.Now().Format("20060102150405")
+	testValue := "ping"
+
+	// 测试缓存写入
+	setErr := h.cacheManager.Set(ctx, testKey, testValue, time.Minute)
+
+	// 测试缓存读取
+	var retrievedValue string
+	getErr := h.cacheManager.Get(ctx, testKey, &retrievedValue)
+
+	// 清理测试数据
+	h.cacheManager.Delete(ctx, testKey)
+
+	// 获取缓存统计信息
+	stats := h.cacheManager.GetStats()
+
+	// 判断健康状态
+	overall := "healthy"
 	statusCode := http.StatusOK
-	if healthReport.Overall == "unhealthy" {
+
+	if setErr != nil || getErr != nil {
+		overall = "unhealthy"
 		statusCode = http.StatusServiceUnavailable
-	} else if healthReport.Overall == "degraded" {
-		statusCode = http.StatusPartialContent
+	}
+
+	healthReport := map[string]interface{}{
+		"overall":   overall,
+		"timestamp": time.Now(),
+		"checks": map[string]interface{}{
+			"set_operation": map[string]interface{}{
+				"status": setErr == nil,
+				"error": func() string {
+					if setErr != nil {
+						return setErr.Error()
+					}
+					return ""
+				}(),
+			},
+			"get_operation": map[string]interface{}{
+				"status": getErr == nil,
+				"error": func() string {
+					if getErr != nil {
+						return getErr.Error()
+					}
+					return ""
+				}(),
+			},
+		},
+		"stats": stats,
 	}
 
 	c.JSON(statusCode, healthReport)
@@ -72,7 +114,7 @@ func (h *CacheHandler) handleCacheMetrics(c *gin.Context) {
 
 	stats := h.cacheManager.GetStats()
 	monitorStats := h.cacheManager.GetMonitor().GetStats()
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"cache_stats":   stats,
 		"monitor_stats": monitorStats,
@@ -254,9 +296,9 @@ func (h *CacheHandler) handleTestCache(c *gin.Context) {
 				"duration": setDuration.String(),
 			},
 			"get_operation": gin.H{
-				"success":        true,
-				"duration":       getDuration.String(),
-				"value_matches":  retrievedValue != nil,
+				"success":       true,
+				"duration":      getDuration.String(),
+				"value_matches": retrievedValue != nil,
 			},
 			"exists_operation": gin.H{
 				"success":  true,
@@ -277,7 +319,7 @@ func parseIntParam(param string) (int, error) {
 	if param == "" {
 		return 0, nil
 	}
-	
+
 	var result int
 	if _, err := fmt.Sscanf(param, "%d", &result); err != nil {
 		return 0, err
