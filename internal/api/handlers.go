@@ -51,7 +51,7 @@ func NewOptimizerHandler(db *database.DB, redis cache.Cacher, metrics *monitor.M
 	if db != nil && db.DB != nil {
 		orchestrator = factory.CreateOrchestrator(db.DB)
 	} else {
-		// Create an orchestrator that works without database (fallback mode)
+		// Create an orchestrator
 		orchestrator = factory.CreateOrchestrator(nil)
 	}
 

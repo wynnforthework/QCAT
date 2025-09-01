@@ -95,11 +95,23 @@ func NewRiskMonitor(cfg *config.Config, db *database.DB, accountManager *account
 func (rm *RiskMonitor) isTestEnvironment() bool {
 	// Check if accountManager has nil fields that indicate it's not properly initialized
 	if rm.accountManager != nil {
-		// Use reflection or simple field checks to determine if it's a test mock
-		// For now, we'll check if the database field is nil
-		return true // Assume test environment for now
+		// 实现真实的环境检测逻辑
+		// 检查账户管理器是否能够正常连接到交易所
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// 尝试获取账户信息来验证连接
+		_, err := rm.accountManager.GetAllBalances(ctx)
+		if err != nil {
+			// 如果无法获取账户信息，可能是测试环境或连接问题
+			log.Printf("Account manager connection test failed: %v", err)
+			return true
+		}
+
+		// 连接正常，是真实环境
+		return false
 	}
-	return false
+	return true // 没有账户管理器，肯定是测试环境
 }
 
 // CheckMarginRatio checks current margin ratio against configured thresholds
@@ -110,22 +122,20 @@ func (rm *RiskMonitor) CheckMarginRatio(ctx context.Context) (*MarginStatus, err
 	log.Printf("Starting margin ratio check")
 
 	// Check if account manager is available and properly initialized
-	if rm.accountManager == nil || rm.isTestEnvironment() {
-		// Return mock data for testing environment
-		return &MarginStatus{
-			TotalEquity:     100000.0,
-			UsedMargin:      50000.0,
-			AvailableMargin: 50000.0,
-			MarginRatio:     2.0,
-			RiskLevel:       shared.RiskLevelLow,
-			Timestamp:       time.Now(),
-			ExchangeBreakdown: map[string]float64{
-				"test_equity":           100000.0,
-				"test_used_margin":      50000.0,
-				"test_available_margin": 50000.0,
-			},
-			Recommendations: []string{"Account manager unavailable - using mock data"},
-		}, nil
+	if rm.accountManager == nil {
+		return nil, shared.NewAutomationError(
+			shared.ErrCodeInvalidConfiguration,
+			"Account manager not initialized",
+			"RiskMonitor",
+			shared.ErrorSeverityHigh,
+			false,
+		).WithContext("operation", "CheckMarginRatio")
+	}
+
+	// 如果是测试环境但仍有账户管理器，尝试获取真实数据
+	// 只有在完全无法获取数据时才使用备用逻辑
+	if rm.isTestEnvironment() {
+		log.Printf("Warning: Running in test environment, attempting to get real data anyway")
 	}
 
 	// Get account balances from exchange

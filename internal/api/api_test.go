@@ -76,7 +76,7 @@ func TestStrategyAPI(t *testing.T) {
 	setupTestRoutes(httpHelper.Router, suite)
 
 	t.Run("create strategy", func(t *testing.T) {
-		// Create test strategy data directly instead of using mock generator
+		// Create test strategy data
 		strategy := map[string]interface{}{
 			"name":        "Test Trend Strategy",
 			"version":     "1.0.0",

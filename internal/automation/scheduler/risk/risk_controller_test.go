@@ -33,7 +33,6 @@ func TestRiskController_TriggerPositionReduction(t *testing.T) {
 	originalPositions := make([]shared.Position, len(testRC.testDB.positions))
 	copy(originalPositions, testRC.testDB.positions)
 
-	// Call the real implementation instead of mock
 	action, err := testRC.TriggerPositionReduction(ctx, marginStatus, 0.3)
 
 	assert.NoError(t, err)

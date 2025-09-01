@@ -461,21 +461,10 @@ func (sla *StopLossAdjuster) GenerateStopLossAdjustments(ctx context.Context) ([
 
 	log.Printf("Generating stop loss adjustments for all active positions")
 
-	// Check if this is a test environment
+	// 即使在测试环境中也尝试获取真实数据
+	// 只有在完全无法获取数据时才返回空列表
 	if sla.isTestEnvironment() {
-		// Return mock adjustments for testing
-		return []StopLossAdjustment{
-			{
-				PositionID:     "pos_1",
-				Symbol:         "BTCUSDT",
-				OldLevel:       49000.0,
-				NewLevel:       48500.0,
-				AdjustmentType: "TEST",
-				Reason:         "Test mode calculation",
-				Priority:       1,
-				Timestamp:      time.Now(),
-			},
-		}, nil
+		log.Printf("Warning: Running in test environment, attempting to get real position data anyway")
 	}
 
 	// Get all active positions

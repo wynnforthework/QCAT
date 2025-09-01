@@ -477,15 +477,7 @@ func (slpt *StopLossPerformanceTracker) analyzeActivePosition(ctx context.Contex
 func (slpt *StopLossPerformanceTracker) getCurrentPrice(ctx context.Context, symbol string) (float64, error) {
 	// Check if database is nil (test environment)
 	if slpt.db == nil || slpt.db.DB == nil {
-		// Return mock price for testing
-		switch symbol {
-		case "BTCUSDT":
-			return 51000.0, nil
-		case "ETHUSDT":
-			return 3200.0, nil
-		default:
-			return 1000.0, nil
-		}
+		return 0, fmt.Errorf("database not available for price lookup of symbol %s", symbol)
 	}
 
 	query := `
