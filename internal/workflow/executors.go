@@ -1158,11 +1158,11 @@ func (dce *DataCleaningExecutor) fetchRawData(ctx context.Context, dataSource st
 
 	switch dataSource {
 	case "market_data":
-		rawData = dce.generateMockMarketData(timeRange)
+		rawData = dce.getRealMarketData(timeRange)
 	case "trading_data":
-		rawData = dce.generateMockTradingData(timeRange)
+		rawData = dce.getRealTradingData(timeRange)
 	case "account_data":
-		rawData = dce.generateMockAccountData(timeRange)
+		rawData = dce.getRealAccountData(timeRange)
 	default:
 		return nil, fmt.Errorf("不支持的数据源: %s", dataSource)
 	}
@@ -1170,90 +1170,442 @@ func (dce *DataCleaningExecutor) fetchRawData(ctx context.Context, dataSource st
 	return rawData, nil
 }
 
-// generateMockMarketData 生成模拟市场数据
-func (dce *DataCleaningExecutor) generateMockMarketData(timeRange map[string]time.Time) []map[string]interface{} {
+// getRealMarketData 获取真实市场数据
+func (dce *DataCleaningExecutor) getRealMarketData(timeRange map[string]time.Time) []map[string]interface{} {
 	data := make([]map[string]interface{}, 0)
 
 	symbols := []string{"BTCUSDT", "ETHUSDT", "BNBUSDT"}
 	start := timeRange["start"]
 	end := timeRange["end"]
 
-	// 生成每分钟的数据点
-	for t := start; t.Before(end); t = t.Add(time.Minute) {
-		for _, symbol := range symbols {
-			// 正常数据
-			record := map[string]interface{}{
-				"timestamp": t,
-				"symbol":    symbol,
-				"price":     45000.0 + rand.Float64()*1000,
-				"volume":    rand.Float64() * 100,
-				"high":      45500.0 + rand.Float64()*500,
-				"low":       44500.0 + rand.Float64()*500,
-			}
-			data = append(data, record)
-
-			// 偶尔添加异常数据用于测试清洗功能
-			if rand.Float64() < 0.05 { // 5%概率
-				anomalyRecord := map[string]interface{}{
-					"timestamp": t,
-					"symbol":    symbol,
-					"price":     45000.0 * (1 + (rand.Float64()-0.5)*0.5), // 异常价格
-					"volume":    rand.Float64() * 1000,                    // 异常交易量
-					"high":      nil,                                      // 缺失值
-					"low":       44500.0,
+	// 从数据库获取历史市场数据
+	for _, symbol := range symbols {
+		marketData, err := dce.fetchMarketDataFromDB(symbol, start, end)
+		if err != nil {
+			log.Printf("获取 %s 市场数据失败: %v", symbol, err)
+			// 如果数据库中没有数据，尝试从交易所API获取
+			if dce.exchange != nil {
+				apiData, apiErr := dce.fetchMarketDataFromAPI(symbol, start, end)
+				if apiErr != nil {
+					log.Printf("从API获取 %s 市场数据失败: %v", symbol, apiErr)
+					continue
 				}
-				data = append(data, anomalyRecord)
+				marketData = apiData
+			} else {
+				continue
 			}
 		}
+
+		// 转换数据格式
+		for _, record := range marketData {
+			formattedRecord := map[string]interface{}{
+				"timestamp": record.Timestamp,
+				"symbol":    record.Symbol,
+				"price":     record.Price,
+				"volume":    record.Volume,
+				"high":      record.High,
+				"low":       record.Low,
+				"open":      record.Open,
+				"close":     record.Close,
+			}
+			data = append(data, formattedRecord)
+		}
 	}
 
+	log.Printf("获取到 %d 条真实市场数据记录", len(data))
 	return data
 }
 
-// generateMockTradingData 生成模拟交易数据
-func (dce *DataCleaningExecutor) generateMockTradingData(timeRange map[string]time.Time) []map[string]interface{} {
+// MarketDataRecord 市场数据记录
+type MarketDataRecord struct {
+	Timestamp time.Time `json:"timestamp"`
+	Symbol    string    `json:"symbol"`
+	Price     float64   `json:"price"`
+	Volume    float64   `json:"volume"`
+	High      float64   `json:"high"`
+	Low       float64   `json:"low"`
+	Open      float64   `json:"open"`
+	Close     float64   `json:"close"`
+}
+
+// fetchMarketDataFromDB 从数据库获取市场数据
+func (dce *DataCleaningExecutor) fetchMarketDataFromDB(symbol string, start, end time.Time) ([]*MarketDataRecord, error) {
+	if dce.db == nil {
+		return nil, fmt.Errorf("数据库连接未初始化")
+	}
+
+	query := `
+		SELECT timestamp, symbol, price, volume, high, low, open, close
+		FROM market_data
+		WHERE symbol = ? AND timestamp BETWEEN ? AND ?
+		ORDER BY timestamp ASC
+	`
+
+	rows, err := dce.db.Query(query, symbol, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("查询市场数据失败: %w", err)
+	}
+	defer rows.Close()
+
+	var records []*MarketDataRecord
+	for rows.Next() {
+		record := &MarketDataRecord{}
+		err := rows.Scan(
+			&record.Timestamp,
+			&record.Symbol,
+			&record.Price,
+			&record.Volume,
+			&record.High,
+			&record.Low,
+			&record.Open,
+			&record.Close,
+		)
+		if err != nil {
+			log.Printf("扫描市场数据记录失败: %v", err)
+			continue
+		}
+		records = append(records, record)
+	}
+
+	return records, nil
+}
+
+// fetchMarketDataFromAPI 从交易所API获取市场数据
+func (dce *DataCleaningExecutor) fetchMarketDataFromAPI(symbol string, start, end time.Time) ([]*MarketDataRecord, error) {
+	if dce.exchange == nil {
+		return nil, fmt.Errorf("交易所连接未初始化")
+	}
+
+	// 获取K线数据
+	ctx := context.Background()
+	interval := "1m" // 1分钟K线
+
+	// 注意：这里需要根据实际的交易所API接口调整
+	// 假设交易所有获取历史K线数据的方法
+	klines, err := dce.getKlineData(ctx, symbol, interval, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("获取K线数据失败: %w", err)
+	}
+
+	var records []*MarketDataRecord
+	for _, kline := range klines {
+		record := &MarketDataRecord{
+			Timestamp: kline.OpenTime,
+			Symbol:    symbol,
+			Price:     kline.Close, // 使用收盘价作为价格
+			Volume:    kline.Volume,
+			High:      kline.High,
+			Low:       kline.Low,
+			Open:      kline.Open,
+			Close:     kline.Close,
+		}
+		records = append(records, record)
+	}
+
+	return records, nil
+}
+
+// KlineData K线数据结构
+type KlineData struct {
+	OpenTime  time.Time `json:"open_time"`
+	Open      float64   `json:"open"`
+	High      float64   `json:"high"`
+	Low       float64   `json:"low"`
+	Close     float64   `json:"close"`
+	Volume    float64   `json:"volume"`
+	CloseTime time.Time `json:"close_time"`
+}
+
+// getKlineData 获取K线数据（简化实现）
+func (dce *DataCleaningExecutor) getKlineData(ctx context.Context, symbol, interval string, start, end time.Time) ([]*KlineData, error) {
+	// 这里应该调用实际的交易所API
+	// 由于没有具体的API接口，这里提供一个框架实现
+
+	// 示例：如果交易所有GetKlines方法
+	// klines, err := dce.exchange.GetKlines(ctx, symbol, interval, start, end)
+	// if err != nil {
+	//     return nil, err
+	// }
+
+	// 暂时返回空数据，实际使用时需要实现具体的API调用
+	log.Printf("需要实现具体的交易所API调用来获取 %s 的K线数据", symbol)
+	return []*KlineData{}, nil
+}
+
+// getRealTradingData 获取真实交易数据
+func (dce *DataCleaningExecutor) getRealTradingData(timeRange map[string]time.Time) []map[string]interface{} {
 	data := make([]map[string]interface{}, 0)
 
 	start := timeRange["start"]
 	end := timeRange["end"]
 
-	for t := start; t.Before(end); t = t.Add(5 * time.Minute) {
-		record := map[string]interface{}{
-			"timestamp":  t,
-			"order_id":   fmt.Sprintf("order_%d", rand.Int63()),
-			"symbol":     "BTCUSDT",
-			"side":       []string{"BUY", "SELL"}[rand.Intn(2)],
-			"quantity":   rand.Float64() * 10,
-			"price":      45000.0 + rand.Float64()*1000,
-			"status":     "FILLED",
-			"commission": rand.Float64() * 10,
+	// 从数据库获取历史交易数据
+	tradingData, err := dce.fetchTradingDataFromDB(start, end)
+	if err != nil {
+		log.Printf("获取交易数据失败: %v", err)
+		// 如果数据库中没有数据，尝试从交易所API获取
+		if dce.exchange != nil {
+			apiData, apiErr := dce.fetchTradingDataFromAPI(start, end)
+			if apiErr != nil {
+				log.Printf("从API获取交易数据失败: %v", apiErr)
+				return data
+			}
+			tradingData = apiData
+		} else {
+			return data
 		}
-		data = append(data, record)
 	}
 
+	// 转换数据格式
+	for _, record := range tradingData {
+		formattedRecord := map[string]interface{}{
+			"timestamp":    record.Timestamp,
+			"order_id":     record.OrderID,
+			"symbol":       record.Symbol,
+			"side":         record.Side,
+			"quantity":     record.Quantity,
+			"price":        record.Price,
+			"status":       record.Status,
+			"commission":   record.Commission,
+			"executed_qty": record.ExecutedQty,
+			"avg_price":    record.AvgPrice,
+		}
+		data = append(data, formattedRecord)
+	}
+
+	log.Printf("获取到 %d 条真实交易数据记录", len(data))
 	return data
 }
 
-// generateMockAccountData 生成模拟账户数据
-func (dce *DataCleaningExecutor) generateMockAccountData(timeRange map[string]time.Time) []map[string]interface{} {
+// TradingDataRecord 交易数据记录
+type TradingDataRecord struct {
+	Timestamp   time.Time `json:"timestamp"`
+	OrderID     string    `json:"order_id"`
+	Symbol      string    `json:"symbol"`
+	Side        string    `json:"side"`
+	Quantity    float64   `json:"quantity"`
+	Price       float64   `json:"price"`
+	Status      string    `json:"status"`
+	Commission  float64   `json:"commission"`
+	ExecutedQty float64   `json:"executed_qty"`
+	AvgPrice    float64   `json:"avg_price"`
+}
+
+// fetchTradingDataFromDB 从数据库获取交易数据
+func (dce *DataCleaningExecutor) fetchTradingDataFromDB(start, end time.Time) ([]*TradingDataRecord, error) {
+	if dce.db == nil {
+		return nil, fmt.Errorf("数据库连接未初始化")
+	}
+
+	query := `
+		SELECT timestamp, order_id, symbol, side, quantity, price, status, commission, executed_qty, avg_price
+		FROM trading_orders
+		WHERE timestamp BETWEEN ? AND ? AND status = 'FILLED'
+		ORDER BY timestamp ASC
+	`
+
+	rows, err := dce.db.Query(query, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("查询交易数据失败: %w", err)
+	}
+	defer rows.Close()
+
+	var records []*TradingDataRecord
+	for rows.Next() {
+		record := &TradingDataRecord{}
+		err := rows.Scan(
+			&record.Timestamp,
+			&record.OrderID,
+			&record.Symbol,
+			&record.Side,
+			&record.Quantity,
+			&record.Price,
+			&record.Status,
+			&record.Commission,
+			&record.ExecutedQty,
+			&record.AvgPrice,
+		)
+		if err != nil {
+			log.Printf("扫描交易数据记录失败: %v", err)
+			continue
+		}
+		records = append(records, record)
+	}
+
+	return records, nil
+}
+
+// fetchTradingDataFromAPI 从交易所API获取交易数据
+func (dce *DataCleaningExecutor) fetchTradingDataFromAPI(start, end time.Time) ([]*TradingDataRecord, error) {
+	if dce.exchange == nil {
+		return nil, fmt.Errorf("交易所连接未初始化")
+	}
+
+	ctx := context.Background()
+
+	// 获取历史订单数据
+	orders, err := dce.exchange.GetOrderHistory(ctx, "", start, end)
+	if err != nil {
+		return nil, fmt.Errorf("获取历史订单失败: %w", err)
+	}
+
+	var records []*TradingDataRecord
+	for _, order := range orders {
+		// 只处理已成交的订单
+		if order.Status != "FILLED" {
+			continue
+		}
+
+		record := &TradingDataRecord{
+			Timestamp:   order.Time,
+			OrderID:     order.OrderID,
+			Symbol:      order.Symbol,
+			Side:        order.Side,
+			Quantity:    order.Quantity,
+			Price:       order.Price,
+			Status:      order.Status,
+			Commission:  0.0, // 需要从其他接口获取手续费信息
+			ExecutedQty: order.FilledQty,
+			AvgPrice:    order.AvgPrice,
+		}
+		records = append(records, record)
+	}
+
+	return records, nil
+}
+
+// getRealAccountData 获取真实账户数据
+func (dce *DataCleaningExecutor) getRealAccountData(timeRange map[string]time.Time) []map[string]interface{} {
 	data := make([]map[string]interface{}, 0)
 
 	start := timeRange["start"]
 	end := timeRange["end"]
 
-	for t := start; t.Before(end); t = t.Add(time.Hour) {
-		record := map[string]interface{}{
-			"timestamp":     t,
-			"account_id":    "account_001",
-			"total_balance": 100000.0 + rand.Float64()*10000,
-			"available":     90000.0 + rand.Float64()*5000,
-			"locked":        rand.Float64() * 1000,
-			"pnl":           (rand.Float64() - 0.5) * 2000,
+	// 从数据库获取历史账户数据
+	accountData, err := dce.fetchAccountDataFromDB(start, end)
+	if err != nil {
+		log.Printf("获取账户数据失败: %v", err)
+		// 如果数据库中没有数据，尝试从交易所API获取
+		if dce.exchange != nil {
+			apiData, apiErr := dce.fetchAccountDataFromAPI(start, end)
+			if apiErr != nil {
+				log.Printf("从API获取账户数据失败: %v", apiErr)
+				return data
+			}
+			accountData = apiData
+		} else {
+			return data
 		}
-		data = append(data, record)
 	}
 
+	// 转换数据格式
+	for _, record := range accountData {
+		formattedRecord := map[string]interface{}{
+			"timestamp":      record.Timestamp,
+			"account_id":     record.AccountID,
+			"total_balance":  record.TotalBalance,
+			"available":      record.Available,
+			"locked":         record.Locked,
+			"pnl":            record.PnL,
+			"margin_balance": record.MarginBalance,
+			"wallet_balance": record.WalletBalance,
+		}
+		data = append(data, formattedRecord)
+	}
+
+	log.Printf("获取到 %d 条真实账户数据记录", len(data))
 	return data
+}
+
+// AccountDataRecord 账户数据记录
+type AccountDataRecord struct {
+	Timestamp     time.Time `json:"timestamp"`
+	AccountID     string    `json:"account_id"`
+	TotalBalance  float64   `json:"total_balance"`
+	Available     float64   `json:"available"`
+	Locked        float64   `json:"locked"`
+	PnL           float64   `json:"pnl"`
+	MarginBalance float64   `json:"margin_balance"`
+	WalletBalance float64   `json:"wallet_balance"`
+}
+
+// fetchAccountDataFromDB 从数据库获取账户数据
+func (dce *DataCleaningExecutor) fetchAccountDataFromDB(start, end time.Time) ([]*AccountDataRecord, error) {
+	if dce.db == nil {
+		return nil, fmt.Errorf("数据库连接未初始化")
+	}
+
+	query := `
+		SELECT timestamp, account_id, total_balance, available, locked, pnl, margin_balance, wallet_balance
+		FROM account_snapshots
+		WHERE timestamp BETWEEN ? AND ?
+		ORDER BY timestamp ASC
+	`
+
+	rows, err := dce.db.Query(query, start, end)
+	if err != nil {
+		return nil, fmt.Errorf("查询账户数据失败: %w", err)
+	}
+	defer rows.Close()
+
+	var records []*AccountDataRecord
+	for rows.Next() {
+		record := &AccountDataRecord{}
+		err := rows.Scan(
+			&record.Timestamp,
+			&record.AccountID,
+			&record.TotalBalance,
+			&record.Available,
+			&record.Locked,
+			&record.PnL,
+			&record.MarginBalance,
+			&record.WalletBalance,
+		)
+		if err != nil {
+			log.Printf("扫描账户数据记录失败: %v", err)
+			continue
+		}
+		records = append(records, record)
+	}
+
+	return records, nil
+}
+
+// fetchAccountDataFromAPI 从交易所API获取账户数据
+func (dce *DataCleaningExecutor) fetchAccountDataFromAPI(start, end time.Time) ([]*AccountDataRecord, error) {
+	if dce.exchange == nil {
+		return nil, fmt.Errorf("交易所连接未初始化")
+	}
+
+	ctx := context.Background()
+
+	// 获取账户快照数据
+	snapshots, err := dce.exchange.GetAccountSnapshots(ctx, int(end.Sub(start).Hours()/24)+1)
+	if err != nil {
+		return nil, fmt.Errorf("获取账户快照失败: %w", err)
+	}
+
+	var records []*AccountDataRecord
+	for _, snapshot := range snapshots {
+		// 只处理时间范围内的数据
+		if snapshot.Timestamp.Before(start) || snapshot.Timestamp.After(end) {
+			continue
+		}
+
+		record := &AccountDataRecord{
+			Timestamp:     snapshot.Timestamp,
+			AccountID:     "main_account", // 默认账户ID
+			TotalBalance:  snapshot.TotalWalletBalance,
+			Available:     snapshot.TotalWalletBalance - snapshot.TotalMarginBalance,
+			Locked:        snapshot.TotalMarginBalance,
+			PnL:           snapshot.TotalUnrealizedPnL,
+			MarginBalance: snapshot.TotalMarginBalance,
+			WalletBalance: snapshot.TotalWalletBalance,
+		}
+		records = append(records, record)
+	}
+
+	return records, nil
 }
 
 // applyCleaningRule 应用清洗规则
