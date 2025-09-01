@@ -184,18 +184,25 @@ check_api "数据库健康检查" "GET" "$API_BASE/api/v1/dashboard/db-health" "
 
 # 策略管理API
 check_api "策略列表" "GET" "$API_BASE/api/v1/strategy" "$auth_header" "策略管理"
+check_api "策略列表(管理视图)" "GET" "$API_BASE/api/v1/strategy?view=management&page=1&page_size=50" "$auth_header" "策略管理"
+check_api "策略列表(池视图)" "GET" "$API_BASE/api/v1/strategy?view=pool" "$auth_header" "策略管理"
+check_api "策略列表(执行视图)" "GET" "$API_BASE/api/v1/strategy?view=execution" "$auth_header" "策略管理"
+check_api "策略列表(性能视图)" "GET" "$API_BASE/api/v1/strategy?view=performance" "$auth_header" "策略管理"
 check_api "策略池概览" "GET" "$API_BASE/api/v1/strategy/pool/overview" "$auth_header" "策略管理"
 check_api "策略执行概览" "GET" "$API_BASE/api/v1/strategy/execution/overview" "$auth_header" "策略管理"
+check_api "策略实时状态" "GET" "$API_BASE/api/v1/strategy/execution/realtime" "$auth_header" "策略管理"
 check_api "策略工作流状态" "GET" "$API_BASE/api/v1/strategy/workflow/status" "$auth_header" "策略管理"
 
 # 投资组合API
 check_api "投资组合概览" "GET" "$API_BASE/api/v1/portfolio/overview" "$auth_header" "投资组合"
-check_api "投资组合持仓" "GET" "$API_BASE/api/v1/trading/positions" "$auth_header" "投资组合"
+check_api "投资组合分配" "GET" "$API_BASE/api/v1/portfolio/allocations" "$auth_header" "投资组合"
+check_api "投资组合历史" "GET" "$API_BASE/api/v1/portfolio/history" "$auth_header" "投资组合"
 check_api "投资组合性能" "GET" "$API_BASE/api/v1/portfolio/performance" "$auth_header" "投资组合"
 
 # 风险管理API
 check_api "风险概览" "GET" "$API_BASE/api/v1/risk/overview" "$auth_header" "风险管理"
 check_api "风险限制" "GET" "$API_BASE/api/v1/risk/limits" "$auth_header" "风险管理"
+check_api "熔断器状态" "GET" "$API_BASE/api/v1/risk/circuit-breakers" "$auth_header" "风险管理"
 check_api "风险违规记录" "GET" "$API_BASE/api/v1/risk/violations" "$auth_header" "风险管理"
 
 # 市场数据API
@@ -233,16 +240,54 @@ check_api "编排器健康检查" "GET" "$API_BASE/api/v1/orchestrator/health" "
 check_api "热点符号" "GET" "$API_BASE/api/v1/hotlist/symbols" "$auth_header" "热点管理"
 check_api "白名单" "GET" "$API_BASE/api/v1/hotlist/whitelist" "$auth_header" "热点管理"
 
+# 自动启动管理API
+check_api "自动启动策略" "GET" "$API_BASE/api/v1/auto-start/strategies" "$auth_header" "自动启动"
+check_api "自动启动统计" "GET" "$API_BASE/api/v1/auto-start/stats" "$auth_header" "自动启动"
+
 # 黑名单API
 check_api "黑名单列表" "GET" "$API_BASE/api/v1/blacklist/" "$auth_header" "黑名单管理"
 
 # 并发管理API
 check_api "线程池状态" "GET" "$API_BASE/api/v1/concurrent/pools" "$auth_header" "并发管理"
 check_api "监控统计" "GET" "$API_BASE/api/v1/concurrent/monitor" "$auth_header" "并发管理"
+check_api "并发告警" "GET" "$API_BASE/api/v1/concurrent/alerts" "$auth_header" "并发管理"
+check_api "负载均衡器状态" "GET" "$API_BASE/api/v1/concurrent/load-balancer" "$auth_header" "并发管理"
+check_api "任务队列状态" "GET" "$API_BASE/api/v1/concurrent/task-queue" "$auth_header" "并发管理"
+
+# 优化器API
+check_api "优化任务列表" "GET" "$API_BASE/api/v1/optimizer/tasks" "$auth_header" "优化器"
+
+# 工作流API
+check_api "依赖图" "GET" "$API_BASE/api/v1/workflow/dependency-graph" "$auth_header" "工作流"
+check_api "执行结果" "GET" "$API_BASE/api/v1/workflow/results" "$auth_header" "工作流"
+check_api "工作流状态" "GET" "$API_BASE/api/v1/workflow/status" "$auth_header" "工作流"
+check_api "工作流验证" "GET" "$API_BASE/api/v1/workflow/validate" "$auth_header" "工作流"
+check_api "启用的功能" "GET" "$API_BASE/api/v1/workflow/enabled" "$auth_header" "工作流"
+
+# 紧急停止API
+check_api "紧急停止状态" "GET" "$API_BASE/api/v1/emergency/status" "$auth_header" "紧急停止"
+check_api "紧急停止历史" "GET" "$API_BASE/api/v1/emergency/history" "$auth_header" "紧急停止"
 
 # 安全管理API
-check_api "API密钥" "GET" "$API_BASE/api/v1/security/keys/" "$auth_header" "安全管理"
+check_api "API密钥列表" "GET" "$API_BASE/api/v1/security/keys/" "$auth_header" "安全管理"
 check_api "安全审计日志" "GET" "$API_BASE/api/v1/security/audit/logs" "$auth_header" "安全管理"
+check_api "安全告警" "GET" "$API_BASE/api/v1/security/monitoring/alerts" "$auth_header" "安全管理"
+check_api "安全事件" "GET" "$API_BASE/api/v1/security/monitoring/events" "$auth_header" "安全管理"
+
+# 策略验证API
+check_api "策略验证状态" "GET" "$API_BASE/api/v1/validation/strategies" "$auth_header" "策略验证"
+check_api "策略问题" "GET" "$API_BASE/api/v1/validation/problems" "$auth_header" "策略验证"
+check_api "自动化状态" "GET" "$API_BASE/api/v1/validation/automation" "$auth_header" "策略验证"
+
+# 系统稳定性API
+check_api "内存统计" "GET" "$API_BASE/api/v1/memory/stats" "$auth_header" "系统稳定性"
+check_api "网络连接" "GET" "$API_BASE/api/v1/network/connections" "$auth_header" "系统稳定性"
+check_api "健康状态" "GET" "$API_BASE/api/v1/health/status" "$auth_header" "系统稳定性"
+check_api "健康检查" "GET" "$API_BASE/api/v1/health/checks" "$auth_header" "系统稳定性"
+check_api "关闭状态" "GET" "$API_BASE/api/v1/shutdown/status" "$auth_header" "系统稳定性"
+
+# 结果分享API
+check_api "分享结果" "GET" "$API_BASE/api/v1/shared-results" "$auth_header" "结果分享"
 
 # 系统设置API
 check_api "系统设置" "GET" "$API_BASE/api/v1/settings" "" "系统设置"
