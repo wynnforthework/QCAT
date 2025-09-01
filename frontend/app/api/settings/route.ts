@@ -48,7 +48,8 @@ export async function PUT(request: NextRequest) {
     // 如果是 dry-run 模式变更，调用后端 API
     if (newSettings.trading?.dryRunMode !== undefined) {
       try {
-        const backendResponse = await fetch('http://localhost:8080/api/settings', {
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8082';
+        const backendResponse = await fetch(`${backendUrl}/api/v1/settings`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json'

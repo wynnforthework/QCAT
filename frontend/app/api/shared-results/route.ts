@@ -28,8 +28,9 @@ export async function GET(request: NextRequest) {
       params.append('strategy_name', strategyName)
     }
 
-    // 调用后端API获取结果
-    const response = await fetch(`http://localhost:8082/shared-results?${params.toString()}`, {
+    // 调用后端API获取结果 - 使用环境变量配置的后端URL
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8082';
+    const response = await fetch(`${backendUrl}/api/v1/shared-results?${params.toString()}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

@@ -30,9 +30,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 这里应该调用后端API来保存结果
-    // 暂时模拟成功响应
-    const response = await fetch('http://localhost:8082/share-result', {
+    // 调用后端API来保存结果 - 使用环境变量配置的后端URL
+    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8082';
+    const response = await fetch(`${backendUrl}/api/v1/share-result`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

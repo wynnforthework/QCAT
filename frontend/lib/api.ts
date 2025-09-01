@@ -1,5 +1,5 @@
-// API客户端配置
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8082';
+// API客户端配置 - 使用相对路径通过Next.js代理
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 interface ApiResponse<T> {
   success: boolean;
