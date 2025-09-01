@@ -234,14 +234,14 @@ check_api "热点符号" "GET" "$API_BASE/api/v1/hotlist/symbols" "$auth_header"
 check_api "白名单" "GET" "$API_BASE/api/v1/hotlist/whitelist" "$auth_header" "热点管理"
 
 # 黑名单API
-check_api "黑名单列表" "GET" "$API_BASE/api/v1/blacklist" "$auth_header" "黑名单管理"
+check_api "黑名单列表" "GET" "$API_BASE/api/v1/blacklist/" "$auth_header" "黑名单管理"
 
 # 并发管理API
 check_api "线程池状态" "GET" "$API_BASE/api/v1/concurrent/pools" "$auth_header" "并发管理"
 check_api "监控统计" "GET" "$API_BASE/api/v1/concurrent/monitor" "$auth_header" "并发管理"
 
 # 安全管理API
-check_api "API密钥" "GET" "$API_BASE/api/v1/security/keys" "$auth_header" "安全管理"
+check_api "API密钥" "GET" "$API_BASE/api/v1/security/keys/" "$auth_header" "安全管理"
 check_api "安全审计日志" "GET" "$API_BASE/api/v1/security/audit/logs" "$auth_header" "安全管理"
 
 # 系统设置API
