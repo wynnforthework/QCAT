@@ -19,7 +19,7 @@ log_info()    { echo -e "${BLUE}[INFO]${NC} $(date '+%H:%M:%S') $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $(date '+%H:%M:%S') $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $(date '+%H:%M:%S') $1"; }
 log_error()   { echo -e "${RED}[ERROR]${NC} $(date '+%H:%M:%S') $1"; }
-log_debug()   { [ "$DEBUG_MODE" = "true" ] && echo -e "${PURPLE}[DEBUG]${NC} $(date '+%H:%M:%S') $1"; }
+log_debug()   { [ "$DEBUG_MODE" = "true" ] && echo -e "${PURPLE}[DEBUG]${NC} $(date '+%H:%M:%S') $1" || true; }
 
 # 全局变量
 DEBUG_MODE=false
@@ -129,7 +129,8 @@ detect_os() {
         *)          OS_TYPE="unknown";;
     esac
     log_info "检测到操作系统: $OS_TYPE"
-    log_debug "系统详细信息: $(uname -a)"
+    log_debug "系统详细信息: $(uname -a)" || true
+    return 0
 }
 
 # 重试执行函数
@@ -861,37 +862,57 @@ start_services() {
     if [[ "$SERVICES_TO_START" == "all" || "$SERVICES_TO_START" == *"frontend"* ]]; then
         if [ -d "frontend" ]; then
             log_info "配置前端环境变量"
-            cd frontend
 
             # 创建或更新 .env.local 文件
-            cat > .env.local << EOF
+            cat > frontend/.env.local << EOF
 NEXT_PUBLIC_API_URL=http://localhost:$QCAT_API_PORT
 NEXT_PUBLIC_APP_NAME=QCAT
 NEXT_PUBLIC_APP_VERSION=2.0.0
 EOF
 
             if [ "$DEV_MODE" = "true" ]; then
-                echo "NEXT_PUBLIC_ENV=development" >> .env.local
+                echo "NEXT_PUBLIC_ENV=development" >> frontend/.env.local
             elif [ "$PRODUCTION_MODE" = "true" ]; then
-                echo "NEXT_PUBLIC_ENV=production" >> .env.local
+                echo "NEXT_PUBLIC_ENV=production" >> frontend/.env.local
             fi
 
             log_debug "前端环境变量配置完成"
 
             # 启动前端开发服务器
-            local frontend_args="--port $FRONTEND_DEV_PORT"
-            if [ "$DEV_MODE" = "true" ]; then
-                frontend_args="$frontend_args --turbo"  # 开发模式启用 turbopack
-            fi
+            log_info "启动 Frontend 服务 (端口: $FRONTEND_DEV_PORT)..."
 
-            FRONTEND_PID=$(start_service "Frontend" "$FRONTEND_DEV_PORT" "npx next dev" "$frontend_args")
-            cd ..
+            # 检查并清理端口占用
+            if ! check_port "$FRONTEND_DEV_PORT" "Frontend" true; then
+                log_error "无法清理端口 $FRONTEND_DEV_PORT，Frontend 启动失败"
+                FRONTEND_PID=""
+            else
+                # 构建启动命令
+                local frontend_cmd="cd frontend && npx next dev --port $FRONTEND_DEV_PORT"
+                if [ "$DEV_MODE" = "true" ]; then
+                    frontend_cmd="$frontend_cmd --turbo"  # 开发模式启用 turbopack
+                fi
 
-            if [ -z "$FRONTEND_PID" ]; then
-                log_warning "前端服务启动失败，但继续运行其他服务"
+                log_debug "执行命令: $frontend_cmd"
+
+                # 启动前端服务
+                eval "$frontend_cmd" &
+                FRONTEND_PID=$!
+
+                log_debug "Frontend PID: $FRONTEND_PID"
+
+                # 简单等待，不做复杂的端口检查（前端启动较慢）
+                sleep 3
+
+                if kill -0 "$FRONTEND_PID" 2>/dev/null; then
+                    log_success "Frontend 启动成功 (PID: $FRONTEND_PID, 端口: $FRONTEND_DEV_PORT)"
+                else
+                    log_warning "Frontend 进程可能已退出"
+                    FRONTEND_PID=""
+                fi
             fi
         else
             log_warning "frontend 目录不存在，跳过前端服务启动"
+            FRONTEND_PID=""
         fi
     fi
 

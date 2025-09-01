@@ -7,33 +7,46 @@ BEGIN;
 CREATE TABLE IF NOT EXISTS strategy_onboarding (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     strategy_id VARCHAR(255) NOT NULL,
+    request_id VARCHAR(255) UNIQUE, -- 添加request_id字段用于查询
     status VARCHAR(50) NOT NULL DEFAULT 'pending', -- 'pending', 'processing', 'validation_failed', 'risk_rejected', 'approved_pending_deployment', 'deployed', 'failed'
+    progress DECIMAL(5,4) DEFAULT 0.0, -- 添加进度字段 (0.0 - 1.0)
+    current_stage VARCHAR(100), -- 添加当前阶段字段
     risk_level VARCHAR(20) NOT NULL DEFAULT 'medium', -- 'low', 'medium', 'high', 'unacceptable'
     validation_score DECIMAL(5,2) DEFAULT 0,
     risk_score DECIMAL(5,2) DEFAULT 0,
     auto_deploy BOOLEAN DEFAULT false,
     test_mode BOOLEAN DEFAULT false,
-    
+
     -- Validation results
     validation_errors JSONB,
     validation_warnings JSONB,
     validation_passed JSONB,
-    
+
     -- Risk assessment results
     risk_assessment JSONB,
     risk_recommendations JSONB,
-    
+
+    -- Strategy generation and testing results
+    generated_strategies JSONB DEFAULT '[]', -- 添加生成的策略列表
+    test_results JSONB DEFAULT '[]', -- 添加测试结果
+    deployed_strategies JSONB DEFAULT '[]', -- 添加已部署策略列表
+    errors JSONB DEFAULT '[]', -- 添加错误列表
+    warnings JSONB DEFAULT '[]', -- 添加警告列表
+
     -- Deployment information
     deployment_id VARCHAR(255),
     deployment_environment VARCHAR(20), -- 'test', 'staging', 'production'
     deployment_status VARCHAR(50),
     deployment_config JSONB,
-    
+
     -- Monitoring information
     monitoring_started_at TIMESTAMP WITH TIME ZONE,
     monitoring_status VARCHAR(20), -- 'active', 'paused', 'stopped'
-    
+
     -- Timestamps
+    start_time TIMESTAMP WITH TIME ZONE DEFAULT NOW(), -- 重命名为start_time以匹配查询
+    end_time TIMESTAMP WITH TIME ZONE, -- 重命名为end_time以匹配查询
+    duration INTERVAL, -- 添加持续时间字段
     started_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     completed_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -124,9 +137,12 @@ CREATE TABLE IF NOT EXISTS deployment_history (
 
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_strategy_onboarding_strategy_id ON strategy_onboarding(strategy_id);
+CREATE INDEX IF NOT EXISTS idx_strategy_onboarding_request_id ON strategy_onboarding(request_id);
 CREATE INDEX IF NOT EXISTS idx_strategy_onboarding_status ON strategy_onboarding(status);
 CREATE INDEX IF NOT EXISTS idx_strategy_onboarding_risk_level ON strategy_onboarding(risk_level);
+CREATE INDEX IF NOT EXISTS idx_strategy_onboarding_current_stage ON strategy_onboarding(current_stage);
 CREATE INDEX IF NOT EXISTS idx_strategy_onboarding_created_at ON strategy_onboarding(created_at);
+CREATE INDEX IF NOT EXISTS idx_strategy_onboarding_start_time ON strategy_onboarding(start_time);
 
 CREATE INDEX IF NOT EXISTS idx_onboarding_stages_onboarding_id ON onboarding_stages(onboarding_id);
 CREATE INDEX IF NOT EXISTS idx_onboarding_stages_stage_name ON onboarding_stages(stage_name);
