@@ -757,60 +757,51 @@ start_service() {
     # 检查并清理端口占用
     if ! check_port "$service_port" "$service_name" true; then
         log_error "无法清理端口 $service_port，$service_name 启动失败"
+        echo ""
         return 1
     fi
 
-    # 启动服务
+    # 启动服务（确保真正后台运行）
     log_debug "执行命令: $service_cmd $service_args"
+    local log_name=$(echo "${service_name,,}" | tr ' ' '_')
     if [ -n "$service_args" ]; then
-        $service_cmd $service_args &
+        nohup $service_cmd $service_args > "logs/${log_name}_$(date +%Y%m%d_%H%M%S).log" 2>&1 &
     else
-        $service_cmd &
+        nohup $service_cmd > "logs/${log_name}_$(date +%Y%m%d_%H%M%S).log" 2>&1 &
     fi
 
     local pid=$!
     log_debug "$service_name PID: $pid"
 
-    # 等待服务启动
-    local wait_time=0
-    local max_wait=30
-    while [ $wait_time -lt $max_wait ]; do
-        if kill -0 $pid 2>/dev/null; then
-            sleep 1
-            wait_time=$((wait_time + 1))
-            if [ $((wait_time % 5)) -eq 0 ]; then
-                log_debug "等待 $service_name 启动... ($wait_time/$max_wait 秒)"
-            fi
-        else
-            log_error "$service_name 进程意外退出"
-            return 1
-        fi
+    # 简化启动检查，避免复杂的端口检查导致问题
+    sleep 3  # 给服务一些时间启动
 
-        # 检查端口是否开始监听
-        if [ "$OS_TYPE" = "windows" ]; then
-            if netstat -ano | findstr ":$service_port " > /dev/null 2>&1; then
-                break
-            fi
-        else
-            if lsof -i :$service_port > /dev/null 2>&1; then
-                break
-            fi
-        fi
-    done
-
-    if [ $wait_time -ge $max_wait ]; then
-        log_warning "$service_name 启动超时，但进程仍在运行"
-    else
+    # 检查进程是否还在运行
+    if kill -0 $pid 2>/dev/null; then
         log_success "$service_name 启动成功 (PID: $pid, 端口: $service_port)"
+        echo $pid
+    else
+        log_error "$service_name 进程启动失败或已退出"
+        echo ""
+        return 1
     fi
+}
 
-    echo $pid
+# 确保日志目录存在
+ensure_log_directory() {
+    if [ ! -d "logs" ]; then
+        mkdir -p logs
+        log_debug "创建日志目录: logs"
+    fi
 }
 
 # 启动服务（增强版）
 start_services() {
     log_info "启动服务..."
     log_info "服务启动配置: $SERVICES_TO_START"
+
+    # 确保日志目录存在
+    ensure_log_directory
 
     # 全局变量存储 PID
     BACKEND_PID=""
@@ -830,12 +821,13 @@ start_services() {
             BACKEND_PID=$(start_service "QCAT API" "$QCAT_API_PORT" "$api_cmd" "")
             if [ -z "$BACKEND_PID" ]; then
                 log_error "QCAT API 启动失败"
-                return 1
+                BACKEND_PID=""
+            else
+                sleep 2  # 等待 API 服务完全启动
             fi
-            sleep 3  # 等待 API 服务完全启动
         else
             log_error "QCAT API 二进制文件不存在: $api_cmd"
-            return 1
+            BACKEND_PID=""
         fi
     fi
 
@@ -874,40 +866,75 @@ EOF
                 echo "NEXT_PUBLIC_ENV=development" >> frontend/.env.local
             elif [ "$PRODUCTION_MODE" = "true" ]; then
                 echo "NEXT_PUBLIC_ENV=production" >> frontend/.env.local
+            else
+                echo "NEXT_PUBLIC_ENV=development" >> frontend/.env.local
             fi
 
             log_debug "前端环境变量配置完成"
-
-            # 启动前端开发服务器
-            log_info "启动 Frontend 服务 (端口: $FRONTEND_DEV_PORT)..."
 
             # 检查并清理端口占用
             if ! check_port "$FRONTEND_DEV_PORT" "Frontend" true; then
                 log_error "无法清理端口 $FRONTEND_DEV_PORT，Frontend 启动失败"
                 FRONTEND_PID=""
             else
+                # 启动前端开发服务器
+                log_info "启动 Frontend 服务 (端口: $FRONTEND_DEV_PORT)..."
+
                 # 构建启动命令
-                local frontend_cmd="cd frontend && npx next dev --port $FRONTEND_DEV_PORT"
+                local frontend_cmd="npx next dev --port $FRONTEND_DEV_PORT"
                 if [ "$DEV_MODE" = "true" ]; then
                     frontend_cmd="$frontend_cmd --turbo"  # 开发模式启用 turbopack
                 fi
 
-                log_debug "执行命令: $frontend_cmd"
+                log_debug "执行命令: cd frontend && $frontend_cmd"
 
-                # 启动前端服务
-                eval "$frontend_cmd" &
+                # 启动前端服务（确保真正后台运行）
+                cd frontend
+                nohup $frontend_cmd > "../logs/frontend_$(date +%Y%m%d_%H%M%S).log" 2>&1 &
                 FRONTEND_PID=$!
+                cd ..
 
                 log_debug "Frontend PID: $FRONTEND_PID"
 
-                # 简单等待，不做复杂的端口检查（前端启动较慢）
-                sleep 3
+                # 等待前端服务启动
+                local wait_time=0
+                local max_wait=30
+                local frontend_ready=false
 
-                if kill -0 "$FRONTEND_PID" 2>/dev/null; then
+                while [ $wait_time -lt $max_wait ]; do
+                    # 检查进程是否还在运行
+                    if ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
+                        log_error "Frontend 进程意外退出"
+                        FRONTEND_PID=""
+                        break
+                    fi
+
+                    # 检查端口是否开始监听
+                    if [ "$OS_TYPE" = "windows" ]; then
+                        if netstat -ano | findstr ":$FRONTEND_DEV_PORT " > /dev/null 2>&1; then
+                            frontend_ready=true
+                            break
+                        fi
+                    else
+                        if lsof -i :$FRONTEND_DEV_PORT > /dev/null 2>&1; then
+                            frontend_ready=true
+                            break
+                        fi
+                    fi
+
+                    sleep 1
+                    wait_time=$((wait_time + 1))
+
+                    if [ $((wait_time % 10)) -eq 0 ]; then
+                        log_debug "等待 Frontend 启动... ($wait_time/$max_wait 秒)"
+                    fi
+                done
+
+                if [ "$frontend_ready" = true ]; then
                     log_success "Frontend 启动成功 (PID: $FRONTEND_PID, 端口: $FRONTEND_DEV_PORT)"
-                else
-                    log_warning "Frontend 进程可能已退出"
-                    FRONTEND_PID=""
+                elif [ -n "$FRONTEND_PID" ]; then
+                    log_warning "Frontend 启动超时，但进程仍在运行 (PID: $FRONTEND_PID)"
+                    log_info "请检查日志文件: logs/frontend_$(date +%Y%m%d_%H%M%S).log"
                 fi
             fi
         else
@@ -918,9 +945,44 @@ EOF
 
     # 等待所有服务稳定
     log_info "等待服务稳定..."
-    sleep 5
+    sleep 3
 
-    log_success "服务启动流程完成"
+    # 验证服务状态
+    log_info "验证服务状态..."
+    local services_ok=true
+
+    if [[ "$SERVICES_TO_START" == "all" || "$SERVICES_TO_START" == *"api"* ]]; then
+        if [ -n "$BACKEND_PID" ] && kill -0 "$BACKEND_PID" 2>/dev/null; then
+            log_success "✅ API服务运行正常 (PID: $BACKEND_PID)"
+        else
+            log_error "❌ API服务启动失败"
+            services_ok=false
+        fi
+    fi
+
+    if [[ "$SERVICES_TO_START" == "all" || "$SERVICES_TO_START" == *"optimizer"* ]]; then
+        if [ -n "$OPTIMIZER_PID" ] && kill -0 "$OPTIMIZER_PID" 2>/dev/null; then
+            log_success "✅ 优化器服务运行正常 (PID: $OPTIMIZER_PID)"
+        else
+            log_warning "⚠️ 优化器服务启动失败或未启动"
+        fi
+    fi
+
+    if [[ "$SERVICES_TO_START" == "all" || "$SERVICES_TO_START" == *"frontend"* ]]; then
+        if [ -n "$FRONTEND_PID" ] && kill -0 "$FRONTEND_PID" 2>/dev/null; then
+            log_success "✅ 前端服务运行正常 (PID: $FRONTEND_PID)"
+        else
+            log_error "❌ 前端服务启动失败"
+            services_ok=false
+        fi
+    fi
+
+    if [ "$services_ok" = true ]; then
+        log_success "🎉 所有服务启动完成！"
+    else
+        log_warning "⚠️ 部分服务启动失败，请检查日志"
+    fi
+
     log_info "启动的服务 PID: API=$BACKEND_PID, Optimizer=$OPTIMIZER_PID, Frontend=$FRONTEND_PID"
 }
 
@@ -1074,7 +1136,7 @@ cleanup() {
         check_port "$FRONTEND_DEV_PORT" "Frontend" true >/dev/null 2>&1 || true
     fi
 
-    log_success "所有服务已停止"
+    log_success "🛑 所有服务已停止"
     exit 0
 }
 
