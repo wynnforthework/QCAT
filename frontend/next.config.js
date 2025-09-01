@@ -6,6 +6,7 @@ const nextConfig = {
   // 配置实验性功能 (如果需要的话)
   experimental: {
     // 可以在这里添加实验性功能
+    optimizeCss: true, // 启用CSS优化
   },
 
   // Turbopack 配置已移除 - 使用默认配置
@@ -98,6 +99,26 @@ const nextConfig = {
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     // 自定义 webpack 配置
     // 注意：当使用 Turbopack 时，这个配置不会被使用
+
+    // 优化CSS预加载配置
+    if (!isServer) {
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          ...config.optimization.splitChunks,
+          cacheGroups: {
+            ...config.optimization.splitChunks.cacheGroups,
+            styles: {
+              name: 'styles',
+              test: /\.(css|scss|sass)$/,
+              chunks: 'all',
+              enforce: true,
+            },
+          },
+        },
+      };
+    }
+
     return config
   },
 }
