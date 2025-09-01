@@ -818,7 +818,7 @@ start_services() {
         fi
 
         if [ -f "$api_cmd" ]; then
-            BACKEND_PID=$(start_service "QCAT API" "$QCAT_API_PORT" "$api_cmd" "")
+            BACKEND_PID=$(start_service "QCAT API" "$QCAT_API_PORT" "$api_cmd" "" || echo "")
             if [ -z "$BACKEND_PID" ]; then
                 log_error "QCAT API 启动失败"
                 BACKEND_PID=""
@@ -841,7 +841,7 @@ start_services() {
         fi
 
         if [ -f "$optimizer_cmd" ]; then
-            OPTIMIZER_PID=$(start_service "QCAT Optimizer" "$QCAT_OPTIMIZER_PORT" "$optimizer_cmd" "--port=$QCAT_OPTIMIZER_PORT")
+            OPTIMIZER_PID=$(start_service "QCAT Optimizer" "$QCAT_OPTIMIZER_PORT" "$optimizer_cmd" "--port=$QCAT_OPTIMIZER_PORT" || echo "")
             if [ -z "$OPTIMIZER_PID" ]; then
                 log_warning "QCAT Optimizer 启动失败，但继续启动其他服务"
             fi
