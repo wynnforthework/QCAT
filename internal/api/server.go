@@ -27,10 +27,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	swaggerFiles "github.com/swaggo/files"
-	ginSwagger "github.com/swaggo/gin-swagger"
-
-	_ "qcat/docs" // Import generated docs
 )
 
 // Global metrics collector to avoid duplicate registration
@@ -595,8 +591,65 @@ func (s *Server) setupRoutes() {
 	s.router.Use(s.metrics.MetricsMiddleware())
 
 	// Swagger documentation
+	log.Printf("Environment: %s", s.config.App.Environment)
 	if s.config.App.Environment == "development" {
-		s.router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+		log.Println("Setting up Swagger routes...")
+		// 直接提供我们生成的完整swagger.json文件
+		s.router.GET("/swagger/doc.json", func(c *gin.Context) {
+			log.Println("Serving swagger doc.json")
+			c.File("./docs/swagger.json")
+		})
+		s.router.GET("/swagger/swagger.json", func(c *gin.Context) {
+			log.Println("Serving swagger.json")
+			c.File("./docs/swagger.json")
+		})
+		s.router.GET("/swagger/index.html", func(c *gin.Context) {
+			c.Header("Content-Type", "text/html")
+			html := `<!DOCTYPE html>
+<html>
+<head>
+    <title>QCAT API Documentation</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@3.25.0/swagger-ui.css" />
+    <style>
+        html {
+            box-sizing: border-box;
+            overflow: -moz-scrollbars-vertical;
+            overflow-y: scroll;
+        }
+        *, *:before, *:after {
+            box-sizing: inherit;
+        }
+        body {
+            margin:0;
+            background: #fafafa;
+        }
+    </style>
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@3.25.0/swagger-ui-bundle.js"></script>
+    <script src="https://unpkg.com/swagger-ui-dist@3.25.0/swagger-ui-standalone-preset.js"></script>
+    <script>
+        window.onload = function() {
+            const ui = SwaggerUIBundle({
+                url: '/swagger/swagger.json',
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [
+                    SwaggerUIBundle.presets.apis,
+                    SwaggerUIStandalonePreset
+                ],
+                plugins: [
+                    SwaggerUIBundle.plugins.DownloadUrl
+                ],
+                layout: "StandaloneLayout"
+            });
+        };
+    </script>
+</body>
+</html>`
+			c.String(200, html)
+		})
 	}
 
 	// Basic health endpoint (always available)

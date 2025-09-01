@@ -95,51 +95,15 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     requiresAuth: true,
     category: '策略'
   },
-  {
-    id: 'strategy-list-management',
-    name: '策略列表(管理视图)',
-    method: 'GET',
-    path: '/api/v1/strategy?view=management&page=1&page_size=50',
-    description: '获取策略列表 - 管理视图',
-    requiresAuth: true,
-    category: '策略'
-  },
-  {
-    id: 'strategy-list-pool',
-    name: '策略列表(池视图)',
-    method: 'GET',
-    path: '/api/v1/strategy?view=pool',
-    description: '获取策略列表 - 策略池视图',
-    requiresAuth: true,
-    category: '策略'
-  },
-  {
-    id: 'strategy-list-execution',
-    name: '策略列表(执行视图)',
-    method: 'GET',
-    path: '/api/v1/strategy?view=execution',
-    description: '获取策略列表 - 执行视图',
-    requiresAuth: true,
-    category: '策略'
-  },
-  {
-    id: 'strategy-list-performance',
-    name: '策略列表(性能视图)',
-    method: 'GET',
-    path: '/api/v1/strategy?view=performance',
-    description: '获取策略列表 - 性能视图',
-    requiresAuth: true,
-    category: '策略'
-  },
+
   {
     id: 'strategy-get',
     name: '获取策略详情',
     method: 'GET',
-    path: '/api/v1/strategy/00000000-0000-0000-0000-000000000001',
-    description: '获取指定策略的详细信息 (使用示例ID)',
+    path: '/api/v1/strategy/:id',
+    description: '获取指定策略的详细信息',
     requiresAuth: true,
-    category: '策略',
-    expectedToFail: true
+    category: '策略'
   },
   {
     id: 'strategy-pool-overview',
@@ -181,7 +145,7 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     id: 'strategy-create',
     name: '创建策略',
     method: 'POST',
-    path: '/api/v1/strategy/',
+    path: '/api/v1/strategy',
     description: '创建新的交易策略',
     requiresAuth: true,
     category: '策略',
@@ -192,69 +156,51 @@ const API_ENDPOINTS: ApiEndpoint[] = [
       parameters: {}
     }
   },
-  {
-    id: 'strategy-update',
-    name: '更新策略',
-    method: 'PUT',
-    path: '/api/v1/strategy/00000000-0000-0000-0000-000000000001',
-    description: '更新指定策略 (需要真实策略ID)',
-    requiresAuth: true,
-    category: '策略',
-    expectedToFail: true,
-    testData: {
-      name: 'Updated Strategy',
-      description: 'Updated description'
-    }
-  },
-  {
-    id: 'strategy-delete',
-    name: '删除策略',
-    method: 'DELETE',
-    path: '/api/v1/strategy/00000000-0000-0000-0000-000000000001',
-    description: '删除指定策略 (需要真实策略ID)',
-    requiresAuth: true,
-    category: '策略',
-    expectedToFail: true
-  },
+
   {
     id: 'strategy-promote',
     name: '推广策略',
     method: 'POST',
-    path: '/api/v1/strategy/00000000-0000-0000-0000-000000000001/promote',
-    description: '推广策略到生产环境 (需要真实策略ID)',
+    path: '/api/v1/strategy/:id/promote',
+    description: '推广策略到生产环境',
     requiresAuth: true,
-    category: '策略',
-    expectedToFail: true
+    category: '策略'
   },
   {
     id: 'strategy-start',
     name: '启动策略',
     method: 'POST',
-    path: '/api/v1/strategy/00000000-0000-0000-0000-000000000001/start',
-    description: '启动指定策略 (需要真实策略ID)',
+    path: '/api/v1/strategy/:id/start',
+    description: '启动指定策略',
     requiresAuth: true,
-    category: '策略',
-    expectedToFail: true
+    category: '策略'
   },
   {
     id: 'strategy-stop',
     name: '停止策略',
     method: 'POST',
-    path: '/api/v1/strategy/00000000-0000-0000-0000-000000000001/stop',
-    description: '停止指定策略 (需要真实策略ID)',
+    path: '/api/v1/strategy/:id/stop',
+    description: '停止指定策略',
     requiresAuth: true,
-    category: '策略',
-    expectedToFail: true
+    category: '策略'
+  },
+  {
+    id: 'strategy-auto-start',
+    name: '策略自动启动',
+    method: 'POST',
+    path: '/api/v1/strategy/:id/auto-start',
+    description: '为指定策略设置自动启动',
+    requiresAuth: true,
+    category: '策略'
   },
   {
     id: 'strategy-backtest',
     name: '策略回测',
     method: 'POST',
-    path: '/api/v1/strategy/00000000-0000-0000-0000-000000000001/backtest',
-    description: '运行策略回测 (需要真实策略ID)',
+    path: '/api/v1/strategy/:id/backtest',
+    description: '运行策略回测',
     requiresAuth: true,
     category: '策略',
-    expectedToFail: true,
     testData: {
       start_date: '2024-01-01',
       end_date: '2024-01-31',
@@ -287,26 +233,7 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     category: '优化器',
     expectedToFail: true
   },
-  {
-    id: 'optimizer-task',
-    name: '获取优化任务',
-    method: 'GET',
-    path: '/api/v1/optimizer/tasks/00000000-0000-0000-0000-000000000001',
-    description: '获取指定优化任务详情 (需要真实任务ID)',
-    requiresAuth: true,
-    category: '优化器',
-    expectedToFail: true
-  },
-  {
-    id: 'optimizer-results',
-    name: '优化结果',
-    method: 'GET',
-    path: '/api/v1/optimizer/results/00000000-0000-0000-0000-000000000001',
-    description: '获取优化结果 (需要真实任务ID)',
-    requiresAuth: true,
-    category: '优化器',
-    expectedToFail: true
-  },
+
 
   // 市场数据
   {
@@ -474,15 +401,7 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     category: '热门列表',
     testData: { symbol: 'ETHUSDT' }
   },
-  {
-    id: 'hotlist-remove-whitelist',
-    name: '从白名单移除',
-    method: 'DELETE',
-    path: '/api/v1/hotlist/whitelist/BTCUSDT',
-    description: '从白名单移除符号',
-    requiresAuth: true,
-    category: '热门列表'
-  },
+
 
   // 系统指标
   {
@@ -494,16 +413,7 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     requiresAuth: true,
     category: '系统'
   },
-  {
-    id: 'strategy-metrics',
-    name: '策略指标',
-    method: 'GET',
-    path: '/api/v1/metrics/strategy/00000000-0000-0000-0000-000000000001',
-    description: '获取策略性能指标 (需要真实策略ID)',
-    requiresAuth: true,
-    category: '系统',
-    expectedToFail: true
-  },
+
   {
     id: 'performance-metrics',
     name: '性能指标',
@@ -547,26 +457,7 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     category: '系统管理',
     expectedToFail: true
   },
-  {
-    id: 'network-connection',
-    name: '单个网络连接',
-    method: 'GET',
-    path: '/api/v1/network/connections/connection-1',
-    description: '获取指定网络连接详情 (需要真实连接ID)',
-    requiresAuth: true,
-    category: '系统管理',
-    expectedToFail: true
-  },
-  {
-    id: 'network-reconnect',
-    name: '重新连接',
-    method: 'POST',
-    path: '/api/v1/network/connections/connection-1/reconnect',
-    description: '强制重新连接 (需要真实连接ID)',
-    requiresAuth: true,
-    category: '系统管理',
-    expectedToFail: true
-  },
+
 
   // 健康检查
   {
@@ -588,22 +479,13 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     category: '健康检查'
   },
   {
-    id: 'health-check',
-    name: '单个健康检查',
+    id: 'auth-profile',
+    name: '用户信息',
     method: 'GET',
-    path: '/api/v1/health/checks/database',
-    description: '获取指定健康检查结果',
+    path: '/api/v1/auth/profile',
+    description: '获取当前用户信息',
     requiresAuth: true,
-    category: '健康检查'
-  },
-  {
-    id: 'health-force-check',
-    name: '强制健康检查',
-    method: 'POST',
-    path: '/api/v1/health/checks/database/force',
-    description: '强制执行健康检查',
-    requiresAuth: true,
-    category: '健康检查'
+    category: '认证'
   },
 
   // 关闭管理
@@ -681,158 +563,326 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     }
   },
 
-  // 缓存管理
+  // 自动启动管理
   {
-    id: 'cache-status',
-    name: '缓存状态',
-    method: 'GET',
-    path: '/api/v1/cache/status',
-    description: '获取缓存状态',
-    requiresAuth: true,
-    category: '缓存'
-  },
-  {
-    id: 'cache-health',
-    name: '缓存健康',
-    method: 'GET',
-    path: '/api/v1/cache/health',
-    description: '获取缓存健康状态',
-    requiresAuth: true,
-    category: '缓存'
-  },
-  {
-    id: 'cache-metrics',
-    name: '缓存指标',
-    method: 'GET',
-    path: '/api/v1/cache/metrics',
-    description: '获取缓存性能指标',
-    requiresAuth: true,
-    category: '缓存'
-  },
-  {
-    id: 'cache-events',
-    name: '缓存事件',
-    method: 'GET',
-    path: '/api/v1/cache/events',
-    description: '获取缓存事件记录',
-    requiresAuth: true,
-    category: '缓存'
-  },
-  {
-    id: 'cache-config',
-    name: '缓存配置',
-    method: 'GET',
-    path: '/api/v1/cache/config',
-    description: '获取缓存配置',
-    requiresAuth: true,
-    category: '缓存'
-  },
-  {
-    id: 'cache-test',
-    name: '测试缓存',
+    id: 'auto-start-trigger',
+    name: '触发自动启动',
     method: 'POST',
-    path: '/api/v1/cache/test',
-    description: '测试缓存功能',
+    path: '/api/v1/auto-start/trigger',
+    description: '手动触发自动启动流程',
     requiresAuth: true,
-    category: '缓存',
-    testData: { test_key: 'test_value' }
-  },
-  {
-    id: 'cache-force-fallback',
-    name: '强制降级',
-    method: 'POST',
-    path: '/api/v1/cache/fallback/force',
-    description: '强制缓存降级',
-    requiresAuth: true,
-    category: '缓存'
-  },
-  {
-    id: 'cache-reset-counters',
-    name: '重置计数器',
-    method: 'POST',
-    path: '/api/v1/cache/counters/reset',
-    description: '重置缓存计数器',
-    requiresAuth: true,
-    category: '缓存'
+    category: '自动启动'
   },
 
-  // 安全管理
+  // 黑名单管理 (补充)
   {
-    id: 'security-keys-list',
-    name: 'API密钥列表',
-    method: 'GET',
-    path: '/api/v1/security/keys/',
-    description: '获取API密钥列表',
+    id: 'blacklist-delete-strategy',
+    name: '删除黑名单条目',
+    method: 'DELETE',
+    path: '/api/v1/blacklist/:strategy_id',
+    description: '删除指定策略的黑名单条目',
     requiresAuth: true,
-    category: '安全'
+    category: '黑名单'
   },
   {
-    id: 'security-keys-create',
-    name: '创建API密钥',
+    id: 'blacklist-clear-expired',
+    name: '清理过期条目',
     method: 'POST',
-    path: '/api/v1/security/keys/',
-    description: '创建新的API密钥',
+    path: '/api/v1/blacklist/clear-expired',
+    description: '清理黑名单中的过期条目',
     requiresAuth: true,
-    category: '安全',
-    testData: { name: 'Test API Key', permissions: ['read', 'write'] }
+    category: '黑名单'
   },
+
+  // 并发管理 (补充)
   {
-    id: 'security-key-get',
-    name: '获取API密钥',
+    id: 'concurrent-pool-detail',
+    name: '线程池详情',
     method: 'GET',
-    path: '/api/v1/security/keys/00000000-0000-0000-0000-000000000001',
-    description: '获取指定API密钥详情 (需要真实密钥ID)',
+    path: '/api/v1/concurrent/pools/:pool_name',
+    description: '获取指定线程池的详细状态',
     requiresAuth: true,
-    category: '安全',
-    expectedToFail: true
+    category: '并发管理'
   },
   {
-    id: 'security-key-rotate',
-    name: '轮换API密钥',
+    id: 'concurrent-pool-scale',
+    name: '线程池扩缩容',
     method: 'POST',
-    path: '/api/v1/security/keys/00000000-0000-0000-0000-000000000001/rotate',
-    description: '轮换API密钥 (需要真实密钥ID)',
+    path: '/api/v1/concurrent/pools/:pool_name/scale',
+    description: '调整线程池的大小',
     requiresAuth: true,
-    category: '安全',
-    expectedToFail: true
+    category: '并发管理'
   },
   {
-    id: 'security-key-revoke',
-    name: '撤销API密钥',
+    id: 'concurrent-task-queue',
+    name: '任务队列状态',
+    method: 'GET',
+    path: '/api/v1/concurrent/task-queue',
+    description: '获取任务队列的状态信息',
+    requiresAuth: true,
+    category: '并发管理'
+  },
+  {
+    id: 'concurrent-tasks',
+    name: '任务列表',
+    method: 'GET',
+    path: '/api/v1/concurrent/tasks',
+    description: '获取当前运行的任务列表',
+    requiresAuth: true,
+    category: '并发管理'
+  },
+
+  // 仪表盘 (补充)
+  {
+    id: 'dashboard-db-health',
+    name: '数据库健康状态',
+    method: 'GET',
+    path: '/api/v1/dashboard/db-health',
+    description: '获取数据库健康状态',
+    requiresAuth: true,
+    category: '仪表盘'
+  },
+
+  // 紧急停止 (补充)
+  {
+    id: 'emergency-reset',
+    name: '重置紧急停止',
     method: 'POST',
-    path: '/api/v1/security/keys/00000000-0000-0000-0000-000000000001/revoke',
-    description: '撤销API密钥 (需要真实密钥ID)',
+    path: '/api/v1/emergency/reset',
+    description: '重置系统的紧急停止状态',
     requiresAuth: true,
-    category: '安全',
-    expectedToFail: true
+    category: '紧急停止'
   },
   {
-    id: 'security-key-usage',
-    name: 'API密钥使用情况',
-    method: 'GET',
-    path: '/api/v1/security/keys/00000000-0000-0000-0000-000000000001/usage',
-    description: '获取API密钥使用情况 (需要真实密钥ID)',
+    id: 'emergency-stop-all',
+    name: '紧急停止所有',
+    method: 'POST',
+    path: '/api/v1/emergency/stop-all',
+    description: '立即停止所有运行中的策略',
     requiresAuth: true,
-    category: '安全',
-    expectedToFail: true
+    category: '紧急停止'
+  },
+
+  // 健康检查 (补充)
+  {
+    id: 'health-check-name',
+    name: '指定健康检查',
+    method: 'GET',
+    path: '/api/v1/health/checks/:name',
+    description: '获取指定健康检查项目的详细状态',
+    requiresAuth: true,
+    category: '健康检查'
   },
   {
-    id: 'security-audit-logs',
-    name: '安全审计日志',
-    method: 'GET',
-    path: '/api/v1/security/audit/logs',
-    description: '获取安全审计日志',
+    id: 'health-force-check-name',
+    name: '强制执行健康检查',
+    method: 'POST',
+    path: '/api/v1/health/checks/:name/force',
+    description: '强制执行指定的健康检查',
     requiresAuth: true,
-    category: '安全'
+    category: '健康检查'
+  },
+
+  // 热点管理 (补充)
+  {
+    id: 'hotlist-whitelist-symbol',
+    name: '管理白名单符号',
+    method: 'POST',
+    path: '/api/v1/hotlist/whitelist/:symbol',
+    description: '添加或移除白名单符号',
+    requiresAuth: true,
+    category: '热点管理'
+  },
+
+  // 指标 (补充)
+  {
+    id: 'metrics-strategy-id',
+    name: '策略指标',
+    method: 'GET',
+    path: '/api/v1/metrics/strategy/:id',
+    description: '获取特定策略的性能指标',
+    requiresAuth: true,
+    category: '指标'
+  },
+
+  // 网络连接 (补充)
+  {
+    id: 'network-connection-id',
+    name: '指定网络连接',
+    method: 'GET',
+    path: '/api/v1/network/connections/:id',
+    description: '获取指定网络连接的详细信息',
+    requiresAuth: true,
+    category: '网络'
   },
   {
-    id: 'security-audit-integrity',
-    name: '完整性验证',
-    method: 'GET',
-    path: '/api/v1/security/audit/integrity',
-    description: '验证数据完整性',
+    id: 'network-reconnect-id',
+    name: '重新连接',
+    method: 'POST',
+    path: '/api/v1/network/connections/:id/reconnect',
+    description: '重新建立指定的网络连接',
     requiresAuth: true,
-    category: '安全'
+    category: '网络'
+  },
+
+  // 优化器 (补充)
+  {
+    id: 'optimizer-result-id',
+    name: '优化结果',
+    method: 'GET',
+    path: '/api/v1/optimizer/results/:id',
+    description: '获取优化任务的结果',
+    requiresAuth: true,
+    category: '优化器'
+  },
+  {
+    id: 'optimizer-task-id',
+    name: '优化任务详情',
+    method: 'GET',
+    path: '/api/v1/optimizer/tasks/:id',
+    description: '获取指定优化任务的详细信息',
+    requiresAuth: true,
+    category: '优化器'
+  },
+
+  // 投资组合 (补充)
+  {
+    id: 'portfolio-performance',
+    name: '投资组合表现',
+    method: 'GET',
+    path: '/api/v1/portfolio/performance',
+    description: '获取投资组合的历史表现数据',
+    requiresAuth: true,
+    category: '投资组合'
+  },
+
+  // 系统设置 (补充)
+  {
+    id: 'settings-get',
+    name: '系统设置',
+    method: 'GET',
+    path: '/api/v1/settings',
+    description: '获取当前系统配置设置',
+    requiresAuth: false,
+    category: '系统设置'
+  },
+
+  // 结果分享 (补充)
+  {
+    id: 'share-result',
+    name: '分享结果',
+    method: 'POST',
+    path: '/api/v1/share-result',
+    description: '分享分析结果',
+    requiresAuth: true,
+    category: '结果分享'
+  },
+
+  // 交易管理 (补充)
+  {
+    id: 'trading-history',
+    name: '交易历史',
+    method: 'GET',
+    path: '/api/v1/trading/history',
+    description: '获取历史交易记录',
+    requiresAuth: true,
+    category: '交易管理'
+  },
+  {
+    id: 'trading-positions',
+    name: '持仓信息',
+    method: 'GET',
+    path: '/api/v1/trading/positions',
+    description: '获取当前的持仓信息',
+    requiresAuth: true,
+    category: '交易管理'
+  },
+
+  // 工作流 (补充)
+  {
+    id: 'workflow-execute',
+    name: '执行工作流',
+    method: 'POST',
+    path: '/api/v1/workflow/execute',
+    description: '执行指定的工作流',
+    requiresAuth: true,
+    category: '工作流'
+  },
+  {
+    id: 'workflow-function-id',
+    name: '工作流函数',
+    method: 'GET',
+    path: '/api/v1/workflow/functions/:function_id',
+    description: '获取指定工作流函数的信息',
+    requiresAuth: true,
+    category: '工作流'
+  },
+  {
+    id: 'workflow-function-enable',
+    name: '启用工作流函数',
+    method: 'POST',
+    path: '/api/v1/workflow/functions/:function_id/enable',
+    description: '启用指定的工作流函数',
+    requiresAuth: true,
+    category: '工作流'
+  },
+  {
+    id: 'workflow-function-disable',
+    name: '禁用工作流函数',
+    method: 'POST',
+    path: '/api/v1/workflow/functions/:function_id/disable',
+    description: '禁用指定的工作流函数',
+    requiresAuth: true,
+    category: '工作流'
+  },
+
+  // 基础健康检查API
+  {
+    id: 'health-basic',
+    name: '基础健康检查',
+    method: 'GET',
+    path: '/health',
+    description: '检查系统基础健康状态',
+    requiresAuth: false,
+    category: '基础API'
+  },
+  {
+    id: 'health-detailed',
+    name: '详细健康检查',
+    method: 'GET',
+    path: '/health/detailed',
+    description: '检查系统详细健康状态',
+    requiresAuth: false,
+    category: '基础API'
+  },
+
+  // WebSocket API
+  {
+    id: 'ws-alerts',
+    name: 'WebSocket告警',
+    method: 'GET',
+    path: '/ws/alerts',
+    description: '订阅系统告警信息',
+    requiresAuth: false,
+    category: 'WebSocket'
+  },
+  {
+    id: 'ws-market',
+    name: 'WebSocket市场数据',
+    method: 'GET',
+    path: '/ws/market/:symbol',
+    description: '订阅特定符号的实时市场数据',
+    requiresAuth: false,
+    category: 'WebSocket'
+  },
+  {
+    id: 'ws-strategy',
+    name: 'WebSocket策略数据',
+    method: 'GET',
+    path: '/ws/strategy/:id',
+    description: '订阅特定策略的实时数据',
+    requiresAuth: false,
+    category: 'WebSocket'
   },
 
   // 自动启动管理

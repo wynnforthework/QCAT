@@ -1,704 +1,3348 @@
 {
-    "swagger": "2.0",
-    "info": {
-        "description": "Quantitative Contract Automated Trading System API",
-        "title": "QCAT API",
-        "termsOfService": "http://swagger.io/terms/",
-        "contact": {
-            "name": "API Support",
-            "url": "http://www.swagger.io/support",
-            "email": "support@swagger.io"
-        },
-        "license": {
-            "name": "Apache 2.0",
-            "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
-        },
-        "version": "1.0"
+  "swagger": "2.0",
+  "info": {
+    "title": "QCAT API",
+    "description": "Quantitative Contract Automated Trading System - 完整API文档",
+    "version": "1.0",
+    "contact": {
+      "name": "QCAT Team",
+      "url": "https://github.com/qcat",
+      "email": "support@qcat.local"
     },
-    "host": "localhost:8082",
-    "basePath": "/api/v1",
-    "paths": {
-        "/auth/login": {
-            "post": {
-                "description": "用户登录认证",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "auth"
-                ],
-                "summary": "用户登录",
-                "parameters": [
-                    {
-                        "description": "登录信息",
-                        "name": "loginRequest",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "username": {
-                                    "type": "string"
-                                },
-                                "password": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "登录成功",
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "success": {
-                                    "type": "boolean"
-                                },
-                                "data": {
-                                    "type": "object",
-                                    "properties": {
-                                        "access_token": {
-                                            "type": "string"
-                                        },
-                                        "refresh_token": {
-                                            "type": "string"
-                                        },
-                                        "user": {
-                                            "type": "object"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "认证失败",
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "success": {
-                                    "type": "boolean"
-                                },
-                                "error": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/profile": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "获取当前用户信息",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "auth"
-                ],
-                "summary": "获取用户信息",
-                "responses": {
-                    "200": {
-                        "description": "用户信息",
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "success": {
-                                    "type": "boolean"
-                                },
-                                "data": {
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "未授权",
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "success": {
-                                    "type": "boolean"
-                                },
-                                "error": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/strategy": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "获取策略列表",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "strategy"
-                ],
-                "summary": "获取策略列表",
-                "responses": {
-                    "200": {
-                        "description": "策略列表",
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "success": {
-                                    "type": "boolean"
-                                },
-                                "data": {
-                                    "type": "array",
-                                    "items": {
-                                        "type": "object"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/strategy/pool/overview": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "获取策略池的整体状态和统计信息",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "strategy"
-                ],
-                "summary": "获取策略池概览",
-                "responses": {
-                    "200": {
-                        "description": "策略池概览",
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "success": {
-                                    "type": "boolean"
-                                },
-                                "data": {
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/dashboard": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取系统概览和关键指标",
-                "produces": ["application/json"],
-                "tags": ["仪表盘"],
-                "summary": "获取仪表盘数据",
-                "responses": {
-                    "200": {
-                        "description": "仪表盘数据",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/portfolio/overview": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取投资组合的整体状态和收益情况",
-                "produces": ["application/json"],
-                "tags": ["投资组合"],
-                "summary": "获取投资组合概览",
-                "responses": {
-                    "200": {
-                        "description": "投资组合概览",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/risk/overview": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取系统整体风险状况",
-                "produces": ["application/json"],
-                "tags": ["风险管理"],
-                "summary": "获取风险概览",
-                "responses": {
-                    "200": {
-                        "description": "风险概览",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/market/data": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取实时市场行情数据",
-                "produces": ["application/json"],
-                "tags": ["市场数据"],
-                "summary": "获取市场数据",
-                "responses": {
-                    "200": {
-                        "description": "市场数据",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/trading/activity": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取最近的交易活动记录",
-                "produces": ["application/json"],
-                "tags": ["交易活动"],
-                "summary": "获取交易活动",
-                "responses": {
-                    "200": {
-                        "description": "交易活动",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/metrics/system": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取系统性能和资源使用情况",
-                "produces": ["application/json"],
-                "tags": ["系统监控"],
-                "summary": "获取系统指标",
-                "responses": {
-                    "200": {
-                        "description": "系统指标",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/audit/logs": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取系统操作的审计日志",
-                "produces": ["application/json"],
-                "tags": ["审计日志"],
-                "summary": "获取审计日志",
-                "responses": {
-                    "200": {
-                        "description": "审计日志",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/cache/status": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取缓存系统的运行状态",
-                "produces": ["application/json"],
-                "tags": ["缓存管理"],
-                "summary": "获取缓存状态",
-                "responses": {
-                    "200": {
-                        "description": "缓存状态",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/automation/status": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取自动化系统的运行状态",
-                "produces": ["application/json"],
-                "tags": ["自动化系统"],
-                "summary": "获取自动化状态",
-                "responses": {
-                    "200": {
-                        "description": "自动化状态",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/orchestrator/status": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取系统编排器的运行状态",
-                "produces": ["application/json"],
-                "tags": ["系统编排"],
-                "summary": "获取编排器状态",
-                "responses": {
-                    "200": {
-                        "description": "编排器状态",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/auto-start/strategies": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取配置为自动启动的策略列表",
-                "produces": ["application/json"],
-                "tags": ["自动启动"],
-                "summary": "获取自动启动策略",
-                "responses": {
-                    "200": {
-                        "description": "自动启动策略列表",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/auto-start/stats": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取自动启动的执行统计信息",
-                "produces": ["application/json"],
-                "tags": ["自动启动"],
-                "summary": "获取自动启动统计",
-                "responses": {
-                    "200": {
-                        "description": "自动启动统计",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/blacklist/": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取策略黑名单列表",
-                "produces": ["application/json"],
-                "tags": ["黑名单管理"],
-                "summary": "获取黑名单列表",
-                "responses": {
-                    "200": {
-                        "description": "黑名单列表",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/workflow/dependency-graph": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取工作流依赖图",
-                "produces": ["application/json"],
-                "tags": ["工作流"],
-                "summary": "获取依赖图",
-                "responses": {
-                    "200": {
-                        "description": "工作流依赖图",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/workflow/results": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取工作流执行结果",
-                "produces": ["application/json"],
-                "tags": ["工作流"],
-                "summary": "获取执行结果",
-                "responses": {
-                    "200": {
-                        "description": "工作流执行结果",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/workflow/status": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取工作流状态",
-                "produces": ["application/json"],
-                "tags": ["工作流"],
-                "summary": "获取工作流状态",
-                "responses": {
-                    "200": {
-                        "description": "工作流状态",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/workflow/validate": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "验证工作流配置",
-                "produces": ["application/json"],
-                "tags": ["工作流"],
-                "summary": "工作流验证",
-                "responses": {
-                    "200": {
-                        "description": "验证结果",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/workflow/enabled": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取启用的工作流功能",
-                "produces": ["application/json"],
-                "tags": ["工作流"],
-                "summary": "获取启用的功能",
-                "responses": {
-                    "200": {
-                        "description": "启用的功能列表",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/concurrent/pools": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取并发线程池状态",
-                "produces": ["application/json"],
-                "tags": ["并发管理"],
-                "summary": "获取线程池状态",
-                "responses": {
-                    "200": {
-                        "description": "线程池状态",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/concurrent/monitor": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取并发监控统计",
-                "produces": ["application/json"],
-                "tags": ["并发管理"],
-                "summary": "获取监控统计",
-                "responses": {
-                    "200": {
-                        "description": "监控统计",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/emergency/status": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取紧急停止状态",
-                "produces": ["application/json"],
-                "tags": ["紧急停止"],
-                "summary": "获取紧急停止状态",
-                "responses": {
-                    "200": {
-                        "description": "紧急停止状态",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/emergency/history": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取紧急停止历史记录",
-                "produces": ["application/json"],
-                "tags": ["紧急停止"],
-                "summary": "获取紧急停止历史",
-                "responses": {
-                    "200": {
-                        "description": "紧急停止历史",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/memory/stats": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取系统内存使用统计",
-                "produces": ["application/json"],
-                "tags": ["系统稳定性"],
-                "summary": "获取内存统计",
-                "responses": {
-                    "200": {
-                        "description": "内存统计",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/network/connections": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取网络连接状态",
-                "produces": ["application/json"],
-                "tags": ["系统稳定性"],
-                "summary": "获取网络连接",
-                "responses": {
-                    "200": {
-                        "description": "网络连接状态",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/health/status": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取系统健康状态",
-                "produces": ["application/json"],
-                "tags": ["系统稳定性"],
-                "summary": "获取健康状态",
-                "responses": {
-                    "200": {
-                        "description": "健康状态",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/health/checks": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "执行系统健康检查",
-                "produces": ["application/json"],
-                "tags": ["系统稳定性"],
-                "summary": "获取健康检查",
-                "responses": {
-                    "200": {
-                        "description": "健康检查结果",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/validation/strategies": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取策略验证状态",
-                "produces": ["application/json"],
-                "tags": ["策略验证"],
-                "summary": "获取策略验证状态",
-                "responses": {
-                    "200": {
-                        "description": "策略验证状态",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/validation/problems": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取策略验证问题",
-                "produces": ["application/json"],
-                "tags": ["策略验证"],
-                "summary": "获取策略问题",
-                "responses": {
-                    "200": {
-                        "description": "策略验证问题",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/optimizer/tasks": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取优化任务列表",
-                "produces": ["application/json"],
-                "tags": ["优化器"],
-                "summary": "获取优化任务列表",
-                "responses": {
-                    "200": {
-                        "description": "优化任务列表",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/shared-results": {
-            "get": {
-                "security": [{"BearerAuth": []}],
-                "description": "获取分享的结果列表",
-                "produces": ["application/json"],
-                "tags": ["结果分享"],
-                "summary": "获取分享结果",
-                "responses": {
-                    "200": {
-                        "description": "分享结果列表",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        },
-        "/settings": {
-            "get": {
-                "description": "获取当前系统配置设置",
-                "produces": ["application/json"],
-                "tags": ["系统设置"],
-                "summary": "获取系统设置",
-                "responses": {
-                    "200": {
-                        "description": "系统设置",
-                        "schema": {"type": "object"}
-                    }
-                }
-            },
-            "put": {
-                "description": "更新系统配置设置",
-                "consumes": ["application/json"],
-                "produces": ["application/json"],
-                "tags": ["系统设置"],
-                "summary": "更新系统设置",
-                "parameters": [{
-                    "name": "body",
-                    "in": "body",
-                    "required": true,
-                    "schema": {"type": "object"}
-                }],
-                "responses": {
-                    "200": {
-                        "description": "设置更新成功",
-                        "schema": {"type": "object"}
-                    }
-                }
-            }
-        }
-    },
-    "securityDefinitions": {
-        "BearerAuth": {
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header",
-            "description": "Type 'Bearer' followed by a space and JWT token."
-        }
+    "license": {
+      "name": "Apache 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
     }
+  },
+  "host": "localhost:8082",
+  "basePath": "/api/v1",
+  "schemes": [
+    "http",
+    "https"
+  ],
+  "paths": {
+    "/audit/decisions": {
+      "get": {
+        "description": "获取交易决策的完整链路",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "决策链",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取决策链",
+        "tags": [
+          "审计日志"
+        ]
+      }
+    },
+    "/audit/export": {
+      "post": {
+        "description": "导出审计日志报告",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "导出成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "导出审计报告",
+        "tags": [
+          "审计日志"
+        ]
+      }
+    },
+    "/audit/logs": {
+      "get": {
+        "description": "获取系统审计日志",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "审计日志",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取审计日志",
+        "tags": [
+          "审计日志"
+        ]
+      }
+    },
+    "/audit/performance": {
+      "get": {
+        "description": "获取系统性能的审计数据",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "性能审计",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取性能审计",
+        "tags": [
+          "审计日志"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "用户登录认证",
+        "parameters": [
+          {
+            "description": "登录信息",
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "properties": {
+                "password": {
+                  "type": "string"
+                },
+                "username": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "username",
+                "password"
+              ],
+              "type": "object"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "登录成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          },
+          "401": {
+            "description": "认证失败",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "summary": "用户登录",
+        "tags": [
+          "认证"
+        ]
+      }
+    },
+    "/auth/profile": {
+      "get": {
+        "description": "获取当前登录用户的详细信息",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "用户信息",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          },
+          "401": {
+            "description": "未授权",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取用户信息",
+        "tags": [
+          "认证"
+        ]
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "使用刷新令牌获取新的访问令牌",
+        "parameters": [
+          {
+            "description": "刷新令牌",
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "properties": {
+                "refresh_token": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "refresh_token"
+              ],
+              "type": "object"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "令牌刷新成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          },
+          "401": {
+            "description": "刷新令牌无效",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "summary": "刷新访问令牌",
+        "tags": [
+          "认证"
+        ]
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "注册新用户",
+        "parameters": [
+          {
+            "description": "注册信息",
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "password": {
+                  "type": "string"
+                },
+                "username": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "username",
+                "password",
+                "email"
+              ],
+              "type": "object"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "201": {
+            "description": "注册成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          },
+          "400": {
+            "description": "请求参数错误",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "summary": "用户注册",
+        "tags": [
+          "认证"
+        ]
+      }
+    },
+    "/auto-start/stats": {
+      "get": {
+        "description": "获取自动启动的统计信息",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "自动启动统计",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取自动启动统计",
+        "tags": [
+          "自动启动"
+        ]
+      }
+    },
+    "/auto-start/strategies": {
+      "get": {
+        "description": "获取自动启动策略列表",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "自动启动策略",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取自动启动策略",
+        "tags": [
+          "自动启动"
+        ]
+      }
+    },
+    "/auto-start/trigger": {
+      "post": {
+        "description": "手动触发自动启动流程",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "触发成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "触发自动启动",
+        "tags": [
+          "自动启动"
+        ]
+      }
+    },
+    "/blacklist/": {
+      "get": {
+        "description": "获取当前的黑名单条目",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "黑名单列表",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取黑名单列表",
+        "tags": [
+          "黑名单管理"
+        ]
+      },
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "添加新的黑名单条目",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "201": {
+            "description": "添加成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "添加黑名单条目",
+        "tags": [
+          "黑名单管理"
+        ]
+      }
+    },
+    "/blacklist/:strategy_id": {
+      "delete": {
+        "description": "删除指定的黑名单条目",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "strategy_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "删除黑名单条目",
+        "tags": [
+          "黑名单管理"
+        ]
+      }
+    },
+    "/blacklist/clear-expired": {
+      "post": {
+        "description": "清理黑名单中的过期条目",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "清理成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "清理过期条目",
+        "tags": [
+          "黑名单管理"
+        ]
+      }
+    },
+    "/concurrent/alerts": {
+      "get": {
+        "description": "获取并发系统的告警信息",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "并发告警",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取并发告警",
+        "tags": [
+          "并发管理"
+        ]
+      }
+    },
+    "/concurrent/load-balancer": {
+      "get": {
+        "description": "获取负载均衡器的状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "负载均衡状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取负载均衡状态",
+        "tags": [
+          "并发管理"
+        ]
+      }
+    },
+    "/concurrent/monitor": {
+      "get": {
+        "description": "获取并发系统的监控数据",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "监控统计",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取监控统计",
+        "tags": [
+          "并发管理"
+        ]
+      }
+    },
+    "/concurrent/pools": {
+      "get": {
+        "description": "获取并发线程池的状态信息",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "线程池状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取线程池状态",
+        "tags": [
+          "并发管理"
+        ]
+      }
+    },
+    "/concurrent/pools/:pool_name": {
+      "get": {
+        "description": "获取指定线程池的详细状态",
+        "parameters": [
+          {
+            "description": "线程池名称",
+            "in": "path",
+            "name": "pool_name",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "线程池状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取指定线程池状态",
+        "tags": [
+          "并发管理"
+        ]
+      }
+    },
+    "/concurrent/pools/:pool_name/scale": {
+      "post": {
+        "description": "调整线程池的大小",
+        "parameters": [
+          {
+            "description": "线程池名称",
+            "in": "path",
+            "name": "pool_name",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "扩缩容成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "扩缩容线程池",
+        "tags": [
+          "并发管理"
+        ]
+      }
+    },
+    "/concurrent/task-queue": {
+      "get": {
+        "description": "获取任务队列的状态信息",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "任务队列状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取任务队列状态",
+        "tags": [
+          "并发管理"
+        ]
+      }
+    },
+    "/concurrent/tasks": {
+      "get": {
+        "description": "获取当前运行的任务列表",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "任务列表",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取任务列表",
+        "tags": [
+          "并发管理"
+        ]
+      }
+    },
+    "/dashboard": {
+      "get": {
+        "description": "获取系统概览和关键指标",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "仪表盘数据",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取仪表盘数据",
+        "tags": [
+          "仪表盘"
+        ]
+      }
+    },
+    "/dashboard/db-health": {
+      "get": {
+        "description": "检查数据库连接状态和性能",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "数据库健康状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "数据库健康检查",
+        "tags": [
+          "仪表盘"
+        ]
+      }
+    },
+    "/emergency/history": {
+      "get": {
+        "description": "获取紧急停止的历史记录",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "紧急停止历史",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取紧急停止历史",
+        "tags": [
+          "紧急停止"
+        ]
+      }
+    },
+    "/emergency/reset": {
+      "post": {
+        "description": "重置系统的紧急停止状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "重置成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "重置紧急停止状态",
+        "tags": [
+          "紧急停止"
+        ]
+      }
+    },
+    "/emergency/status": {
+      "get": {
+        "description": "获取系统紧急停止的状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "紧急停止状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取紧急停止状态",
+        "tags": [
+          "紧急停止"
+        ]
+      }
+    },
+    "/emergency/stop-all": {
+      "post": {
+        "description": "立即停止所有运行中的策略",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "紧急停止成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "紧急停止所有策略",
+        "tags": [
+          "紧急停止"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "description": "检查系统基础健康状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "健康状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "summary": "基础健康检查",
+        "tags": [
+          "基础API"
+        ]
+      }
+    },
+    "/health/checks": {
+      "get": {
+        "description": "获取所有健康检查项目的状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "健康检查列表",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取健康检查列表",
+        "tags": [
+          "系统稳定性"
+        ]
+      }
+    },
+    "/health/checks/:name": {
+      "get": {
+        "description": "获取指定健康检查项目的详细状态",
+        "parameters": [
+          {
+            "description": "健康检查名称",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "健康检查详情",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取指定健康检查",
+        "tags": [
+          "系统稳定性"
+        ]
+      }
+    },
+    "/health/checks/:name/force": {
+      "post": {
+        "description": "强制执行指定的健康检查",
+        "parameters": [
+          {
+            "description": "健康检查名称",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "检查执行成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "强制执行健康检查",
+        "tags": [
+          "系统稳定性"
+        ]
+      }
+    },
+    "/health/detailed": {
+      "get": {
+        "description": "检查系统详细健康状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "详细健康状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "summary": "详细健康检查",
+        "tags": [
+          "基础API"
+        ]
+      }
+    },
+    "/health/status": {
+      "get": {
+        "description": "获取系统整体健康状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "健康状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取健康状态",
+        "tags": [
+          "系统稳定性"
+        ]
+      }
+    },
+    "/hotlist/approve": {
+      "post": {
+        "description": "批准热点符号进入交易",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "批准成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "批准热点符号",
+        "tags": [
+          "热点管理"
+        ]
+      }
+    },
+    "/hotlist/symbols": {
+      "get": {
+        "description": "获取当前热点交易符号列表",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "热点符号列表",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取热点符号",
+        "tags": [
+          "热点管理"
+        ]
+      }
+    },
+    "/hotlist/whitelist": {
+      "get": {
+        "description": "获取交易白名单",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "白名单",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取白名单",
+        "tags": [
+          "热点管理"
+        ]
+      }
+    },
+    "/hotlist/whitelist/:symbol": {
+      "delete": {
+        "description": "从白名单中移除符号",
+        "parameters": [
+          {
+            "description": "交易符号",
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "移除成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "从白名单移除",
+        "tags": [
+          "热点管理"
+        ]
+      },
+      "post": {
+        "description": "将符号添加到白名单",
+        "parameters": [
+          {
+            "description": "交易符号",
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "添加成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "添加到白名单",
+        "tags": [
+          "热点管理"
+        ]
+      }
+    },
+    "/hotlist/whitelist/{symbol}": {
+      "delete": {
+        "description": "从白名单中移除符号",
+        "parameters": [
+          {
+            "description": "交易符号",
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "移除成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "从白名单移除",
+        "tags": [
+          "热点管理"
+        ]
+      },
+      "post": {
+        "description": "将符号添加到白名单",
+        "parameters": [
+          {
+            "description": "交易符号",
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "添加成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "添加到白名单",
+        "tags": [
+          "热点管理"
+        ]
+      }
+    },
+    "/market/data": {
+      "get": {
+        "description": "获取实时市场数据",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "市场数据",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取市场数据",
+        "tags": [
+          "市场数据"
+        ]
+      }
+    },
+    "/memory/gc": {
+      "post": {
+        "description": "手动触发垃圾回收",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "垃圾回收完成",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "执行垃圾回收",
+        "tags": [
+          "系统稳定性"
+        ]
+      }
+    },
+    "/memory/stats": {
+      "get": {
+        "description": "获取系统内存使用统计信息",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "内存统计",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取内存统计",
+        "tags": [
+          "系统稳定性"
+        ]
+      }
+    },
+    "/metrics/performance": {
+      "get": {
+        "description": "获取系统性能指标",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "性能指标",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取性能指标",
+        "tags": [
+          "系统指标"
+        ]
+      }
+    },
+    "/metrics/strategy/:id": {
+      "get": {
+        "description": "获取特定策略的性能指标",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略指标",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取策略指标",
+        "tags": [
+          "系统指标"
+        ]
+      }
+    },
+    "/metrics/system": {
+      "get": {
+        "description": "获取系统性能指标",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "系统指标",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取系统指标",
+        "tags": [
+          "系统指标"
+        ]
+      }
+    },
+    "/network/connections": {
+      "get": {
+        "description": "获取系统网络连接状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "网络连接状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取网络连接",
+        "tags": [
+          "系统稳定性"
+        ]
+      }
+    },
+    "/network/connections/:id": {
+      "get": {
+        "description": "获取指定网络连接的详细信息",
+        "parameters": [
+          {
+            "description": "连接ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "连接详情",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取指定连接详情",
+        "tags": [
+          "系统稳定性"
+        ]
+      }
+    },
+    "/network/connections/:id/reconnect": {
+      "post": {
+        "description": "重新建立指定的网络连接",
+        "parameters": [
+          {
+            "description": "连接ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "重连成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "重新连接",
+        "tags": [
+          "系统稳定性"
+        ]
+      }
+    },
+    "/optimizer/results/:id": {
+      "get": {
+        "description": "获取优化任务的结果",
+        "parameters": [
+          {
+            "description": "任务ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "优化结果",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取优化结果",
+        "tags": [
+          "策略优化"
+        ]
+      }
+    },
+    "/optimizer/run": {
+      "post": {
+        "description": "启动策略参数优化任务",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "优化任务启动成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "运行优化任务",
+        "tags": [
+          "策略优化"
+        ]
+      }
+    },
+    "/optimizer/tasks": {
+      "get": {
+        "description": "获取所有优化任务的状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "优化任务列表",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取优化任务列表",
+        "tags": [
+          "策略优化"
+        ]
+      }
+    },
+    "/optimizer/tasks/:id": {
+      "get": {
+        "description": "获取指定优化任务的详细信息",
+        "parameters": [
+          {
+            "description": "任务ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "优化任务详情",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取优化任务详情",
+        "tags": [
+          "策略优化"
+        ]
+      }
+    },
+    "/orchestrator/health": {
+      "get": {
+        "description": "检查编排器的健康状况",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "编排器健康状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "编排器健康检查",
+        "tags": [
+          "系统编排"
+        ]
+      }
+    },
+    "/orchestrator/optimize": {
+      "post": {
+        "description": "执行系统优化操作",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "优化成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "优化系统",
+        "tags": [
+          "系统编排"
+        ]
+      }
+    },
+    "/orchestrator/services": {
+      "get": {
+        "description": "获取系统中所有服务的状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "服务列表",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取服务列表",
+        "tags": [
+          "系统编排"
+        ]
+      }
+    },
+    "/orchestrator/services/restart": {
+      "post": {
+        "description": "重启指定的系统服务",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "服务重启成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "重启服务",
+        "tags": [
+          "系统编排"
+        ]
+      }
+    },
+    "/orchestrator/services/start": {
+      "post": {
+        "description": "启动指定的系统服务",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "服务启动成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "启动服务",
+        "tags": [
+          "系统编排"
+        ]
+      }
+    },
+    "/orchestrator/services/stop": {
+      "post": {
+        "description": "停止指定的系统服务",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "服务停止成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "停止服务",
+        "tags": [
+          "系统编排"
+        ]
+      }
+    },
+    "/orchestrator/status": {
+      "get": {
+        "description": "获取系统编排器的运行状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "编排器状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取编排器状态",
+        "tags": [
+          "系统编排"
+        ]
+      }
+    },
+    "/portfolio/allocations": {
+      "get": {
+        "description": "获取投资组合的资产配置信息",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "资产配置信息",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取资产配置",
+        "tags": [
+          "投资组合"
+        ]
+      }
+    },
+    "/portfolio/history": {
+      "get": {
+        "description": "获取投资组合的历史记录",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "投资组合历史",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取投资组合历史",
+        "tags": [
+          "投资组合"
+        ]
+      }
+    },
+    "/portfolio/overview": {
+      "get": {
+        "description": "获取投资组合的整体状态和统计信息",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "投资组合概览",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取投资组合概览",
+        "tags": [
+          "投资组合"
+        ]
+      }
+    },
+    "/portfolio/performance": {
+      "get": {
+        "description": "获取投资组合的历史表现数据",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "投资组合表现",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取投资组合表现",
+        "tags": [
+          "投资组合"
+        ]
+      }
+    },
+    "/portfolio/rebalance": {
+      "post": {
+        "description": "执行投资组合重新平衡操作",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "重新平衡成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "重新平衡投资组合",
+        "tags": [
+          "投资组合"
+        ]
+      }
+    },
+    "/risk/circuit-breakers": {
+      "get": {
+        "description": "获取系统熔断器的状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "熔断器状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取熔断器状态",
+        "tags": [
+          "风险管理"
+        ]
+      }
+    },
+    "/risk/limits": {
+      "get": {
+        "description": "获取当前的风险限制设置",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "风险限制",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取风险限制",
+        "tags": [
+          "风险管理"
+        ]
+      }
+    },
+    "/risk/overview": {
+      "get": {
+        "description": "获取系统风险管理的整体状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "风险概览",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取风险概览",
+        "tags": [
+          "风险管理"
+        ]
+      }
+    },
+    "/risk/violations": {
+      "get": {
+        "description": "获取风险违规记录",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "风险违规记录",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取风险违规",
+        "tags": [
+          "风险管理"
+        ]
+      }
+    },
+    "/settings": {
+      "get": {
+        "description": "获取当前系统配置设置",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "系统设置",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "summary": "获取系统设置",
+        "tags": [
+          "系统设置"
+        ]
+      },
+      "put": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "更新系统配置设置",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "summary": "更新系统设置",
+        "tags": [
+          "系统设置"
+        ]
+      }
+    },
+    "/share-result": {
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "分享分析结果",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "201": {
+            "description": "分享成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "分享结果",
+        "tags": [
+          "结果分享"
+        ]
+      }
+    },
+    "/shared-results": {
+      "get": {
+        "description": "获取共享的分析结果",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "分享结果",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取分享结果",
+        "tags": [
+          "结果分享"
+        ]
+      }
+    },
+    "/shutdown/force": {
+      "post": {
+        "description": "执行系统强制关闭",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "强制关闭启动成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "强制关闭",
+        "tags": [
+          "系统稳定性"
+        ]
+      }
+    },
+    "/shutdown/graceful": {
+      "post": {
+        "description": "执行系统优雅关闭",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "关闭启动成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "优雅关闭",
+        "tags": [
+          "系统稳定性"
+        ]
+      }
+    },
+    "/shutdown/status": {
+      "get": {
+        "description": "获取系统关闭状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "关闭状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取关闭状态",
+        "tags": [
+          "系统稳定性"
+        ]
+      }
+    },
+    "/strategy": {
+      "get": {
+        "description": "获取所有交易策略的列表",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略列表",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取策略列表",
+        "tags": [
+          "策略管理"
+        ]
+      },
+      "post": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "创建一个新的交易策略",
+        "parameters": [
+          {
+            "description": "策略信息",
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "properties": {
+                "config": {
+                  "type": "object"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "type"
+              ],
+              "type": "object"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "201": {
+            "description": "策略创建成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "创建新策略",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/:id": {
+      "get": {
+        "description": "获取指定策略的详细信息",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略详情",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取策略详情",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/:id/auto-start": {
+      "post": {
+        "description": "为指定策略设置自动启动",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "设置成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "设置策略自动启动",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/:id/backtest": {
+      "post": {
+        "description": "对指定策略进行回测",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "回测启动成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "策略回测",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/:id/promote": {
+      "post": {
+        "description": "将策略提升到生产环境",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略提升成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "策略提升",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/:id/start": {
+      "post": {
+        "description": "启动指定的交易策略",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略启动成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "启动策略",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/:id/stop": {
+      "post": {
+        "description": "停止指定的交易策略",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略停止成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "停止策略",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/execution/overview": {
+      "get": {
+        "description": "获取策略执行的整体状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略执行概览",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取策略执行概览",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/execution/realtime": {
+      "get": {
+        "description": "获取策略的实时执行状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "实时执行状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取实时执行状态",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/pool/overview": {
+      "get": {
+        "description": "获取策略池的整体状态和统计信息",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略池概览",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取策略池概览",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/workflow/status": {
+      "get": {
+        "description": "获取策略工作流的运行状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "工作流状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取工作流状态",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/{id}": {
+      "delete": {
+        "description": "删除指定的策略",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略删除成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "删除策略",
+        "tags": [
+          "策略管理"
+        ]
+      },
+      "get": {
+        "description": "根据ID获取特定策略的详细信息",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略详情",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          },
+          "404": {
+            "description": "策略不存在",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取策略详情",
+        "tags": [
+          "策略管理"
+        ]
+      },
+      "put": {
+        "consumes": [
+          "application/json"
+        ],
+        "description": "更新指定策略的配置",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "description": "更新的策略信息",
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "properties": {
+                "config": {
+                  "type": "object"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略更新成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "更新策略",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/{id}/auto-start": {
+      "post": {
+        "description": "为指定策略设置自动启动",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "设置成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "设置策略自动启动",
+        "tags": [
+          "自动启动"
+        ]
+      }
+    },
+    "/strategy/{id}/backtest": {
+      "post": {
+        "description": "对指定策略进行回测",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "回测启动成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "策略回测",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/{id}/promote": {
+      "post": {
+        "description": "将策略提升到生产环境",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略提升成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "策略提升",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/{id}/start": {
+      "post": {
+        "description": "启动指定的交易策略",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略启动成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "启动策略",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/strategy/{id}/stop": {
+      "post": {
+        "description": "停止指定的交易策略",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略停止成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "停止策略",
+        "tags": [
+          "策略管理"
+        ]
+      }
+    },
+    "/trading/activity": {
+      "get": {
+        "description": "获取当前的交易活动信息",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "交易活动",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取交易活动",
+        "tags": [
+          "交易管理"
+        ]
+      }
+    },
+    "/trading/history": {
+      "get": {
+        "description": "获取历史交易记录",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "交易历史",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取交易历史",
+        "tags": [
+          "交易管理"
+        ]
+      }
+    },
+    "/trading/positions": {
+      "get": {
+        "description": "获取当前的持仓信息",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "持仓信息",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取持仓信息",
+        "tags": [
+          "交易管理"
+        ]
+      }
+    },
+    "/validation/automation": {
+      "get": {
+        "description": "获取策略验证自动化的状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "自动化状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取自动化状态",
+        "tags": [
+          "策略验证"
+        ]
+      }
+    },
+    "/validation/problems": {
+      "get": {
+        "description": "获取策略验证发现的问题",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略问题列表",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取策略问题",
+        "tags": [
+          "策略验证"
+        ]
+      }
+    },
+    "/validation/strategies": {
+      "get": {
+        "description": "获取策略验证的状态信息",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "策略验证状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取策略验证状态",
+        "tags": [
+          "策略验证"
+        ]
+      }
+    },
+    "/workflow/dependency-graph": {
+      "get": {
+        "description": "获取工作流的依赖关系图",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "依赖图",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取依赖图",
+        "tags": [
+          "工作流"
+        ]
+      }
+    },
+    "/workflow/enabled": {
+      "get": {
+        "description": "获取工作流中启用的功能列表",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "启用的功能",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取启用的功能",
+        "tags": [
+          "工作流"
+        ]
+      }
+    },
+    "/workflow/execute": {
+      "post": {
+        "description": "执行指定的工作流",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "执行成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "执行工作流",
+        "tags": [
+          "工作流"
+        ]
+      }
+    },
+    "/workflow/functions/:function_id": {
+      "get": {
+        "description": "获取指定工作流函数的信息",
+        "parameters": [
+          {
+            "description": "函数ID",
+            "in": "path",
+            "name": "function_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "函数信息",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取工作流函数",
+        "tags": [
+          "工作流"
+        ]
+      }
+    },
+    "/workflow/functions/:function_id/disable": {
+      "post": {
+        "description": "禁用指定的工作流函数",
+        "parameters": [
+          {
+            "description": "函数ID",
+            "in": "path",
+            "name": "function_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "禁用成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "禁用工作流函数",
+        "tags": [
+          "工作流"
+        ]
+      }
+    },
+    "/workflow/functions/:function_id/enable": {
+      "post": {
+        "description": "启用指定的工作流函数",
+        "parameters": [
+          {
+            "description": "函数ID",
+            "in": "path",
+            "name": "function_id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "启用成功",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "启用工作流函数",
+        "tags": [
+          "工作流"
+        ]
+      }
+    },
+    "/workflow/results": {
+      "get": {
+        "description": "获取工作流的执行结果",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "执行结果",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取执行结果",
+        "tags": [
+          "工作流"
+        ]
+      }
+    },
+    "/workflow/status": {
+      "get": {
+        "description": "获取工作流系统的运行状态",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "工作流状态",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "获取工作流状态",
+        "tags": [
+          "工作流"
+        ]
+      }
+    },
+    "/workflow/validate": {
+      "get": {
+        "description": "验证工作流配置的正确性",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "200": {
+            "description": "验证结果",
+            "schema": {
+              "$ref": "#/definitions/Response"
+            }
+          }
+        },
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "summary": "工作流验证",
+        "tags": [
+          "工作流"
+        ]
+      }
+    },
+    "/ws/alerts": {
+      "get": {
+        "description": "订阅系统告警信息",
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "101": {
+            "description": "WebSocket连接建立"
+          }
+        },
+        "summary": "告警数据流",
+        "tags": [
+          "WebSocket"
+        ]
+      }
+    },
+    "/ws/market/:symbol": {
+      "get": {
+        "description": "订阅特定符号的实时市场数据",
+        "parameters": [
+          {
+            "description": "交易符号",
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "101": {
+            "description": "WebSocket连接建立"
+          }
+        },
+        "summary": "市场数据流",
+        "tags": [
+          "WebSocket"
+        ]
+      }
+    },
+    "/ws/strategy/:id": {
+      "get": {
+        "description": "订阅特定策略的实时数据",
+        "parameters": [
+          {
+            "description": "策略ID",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "responses": {
+          "101": {
+            "description": "WebSocket连接建立"
+          }
+        },
+        "summary": "策略数据流",
+        "tags": [
+          "WebSocket"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "Response": {
+      "properties": {
+        "data": {
+          "type": "object"
+        },
+        "error": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "securityDefinitions": {
+    "BearerAuth": {
+      "description": "Type 'Bearer' followed by a space and JWT token.",
+      "in": "header",
+      "name": "Authorization",
+      "type": "apiKey"
+    }
+  }
 }
