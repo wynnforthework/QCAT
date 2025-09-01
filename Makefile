@@ -180,19 +180,62 @@ config-decrypt:
 	$(GOBUILD) -o qcat-config -v ./cmd/config
 	./qcat-config -decrypt "$(TEXT)"
 
-# Start local development
+# Start local development (enhanced)
 start-local:
 	@echo "Starting local development environment..."
-	chmod +x scripts/start_local.sh
-	./scripts/start_local.sh
+	chmod +x scripts/start_local_improved.sh
+	./scripts/start_local_improved.sh
+
+# Development mode shortcuts
+dev:
+	@echo "Starting development mode..."
+	chmod +x scripts/start_local_improved.sh
+	./scripts/start_local_improved.sh --dev
+
+dev-api:
+	@echo "Starting API service only..."
+	chmod +x scripts/start_local_improved.sh
+	./scripts/start_local_improved.sh --services api --dev
+
+dev-frontend:
+	@echo "Starting frontend service only..."
+	chmod +x scripts/start_local_improved.sh
+	./scripts/start_local_improved.sh --services frontend --dev
+
+dev-optimizer:
+	@echo "Starting optimizer service only..."
+	chmod +x scripts/start_local_improved.sh
+	./scripts/start_local_improved.sh --services optimizer --dev
+
+# Production mode
+prod:
+	@echo "Starting production mode..."
+	chmod +x scripts/start_local_improved.sh
+	./scripts/start_local_improved.sh --production
+
+# Quick start (skip deps and build for faster iteration)
+quick-start:
+	@echo "Quick start (skip deps and build)..."
+	chmod +x scripts/start_local_improved.sh
+	./scripts/start_local_improved.sh --skip-deps --skip-build
+
+# Debug mode
+debug:
+	@echo "Starting with debug output..."
+	chmod +x scripts/start_local_improved.sh
+	./scripts/start_local_improved.sh --debug
 
 # Help
 help:
 	@echo "Available targets:"
+	@echo ""
+	@echo "Build & Clean:"
 	@echo "  build           - Build the application"
 	@echo "  build-linux     - Build for Linux"
 	@echo "  clean           - Clean build artifacts"
 	@echo "  deps            - Download dependencies"
+	@echo ""
+	@echo "Testing:"
 	@echo "  test            - Run unit and integration tests"
 	@echo "  test-unit       - Run unit tests"
 	@echo "  test-coverage   - Run unit tests with coverage"
@@ -202,21 +245,40 @@ help:
 	@echo "  test-all        - Run all tests"
 	@echo "  test-short      - Run tests in short mode"
 	@echo "  test-report     - Generate test report"
+	@echo ""
+	@echo "Code Quality:"
 	@echo "  lint            - Run linters"
 	@echo "  fmt             - Format code"
 	@echo "  vet             - Vet code"
 	@echo "  security        - Run security scan"
 	@echo "  quality         - Run all quality checks"
 	@echo "  install-tools   - Install development tools"
-	@echo "  dev-up          - Start development environment"
-	@echo "  dev-down        - Stop development environment"
+	@echo ""
+	@echo "Development Environment:"
+	@echo "  start-local     - Start local development environment (all services)"
+	@echo "  dev             - Start development mode (hot reload, debug)"
+	@echo "  dev-api         - Start API service only (dev mode)"
+	@echo "  dev-frontend    - Start frontend service only (dev mode)"
+	@echo "  dev-optimizer   - Start optimizer service only (dev mode)"
+	@echo "  prod            - Start production mode"
+	@echo "  quick-start     - Quick start (skip deps and build)"
+	@echo "  debug           - Start with debug output"
+	@echo ""
+	@echo "Docker Environment:"
+	@echo "  dev-up          - Start development environment (Docker)"
+	@echo "  dev-down        - Stop development environment (Docker)"
+	@echo ""
+	@echo "Database:"
 	@echo "  migrate-up      - Run database migrations"
 	@echo "  migrate-down    - Rollback database migrations"
 	@echo "  migrate-version - Show migration version"
-	@echo "  generate-mocks  - Generate mocks"
+	@echo ""
+	@echo "Configuration:"
 	@echo "  config-validate - Validate configuration"
 	@echo "  config-generate - Generate environment template"
 	@echo "  config-encrypt  - Encrypt string (TEXT=string)"
 	@echo "  config-decrypt  - Decrypt string (TEXT=string)"
-	@echo "  start-local     - Start local development environment"
+	@echo ""
+	@echo "Other:"
+	@echo "  generate-mocks  - Generate mocks"
 	@echo "  help            - Show this help"
