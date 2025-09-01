@@ -344,7 +344,8 @@ func (s *Scanner) calculateMetrics(ctx context.Context, symbol string) (*Metrics
 	var rates []float64
 	for _, rate := range funding {
 		rates = append(rates, rate.Rate)
-		if rate.NextTime.After(time.Now()) {
+		// 检查NextTime是否有效且在未来
+		if !rate.NextTime.IsZero() && rate.NextTime.After(time.Now()) {
 			metrics.FundingPredicted = rate.NextRate
 		}
 	}

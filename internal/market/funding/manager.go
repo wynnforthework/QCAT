@@ -121,9 +121,19 @@ func (m *Manager) GetHistory(ctx context.Context, symbol string, start, end time
 	var history []*Rate
 	for rows.Next() {
 		var h Rate
-		if err := rows.Scan(&h.Symbol, &h.Rate, &h.NextRate, &h.NextTime, &h.LastUpdated); err != nil {
+		var nextTime sql.NullTime
+		if err := rows.Scan(&h.Symbol, &h.Rate, &h.NextRate, &nextTime, &h.LastUpdated); err != nil {
 			return nil, fmt.Errorf("failed to scan funding rate: %w", err)
 		}
+
+		// 处理NULL的next_time
+		if nextTime.Valid {
+			h.NextTime = nextTime.Time
+		} else {
+			// 如果next_time为NULL，设置为当前时间加8小时（常见的资金费率周期）
+			h.NextTime = time.Now().Add(8 * time.Hour)
+		}
+
 		history = append(history, &h)
 	}
 

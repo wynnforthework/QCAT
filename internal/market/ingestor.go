@@ -607,15 +607,25 @@ func (i *Ingestor) GetFundingRates(ctx context.Context, symbol string, start, en
 	var rates []*FundingRate
 	for rows.Next() {
 		var r FundingRate
+		var nextTime sql.NullTime
 		if err := rows.Scan(
 			&r.Symbol,
 			&r.Rate,
 			&r.NextRate,
-			&r.NextTime,
+			&nextTime,
 			&r.LastUpdated,
 		); err != nil {
 			return nil, fmt.Errorf("failed to scan funding rate: %w", err)
 		}
+
+		// 处理NULL的next_time
+		if nextTime.Valid {
+			r.NextTime = nextTime.Time
+		} else {
+			// 如果next_time为NULL，设置为当前时间加8小时
+			r.NextTime = time.Now().Add(8 * time.Hour)
+		}
+
 		rates = append(rates, &r)
 	}
 

@@ -225,13 +225,22 @@ func (f *DBDataFeed) loadFundingRates(ctx context.Context, symbol string) error 
 
 	for rows.Next() {
 		var fr market.FundingRate
+		var nextTime sql.NullTime
 		if err := rows.Scan(
 			&fr.Rate,
 			&fr.NextRate,
-			&fr.NextTime,
+			&nextTime,
 			&fr.LastUpdated,
 		); err != nil {
 			return fmt.Errorf("failed to scan funding rate: %w", err)
+		}
+
+		// 处理NULL的next_time
+		if nextTime.Valid {
+			fr.NextTime = nextTime.Time
+		} else {
+			// 如果next_time为NULL，设置为当前时间加8小时
+			fr.NextTime = time.Now().Add(8 * time.Hour)
 		}
 
 		fr.Symbol = symbol
