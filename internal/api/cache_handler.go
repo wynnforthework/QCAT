@@ -22,6 +22,14 @@ func NewCacheHandler(cacheManager *cache.CacheManager) *CacheHandler {
 }
 
 // handleCacheStatus returns cache status and statistics
+// @Summary Get cache status
+// @Description Get current cache status and basic statistics
+// @Tags Cache
+// @Accept json
+// @Produce json
+// @Success 200 {object} object{status=string,stats=object}
+// @Failure 503 {object} object{error=string}
+// @Router /cache/status [get]
 func (h *CacheHandler) handleCacheStatus(c *gin.Context) {
 	if h.cacheManager == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -39,6 +47,14 @@ func (h *CacheHandler) handleCacheStatus(c *gin.Context) {
 }
 
 // handleCacheHealth returns comprehensive cache health information
+// @Summary Get cache health
+// @Description Get comprehensive cache health information and diagnostics
+// @Tags Cache
+// @Accept json
+// @Produce json
+// @Success 200 {object} object{status=string,health=object,diagnostics=object}
+// @Failure 503 {object} object{error=string}
+// @Router /cache/health [get]
 func (h *CacheHandler) handleCacheHealth(c *gin.Context) {
 	if h.cacheManager == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -104,6 +120,14 @@ func (h *CacheHandler) handleCacheHealth(c *gin.Context) {
 }
 
 // handleCacheMetrics returns detailed cache metrics
+// @Summary Get cache metrics
+// @Description Get detailed cache performance metrics and statistics
+// @Tags Cache
+// @Accept json
+// @Produce json
+// @Success 200 {object} object{metrics=object,performance=object,timestamp=string}
+// @Failure 503 {object} object{error=string}
+// @Router /cache/metrics [get]
 func (h *CacheHandler) handleCacheMetrics(c *gin.Context) {
 	if h.cacheManager == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -123,6 +147,14 @@ func (h *CacheHandler) handleCacheMetrics(c *gin.Context) {
 }
 
 // handleCacheEvents returns recent cache events
+// @Summary Get cache events
+// @Description Get recent cache events and activity logs
+// @Tags Cache
+// @Accept json
+// @Produce json
+// @Success 200 {object} object{events=[]object,count=integer,timestamp=string}
+// @Failure 503 {object} object{error=string}
+// @Router /cache/events [get]
 func (h *CacheHandler) handleCacheEvents(c *gin.Context) {
 	if h.cacheManager == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -148,6 +180,14 @@ func (h *CacheHandler) handleCacheEvents(c *gin.Context) {
 }
 
 // handleForceFallback forces cache fallback mode
+// @Summary Force cache fallback
+// @Description Force the cache system to enter fallback mode
+// @Tags Cache
+// @Accept json
+// @Produce json
+// @Success 200 {object} object{message=string,fallback_mode=boolean,reason=string}
+// @Failure 503 {object} object{error=string}
+// @Router /cache/fallback/force [post]
 func (h *CacheHandler) handleForceFallback(c *gin.Context) {
 	if h.cacheManager == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -185,6 +225,14 @@ func (h *CacheHandler) handleForceFallback(c *gin.Context) {
 }
 
 // handleResetCounters resets cache monitoring counters
+// @Summary Reset cache counters
+// @Description Reset all cache monitoring counters and statistics
+// @Tags Cache
+// @Accept json
+// @Produce json
+// @Success 200 {object} object{message=string,reset_time=string}
+// @Failure 503 {object} object{error=string}
+// @Router /cache/counters/reset [post]
 func (h *CacheHandler) handleResetCounters(c *gin.Context) {
 	if h.cacheManager == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -202,6 +250,14 @@ func (h *CacheHandler) handleResetCounters(c *gin.Context) {
 }
 
 // handleCacheConfig returns cache configuration
+// @Summary Get cache configuration
+// @Description Get current cache configuration and settings
+// @Tags Cache
+// @Accept json
+// @Produce json
+// @Success 200 {object} object{config=object,timestamp=string}
+// @Failure 503 {object} object{error=string}
+// @Router /cache/config [get]
 func (h *CacheHandler) handleCacheConfig(c *gin.Context) {
 	if h.cacheManager == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
@@ -218,6 +274,14 @@ func (h *CacheHandler) handleCacheConfig(c *gin.Context) {
 }
 
 // handleTestCache tests cache operations
+// @Summary Test cache operations
+// @Description Test cache operations including read, write, and delete
+// @Tags Cache
+// @Accept json
+// @Produce json
+// @Success 200 {object} object{test_results=object,status=string}
+// @Failure 503 {object} object{error=string}
+// @Router /cache/test [post]
 func (h *CacheHandler) handleTestCache(c *gin.Context) {
 	if h.cacheManager == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{

@@ -29,7 +29,7 @@ echo "📝 正在生成Swagger文档..."
 
 # 生成swagger文档
 swag init \
-    --generalInfo internal/api/docs.go \
+    --generalInfo cmd/qcat/main.go \
     --dir ./ \
     --output ./docs \
     --parseDependency \

@@ -58,6 +58,14 @@ func NewSettingsHandler() *SettingsHandler {
 }
 
 // GetSettings 获取当前设置
+// @Summary Get system settings
+// @Description Get current system settings and configuration
+// @Tags Settings
+// @Accept json
+// @Produce json
+// @Success 200 {object} Settings "Current system settings"
+// @Failure 500 {object} object{error=string}
+// @Router /settings [get]
 func (h *SettingsHandler) GetSettings(c *gin.Context) {
 	c.Header("Access-Control-Allow-Origin", "*")
 	c.JSON(http.StatusOK, h.currentSettings)
@@ -65,6 +73,16 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 }
 
 // UpdateSettings 更新设置
+// @Summary Update system settings
+// @Description Update system settings and configuration
+// @Tags Settings
+// @Accept json
+// @Produce json
+// @Param settings body Settings true "Updated settings"
+// @Success 200 {object} object{message=string,settings=Settings}
+// @Failure 400 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /settings [put]
 func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	// Handle CORS preflight
 	if c.Request.Method == http.MethodOptions {

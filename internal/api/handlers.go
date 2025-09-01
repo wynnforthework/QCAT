@@ -64,6 +64,16 @@ func NewOptimizerHandler(db *database.DB, redis cache.Cacher, metrics *monitor.M
 }
 
 // RunOptimization starts a new optimization task
+// @Summary Start optimization task
+// @Description Start a new parameter optimization task for a strategy
+// @Tags Optimizer
+// @Accept json
+// @Produce json
+// @Param request body object{strategy_id=string,method=string,params=object,objective=string} true "Optimization parameters"
+// @Success 200 {object} Response{data=object{task_id=string,status=string}}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /optimizer/run [post]
 func (h *OptimizerHandler) RunOptimization(c *gin.Context) {
 	var req struct {
 		StrategyID string                 `json:"strategy_id" binding:"required"`
@@ -118,6 +128,16 @@ func (h *OptimizerHandler) RunOptimization(c *gin.Context) {
 }
 
 // GetTasks returns optimization tasks
+// @Summary Get optimization tasks
+// @Description Get list of all optimization tasks with their status
+// @Tags Optimizer
+// @Accept json
+// @Produce json
+// @Param status query string false "Filter by task status"
+// @Param limit query int false "Limit number of results" default(50)
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /optimizer/tasks [get]
 func (h *OptimizerHandler) GetTasks(c *gin.Context) {
 	// 实现获取任务列表逻辑
 	ctx := c.Request.Context()
@@ -174,6 +194,16 @@ func (h *OptimizerHandler) GetTasks(c *gin.Context) {
 }
 
 // GetTask returns a specific optimization task
+// @Summary Get optimization task
+// @Description Get details of a specific optimization task by ID
+// @Tags Optimizer
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID"
+// @Success 200 {object} Response{data=object}
+// @Failure 404 {object} Response
+// @Failure 500 {object} Response
+// @Router /optimizer/tasks/{id} [get]
 func (h *OptimizerHandler) GetTask(c *gin.Context) {
 	taskID := c.Param("id")
 	ctx := c.Request.Context()
@@ -227,6 +257,16 @@ func (h *OptimizerHandler) GetTask(c *gin.Context) {
 }
 
 // GetResults returns optimization results
+// @Summary Get optimization results
+// @Description Get optimization results for a specific task
+// @Tags Optimizer
+// @Accept json
+// @Produce json
+// @Param id path string true "Task ID"
+// @Success 200 {object} Response{data=object{task_id=string,results=object,best_params=object,performance_metrics=object,overfitting_metrics=object}}
+// @Failure 404 {object} Response
+// @Failure 500 {object} Response
+// @Router /optimizer/tasks/{id}/results [get]
 func (h *OptimizerHandler) GetResults(c *gin.Context) {
 	taskID := c.Param("id")
 	ctx := c.Request.Context()
@@ -289,6 +329,17 @@ func NewStrategyHandler(db *database.DB, redis cache.Cacher, metrics *monitor.Me
 }
 
 // ListStrategies returns all strategies
+// @Summary List all strategies
+// @Description Get list of all trading strategies with their status and configuration
+// @Tags Strategy
+// @Accept json
+// @Produce json
+// @Param status query string false "Filter by strategy status"
+// @Param type query string false "Filter by strategy type"
+// @Param limit query int false "Limit number of results" default(50)
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /strategy [get]
 func (h *StrategyHandler) ListStrategies(c *gin.Context) {
 	// 检查数据库连接
 	if h.db == nil {
@@ -399,6 +450,16 @@ func (h *StrategyHandler) ListStrategies(c *gin.Context) {
 }
 
 // GetStrategy returns a specific strategy
+// @Summary Get strategy details
+// @Description Get detailed information about a specific trading strategy
+// @Tags Strategy
+// @Accept json
+// @Produce json
+// @Param id path string true "Strategy ID"
+// @Success 200 {object} Response{data=object}
+// @Failure 404 {object} Response
+// @Failure 500 {object} Response
+// @Router /strategy/{id} [get]
 func (h *StrategyHandler) GetStrategy(c *gin.Context) {
 	strategyID := c.Param("id")
 	ctx := c.Request.Context()
@@ -448,6 +509,16 @@ func (h *StrategyHandler) GetStrategy(c *gin.Context) {
 }
 
 // CreateStrategy creates a new strategy
+// @Summary Create new strategy
+// @Description Create a new trading strategy with specified configuration
+// @Tags Strategy
+// @Accept json
+// @Produce json
+// @Param request body object true "Strategy configuration"
+// @Success 201 {object} Response{data=object{strategy_id=string}}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /strategy [post]
 func (h *StrategyHandler) CreateStrategy(c *gin.Context) {
 	var req map[string]interface{}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -519,6 +590,18 @@ func (h *StrategyHandler) CreateStrategy(c *gin.Context) {
 }
 
 // UpdateStrategy updates a strategy
+// @Summary Update strategy
+// @Description Update configuration of an existing trading strategy
+// @Tags Strategy
+// @Accept json
+// @Produce json
+// @Param id path string true "Strategy ID"
+// @Param request body object true "Updated strategy configuration"
+// @Success 200 {object} Response{data=object{strategy_id=string}}
+// @Failure 400 {object} Response
+// @Failure 404 {object} Response
+// @Failure 500 {object} Response
+// @Router /strategy/{id} [put]
 func (h *StrategyHandler) UpdateStrategy(c *gin.Context) {
 	strategyID := c.Param("id")
 	var req map[string]interface{}
@@ -572,6 +655,16 @@ func (h *StrategyHandler) UpdateStrategy(c *gin.Context) {
 }
 
 // DeleteStrategy deletes a strategy
+// @Summary Delete strategy
+// @Description Delete a trading strategy permanently
+// @Tags Strategy
+// @Accept json
+// @Produce json
+// @Param id path string true "Strategy ID"
+// @Success 200 {object} Response
+// @Failure 404 {object} Response
+// @Failure 500 {object} Response
+// @Router /strategy/{id} [delete]
 func (h *StrategyHandler) DeleteStrategy(c *gin.Context) {
 	strategyID := c.Param("id")
 	ctx := c.Request.Context()
@@ -604,6 +697,18 @@ func (h *StrategyHandler) DeleteStrategy(c *gin.Context) {
 }
 
 // PromoteStrategy promotes a strategy version
+// @Summary Promote strategy version
+// @Description Promote a strategy version to a higher stage (dev -> test -> prod)
+// @Tags Strategy
+// @Accept json
+// @Produce json
+// @Param id path string true "Strategy ID"
+// @Param request body object{version_id=string,stage=string} true "Promotion details"
+// @Success 200 {object} Response{data=object{strategy_id=string,version_id=string,stage=string}}
+// @Failure 400 {object} Response
+// @Failure 404 {object} Response
+// @Failure 500 {object} Response
+// @Router /strategy/{id}/promote [post]
 func (h *StrategyHandler) PromoteStrategy(c *gin.Context) {
 	strategyID := c.Param("id")
 	var req struct {
@@ -664,6 +769,18 @@ func (h *StrategyHandler) PromoteStrategy(c *gin.Context) {
 }
 
 // StartStrategy starts a strategy with mandatory validation
+// @Summary Start strategy
+// @Description Start a trading strategy after mandatory validation checks
+// @Tags Strategy
+// @Accept json
+// @Produce json
+// @Param id path string true "Strategy ID"
+// @Success 200 {object} Response{data=object{strategy_id=string,status=string,validation_result=object}}
+// @Failure 400 {object} Response
+// @Failure 403 {object} Response "Strategy failed validation"
+// @Failure 404 {object} Response
+// @Failure 500 {object} Response
+// @Router /strategy/{id}/start [post]
 func (h *StrategyHandler) StartStrategy(c *gin.Context) {
 	strategyID := c.Param("id")
 	ctx := c.Request.Context()
@@ -749,6 +866,16 @@ func (h *StrategyHandler) StartStrategy(c *gin.Context) {
 }
 
 // StopStrategy stops a strategy
+// @Summary Stop strategy
+// @Description Stop a running trading strategy
+// @Tags Strategy
+// @Accept json
+// @Produce json
+// @Param id path string true "Strategy ID"
+// @Success 200 {object} Response{data=object{strategy_id=string,status=string}}
+// @Failure 404 {object} Response
+// @Failure 500 {object} Response
+// @Router /strategy/{id}/stop [post]
 func (h *StrategyHandler) StopStrategy(c *gin.Context) {
 	strategyID := c.Param("id")
 	ctx := c.Request.Context()
@@ -795,6 +922,18 @@ func (h *StrategyHandler) StopStrategy(c *gin.Context) {
 }
 
 // RunBacktest runs a backtest for a strategy
+// @Summary Run strategy backtest
+// @Description Run historical backtesting for a trading strategy
+// @Tags Strategy
+// @Accept json
+// @Produce json
+// @Param id path string true "Strategy ID"
+// @Param request body object true "Backtest parameters (start_date, end_date, initial_capital, etc.)"
+// @Success 200 {object} Response{data=object{backtest_id=string,status=string}}
+// @Failure 400 {object} Response
+// @Failure 404 {object} Response
+// @Failure 500 {object} Response
+// @Router /strategy/{id}/backtest [post]
 func (h *StrategyHandler) RunBacktest(c *gin.Context) {
 	strategyID := c.Param("id")
 	var req map[string]interface{}
@@ -865,6 +1004,14 @@ func NewPortfolioHandler(db *database.DB, redis cache.Cacher, metrics *monitor.M
 }
 
 // GetOverview returns portfolio overview
+// @Summary Get portfolio overview
+// @Description Get comprehensive portfolio overview including total value, allocations, and performance
+// @Tags Portfolio
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object{total_value=number,total_pnl=number,allocations=[]object,performance=object}}
+// @Failure 500 {object} Response
+// @Router /portfolio/overview [get]
 func (h *PortfolioHandler) GetOverview(c *gin.Context) {
 	// 实现投资组合概览逻辑
 	ctx := c.Request.Context()
@@ -927,6 +1074,14 @@ func (h *PortfolioHandler) GetOverview(c *gin.Context) {
 }
 
 // GetAllocations returns portfolio allocations
+// @Summary Get portfolio allocations
+// @Description Get detailed portfolio allocations across different strategies and assets
+// @Tags Portfolio
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /portfolio/allocations [get]
 func (h *PortfolioHandler) GetAllocations(c *gin.Context) {
 	// 实现获取投资组合分配逻辑
 	ctx := c.Request.Context()
@@ -991,6 +1146,16 @@ func (h *PortfolioHandler) GetAllocations(c *gin.Context) {
 }
 
 // Rebalance triggers portfolio rebalancing
+// @Summary Trigger portfolio rebalancing
+// @Description Trigger automatic or manual portfolio rebalancing based on target allocations
+// @Tags Portfolio
+// @Accept json
+// @Produce json
+// @Param request body object{mode=string} true "Rebalancing mode (auto/manual)"
+// @Success 200 {object} Response{data=object{rebalance_id=string,status=string,changes=[]object}}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /portfolio/rebalance [post]
 func (h *PortfolioHandler) Rebalance(c *gin.Context) {
 	var req struct {
 		Mode string `json:"mode"`
@@ -1049,6 +1214,18 @@ func (h *PortfolioHandler) Rebalance(c *gin.Context) {
 }
 
 // GetHistory returns portfolio history
+// @Summary Get portfolio history
+// @Description Get historical portfolio performance data over a specified time period
+// @Tags Portfolio
+// @Accept json
+// @Produce json
+// @Param start_date query string false "Start date (YYYY-MM-DD)"
+// @Param end_date query string false "End date (YYYY-MM-DD)"
+// @Param interval query string false "Data interval (1h, 1d, 1w)" default(1d)
+// @Success 200 {object} Response{data=[]object}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /portfolio/history [get]
 func (h *PortfolioHandler) GetHistory(c *gin.Context) {
 	// 实现获取投资组合历史逻辑
 	ctx := c.Request.Context()
@@ -1132,6 +1309,16 @@ func (h *PortfolioHandler) GetHistory(c *gin.Context) {
 }
 
 // GetPerformance returns portfolio performance metrics
+// @Summary Get portfolio performance metrics
+// @Description Get detailed portfolio performance metrics including returns, volatility, and risk metrics
+// @Tags Portfolio
+// @Accept json
+// @Produce json
+// @Param period query string false "Performance period (7d, 30d, 90d, 1y)" default(30d)
+// @Success 200 {object} Response{data=object{total_return=number,annualized_return=number,volatility=number,sharpe_ratio=number,max_drawdown=number}}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /portfolio/performance [get]
 func (h *PortfolioHandler) GetPerformance(c *gin.Context) {
 	// 实现获取投资组合性能指标逻辑
 	ctx := c.Request.Context()
@@ -1259,6 +1446,14 @@ func NewRiskHandler(db *database.DB, redis cache.Cacher, metrics *monitor.Metric
 }
 
 // GetOverview returns risk overview
+// @Summary Get risk overview
+// @Description Get comprehensive risk management overview including current exposure and limits
+// @Tags Risk
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object{total_exposure=number,risk_score=number,violations=[]object,limits=object}}
+// @Failure 500 {object} Response
+// @Router /risk/overview [get]
 func (h *RiskHandler) GetOverview(c *gin.Context) {
 	// 实现风控概览逻辑
 	ctx := c.Request.Context()
@@ -1326,6 +1521,14 @@ func (h *RiskHandler) GetOverview(c *gin.Context) {
 }
 
 // GetLimits returns risk limits
+// @Summary Get risk limits
+// @Description Get current risk limits and thresholds for trading operations
+// @Tags Risk
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /risk/limits [get]
 func (h *RiskHandler) GetLimits(c *gin.Context) {
 	// 实现获取风控限额逻辑
 	ctx := c.Request.Context()
@@ -1386,6 +1589,16 @@ func (h *RiskHandler) GetLimits(c *gin.Context) {
 }
 
 // SetLimits sets risk limits
+// @Summary Set risk limits
+// @Description Update risk limits and thresholds for trading operations
+// @Tags Risk
+// @Accept json
+// @Produce json
+// @Param request body object true "Risk limits configuration"
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /risk/limits [put]
 func (h *RiskHandler) SetLimits(c *gin.Context) {
 	var req map[string]interface{}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -1451,6 +1664,14 @@ func (h *RiskHandler) SetLimits(c *gin.Context) {
 }
 
 // GetCircuitBreakers returns circuit breakers
+// @Summary Get circuit breakers
+// @Description Get current circuit breaker status and configuration
+// @Tags Risk
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /risk/circuit-breakers [get]
 func (h *RiskHandler) GetCircuitBreakers(c *gin.Context) {
 	// 实现获取熔断器逻辑
 	ctx := c.Request.Context()
@@ -1514,6 +1735,16 @@ func (h *RiskHandler) GetCircuitBreakers(c *gin.Context) {
 }
 
 // SetCircuitBreakers sets circuit breakers
+// @Summary Set circuit breakers
+// @Description Configure circuit breakers for risk management
+// @Tags Risk
+// @Accept json
+// @Produce json
+// @Param request body object true "Circuit breaker configuration"
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /risk/circuit-breakers [put]
 func (h *RiskHandler) SetCircuitBreakers(c *gin.Context) {
 	var req map[string]interface{}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -1578,6 +1809,18 @@ func (h *RiskHandler) SetCircuitBreakers(c *gin.Context) {
 }
 
 // GetViolations returns risk violations
+// @Summary Get risk violations
+// @Description Get list of risk violations and breaches over a specified time period
+// @Tags Risk
+// @Accept json
+// @Produce json
+// @Param start_date query string false "Start date (YYYY-MM-DD)"
+// @Param end_date query string false "End date (YYYY-MM-DD)"
+// @Param severity query string false "Filter by violation severity"
+// @Success 200 {object} Response{data=[]object}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /risk/violations [get]
 func (h *RiskHandler) GetViolations(c *gin.Context) {
 	// 实现获取风控违规逻辑
 	ctx := c.Request.Context()
@@ -1683,6 +1926,16 @@ func NewHotlistHandler(db *database.DB, redis cache.Cacher, metrics *monitor.Met
 }
 
 // GetHotSymbols returns hot symbols
+// @Summary Get hot symbols
+// @Description Get list of currently hot trading symbols based on market activity
+// @Tags Hotlist
+// @Accept json
+// @Produce json
+// @Param limit query int false "Limit number of results" default(50)
+// @Param sort_by query string false "Sort by field (volume, price_change, activity)" default(volume)
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /hotlist/symbols [get]
 func (h *HotlistHandler) GetHotSymbols(c *gin.Context) {
 	// 实现获取热门币种逻辑
 	ctx := c.Request.Context()
@@ -1755,6 +2008,16 @@ func (h *HotlistHandler) GetHotSymbols(c *gin.Context) {
 }
 
 // ApproveSymbol approves a symbol for trading
+// @Summary Approve symbol for trading
+// @Description Approve a trading symbol and add it to the approved list
+// @Tags Hotlist
+// @Accept json
+// @Produce json
+// @Param request body object{symbol=string} true "Symbol to approve"
+// @Success 200 {object} Response{data=object{symbol=string,status=string}}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /hotlist/approve [post]
 func (h *HotlistHandler) ApproveSymbol(c *gin.Context) {
 	var req struct {
 		Symbol string `json:"symbol" binding:"required"`
@@ -1827,6 +2090,14 @@ func (h *HotlistHandler) ApproveSymbol(c *gin.Context) {
 }
 
 // GetWhitelist returns whitelist
+// @Summary Get trading whitelist
+// @Description Get list of symbols approved for trading (whitelist)
+// @Tags Hotlist
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /hotlist/whitelist [get]
 func (h *HotlistHandler) GetWhitelist(c *gin.Context) {
 	// 实现获取白名单逻辑
 	ctx := c.Request.Context()
@@ -1887,6 +2158,16 @@ func (h *HotlistHandler) GetWhitelist(c *gin.Context) {
 }
 
 // AddToWhitelist adds a symbol to whitelist
+// @Summary Add symbol to whitelist
+// @Description Add a trading symbol to the approved whitelist
+// @Tags Hotlist
+// @Accept json
+// @Produce json
+// @Param request body object{symbol=string} true "Symbol to add to whitelist"
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /hotlist/whitelist [post]
 func (h *HotlistHandler) AddToWhitelist(c *gin.Context) {
 	var req struct {
 		Symbol string `json:"symbol" binding:"required"`
@@ -1952,6 +2233,16 @@ func (h *HotlistHandler) AddToWhitelist(c *gin.Context) {
 }
 
 // RemoveFromWhitelist removes a symbol from whitelist
+// @Summary Remove symbol from whitelist
+// @Description Remove a trading symbol from the approved whitelist
+// @Tags Hotlist
+// @Accept json
+// @Produce json
+// @Param symbol path string true "Symbol to remove from whitelist"
+// @Success 200 {object} Response
+// @Failure 404 {object} Response
+// @Failure 500 {object} Response
+// @Router /hotlist/whitelist/{symbol} [delete]
 func (h *HotlistHandler) RemoveFromWhitelist(c *gin.Context) {
 	symbol := c.Param("symbol")
 	ctx := c.Request.Context()
@@ -2003,6 +2294,16 @@ func NewMetricsHandler(db *database.DB, metrics *monitor.MetricsCollector) *Metr
 }
 
 // GetStrategyMetrics returns strategy metrics
+// @Summary Get strategy metrics
+// @Description Get performance metrics for a specific trading strategy
+// @Tags Metrics
+// @Accept json
+// @Produce json
+// @Param id path string true "Strategy ID"
+// @Success 200 {object} Response{data=object{strategy_id=string,performance=object,risk_metrics=object,execution_stats=object}}
+// @Failure 404 {object} Response
+// @Failure 500 {object} Response
+// @Router /metrics/strategy/{id} [get]
 func (h *MetricsHandler) GetStrategyMetrics(c *gin.Context) {
 	strategyID := c.Param("id")
 	ctx := c.Request.Context()
@@ -2087,6 +2388,14 @@ func (h *MetricsHandler) GetStrategyMetrics(c *gin.Context) {
 }
 
 // GetSystemMetrics returns system metrics
+// @Summary Get system metrics
+// @Description Get system-level performance metrics including CPU, memory, and disk usage
+// @Tags Metrics
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object{cpu=number,memory=number,disk=number,network=object}}
+// @Failure 500 {object} Response
+// @Router /metrics/system [get]
 func (h *MetricsHandler) GetSystemMetrics(c *gin.Context) {
 	// 获取真实的系统指标
 	systemMetrics := map[string]interface{}{
@@ -2108,6 +2417,14 @@ func (h *MetricsHandler) GetSystemMetrics(c *gin.Context) {
 }
 
 // GetPerformanceMetrics returns performance metrics
+// @Summary Get performance metrics
+// @Description Get detailed performance metrics for API and database operations
+// @Tags Metrics
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object{api_response_time=number,database_query_time=number,throughput=object,error_rates=object}}
+// @Failure 500 {object} Response
+// @Router /metrics/performance [get]
 func (h *MetricsHandler) GetPerformanceMetrics(c *gin.Context) {
 	// 实现获取性能指标逻辑
 	// 从监控系统获取性能指标
@@ -2166,6 +2483,20 @@ func (h *AuditHandler) hasAuditPermission(userID string) bool {
 }
 
 // GetLogs returns audit logs
+// @Summary Get audit logs
+// @Description Get audit logs with optional filtering by date range and user
+// @Tags Audit
+// @Accept json
+// @Produce json
+// @Param start_date query string false "Start date (YYYY-MM-DD)"
+// @Param end_date query string false "End date (YYYY-MM-DD)"
+// @Param user_id query string false "Filter by user ID"
+// @Param action query string false "Filter by action type"
+// @Param limit query int false "Limit number of results" default(100)
+// @Success 200 {object} Response{data=[]object}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /audit/logs [get]
 func (h *AuditHandler) GetLogs(c *gin.Context) {
 	// 实现获取审计日志逻辑
 	ctx := c.Request.Context()
@@ -2279,6 +2610,18 @@ func (h *AuditHandler) GetLogs(c *gin.Context) {
 }
 
 // GetDecisionChains returns decision chains
+// @Summary Get decision chains
+// @Description Get trading decision chains and audit trails for analysis
+// @Tags Audit
+// @Accept json
+// @Produce json
+// @Param start_date query string false "Start date (YYYY-MM-DD)"
+// @Param end_date query string false "End date (YYYY-MM-DD)"
+// @Param strategy_id query string false "Filter by strategy ID"
+// @Success 200 {object} Response{data=[]object}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /audit/decisions [get]
 func (h *AuditHandler) GetDecisionChains(c *gin.Context) {
 	// 实现获取决策链逻辑
 	ctx := c.Request.Context()
@@ -2416,6 +2759,15 @@ func (h *AuditHandler) GetDecisionChains(c *gin.Context) {
 }
 
 // GetPerformanceMetrics returns performance metrics
+// @Summary Get audit performance metrics
+// @Description Get performance metrics from audit data for system analysis
+// @Tags Audit
+// @Accept json
+// @Produce json
+// @Param period query string false "Analysis period (7d, 30d, 90d)" default(30d)
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /audit/performance [get]
 func (h *AuditHandler) GetPerformanceMetrics(c *gin.Context) {
 	// 实现获取性能指标逻辑
 	ctx := c.Request.Context()
@@ -2518,6 +2870,16 @@ func (h *AuditHandler) GetPerformanceMetrics(c *gin.Context) {
 }
 
 // ExportReport exports audit report
+// @Summary Export audit report
+// @Description Export audit data as a report in various formats (PDF, CSV, JSON)
+// @Tags Audit
+// @Accept json
+// @Produce json
+// @Param request body object{type=string,start_date=string,end_date=string} true "Export parameters"
+// @Success 200 {object} Response{data=object{report_id=string,download_url=string}}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /audit/export [post]
 func (h *AuditHandler) ExportReport(c *gin.Context) {
 	var req struct {
 		Type      string `json:"type" binding:"required"`
@@ -2749,6 +3111,14 @@ func NewTradingHandler(db *database.DB, metrics *monitor.MetricsCollector) *Trad
 }
 
 // GetDashboardData returns dashboard data
+// @Summary Get dashboard data
+// @Description Get comprehensive dashboard data including account info, portfolio summary, and system status
+// @Tags Dashboard
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object{account=object,portfolio=object,system_status=object,recent_activity=[]object}}
+// @Failure 500 {object} Response
+// @Router /dashboard [get]
 func (h *DashboardHandler) GetDashboardData(c *gin.Context) {
 	// 聚合各种数据源的信息
 
@@ -2785,6 +3155,14 @@ func (h *DashboardHandler) GetDashboardData(c *gin.Context) {
 }
 
 // GetDatabaseHealth returns database health status
+// @Summary Get database health status
+// @Description Get detailed database health status and connection information
+// @Tags Dashboard
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object{status=string,connections=object,performance=object}}
+// @Failure 500 {object} Response
+// @Router /dashboard/db-health [get]
 func (h *DashboardHandler) GetDatabaseHealth(c *gin.Context) {
 	healthStatus := h.getDatabaseHealthStatus()
 
@@ -2810,6 +3188,16 @@ func (h *DashboardHandler) GetDatabaseHealth(c *gin.Context) {
 }
 
 // GetMarketData returns market data
+// @Summary Get market data
+// @Description Get current market data including prices, volumes, and changes for trading symbols
+// @Tags Market
+// @Accept json
+// @Produce json
+// @Param symbol query string false "Filter by specific symbol"
+// @Param limit query int false "Limit number of results" default(50)
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /market/data [get]
 func (h *MarketHandler) GetMarketData(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -2870,6 +3258,15 @@ func (h *MarketHandler) GetMarketData(c *gin.Context) {
 }
 
 // GetTradingActivity returns trading activity
+// @Summary Get trading activity
+// @Description Get recent trading activity and transactions
+// @Tags Trading
+// @Accept json
+// @Produce json
+// @Param limit query int false "Limit number of results" default(10)
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /trading/activity [get]
 func (h *TradingHandler) GetTradingActivity(c *gin.Context) {
 	limit := 10
 	if limitStr := c.Query("limit"); limitStr != "" {
@@ -2941,6 +3338,16 @@ func (h *TradingHandler) GetTradingActivity(c *gin.Context) {
 }
 
 // GetTradeHistory returns trade history for a strategy
+// @Summary Get trade history
+// @Description Get historical trade data for a specific strategy
+// @Tags Trading
+// @Accept json
+// @Produce json
+// @Param strategyId query string false "Strategy ID to filter trades"
+// @Param limit query int false "Limit number of results" default(100)
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /trading/history [get]
 func (h *TradingHandler) GetTradeHistory(c *gin.Context) {
 	strategyId := c.Query("strategyId")
 	limit := 100
@@ -4159,6 +4566,16 @@ func (h *StrategyHandler) GetOnboardingStatus(c *gin.Context) {
 }
 
 // GetPositions returns current positions
+// @Summary Get trading positions
+// @Description Get current trading positions for strategies
+// @Tags Trading
+// @Accept json
+// @Produce json
+// @Param strategyId query string false "Strategy ID to filter positions"
+// @Param status query string false "Position status (open, closed, all)" default(open)
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /trading/positions [get]
 func (h *TradingHandler) GetPositions(c *gin.Context) {
 	strategyId := c.Query("strategyId")
 	status := c.Query("status") // open, closed, all
@@ -4341,6 +4758,14 @@ func NewStrategyValidationHandler() *StrategyValidationHandler {
 }
 
 // GetStrategyValidationStatus returns the validation status of all strategies
+// @Summary Get strategy validation status
+// @Description Get validation status and compliance information for all strategies
+// @Tags Validation
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /validation/strategies [get]
 func (h *StrategyValidationHandler) GetStrategyValidationStatus(c *gin.Context) {
 	// 模拟获取所有策略的验证状态
 	// 实际应该从数据库查询
@@ -4410,6 +4835,14 @@ func (h *StrategyValidationHandler) GetStrategyValidationStatus(c *gin.Context) 
 }
 
 // GetAutomationStatus returns the status of the automation manager
+// @Summary Get automation status
+// @Description Get status and health information of the automation management system
+// @Tags Validation
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object{system_name=string,version=string,status=string,components=[]object}}
+// @Failure 500 {object} Response
+// @Router /validation/automation [get]
 func (h *StrategyValidationHandler) GetAutomationStatus(c *gin.Context) {
 	// 这里应该从实际的自动化管理器获取状态
 	// 现在返回模拟状态
@@ -4464,6 +4897,14 @@ func (h *StrategyValidationHandler) GetAutomationStatus(c *gin.Context) {
 }
 
 // GetStrategyProblems returns detailed problems with current strategies
+// @Summary Get strategy problems
+// @Description Get detailed list of problems and issues with current strategies
+// @Tags Validation
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /validation/problems [get]
 func (h *StrategyValidationHandler) GetStrategyProblems(c *gin.Context) {
 	problems := []map[string]interface{}{
 		{
@@ -5339,6 +5780,18 @@ func NewAutoStartHandler(db *database.DB) *AutoStartHandler {
 }
 
 // UpdateStrategyAutoStart 更新策略自动启动设置
+// @Summary Update strategy auto-start settings
+// @Description Update auto-start configuration for a specific strategy
+// @Tags AutoStart
+// @Accept json
+// @Produce json
+// @Param id path string true "Strategy ID"
+// @Param request body object{auto_start=boolean,startup_priority=integer} true "Auto-start settings"
+// @Success 200 {object} Response{data=object{strategy_id=string,auto_start=boolean}}
+// @Failure 400 {object} Response
+// @Failure 404 {object} Response
+// @Failure 500 {object} Response
+// @Router /strategy/{id}/auto-start [put]
 func (h *AutoStartHandler) UpdateStrategyAutoStart(c *gin.Context) {
 	strategyID := c.Param("id")
 	if strategyID == "" {
@@ -5409,6 +5862,14 @@ func (h *AutoStartHandler) UpdateStrategyAutoStart(c *gin.Context) {
 }
 
 // GetAutoStartStrategies 获取自动启动策略列表
+// @Summary Get auto-start strategies
+// @Description Get list of strategies configured for automatic startup
+// @Tags AutoStart
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /auto-start/strategies [get]
 func (h *AutoStartHandler) GetAutoStartStrategies(c *gin.Context) {
 	query := `
 		SELECT id, name, type, status, enabled, auto_start,
@@ -5489,6 +5950,14 @@ func (h *AutoStartHandler) GetAutoStartStrategies(c *gin.Context) {
 }
 
 // GetAutoStartStats 获取自动启动统计信息
+// @Summary Get auto-start statistics
+// @Description Get statistics and metrics for auto-start system performance
+// @Tags AutoStart
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object{total_strategies=integer,auto_start_enabled=integer,success_rate=number}}
+// @Failure 500 {object} Response
+// @Router /auto-start/stats [get]
 func (h *AutoStartHandler) GetAutoStartStats(c *gin.Context) {
 	if h.service == nil {
 		c.JSON(http.StatusServiceUnavailable, Response{
@@ -5506,6 +5975,14 @@ func (h *AutoStartHandler) GetAutoStartStats(c *gin.Context) {
 }
 
 // TriggerAutoStart 手动触发自动启动
+// @Summary Trigger auto-start manually
+// @Description Manually trigger the auto-start process for all configured strategies
+// @Tags AutoStart
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object{triggered_strategies=integer,status=string}}
+// @Failure 500 {object} Response
+// @Router /auto-start/trigger [post]
 func (h *AutoStartHandler) TriggerAutoStart(c *gin.Context) {
 	if h.service == nil {
 		c.JSON(http.StatusServiceUnavailable, Response{

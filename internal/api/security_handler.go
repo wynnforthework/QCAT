@@ -61,6 +61,16 @@ func (h *SecurityHandler) RegisterRoutes(router *gin.RouterGroup) {
 }
 
 // createAPIKey creates a new API key
+// @Summary Create API key
+// @Description Create a new API key with specified permissions and expiration
+// @Tags Security
+// @Accept json
+// @Produce json
+// @Param request body object{name=string,permissions=[]string,expires_at=string} true "API key details"
+// @Success 200 {object} object{status=string,key_id=string,api_key=string,message=string}
+// @Failure 400 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /security/api-keys [post]
 func (h *SecurityHandler) createAPIKey(c *gin.Context) {
 	var req struct {
 		Name        string                   `json:"name" binding:"required"`
@@ -108,6 +118,16 @@ func (h *SecurityHandler) createAPIKey(c *gin.Context) {
 }
 
 // listAPIKeys lists all API keys
+// @Summary List API keys
+// @Description Get list of all API keys with optional filtering
+// @Tags Security
+// @Accept json
+// @Produce json
+// @Param status query string false "Filter by key status"
+// @Param name query string false "Filter by key name"
+// @Success 200 {object} object{status=string,keys=[]object,count=integer}
+// @Failure 500 {object} object{error=string}
+// @Router /security/api-keys [get]
 func (h *SecurityHandler) listAPIKeys(c *gin.Context) {
 	// Parse query parameters for filtering
 	filter := &security.KeyFilter{}
@@ -139,6 +159,16 @@ func (h *SecurityHandler) listAPIKeys(c *gin.Context) {
 }
 
 // getAPIKey gets a specific API key
+// @Summary Get API key details
+// @Description Get detailed information about a specific API key
+// @Tags Security
+// @Accept json
+// @Produce json
+// @Param keyId path string true "API Key ID"
+// @Success 200 {object} object{status=string,key_info=object}
+// @Failure 400 {object} object{error=string}
+// @Failure 404 {object} object{error=string}
+// @Router /security/api-keys/{keyId} [get]
 func (h *SecurityHandler) getAPIKey(c *gin.Context) {
 	keyID := c.Param("keyId")
 	if keyID == "" {
@@ -164,6 +194,17 @@ func (h *SecurityHandler) getAPIKey(c *gin.Context) {
 }
 
 // rotateAPIKey rotates an API key
+// @Summary Rotate API key
+// @Description Rotate an existing API key to generate a new secret
+// @Tags Security
+// @Accept json
+// @Produce json
+// @Param keyId path string true "API Key ID"
+// @Success 200 {object} object{status=string,new_key=string,message=string}
+// @Failure 400 {object} object{error=string}
+// @Failure 404 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /security/api-keys/{keyId}/rotate [post]
 func (h *SecurityHandler) rotateAPIKey(c *gin.Context) {
 	keyID := c.Param("keyId")
 	if keyID == "" {
@@ -197,6 +238,18 @@ func (h *SecurityHandler) rotateAPIKey(c *gin.Context) {
 }
 
 // revokeAPIKey revokes an API key
+// @Summary Revoke API key
+// @Description Revoke an existing API key to disable access
+// @Tags Security
+// @Accept json
+// @Produce json
+// @Param keyId path string true "API Key ID"
+// @Param request body object{reason=string} false "Revocation reason"
+// @Success 200 {object} object{status=string,message=string}
+// @Failure 400 {object} object{error=string}
+// @Failure 404 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /security/api-keys/{keyId}/revoke [post]
 func (h *SecurityHandler) revokeAPIKey(c *gin.Context) {
 	keyID := c.Param("keyId")
 	if keyID == "" {
@@ -236,6 +289,17 @@ func (h *SecurityHandler) revokeAPIKey(c *gin.Context) {
 }
 
 // getKeyUsage gets usage statistics for an API key
+// @Summary Get API key usage
+// @Description Get usage statistics for a specific API key
+// @Tags Security
+// @Accept json
+// @Produce json
+// @Param keyId path string true "API Key ID"
+// @Param period query string false "Time period (24h, 7d, 30d)" default(24h)
+// @Success 200 {object} object{status=string,usage=object,period=string}
+// @Failure 400 {object} object{error=string}
+// @Failure 404 {object} object{error=string}
+// @Router /security/api-keys/{keyId}/usage [get]
 func (h *SecurityHandler) getKeyUsage(c *gin.Context) {
 	keyID := c.Param("keyId")
 	if keyID == "" {
@@ -273,6 +337,16 @@ func (h *SecurityHandler) getKeyUsage(c *gin.Context) {
 }
 
 // getRotationSchedule gets rotation schedule for an API key
+// @Summary Get rotation schedule
+// @Description Get automatic rotation schedule for a specific API key
+// @Tags Security
+// @Accept json
+// @Produce json
+// @Param keyId path string true "API Key ID"
+// @Success 200 {object} object{status=string,schedule=object}
+// @Failure 400 {object} object{error=string}
+// @Failure 404 {object} object{error=string}
+// @Router /security/api-keys/{keyId}/rotation-schedule [get]
 func (h *SecurityHandler) getRotationSchedule(c *gin.Context) {
 	keyID := c.Param("keyId")
 	if keyID == "" {
@@ -300,6 +374,19 @@ func (h *SecurityHandler) getRotationSchedule(c *gin.Context) {
 }
 
 // getAuditLogs gets audit logs with optional filtering
+// @Summary Get audit logs
+// @Description Get security audit logs with optional filtering
+// @Tags Security
+// @Accept json
+// @Produce json
+// @Param user_id query string false "Filter by user ID"
+// @Param action query string false "Filter by action type"
+// @Param start_time query string false "Start time (RFC3339)"
+// @Param end_time query string false "End time (RFC3339)"
+// @Param limit query int false "Limit number of results" default(100)
+// @Success 200 {object} object{status=string,entries=[]object,count=integer}
+// @Failure 500 {object} object{error=string}
+// @Router /security/audit-logs [get]
 func (h *SecurityHandler) getAuditLogs(c *gin.Context) {
 	filter := &security.AuditFilter{}
 
@@ -346,6 +433,16 @@ func (h *SecurityHandler) getAuditLogs(c *gin.Context) {
 }
 
 // getAuditLog gets a specific audit log entry
+// @Summary Get audit log entry
+// @Description Get details of a specific audit log entry
+// @Tags Security
+// @Accept json
+// @Produce json
+// @Param id path string true "Audit log entry ID"
+// @Success 200 {object} object{status=string,entry=object}
+// @Failure 400 {object} object{error=string}
+// @Failure 404 {object} object{error=string}
+// @Router /security/audit-logs/{id} [get]
 func (h *SecurityHandler) getAuditLog(c *gin.Context) {
 	id := c.Param("id")
 	if id == "" {
@@ -371,6 +468,18 @@ func (h *SecurityHandler) getAuditLog(c *gin.Context) {
 }
 
 // exportAuditLogs exports audit logs
+// @Summary Export audit logs
+// @Description Export audit logs in various formats (JSON, CSV, PDF)
+// @Tags Security
+// @Accept json
+// @Produce application/json
+// @Produce text/csv
+// @Produce application/pdf
+// @Param request body object{filter=object,format=string} true "Export parameters"
+// @Success 200 {file} file "Exported audit logs file"
+// @Failure 400 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /security/audit-logs/export [post]
 func (h *SecurityHandler) exportAuditLogs(c *gin.Context) {
 	var req struct {
 		Filter *security.AuditFilter `json:"filter"`
@@ -415,6 +524,14 @@ func (h *SecurityHandler) exportAuditLogs(c *gin.Context) {
 }
 
 // verifyIntegrity verifies audit log integrity
+// @Summary Verify audit log integrity
+// @Description Verify the integrity of audit logs using cryptographic checksums
+// @Tags Security
+// @Accept json
+// @Produce json
+// @Success 200 {object} object{status=string,report=object}
+// @Failure 500 {object} object{error=string,details=string}
+// @Router /security/audit-logs/verify [post]
 func (h *SecurityHandler) verifyIntegrity(c *gin.Context) {
 	report, err := h.auditLogger.VerifyIntegrity()
 	if err != nil {
@@ -437,6 +554,15 @@ func (h *SecurityHandler) verifyIntegrity(c *gin.Context) {
 }
 
 // getSecurityAlerts gets security alerts
+// @Summary Get security alerts
+// @Description Get current security alerts and warnings
+// @Tags Security
+// @Accept json
+// @Produce json
+// @Param acknowledged query boolean false "Filter by acknowledgment status" default(false)
+// @Success 200 {object} object{status=string,alerts=[]object,count=integer}
+// @Failure 500 {object} object{error=string}
+// @Router /security/alerts [get]
 func (h *SecurityHandler) getSecurityAlerts(c *gin.Context) {
 	acknowledgedStr := c.DefaultQuery("acknowledged", "false")
 	acknowledged := acknowledgedStr == "true"
@@ -451,6 +577,17 @@ func (h *SecurityHandler) getSecurityAlerts(c *gin.Context) {
 }
 
 // acknowledgeAlert acknowledges a security alert
+// @Summary Acknowledge security alert
+// @Description Acknowledge a specific security alert
+// @Tags Security
+// @Accept json
+// @Produce json
+// @Param id path string true "Alert ID"
+// @Success 200 {object} object{status=string,message=string}
+// @Failure 400 {object} object{error=string}
+// @Failure 404 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /security/alerts/{id}/acknowledge [post]
 func (h *SecurityHandler) acknowledgeAlert(c *gin.Context) {
 	alertID := c.Param("id")
 	if alertID == "" {
@@ -482,6 +619,15 @@ func (h *SecurityHandler) acknowledgeAlert(c *gin.Context) {
 }
 
 // getSecurityEvents gets recent security events
+// @Summary Get security events
+// @Description Get recent security events and activities
+// @Tags Security
+// @Accept json
+// @Produce json
+// @Param limit query int false "Limit number of results" default(100)
+// @Success 200 {object} object{status=string,events=[]object,count=integer}
+// @Failure 500 {object} object{error=string}
+// @Router /security/events [get]
 func (h *SecurityHandler) getSecurityEvents(c *gin.Context) {
 	limitStr := c.DefaultQuery("limit", "100")
 	limit, err := strconv.Atoi(limitStr)

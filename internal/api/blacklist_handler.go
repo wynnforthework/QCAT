@@ -54,6 +54,14 @@ type AddToBlacklistRequest struct {
 }
 
 // ListBlacklist 获取黑名单列表
+// @Summary Get blacklist entries
+// @Description Get list of all blacklisted strategies with their details
+// @Tags Blacklist
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /blacklist/ [get]
 func (h *BlacklistHandler) ListBlacklist(c *gin.Context) {
 	ctx := c.Request.Context()
 
@@ -108,6 +116,16 @@ func (h *BlacklistHandler) ListBlacklist(c *gin.Context) {
 }
 
 // AddToBlacklist 添加策略到黑名单
+// @Summary Add strategy to blacklist
+// @Description Add a strategy to the blacklist with specified reason and duration
+// @Tags Blacklist
+// @Accept json
+// @Produce json
+// @Param request body AddToBlacklistRequest true "Blacklist entry details"
+// @Success 200 {object} Response{data=object{strategy_id=string,status=string}}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /blacklist/ [post]
 func (h *BlacklistHandler) AddToBlacklist(c *gin.Context) {
 	var req AddToBlacklistRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -139,6 +157,17 @@ func (h *BlacklistHandler) AddToBlacklist(c *gin.Context) {
 }
 
 // RemoveFromBlacklist 从黑名单移除策略
+// @Summary Remove strategy from blacklist
+// @Description Remove a strategy from the blacklist by strategy ID
+// @Tags Blacklist
+// @Accept json
+// @Produce json
+// @Param strategy_id path string true "Strategy ID to remove from blacklist"
+// @Success 200 {object} Response{data=object{strategy_id=string,status=string}}
+// @Failure 400 {object} Response
+// @Failure 404 {object} Response
+// @Failure 500 {object} Response
+// @Router /blacklist/{strategy_id} [delete]
 func (h *BlacklistHandler) RemoveFromBlacklist(c *gin.Context) {
 	strategyID := c.Param("strategy_id")
 	if strategyID == "" {
@@ -180,6 +209,16 @@ func (h *BlacklistHandler) RemoveFromBlacklist(c *gin.Context) {
 }
 
 // CheckBlacklist 检查策略是否在黑名单中
+// @Summary Check if strategy is blacklisted
+// @Description Check if a specific strategy is currently in the blacklist
+// @Tags Blacklist
+// @Accept json
+// @Produce json
+// @Param strategy_id path string true "Strategy ID to check"
+// @Success 200 {object} Response{data=object{strategy_id=string,is_blacklisted=boolean,reason=string,expires_at=string}}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /blacklist/{strategy_id}/check [get]
 func (h *BlacklistHandler) CheckBlacklist(c *gin.Context) {
 	strategyID := c.Param("strategy_id")
 	if strategyID == "" {
@@ -257,6 +296,14 @@ func (h *BlacklistHandler) CheckBlacklist(c *gin.Context) {
 }
 
 // ClearExpiredEntries 清理过期的黑名单条目
+// @Summary Clear expired blacklist entries
+// @Description Remove all expired entries from the blacklist
+// @Tags Blacklist
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object{cleared_count=integer,message=string}}
+// @Failure 500 {object} Response
+// @Router /blacklist/clear-expired [post]
 func (h *BlacklistHandler) ClearExpiredEntries(c *gin.Context) {
 	ctx := c.Request.Context()
 

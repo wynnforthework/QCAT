@@ -55,6 +55,16 @@ func NewWebSocketHandler(upgrader websocket.Upgrader, metrics *monitoring.Metric
 }
 
 // MarketStream handles market data WebSocket connections
+// @Summary Market data WebSocket stream
+// @Description Establish WebSocket connection for real-time market data streaming
+// @Tags WebSocket
+// @Accept json
+// @Produce json
+// @Param symbol path string true "Trading symbol"
+// @Success 101 {string} string "Switching Protocols"
+// @Failure 400 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /ws/market/{symbol} [get]
 func (h *WebSocketHandler) MarketStream(c *gin.Context) {
 	symbol := c.Param("symbol")
 	if symbol == "" {
@@ -101,6 +111,16 @@ func (h *WebSocketHandler) MarketStream(c *gin.Context) {
 }
 
 // StrategyStream handles strategy status WebSocket connections
+// @Summary Strategy status WebSocket stream
+// @Description Establish WebSocket connection for real-time strategy status updates
+// @Tags WebSocket
+// @Accept json
+// @Produce json
+// @Param id path string true "Strategy ID"
+// @Success 101 {string} string "Switching Protocols"
+// @Failure 400 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /ws/strategy/{id} [get]
 func (h *WebSocketHandler) StrategyStream(c *gin.Context) {
 	strategyID := c.Param("id")
 	if strategyID == "" {
@@ -147,6 +167,14 @@ func (h *WebSocketHandler) StrategyStream(c *gin.Context) {
 }
 
 // AlertsStream handles alerts WebSocket connections
+// @Summary Alerts WebSocket stream
+// @Description Establish WebSocket connection for real-time alerts and notifications
+// @Tags WebSocket
+// @Accept json
+// @Produce json
+// @Success 101 {string} string "Switching Protocols"
+// @Failure 500 {object} object{error=string}
+// @Router /ws/alerts [get]
 func (h *WebSocketHandler) AlertsStream(c *gin.Context) {
 	conn, err := h.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {

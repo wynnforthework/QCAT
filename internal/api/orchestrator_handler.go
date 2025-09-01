@@ -22,6 +22,14 @@ func NewOrchestratorHandler(orch *orchestrator.Orchestrator) *OrchestratorHandle
 }
 
 // handleStatus returns the overall orchestrator status
+// @Summary Get orchestrator status
+// @Description Get overall status of the orchestrator and all managed services
+// @Tags Orchestrator
+// @Accept json
+// @Produce json
+// @Success 200 {object} object{status=string,timestamp=string,services=object}
+// @Failure 500 {object} object{error=string}
+// @Router /orchestrator/status [get]
 func (h *OrchestratorHandler) handleStatus(c *gin.Context) {
 	status := h.orchestrator.GetServiceStatus()
 
@@ -33,12 +41,30 @@ func (h *OrchestratorHandler) handleStatus(c *gin.Context) {
 }
 
 // handleServices returns detailed service information
+// @Summary Get services information
+// @Description Get detailed information about all managed services
+// @Tags Orchestrator
+// @Accept json
+// @Produce json
+// @Success 200 {object} object
+// @Failure 500 {object} object{error=string}
+// @Router /orchestrator/services [get]
 func (h *OrchestratorHandler) handleServices(c *gin.Context) {
 	services := h.orchestrator.GetServiceStatus()
 	c.JSON(http.StatusOK, services)
 }
 
 // handleStartService starts a specific service
+// @Summary Start service
+// @Description Start a specific managed service
+// @Tags Orchestrator
+// @Accept json
+// @Produce json
+// @Param request body object{service_name=string} true "Service to start"
+// @Success 200 {object} object{status=string,message=string}
+// @Failure 400 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /orchestrator/services/start [post]
 func (h *OrchestratorHandler) handleStartService(c *gin.Context) {
 	var req struct {
 		ServiceName string `json:"service_name"`
@@ -72,6 +98,16 @@ func (h *OrchestratorHandler) handleStartService(c *gin.Context) {
 }
 
 // handleStopService stops a specific service
+// @Summary Stop service
+// @Description Stop a specific managed service
+// @Tags Orchestrator
+// @Accept json
+// @Produce json
+// @Param request body object{service_name=string} true "Service to stop"
+// @Success 200 {object} object{status=string,message=string}
+// @Failure 400 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /orchestrator/services/stop [post]
 func (h *OrchestratorHandler) handleStopService(c *gin.Context) {
 	var req struct {
 		ServiceName string `json:"service_name"`
@@ -105,6 +141,16 @@ func (h *OrchestratorHandler) handleStopService(c *gin.Context) {
 }
 
 // handleRestartService restarts a specific service
+// @Summary Restart service
+// @Description Restart a specific managed service
+// @Tags Orchestrator
+// @Accept json
+// @Produce json
+// @Param request body object{service_name=string} true "Service to restart"
+// @Success 200 {object} object{status=string,message=string}
+// @Failure 400 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /orchestrator/services/restart [post]
 func (h *OrchestratorHandler) handleRestartService(c *gin.Context) {
 	var req struct {
 		ServiceName string `json:"service_name"`
@@ -138,6 +184,16 @@ func (h *OrchestratorHandler) handleRestartService(c *gin.Context) {
 }
 
 // handleOptimize handles optimization requests
+// @Summary Submit optimization request
+// @Description Submit an optimization request to the orchestrator
+// @Tags Orchestrator
+// @Accept json
+// @Produce json
+// @Param request body orchestrator.OptimizationRequest true "Optimization parameters"
+// @Success 200 {object} object{status=string,task_id=string,message=string}
+// @Failure 400 {object} object{error=string}
+// @Failure 500 {object} object{error=string}
+// @Router /orchestrator/optimize [post]
 func (h *OrchestratorHandler) handleOptimize(c *gin.Context) {
 	var req orchestrator.OptimizationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -176,6 +232,14 @@ func (h *OrchestratorHandler) handleOptimize(c *gin.Context) {
 }
 
 // handleHealth returns health status of all services
+// @Summary Get health status
+// @Description Get health status of all managed services
+// @Tags Orchestrator
+// @Accept json
+// @Produce json
+// @Success 200 {object} object{status=string,services=object,timestamp=string}
+// @Failure 500 {object} object{error=string}
+// @Router /orchestrator/health [get]
 func (h *OrchestratorHandler) handleHealth(c *gin.Context) {
 	// Get service status
 	services := h.orchestrator.GetServiceStatus()

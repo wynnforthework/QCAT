@@ -1,0 +1,5361 @@
+basePath: /api/v1
+definitions:
+  api.AddToBlacklistRequest:
+    properties:
+      expires_at:
+        type: string
+      permanent:
+        type: boolean
+      reason:
+        type: string
+      strategy_id:
+        type: string
+    required:
+    - reason
+    - strategy_id
+    type: object
+  api.AuthResponse:
+    properties:
+      access_token:
+        type: string
+      expires_at:
+        type: string
+      refresh_token:
+        type: string
+      role:
+        type: string
+      user_id:
+        type: string
+      username:
+        type: string
+    type: object
+  api.EmergencyResetRequest:
+    properties:
+      reason:
+        type: string
+    required:
+    - reason
+    type: object
+  api.EmergencyStopRequest:
+    properties:
+      reason:
+        type: string
+    required:
+    - reason
+    type: object
+  api.EvolutionInfo:
+    properties:
+      averageFitness:
+        type: number
+      bestFitness:
+        type: number
+      currentGeneration:
+        type: integer
+      diversityIndex:
+        type: number
+      eliminatedCount:
+        type: integer
+      populationSize:
+        type: integer
+    type: object
+  api.ExecutionActivity:
+    properties:
+      action:
+        type: string
+      latency:
+        type: number
+      status:
+        type: string
+      strategyId:
+        type: string
+      strategyName:
+        type: string
+      timestamp:
+        type: string
+    type: object
+  api.ExecutionOverviewResponse:
+    properties:
+      performance:
+        $ref: '#/definitions/api.ExecutionPerformanceInfo'
+      recentExecutions:
+        items:
+          $ref: '#/definitions/api.ExecutionActivity'
+        type: array
+      system:
+        $ref: '#/definitions/api.ExecutionSystemInfo'
+    type: object
+  api.ExecutionPerformanceInfo:
+    properties:
+      errorRate:
+        type: number
+      latency:
+        type: number
+      successRate:
+        type: number
+      throughput:
+        type: integer
+      totalExecutions:
+        type: integer
+    type: object
+  api.ExecutionSystemInfo:
+    properties:
+      activeStrategies:
+        type: integer
+      status:
+        type: string
+      totalStrategies:
+        type: integer
+      uptime:
+        type: string
+    type: object
+  api.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  api.PoolActivity:
+    properties:
+      message:
+        type: string
+      strategyId:
+        type: string
+      timestamp:
+        type: string
+      type:
+        type: string
+    type: object
+  api.PoolOverviewResponse:
+    properties:
+      distribution:
+        additionalProperties: true
+        type: object
+      recentActivity:
+        items:
+          $ref: '#/definitions/api.PoolActivity'
+        type: array
+      resourceUsage:
+        $ref: '#/definitions/api.ResourceUsageInfo'
+      summary:
+        $ref: '#/definitions/strategy.StrategySummary'
+    type: object
+  api.RealtimeStatusResponse:
+    properties:
+      activeStrategies:
+        items:
+          $ref: '#/definitions/api.RealtimeStrategyInfo'
+        type: array
+      alerts:
+        items:
+          $ref: '#/definitions/api.SystemAlert'
+        type: array
+      systemMetrics:
+        $ref: '#/definitions/api.SystemMetrics'
+      timestamp:
+        type: string
+    type: object
+  api.RealtimeStrategyInfo:
+    properties:
+      id:
+        type: string
+      lastExecution:
+        type: string
+      latency:
+        type: number
+      name:
+        type: string
+      pnl:
+        type: number
+      status:
+        type: string
+      successRate:
+        type: number
+    type: object
+  api.RefreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  api.RegisterRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - email
+    - password
+    - username
+    type: object
+  api.ResourceMetric:
+    properties:
+      total:
+        type: number
+      usage:
+        type: number
+      used:
+        type: number
+    type: object
+  api.ResourceUsageInfo:
+    properties:
+      activeWorkers:
+        type: integer
+      cpu:
+        $ref: '#/definitions/api.ResourceMetric'
+      memory:
+        $ref: '#/definitions/api.ResourceMetric'
+      queuedTasks:
+        type: integer
+    type: object
+  api.Response:
+    properties:
+      data: {}
+      error:
+        type: string
+      message:
+        type: string
+      success:
+        type: boolean
+    type: object
+  api.Settings:
+    properties:
+      system:
+        $ref: '#/definitions/api.SystemSettings'
+      trading:
+        $ref: '#/definitions/api.TradingSettings'
+    type: object
+  api.SystemAlert:
+    properties:
+      level:
+        type: string
+      message:
+        type: string
+      time:
+        type: string
+    type: object
+  api.SystemMetrics:
+    properties:
+      cpu_usage:
+        type: number
+      disk_usage:
+        type: number
+      goroutines:
+        type: integer
+      memory_usage:
+        type: number
+      timestamp:
+        type: string
+      uptime:
+        type: number
+    type: object
+  api.SystemSettings:
+    properties:
+      cacheSize:
+        type: string
+      debugMode:
+        type: boolean
+      logLevel:
+        type: string
+    type: object
+  api.TradingSettings:
+    properties:
+      defaultStopLoss:
+        type: integer
+      dryRunMode:
+        type: boolean
+      maxPositionRatio:
+        type: integer
+      riskControl:
+        type: boolean
+    type: object
+  api.WorkflowActivity:
+    properties:
+      estimatedEnd:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      progress:
+        type: integer
+      stage:
+        type: string
+      startTime:
+        type: string
+      status:
+        type: string
+    type: object
+  api.WorkflowResourceInfo:
+    properties:
+      activeWorkers:
+        type: integer
+      globalCpuUsage:
+        type: number
+      globalMemoryUsage:
+        type: number
+      queuedTasks:
+        type: integer
+    type: object
+  api.WorkflowStatusResponse:
+    properties:
+      evolution:
+        $ref: '#/definitions/api.EvolutionInfo'
+      recentWorkflows:
+        items:
+          $ref: '#/definitions/api.WorkflowActivity'
+        type: array
+      resources:
+        $ref: '#/definitions/api.WorkflowResourceInfo'
+      system:
+        $ref: '#/definitions/api.WorkflowSystemInfo'
+    type: object
+  api.WorkflowSystemInfo:
+    properties:
+      activeWorkflows:
+        type: integer
+      concurrentStrategies:
+        type: integer
+      evolutionGeneration:
+        type: integer
+      status:
+        type: string
+      uptime:
+        type: string
+    type: object
+  database.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      last_login:
+        type: string
+      role:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+      username:
+        type: string
+    type: object
+  orchestrator.OptimizationConfig:
+    properties:
+      method:
+        type: string
+      parameters:
+        additionalProperties: true
+        type: object
+    type: object
+  orchestrator.OptimizationRequest:
+    properties:
+      grid_size:
+        type: integer
+      max_iterations:
+        type: integer
+      method:
+        type: string
+      optimization:
+        $ref: '#/definitions/orchestrator.OptimizationConfig'
+      parameters:
+        additionalProperties: true
+        type: object
+      request_id:
+        type: string
+      strategy_id:
+        type: string
+      time_range:
+        $ref: '#/definitions/orchestrator.TimeRange'
+    type: object
+  orchestrator.TimeRange:
+    properties:
+      end:
+        type: string
+      start:
+        type: string
+    type: object
+  strategy.ExecutionInfo:
+    properties:
+      avgLatency:
+        type: number
+      errorCount:
+        type: integer
+      executionCount:
+        type: integer
+      isRunning:
+        type: boolean
+      lastError:
+        type: string
+      lastExecution:
+        type: string
+      nextExecution:
+        type: string
+      successCount:
+        type: integer
+      successRate:
+        type: number
+    type: object
+  strategy.LifecycleInfo:
+    properties:
+      canDelete:
+        type: boolean
+      canEdit:
+        type: boolean
+      canStart:
+        type: boolean
+      canStop:
+        type: boolean
+      isEnabled:
+        type: boolean
+      stage:
+        description: draft, testing, production, deprecated
+        type: string
+      status:
+        description: active, inactive, paused, error
+        type: string
+    type: object
+  strategy.PerformanceInfo:
+    properties:
+      avgTrade:
+        type: number
+      bestTrade:
+        type: number
+      maxDrawdown:
+        type: number
+      pnl:
+        type: number
+      profitFactor:
+        type: number
+      sharpeRatio:
+        type: number
+      totalReturn:
+        type: number
+      tradeCount:
+        type: integer
+      volatility:
+        type: number
+      winRate:
+        type: number
+      worstTrade:
+        type: number
+    type: object
+  strategy.PoolInfo:
+    properties:
+      lastSync:
+        type: string
+      poolMetrics:
+        $ref: '#/definitions/strategy.PoolMetrics'
+      poolStatus:
+        description: enabled, disabled, testing, pending
+        type: string
+      priority:
+        description: high, medium, low
+        type: string
+      resourceAllocation:
+        $ref: '#/definitions/strategy.ResourceAllocation'
+      syncStatus:
+        type: string
+    type: object
+  strategy.PoolMetrics:
+    properties:
+      conflictCount:
+        type: integer
+      executionWeight:
+        type: number
+      queuePosition:
+        type: integer
+      resourceUsage:
+        type: number
+    type: object
+  strategy.ResourceAllocation:
+    properties:
+      cpu:
+        type: number
+      gpu:
+        type: number
+      memory:
+        type: number
+    type: object
+  strategy.StrategyListResponse:
+    properties:
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      strategies:
+        items:
+          $ref: '#/definitions/strategy.UnifiedStrategy'
+        type: array
+      summary:
+        $ref: '#/definitions/strategy.StrategySummary'
+      total:
+        type: integer
+    type: object
+  strategy.StrategySummary:
+    properties:
+      performance:
+        properties:
+          avgReturn:
+            type: number
+          avgSharpe:
+            type: number
+          totalPnl:
+            type: number
+          winningCount:
+            type: integer
+        type: object
+      pool:
+        properties:
+          disabled:
+            type: integer
+          enabled:
+            type: integer
+          pending:
+            type: integer
+          testing:
+            type: integer
+        type: object
+      total:
+        properties:
+          active:
+            type: integer
+          count:
+            type: integer
+          inactive:
+            type: integer
+          production:
+            type: integer
+          testing:
+            type: integer
+        type: object
+    type: object
+  strategy.UnifiedStrategy:
+    properties:
+      config:
+        additionalProperties: true
+        description: 配置信息
+        type: object
+      createdAt:
+        type: string
+      description:
+        type: string
+      execution:
+        allOf:
+        - $ref: '#/definitions/strategy.ExecutionInfo'
+        description: 执行信息
+      id:
+        description: 基本信息
+        type: string
+      lifecycle:
+        allOf:
+        - $ref: '#/definitions/strategy.LifecycleInfo'
+        description: 生命周期信息
+      name:
+        type: string
+      performance:
+        allOf:
+        - $ref: '#/definitions/strategy.PerformanceInfo'
+        description: 性能信息
+      pool:
+        allOf:
+        - $ref: '#/definitions/strategy.PoolInfo'
+        description: 策略池信息
+      type:
+        type: string
+      updatedAt:
+        type: string
+      version:
+        type: string
+    type: object
+host: localhost:8082
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: Quantitative Contract Automated Trading System API
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+  termsOfService: http://swagger.io/terms/
+  title: QCAT API
+  version: "1.0"
+paths:
+  /api/v1/strategy:
+    get:
+      consumes:
+      - application/json
+      description: 获取策略列表，支持多种视图和过滤选项
+      parameters:
+      - default: list
+        description: 视图类型
+        enum:
+        - list
+        - pool
+        - execution
+        - performance
+        - management
+        in: query
+        name: view
+        type: string
+      - collectionFormat: csv
+        description: 状态过滤
+        in: query
+        items:
+          type: string
+        name: status
+        type: array
+      - collectionFormat: csv
+        description: 类型过滤
+        in: query
+        items:
+          type: string
+        name: type
+        type: array
+      - collectionFormat: csv
+        description: 阶段过滤
+        in: query
+        items:
+          type: string
+        name: stage
+        type: array
+      - collectionFormat: csv
+        description: 池状态过滤
+        in: query
+        items:
+          type: string
+        name: pool_status
+        type: array
+      - default: updated_at
+        description: 排序字段
+        in: query
+        name: sort_by
+        type: string
+      - default: desc
+        description: 排序方向
+        enum:
+        - asc
+        - desc
+        in: query
+        name: sort_order
+        type: string
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 页大小
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/strategy.StrategyListResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: 获取策略列表
+      tags:
+      - strategy
+  /api/v1/strategy/{id}:
+    get:
+      consumes:
+      - application/json
+      description: 获取单个策略的完整信息，包括执行状态、性能数据、池信息等
+      parameters:
+      - description: 策略ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/strategy.UnifiedStrategy'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: 获取策略详情
+      tags:
+      - strategy
+  /api/v1/strategy/execution/overview:
+    get:
+      consumes:
+      - application/json
+      description: 获取策略执行系统的整体状态和性能指标
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.ExecutionOverviewResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: 获取执行系统概览
+      tags:
+      - strategy
+  /api/v1/strategy/execution/realtime:
+    get:
+      consumes:
+      - application/json
+      description: 获取策略执行的实时状态信息
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.RealtimeStatusResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: 获取实时状态
+      tags:
+      - strategy
+  /api/v1/strategy/pool/overview:
+    get:
+      consumes:
+      - application/json
+      description: 获取策略池的整体状态和统计信息
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.PoolOverviewResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: 获取策略池概览
+      tags:
+      - strategy
+  /api/v1/strategy/workflow/status:
+    get:
+      consumes:
+      - application/json
+      description: 获取多策略工作流系统的状态信息
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.WorkflowStatusResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: 获取工作流状态
+      tags:
+      - strategy
+  /audit/decisions:
+    get:
+      consumes:
+      - application/json
+      description: Get trading decision chains and audit trails for analysis
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - description: Filter by strategy ID
+        in: query
+        name: strategy_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get decision chains
+      tags:
+      - Audit
+  /audit/export:
+    post:
+      consumes:
+      - application/json
+      description: Export audit data as a report in various formats (PDF, CSV, JSON)
+      parameters:
+      - description: Export parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            end_date:
+              type: string
+            start_date:
+              type: string
+            type:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    download_url:
+                      type: string
+                    report_id:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Export audit report
+      tags:
+      - Audit
+  /audit/logs:
+    get:
+      consumes:
+      - application/json
+      description: Get audit logs with optional filtering by date range and user
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - description: Filter by user ID
+        in: query
+        name: user_id
+        type: string
+      - description: Filter by action type
+        in: query
+        name: action
+        type: string
+      - default: 100
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get audit logs
+      tags:
+      - Audit
+  /audit/performance:
+    get:
+      consumes:
+      - application/json
+      description: Get performance metrics from audit data for system analysis
+      parameters:
+      - default: 30d
+        description: Analysis period (7d, 30d, 90d)
+        in: query
+        name: period
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get audit performance metrics
+      tags:
+      - Audit
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user and return JWT tokens
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: User login
+      tags:
+      - Auth
+  /auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Logout user and invalidate refresh token
+      parameters:
+      - description: Refresh token to invalidate
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: User logout
+      tags:
+      - Auth
+  /auth/profile:
+    get:
+      consumes:
+      - application/json
+      description: Get current user information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/database.User'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.Response'
+      security:
+      - BearerAuth: []
+      summary: Get current user profile
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refresh access token using refresh token
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Refresh token
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user
+      parameters:
+      - description: Registration data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/api.AuthResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: User registration
+      tags:
+      - Auth
+  /auto-start/stats:
+    get:
+      consumes:
+      - application/json
+      description: Get statistics and metrics for auto-start system performance
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    auto_start_enabled:
+                      type: integer
+                    success_rate:
+                      type: number
+                    total_strategies:
+                      type: integer
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get auto-start statistics
+      tags:
+      - AutoStart
+  /auto-start/strategies:
+    get:
+      consumes:
+      - application/json
+      description: Get list of strategies configured for automatic startup
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get auto-start strategies
+      tags:
+      - AutoStart
+  /auto-start/trigger:
+    post:
+      consumes:
+      - application/json
+      description: Manually trigger the auto-start process for all configured strategies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    status:
+                      type: string
+                    triggered_strategies:
+                      type: integer
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Trigger auto-start manually
+      tags:
+      - AutoStart
+  /automation/{id}/toggle:
+    post:
+      consumes:
+      - application/json
+      description: Enable or disable a specific automation feature
+      parameters:
+      - description: Automation ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Toggle state
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            enabled:
+              type: boolean
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Toggle automation feature
+      tags:
+      - Automation
+  /automation/health:
+    get:
+      consumes:
+      - application/json
+      description: Get health metrics and performance indicators for the automation
+        system
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    enabled_tasks:
+                      type: integer
+                    health_score:
+                      type: number
+                    total_tasks:
+                      type: integer
+                    uptime:
+                      type: string
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get automation health metrics
+      tags:
+      - Automation
+  /automation/stats:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed execution statistics for automation tasks
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    this_month:
+                      type: object
+                    this_week:
+                      type: object
+                    today:
+                      type: object
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get execution statistics
+      tags:
+      - Automation
+  /automation/status:
+    get:
+      consumes:
+      - application/json
+      description: Get status of all automation features and their current state
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get automation status
+      tags:
+      - Automation
+  /automation/system:
+    get:
+      consumes:
+      - application/json
+      description: Get overall status and health of the automation system
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get system status
+      tags:
+      - Automation
+  /blacklist/:
+    get:
+      consumes:
+      - application/json
+      description: Get list of all blacklisted strategies with their details
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get blacklist entries
+      tags:
+      - Blacklist
+    post:
+      consumes:
+      - application/json
+      description: Add a strategy to the blacklist with specified reason and duration
+      parameters:
+      - description: Blacklist entry details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.AddToBlacklistRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    status:
+                      type: string
+                    strategy_id:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Add strategy to blacklist
+      tags:
+      - Blacklist
+  /blacklist/{strategy_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Remove a strategy from the blacklist by strategy ID
+      parameters:
+      - description: Strategy ID to remove from blacklist
+        in: path
+        name: strategy_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    status:
+                      type: string
+                    strategy_id:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Remove strategy from blacklist
+      tags:
+      - Blacklist
+  /blacklist/{strategy_id}/check:
+    get:
+      consumes:
+      - application/json
+      description: Check if a specific strategy is currently in the blacklist
+      parameters:
+      - description: Strategy ID to check
+        in: path
+        name: strategy_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    expires_at:
+                      type: string
+                    is_blacklisted:
+                      type: boolean
+                    reason:
+                      type: string
+                    strategy_id:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Check if strategy is blacklisted
+      tags:
+      - Blacklist
+  /blacklist/clear-expired:
+    post:
+      consumes:
+      - application/json
+      description: Remove all expired entries from the blacklist
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    cleared_count:
+                      type: integer
+                    message:
+                      type: string
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Clear expired blacklist entries
+      tags:
+      - Blacklist
+  /cache/config:
+    get:
+      consumes:
+      - application/json
+      description: Get current cache configuration and settings
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              config:
+                type: object
+              timestamp:
+                type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get cache configuration
+      tags:
+      - Cache
+  /cache/counters/reset:
+    post:
+      consumes:
+      - application/json
+      description: Reset all cache monitoring counters and statistics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              reset_time:
+                type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Reset cache counters
+      tags:
+      - Cache
+  /cache/events:
+    get:
+      consumes:
+      - application/json
+      description: Get recent cache events and activity logs
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              count:
+                type: integer
+              events:
+                items:
+                  type: object
+                type: array
+              timestamp:
+                type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get cache events
+      tags:
+      - Cache
+  /cache/fallback/force:
+    post:
+      consumes:
+      - application/json
+      description: Force the cache system to enter fallback mode
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              fallback_mode:
+                type: boolean
+              message:
+                type: string
+              reason:
+                type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Force cache fallback
+      tags:
+      - Cache
+  /cache/health:
+    get:
+      consumes:
+      - application/json
+      description: Get comprehensive cache health information and diagnostics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              diagnostics:
+                type: object
+              health:
+                type: object
+              status:
+                type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get cache health
+      tags:
+      - Cache
+  /cache/metrics:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed cache performance metrics and statistics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              metrics:
+                type: object
+              performance:
+                type: object
+              timestamp:
+                type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get cache metrics
+      tags:
+      - Cache
+  /cache/status:
+    get:
+      consumes:
+      - application/json
+      description: Get current cache status and basic statistics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              stats:
+                type: object
+              status:
+                type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get cache status
+      tags:
+      - Cache
+  /cache/test:
+    post:
+      consumes:
+      - application/json
+      description: Test cache operations including read, write, and delete
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              status:
+                type: string
+              test_results:
+                type: object
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Test cache operations
+      tags:
+      - Cache
+  /concurrent/alerts:
+    get:
+      consumes:
+      - application/json
+      description: Get current alerts and warnings from the concurrent processing
+        system
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    alerts:
+                      items:
+                        type: object
+                      type: array
+                    count:
+                      type: integer
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get alerts
+      tags:
+      - Concurrent
+  /concurrent/load-balancer:
+    get:
+      consumes:
+      - application/json
+      description: Get statistics and metrics for the load balancer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get load balancer statistics
+      tags:
+      - Concurrent
+  /concurrent/monitor:
+    get:
+      consumes:
+      - application/json
+      description: Get monitoring statistics for the concurrent processing system
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get monitor statistics
+      tags:
+      - Concurrent
+  /concurrent/pools:
+    get:
+      consumes:
+      - application/json
+      description: Get statistics for a specific pool or all pools if no pool name
+        specified
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get pool statistics
+      tags:
+      - Concurrent
+  /concurrent/pools/{pool_name}:
+    get:
+      consumes:
+      - application/json
+      description: Get statistics for a specific pool or all pools if no pool name
+        specified
+      parameters:
+      - description: Pool name (optional)
+        in: path
+        name: pool_name
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get pool statistics
+      tags:
+      - Concurrent
+  /concurrent/task-queue:
+    get:
+      consumes:
+      - application/json
+      description: Get statistics and metrics for the task queue
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get task queue statistics
+      tags:
+      - Concurrent
+  /concurrent/tasks:
+    post:
+      consumes:
+      - application/json
+      description: Submit a new task to the concurrent processing system
+      parameters:
+      - description: Task details
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            parameters:
+              type: object
+            priority:
+              type: integer
+            task_id:
+              type: string
+            task_name:
+              type: string
+            timeout:
+              type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    status:
+                      type: string
+                    task_id:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Submit task
+      tags:
+      - Concurrent
+  /dashboard:
+    get:
+      consumes:
+      - application/json
+      description: Get comprehensive dashboard data including account info, portfolio
+        summary, and system status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    account:
+                      type: object
+                    portfolio:
+                      type: object
+                    recent_activity:
+                      items:
+                        type: object
+                      type: array
+                    system_status:
+                      type: object
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get dashboard data
+      tags:
+      - Dashboard
+  /dashboard/db-health:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed database health status and connection information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    connections:
+                      type: object
+                    performance:
+                      type: object
+                    status:
+                      type: string
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get database health status
+      tags:
+      - Dashboard
+  /emergency/history:
+    get:
+      consumes:
+      - application/json
+      description: Get historical records of emergency stop events
+      parameters:
+      - default: 50
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get emergency history
+      tags:
+      - Emergency
+  /emergency/reset:
+    post:
+      consumes:
+      - application/json
+      description: Reset emergency stop status and allow strategies to resume
+      parameters:
+      - description: Reset parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.EmergencyResetRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    reset_at:
+                      type: string
+                    status:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Reset emergency stop
+      tags:
+      - Emergency
+  /emergency/status:
+    get:
+      consumes:
+      - application/json
+      description: Get current emergency stop status and information
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    affected_strategies:
+                      type: integer
+                    is_emergency_stopped:
+                      type: boolean
+                    reason:
+                      type: string
+                    stopped_at:
+                      type: string
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get emergency status
+      tags:
+      - Emergency
+  /emergency/stop-all:
+    post:
+      consumes:
+      - application/json
+      description: Trigger emergency stop for all trading strategies
+      parameters:
+      - description: Emergency stop parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.EmergencyStopRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    status:
+                      type: string
+                    stopped_strategies:
+                      type: integer
+                    timestamp:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Emergency stop all strategies
+      tags:
+      - Emergency
+  /hotlist/approve:
+    post:
+      consumes:
+      - application/json
+      description: Approve a trading symbol and add it to the approved list
+      parameters:
+      - description: Symbol to approve
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            symbol:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    status:
+                      type: string
+                    symbol:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Approve symbol for trading
+      tags:
+      - Hotlist
+  /hotlist/symbols:
+    get:
+      consumes:
+      - application/json
+      description: Get list of currently hot trading symbols based on market activity
+      parameters:
+      - default: 50
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      - default: volume
+        description: Sort by field (volume, price_change, activity)
+        in: query
+        name: sort_by
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get hot symbols
+      tags:
+      - Hotlist
+  /hotlist/whitelist:
+    get:
+      consumes:
+      - application/json
+      description: Get list of symbols approved for trading (whitelist)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get trading whitelist
+      tags:
+      - Hotlist
+    post:
+      consumes:
+      - application/json
+      description: Add a trading symbol to the approved whitelist
+      parameters:
+      - description: Symbol to add to whitelist
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            symbol:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Add symbol to whitelist
+      tags:
+      - Hotlist
+  /hotlist/whitelist/{symbol}:
+    delete:
+      consumes:
+      - application/json
+      description: Remove a trading symbol from the approved whitelist
+      parameters:
+      - description: Symbol to remove from whitelist
+        in: path
+        name: symbol
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Remove symbol from whitelist
+      tags:
+      - Hotlist
+  /market/data:
+    get:
+      consumes:
+      - application/json
+      description: Get current market data including prices, volumes, and changes
+        for trading symbols
+      parameters:
+      - description: Filter by specific symbol
+        in: query
+        name: symbol
+        type: string
+      - default: 50
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get market data
+      tags:
+      - Market
+  /metrics/performance:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed performance metrics for API and database operations
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    api_response_time:
+                      type: number
+                    database_query_time:
+                      type: number
+                    error_rates:
+                      type: object
+                    throughput:
+                      type: object
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get performance metrics
+      tags:
+      - Metrics
+  /metrics/strategy/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get performance metrics for a specific trading strategy
+      parameters:
+      - description: Strategy ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    execution_stats:
+                      type: object
+                    performance:
+                      type: object
+                    risk_metrics:
+                      type: object
+                    strategy_id:
+                      type: string
+                  type: object
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get strategy metrics
+      tags:
+      - Metrics
+  /metrics/system:
+    get:
+      consumes:
+      - application/json
+      description: Get system-level performance metrics including CPU, memory, and
+        disk usage
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    cpu:
+                      type: number
+                    disk:
+                      type: number
+                    memory:
+                      type: number
+                    network:
+                      type: object
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get system metrics
+      tags:
+      - Metrics
+  /optimizer/run:
+    post:
+      consumes:
+      - application/json
+      description: Start a new parameter optimization task for a strategy
+      parameters:
+      - description: Optimization parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            method:
+              type: string
+            objective:
+              type: string
+            params:
+              type: object
+            strategy_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    status:
+                      type: string
+                    task_id:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Start optimization task
+      tags:
+      - Optimizer
+  /optimizer/tasks:
+    get:
+      consumes:
+      - application/json
+      description: Get list of all optimization tasks with their status
+      parameters:
+      - description: Filter by task status
+        in: query
+        name: status
+        type: string
+      - default: 50
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get optimization tasks
+      tags:
+      - Optimizer
+  /optimizer/tasks/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get details of a specific optimization task by ID
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get optimization task
+      tags:
+      - Optimizer
+  /optimizer/tasks/{id}/results:
+    get:
+      consumes:
+      - application/json
+      description: Get optimization results for a specific task
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    best_params:
+                      type: object
+                    overfitting_metrics:
+                      type: object
+                    performance_metrics:
+                      type: object
+                    results:
+                      type: object
+                    task_id:
+                      type: string
+                  type: object
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get optimization results
+      tags:
+      - Optimizer
+  /orchestrator/health:
+    get:
+      consumes:
+      - application/json
+      description: Get health status of all managed services
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              services:
+                type: object
+              status:
+                type: string
+              timestamp:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get health status
+      tags:
+      - Orchestrator
+  /orchestrator/optimize:
+    post:
+      consumes:
+      - application/json
+      description: Submit an optimization request to the orchestrator
+      parameters:
+      - description: Optimization parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/orchestrator.OptimizationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              status:
+                type: string
+              task_id:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Submit optimization request
+      tags:
+      - Orchestrator
+  /orchestrator/services:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about all managed services
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get services information
+      tags:
+      - Orchestrator
+  /orchestrator/services/restart:
+    post:
+      consumes:
+      - application/json
+      description: Restart a specific managed service
+      parameters:
+      - description: Service to restart
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            service_name:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Restart service
+      tags:
+      - Orchestrator
+  /orchestrator/services/start:
+    post:
+      consumes:
+      - application/json
+      description: Start a specific managed service
+      parameters:
+      - description: Service to start
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            service_name:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Start service
+      tags:
+      - Orchestrator
+  /orchestrator/services/stop:
+    post:
+      consumes:
+      - application/json
+      description: Stop a specific managed service
+      parameters:
+      - description: Service to stop
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            service_name:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Stop service
+      tags:
+      - Orchestrator
+  /orchestrator/status:
+    get:
+      consumes:
+      - application/json
+      description: Get overall status of the orchestrator and all managed services
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              services:
+                type: object
+              status:
+                type: string
+              timestamp:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get orchestrator status
+      tags:
+      - Orchestrator
+  /portfolio/allocations:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed portfolio allocations across different strategies
+        and assets
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get portfolio allocations
+      tags:
+      - Portfolio
+  /portfolio/history:
+    get:
+      consumes:
+      - application/json
+      description: Get historical portfolio performance data over a specified time
+        period
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - default: 1d
+        description: Data interval (1h, 1d, 1w)
+        in: query
+        name: interval
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get portfolio history
+      tags:
+      - Portfolio
+  /portfolio/overview:
+    get:
+      consumes:
+      - application/json
+      description: Get comprehensive portfolio overview including total value, allocations,
+        and performance
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    allocations:
+                      items:
+                        type: object
+                      type: array
+                    performance:
+                      type: object
+                    total_pnl:
+                      type: number
+                    total_value:
+                      type: number
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get portfolio overview
+      tags:
+      - Portfolio
+  /portfolio/performance:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed portfolio performance metrics including returns, volatility,
+        and risk metrics
+      parameters:
+      - default: 30d
+        description: Performance period (7d, 30d, 90d, 1y)
+        in: query
+        name: period
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    annualized_return:
+                      type: number
+                    max_drawdown:
+                      type: number
+                    sharpe_ratio:
+                      type: number
+                    total_return:
+                      type: number
+                    volatility:
+                      type: number
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get portfolio performance metrics
+      tags:
+      - Portfolio
+  /portfolio/rebalance:
+    post:
+      consumes:
+      - application/json
+      description: Trigger automatic or manual portfolio rebalancing based on target
+        allocations
+      parameters:
+      - description: Rebalancing mode (auto/manual)
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            mode:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    changes:
+                      items:
+                        type: object
+                      type: array
+                    rebalance_id:
+                      type: string
+                    status:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Trigger portfolio rebalancing
+      tags:
+      - Portfolio
+  /risk/circuit-breakers:
+    get:
+      consumes:
+      - application/json
+      description: Get current circuit breaker status and configuration
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get circuit breakers
+      tags:
+      - Risk
+    put:
+      consumes:
+      - application/json
+      description: Configure circuit breakers for risk management
+      parameters:
+      - description: Circuit breaker configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Set circuit breakers
+      tags:
+      - Risk
+  /risk/limits:
+    get:
+      consumes:
+      - application/json
+      description: Get current risk limits and thresholds for trading operations
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get risk limits
+      tags:
+      - Risk
+    put:
+      consumes:
+      - application/json
+      description: Update risk limits and thresholds for trading operations
+      parameters:
+      - description: Risk limits configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Set risk limits
+      tags:
+      - Risk
+  /risk/overview:
+    get:
+      consumes:
+      - application/json
+      description: Get comprehensive risk management overview including current exposure
+        and limits
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    limits:
+                      type: object
+                    risk_score:
+                      type: number
+                    total_exposure:
+                      type: number
+                    violations:
+                      items:
+                        type: object
+                      type: array
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get risk overview
+      tags:
+      - Risk
+  /risk/violations:
+    get:
+      consumes:
+      - application/json
+      description: Get list of risk violations and breaches over a specified time
+        period
+      parameters:
+      - description: Start date (YYYY-MM-DD)
+        in: query
+        name: start_date
+        type: string
+      - description: End date (YYYY-MM-DD)
+        in: query
+        name: end_date
+        type: string
+      - description: Filter by violation severity
+        in: query
+        name: severity
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get risk violations
+      tags:
+      - Risk
+  /security/alerts:
+    get:
+      consumes:
+      - application/json
+      description: Get current security alerts and warnings
+      parameters:
+      - default: false
+        description: Filter by acknowledgment status
+        in: query
+        name: acknowledged
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              alerts:
+                items:
+                  type: object
+                type: array
+              count:
+                type: integer
+              status:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get security alerts
+      tags:
+      - Security
+  /security/alerts/{id}/acknowledge:
+    post:
+      consumes:
+      - application/json
+      description: Acknowledge a specific security alert
+      parameters:
+      - description: Alert ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Acknowledge security alert
+      tags:
+      - Security
+  /security/api-keys:
+    get:
+      consumes:
+      - application/json
+      description: Get list of all API keys with optional filtering
+      parameters:
+      - description: Filter by key status
+        in: query
+        name: status
+        type: string
+      - description: Filter by key name
+        in: query
+        name: name
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              count:
+                type: integer
+              keys:
+                items:
+                  type: object
+                type: array
+              status:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: List API keys
+      tags:
+      - Security
+    post:
+      consumes:
+      - application/json
+      description: Create a new API key with specified permissions and expiration
+      parameters:
+      - description: API key details
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            expires_at:
+              type: string
+            name:
+              type: string
+            permissions:
+              items:
+                type: string
+              type: array
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              api_key:
+                type: string
+              key_id:
+                type: string
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Create API key
+      tags:
+      - Security
+  /security/api-keys/{keyId}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific API key
+      parameters:
+      - description: API Key ID
+        in: path
+        name: keyId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              key_info:
+                type: object
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get API key details
+      tags:
+      - Security
+  /security/api-keys/{keyId}/revoke:
+    post:
+      consumes:
+      - application/json
+      description: Revoke an existing API key to disable access
+      parameters:
+      - description: API Key ID
+        in: path
+        name: keyId
+        required: true
+        type: string
+      - description: Revocation reason
+        in: body
+        name: request
+        schema:
+          properties:
+            reason:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Revoke API key
+      tags:
+      - Security
+  /security/api-keys/{keyId}/rotate:
+    post:
+      consumes:
+      - application/json
+      description: Rotate an existing API key to generate a new secret
+      parameters:
+      - description: API Key ID
+        in: path
+        name: keyId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              new_key:
+                type: string
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Rotate API key
+      tags:
+      - Security
+  /security/api-keys/{keyId}/rotation-schedule:
+    get:
+      consumes:
+      - application/json
+      description: Get automatic rotation schedule for a specific API key
+      parameters:
+      - description: API Key ID
+        in: path
+        name: keyId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              schedule:
+                type: object
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get rotation schedule
+      tags:
+      - Security
+  /security/api-keys/{keyId}/usage:
+    get:
+      consumes:
+      - application/json
+      description: Get usage statistics for a specific API key
+      parameters:
+      - description: API Key ID
+        in: path
+        name: keyId
+        required: true
+        type: string
+      - default: 24h
+        description: Time period (24h, 7d, 30d)
+        in: query
+        name: period
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              period:
+                type: string
+              status:
+                type: string
+              usage:
+                type: object
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get API key usage
+      tags:
+      - Security
+  /security/audit-logs:
+    get:
+      consumes:
+      - application/json
+      description: Get security audit logs with optional filtering
+      parameters:
+      - description: Filter by user ID
+        in: query
+        name: user_id
+        type: string
+      - description: Filter by action type
+        in: query
+        name: action
+        type: string
+      - description: Start time (RFC3339)
+        in: query
+        name: start_time
+        type: string
+      - description: End time (RFC3339)
+        in: query
+        name: end_time
+        type: string
+      - default: 100
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              count:
+                type: integer
+              entries:
+                items:
+                  type: object
+                type: array
+              status:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get audit logs
+      tags:
+      - Security
+  /security/audit-logs/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get details of a specific audit log entry
+      parameters:
+      - description: Audit log entry ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              entry:
+                type: object
+              status:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get audit log entry
+      tags:
+      - Security
+  /security/audit-logs/export:
+    post:
+      consumes:
+      - application/json
+      description: Export audit logs in various formats (JSON, CSV, PDF)
+      parameters:
+      - description: Export parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            filter:
+              type: object
+            format:
+              type: string
+          type: object
+      produces:
+      - application/json
+      - text/csv
+      - application/pdf
+      responses:
+        "200":
+          description: Exported audit logs file
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Export audit logs
+      tags:
+      - Security
+  /security/audit-logs/verify:
+    post:
+      consumes:
+      - application/json
+      description: Verify the integrity of audit logs using cryptographic checksums
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              report:
+                type: object
+              status:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              details:
+                type: string
+              error:
+                type: string
+            type: object
+      summary: Verify audit log integrity
+      tags:
+      - Security
+  /security/events:
+    get:
+      consumes:
+      - application/json
+      description: Get recent security events and activities
+      parameters:
+      - default: 100
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              count:
+                type: integer
+              events:
+                items:
+                  type: object
+                type: array
+              status:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get security events
+      tags:
+      - Security
+  /settings:
+    get:
+      consumes:
+      - application/json
+      description: Get current system settings and configuration
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Current system settings
+          schema:
+            $ref: '#/definitions/api.Settings'
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get system settings
+      tags:
+      - Settings
+    put:
+      consumes:
+      - application/json
+      description: Update system settings and configuration
+      parameters:
+      - description: Updated settings
+        in: body
+        name: settings
+        required: true
+        schema:
+          $ref: '#/definitions/api.Settings'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+              settings:
+                $ref: '#/definitions/api.Settings'
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Update system settings
+      tags:
+      - Settings
+  /strategy:
+    get:
+      consumes:
+      - application/json
+      description: Get list of all trading strategies with their status and configuration
+      parameters:
+      - description: Filter by strategy status
+        in: query
+        name: status
+        type: string
+      - description: Filter by strategy type
+        in: query
+        name: type
+        type: string
+      - default: 50
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: List all strategies
+      tags:
+      - Strategy
+    post:
+      consumes:
+      - application/json
+      description: Create a new trading strategy with specified configuration
+      parameters:
+      - description: Strategy configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    strategy_id:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Create new strategy
+      tags:
+      - Strategy
+  /strategy/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a trading strategy permanently
+      parameters:
+      - description: Strategy ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Delete strategy
+      tags:
+      - Strategy
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific trading strategy
+      parameters:
+      - description: Strategy ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get strategy details
+      tags:
+      - Strategy
+    put:
+      consumes:
+      - application/json
+      description: Update configuration of an existing trading strategy
+      parameters:
+      - description: Strategy ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Updated strategy configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    strategy_id:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Update strategy
+      tags:
+      - Strategy
+  /strategy/{id}/auto-start:
+    put:
+      consumes:
+      - application/json
+      description: Update auto-start configuration for a specific strategy
+      parameters:
+      - description: Strategy ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Auto-start settings
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            auto_start:
+              type: boolean
+            startup_priority:
+              type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    auto_start:
+                      type: boolean
+                    strategy_id:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Update strategy auto-start settings
+      tags:
+      - AutoStart
+  /strategy/{id}/backtest:
+    post:
+      consumes:
+      - application/json
+      description: Run historical backtesting for a trading strategy
+      parameters:
+      - description: Strategy ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Backtest parameters (start_date, end_date, initial_capital, etc.)
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    backtest_id:
+                      type: string
+                    status:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Run strategy backtest
+      tags:
+      - Strategy
+  /strategy/{id}/promote:
+    post:
+      consumes:
+      - application/json
+      description: Promote a strategy version to a higher stage (dev -> test -> prod)
+      parameters:
+      - description: Strategy ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Promotion details
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            stage:
+              type: string
+            version_id:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    stage:
+                      type: string
+                    strategy_id:
+                      type: string
+                    version_id:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Promote strategy version
+      tags:
+      - Strategy
+  /strategy/{id}/start:
+    post:
+      consumes:
+      - application/json
+      description: Start a trading strategy after mandatory validation checks
+      parameters:
+      - description: Strategy ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    status:
+                      type: string
+                    strategy_id:
+                      type: string
+                    validation_result:
+                      type: object
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "403":
+          description: Strategy failed validation
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Start strategy
+      tags:
+      - Strategy
+  /strategy/{id}/stop:
+    post:
+      consumes:
+      - application/json
+      description: Stop a running trading strategy
+      parameters:
+      - description: Strategy ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    status:
+                      type: string
+                    strategy_id:
+                      type: string
+                  type: object
+              type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Stop strategy
+      tags:
+      - Strategy
+  /trading/activity:
+    get:
+      consumes:
+      - application/json
+      description: Get recent trading activity and transactions
+      parameters:
+      - default: 10
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get trading activity
+      tags:
+      - Trading
+  /trading/history:
+    get:
+      consumes:
+      - application/json
+      description: Get historical trade data for a specific strategy
+      parameters:
+      - description: Strategy ID to filter trades
+        in: query
+        name: strategyId
+        type: string
+      - default: 100
+        description: Limit number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get trade history
+      tags:
+      - Trading
+  /trading/positions:
+    get:
+      consumes:
+      - application/json
+      description: Get current trading positions for strategies
+      parameters:
+      - description: Strategy ID to filter positions
+        in: query
+        name: strategyId
+        type: string
+      - default: open
+        description: Position status (open, closed, all)
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get trading positions
+      tags:
+      - Trading
+  /validation/automation:
+    get:
+      consumes:
+      - application/json
+      description: Get status and health information of the automation management
+        system
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    components:
+                      items:
+                        type: object
+                      type: array
+                    status:
+                      type: string
+                    system_name:
+                      type: string
+                    version:
+                      type: string
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get automation status
+      tags:
+      - Validation
+  /validation/problems:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed list of problems and issues with current strategies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get strategy problems
+      tags:
+      - Validation
+  /validation/strategies:
+    get:
+      consumes:
+      - application/json
+      description: Get validation status and compliance information for all strategies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  items:
+                    type: object
+                  type: array
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get strategy validation status
+      tags:
+      - Validation
+  /workflow/active-functions:
+    get:
+      consumes:
+      - application/json
+      description: Get list of currently active workflow functions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              active_functions:
+                items:
+                  type: object
+                type: array
+              count:
+                type: integer
+            type: object
+      summary: Get active functions
+      tags:
+      - Workflow
+  /workflow/conflict-groups:
+    get:
+      consumes:
+      - application/json
+      description: Get groups of functions that conflict with each other
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              conflict_groups:
+                items:
+                  type: object
+                type: array
+              total_groups:
+                type: integer
+            type: object
+      summary: Get conflict groups
+      tags:
+      - Workflow
+  /workflow/dependencies:
+    get:
+      consumes:
+      - application/json
+      description: Get dependency relationships and conflicts between workflow functions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              conflicts:
+                type: object
+              dependencies:
+                type: object
+            type: object
+      summary: Get dependencies
+      tags:
+      - Workflow
+  /workflow/dependency-graph:
+    get:
+      consumes:
+      - application/json
+      description: Get the workflow dependency graph and execution order
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    execution_order:
+                      items:
+                        type: object
+                      type: array
+                    functions:
+                      items:
+                        type: object
+                      type: array
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get dependency graph
+      tags:
+      - Workflow
+  /workflow/events:
+    get:
+      consumes:
+      - application/json
+      description: Get workflow events (simplified implementation)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              events:
+                items:
+                  type: object
+                type: array
+              message:
+                type: string
+            type: object
+      summary: Get workflow events
+      tags:
+      - Workflow
+  /workflow/events/handlers:
+    post:
+      consumes:
+      - application/json
+      description: Register an event handler for workflow events
+      parameters:
+      - description: Event handler registration
+        in: body
+        name: request
+        required: true
+        schema:
+          properties:
+            event_type:
+              type: string
+            handler:
+              type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Register event handler
+      tags:
+      - Workflow
+  /workflow/execute:
+    post:
+      consumes:
+      - application/json
+      description: Execute the configured workflow with all enabled functions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    execution_id:
+                      type: string
+                    status:
+                      type: string
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Execute workflow
+      tags:
+      - Workflow
+  /workflow/execution-order:
+    get:
+      consumes:
+      - application/json
+      description: Get the execution order of workflow functions based on dependencies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              enabled_functions:
+                type: integer
+              execution_order:
+                items:
+                  type: object
+                type: array
+              total_functions:
+                type: integer
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get execution order
+      tags:
+      - Workflow
+  /workflow/functions:
+    get:
+      consumes:
+      - application/json
+      description: Get list of all available workflow functions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              functions:
+                items:
+                  type: object
+                type: array
+              total:
+                type: integer
+            type: object
+      summary: Get all functions
+      tags:
+      - Workflow
+  /workflow/functions/{function_id}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific workflow function
+      parameters:
+      - description: Function ID
+        in: path
+        name: function_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get function information
+      tags:
+      - Workflow
+  /workflow/functions/{function_id}/disable:
+    post:
+      consumes:
+      - application/json
+      description: Disable a specific function in the workflow
+      parameters:
+      - description: Function ID
+        in: path
+        name: function_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    function_id:
+                      type: integer
+                    status:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Disable workflow function
+      tags:
+      - Workflow
+  /workflow/functions/{function_id}/enable:
+    post:
+      consumes:
+      - application/json
+      description: Enable a specific function in the workflow
+      parameters:
+      - description: Function ID
+        in: path
+        name: function_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    function_id:
+                      type: integer
+                    status:
+                      type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/api.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Enable workflow function
+      tags:
+      - Workflow
+  /workflow/functions/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific workflow function
+      parameters:
+      - description: Function ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Get function information
+      tags:
+      - Workflow
+  /workflow/functions/{id}/disable:
+    post:
+      consumes:
+      - application/json
+      description: Disable a specific workflow function by ID
+      parameters:
+      - description: Function ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Disable function
+      tags:
+      - Workflow
+  /workflow/functions/{id}/enable:
+    post:
+      consumes:
+      - application/json
+      description: Enable a specific workflow function by ID
+      parameters:
+      - description: Function ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Enable function
+      tags:
+      - Workflow
+  /workflow/functions/enabled:
+    get:
+      consumes:
+      - application/json
+      description: Get list of all enabled workflow functions
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    count:
+                      type: integer
+                    functions:
+                      items:
+                        type: object
+                      type: array
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get enabled functions
+      tags:
+      - Workflow
+  /workflow/interlock-status:
+    get:
+      consumes:
+      - application/json
+      description: Get current interlock status of the workflow system
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              interlock_status:
+                type: object
+            type: object
+      summary: Get interlock status
+      tags:
+      - Workflow
+  /workflow/results:
+    get:
+      consumes:
+      - application/json
+      description: Get the results and summary of workflow execution
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    results:
+                      type: object
+                    summary:
+                      type: object
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get execution results
+      tags:
+      - Workflow
+  /workflow/stats:
+    get:
+      consumes:
+      - application/json
+      description: Get statistical information about workflow execution
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+      summary: Get workflow statistics
+      tags:
+      - Workflow
+  /workflow/status:
+    get:
+      consumes:
+      - application/json
+      description: Get comprehensive status of the workflow including enabled functions
+        and execution state
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    enabled_functions:
+                      items:
+                        type: object
+                      type: array
+                    execution_results:
+                      type: object
+                    status:
+                      type: string
+                    summary:
+                      type: object
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Get workflow status
+      tags:
+      - Workflow
+  /workflow/stop:
+    post:
+      consumes:
+      - application/json
+      description: Stop the currently running workflow
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            properties:
+              message:
+                type: string
+            type: object
+      summary: Stop workflow
+      tags:
+      - Workflow
+  /workflow/summary:
+    get:
+      consumes:
+      - application/json
+      description: Get summary of workflow execution
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+      summary: Get execution summary
+      tags:
+      - Workflow
+  /workflow/validate:
+    post:
+      consumes:
+      - application/json
+      description: Validate the current workflow configuration and dependencies
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/api.Response'
+            - properties:
+                data:
+                  properties:
+                    execution_order:
+                      items:
+                        type: object
+                      type: array
+                    issues:
+                      items:
+                        type: string
+                      type: array
+                    valid:
+                      type: boolean
+                  type: object
+              type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.Response'
+      summary: Validate workflow
+      tags:
+      - Workflow
+  /ws/alerts:
+    get:
+      consumes:
+      - application/json
+      description: Establish WebSocket connection for real-time alerts and notifications
+      produces:
+      - application/json
+      responses:
+        "101":
+          description: Switching Protocols
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Alerts WebSocket stream
+      tags:
+      - WebSocket
+  /ws/market/{symbol}:
+    get:
+      consumes:
+      - application/json
+      description: Establish WebSocket connection for real-time market data streaming
+      parameters:
+      - description: Trading symbol
+        in: path
+        name: symbol
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "101":
+          description: Switching Protocols
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Market data WebSocket stream
+      tags:
+      - WebSocket
+  /ws/strategy/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Establish WebSocket connection for real-time strategy status updates
+      parameters:
+      - description: Strategy ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "101":
+          description: Switching Protocols
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            properties:
+              error:
+                type: string
+            type: object
+      summary: Strategy status WebSocket stream
+      tags:
+      - WebSocket
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

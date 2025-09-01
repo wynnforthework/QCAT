@@ -42,6 +42,16 @@ type EmergencyResetRequest struct {
 }
 
 // EmergencyStopAll 紧急停止所有策略
+// @Summary Emergency stop all strategies
+// @Description Trigger emergency stop for all trading strategies
+// @Tags Emergency
+// @Accept json
+// @Produce json
+// @Param request body EmergencyStopRequest true "Emergency stop parameters"
+// @Success 200 {object} Response{data=object{status=string,stopped_strategies=integer,timestamp=string}}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /emergency/stop-all [post]
 func (h *EmergencyHandler) EmergencyStopAll(c *gin.Context) {
 	var req EmergencyStopRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -74,6 +84,14 @@ func (h *EmergencyHandler) EmergencyStopAll(c *gin.Context) {
 }
 
 // GetEmergencyStatus 获取紧急停止状态
+// @Summary Get emergency status
+// @Description Get current emergency stop status and information
+// @Tags Emergency
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object{is_emergency_stopped=boolean,reason=string,stopped_at=string,affected_strategies=integer}}
+// @Failure 500 {object} Response
+// @Router /emergency/status [get]
 func (h *EmergencyHandler) GetEmergencyStatus(c *gin.Context) {
 	status := h.emergencyMgr.GetEmergencyStopStatus()
 
@@ -84,6 +102,16 @@ func (h *EmergencyHandler) GetEmergencyStatus(c *gin.Context) {
 }
 
 // ResetEmergencyStop 重置紧急停止状态
+// @Summary Reset emergency stop
+// @Description Reset emergency stop status and allow strategies to resume
+// @Tags Emergency
+// @Accept json
+// @Produce json
+// @Param request body EmergencyResetRequest true "Reset parameters"
+// @Success 200 {object} Response{data=object{status=string,reset_at=string}}
+// @Failure 400 {object} Response
+// @Failure 500 {object} Response
+// @Router /emergency/reset [post]
 func (h *EmergencyHandler) ResetEmergencyStop(c *gin.Context) {
 	var req EmergencyResetRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -116,6 +144,16 @@ func (h *EmergencyHandler) ResetEmergencyStop(c *gin.Context) {
 }
 
 // GetEmergencyHistory 获取紧急停止历史记录
+// @Summary Get emergency history
+// @Description Get historical records of emergency stop events
+// @Tags Emergency
+// @Accept json
+// @Produce json
+// @Param limit query int false "Limit number of results" default(50)
+// @Param offset query int false "Offset for pagination" default(0)
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /emergency/history [get]
 func (h *EmergencyHandler) GetEmergencyHistory(c *gin.Context) {
 	ctx := c.Request.Context()
 

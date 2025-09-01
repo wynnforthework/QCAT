@@ -69,6 +69,14 @@ type ExecutionPeriod struct {
 }
 
 // GetAutomationStatus returns the status of all automation features
+// @Summary Get automation status
+// @Description Get status of all automation features and their current state
+// @Tags Automation
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=[]object}
+// @Failure 500 {object} Response
+// @Router /automation/status [get]
 func (h *AutomationHandler) GetAutomationStatus(c *gin.Context) {
 	// Get system status from automation system
 	systemStatus := h.automationSystem.GetStatus()
@@ -83,6 +91,14 @@ func (h *AutomationHandler) GetAutomationStatus(c *gin.Context) {
 }
 
 // GetHealthMetrics returns automation system health metrics
+// @Summary Get automation health metrics
+// @Description Get health metrics and performance indicators for the automation system
+// @Tags Automation
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object{enabled_tasks=integer,total_tasks=integer,health_score=number,uptime=string}}
+// @Failure 500 {object} Response
+// @Router /automation/health [get]
 func (h *AutomationHandler) GetHealthMetrics(c *gin.Context) {
 	systemStatus := h.automationSystem.GetStatus()
 
@@ -125,7 +141,7 @@ func (h *AutomationHandler) getTaskIDByIndex(index int) string {
 		"system_health", "multi_exchange_redundancy", "audit_logging", "account_security_monitoring",
 		"automl_learning", "genetic_evolution", "new_strategy_introduction", "minimum_strategy_check",
 	}
-	
+
 	if index >= 1 && index <= len(taskIDs) {
 		return taskIDs[index-1]
 	}
@@ -133,6 +149,14 @@ func (h *AutomationHandler) getTaskIDByIndex(index int) string {
 }
 
 // GetExecutionStats returns execution statistics
+// @Summary Get execution statistics
+// @Description Get detailed execution statistics for automation tasks
+// @Tags Automation
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object{today=object,this_week=object,this_month=object}}
+// @Failure 500 {object} Response
+// @Router /automation/stats [get]
 func (h *AutomationHandler) GetExecutionStats(c *gin.Context) {
 	systemStatus := h.automationSystem.GetStatus()
 
@@ -161,6 +185,17 @@ func (h *AutomationHandler) GetExecutionStats(c *gin.Context) {
 }
 
 // ToggleAutomation toggles an automation feature on/off
+// @Summary Toggle automation feature
+// @Description Enable or disable a specific automation feature
+// @Tags Automation
+// @Accept json
+// @Produce json
+// @Param id path string true "Automation ID"
+// @Param request body object{enabled=boolean} true "Toggle state"
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 404 {object} Response
+// @Router /automation/{id}/toggle [post]
 func (h *AutomationHandler) ToggleAutomation(c *gin.Context) {
 	automationID := c.Param("id")
 
@@ -196,6 +231,14 @@ func (h *AutomationHandler) ToggleAutomation(c *gin.Context) {
 }
 
 // GetSystemStatus returns overall automation system status
+// @Summary Get system status
+// @Description Get overall status and health of the automation system
+// @Tags Automation
+// @Accept json
+// @Produce json
+// @Success 200 {object} Response{data=object}
+// @Failure 500 {object} Response
+// @Router /automation/system [get]
 func (h *AutomationHandler) GetSystemStatus(c *gin.Context) {
 	systemStatus := h.automationSystem.GetStatus()
 
