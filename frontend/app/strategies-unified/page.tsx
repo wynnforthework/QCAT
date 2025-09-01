@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { TradeHistory } from '@/components/strategies/trade-history';
 import { ParameterSettings } from '@/components/strategies/parameter-settings';
+import { apiClient } from '@/lib/api';
 
 // 统一策略数据模型
 interface UnifiedStrategy {
@@ -152,18 +153,25 @@ const UnifiedStrategiesPage = () => {
         setLoading(true);
         setError(null);
 
-        // 调用新的统一API
-        const [strategiesResponse, overviewResponse] = await Promise.all([
-          fetch(`/api/v1/strategy?view=${currentView}&page=1&page_size=50`),
-          fetch('/api/v1/strategy/pool/overview')
+        // 调用新的统一API - 使用apiClient确保正确的错误处理和认证
+        const [strategiesData, overviewData] = await Promise.all([
+          apiClient.request<any>(`/api/v1/strategy?view=${currentView}&page=1&page_size=50`).then(data => ({
+            success: true,
+            data: { strategies: Array.isArray(data) ? data : [] }
+          })).catch(error => {
+            console.warn('Failed to fetch strategies:', error);
+            return { success: false, data: { strategies: [] } };
+          }),
+          apiClient.request<any>('/api/v1/strategy/pool/overview').then(data => ({
+            success: true,
+            data: data || { distribution: [], summary: { total: { active: 0, count: 0 } } }
+          })).catch(error => {
+            console.warn('Failed to fetch pool overview:', error);
+            return { success: false, data: { distribution: [], summary: { total: { active: 0, count: 0 } } } };
+          })
         ]);
 
-        if (!strategiesResponse.ok || !overviewResponse.ok) {
-          throw new Error('API调用失败');
-        }
-
-        const strategiesData = await strategiesResponse.json();
-        const overviewData = await overviewResponse.json();
+        // API调用已经在上面完成，直接处理数据
 
         if (strategiesData.success) {
           setStrategies(strategiesData.data.strategies || []);
