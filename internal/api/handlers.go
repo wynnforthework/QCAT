@@ -1131,6 +1131,114 @@ func (h *PortfolioHandler) GetHistory(c *gin.Context) {
 	})
 }
 
+// GetPerformance returns portfolio performance metrics
+func (h *PortfolioHandler) GetPerformance(c *gin.Context) {
+	// 实现获取投资组合性能指标逻辑
+	ctx := c.Request.Context()
+
+	// 获取查询参数
+	period := c.DefaultQuery("period", "30d") // 默认30天
+
+	// 从数据库获取投资组合性能数据
+	query := `
+		SELECT
+			AVG(equity) as avg_equity,
+			MAX(equity) as max_equity,
+			MIN(equity) as min_equity,
+			AVG(unrealized_pnl) as avg_pnl,
+			SUM(CASE WHEN unrealized_pnl > 0 THEN 1 ELSE 0 END) as profitable_days,
+			COUNT(*) as total_days,
+			AVG(sharpe_ratio) as avg_sharpe,
+			AVG(volatility) as avg_volatility,
+			MAX(drawdown) as max_drawdown,
+			STDDEV(unrealized_pnl) as pnl_volatility
+		FROM portfolio_snapshots
+		WHERE created_at >= NOW() - INTERVAL '` + period + `'
+	`
+
+	var performance struct {
+		AvgEquity      float64 `db:"avg_equity"`
+		MaxEquity      float64 `db:"max_equity"`
+		MinEquity      float64 `db:"min_equity"`
+		AvgPnL         float64 `db:"avg_pnl"`
+		ProfitableDays int     `db:"profitable_days"`
+		TotalDays      int     `db:"total_days"`
+		AvgSharpe      float64 `db:"avg_sharpe"`
+		AvgVolatility  float64 `db:"avg_volatility"`
+		MaxDrawdown    float64 `db:"max_drawdown"`
+		PnLVolatility  float64 `db:"pnl_volatility"`
+	}
+
+	err := h.db.QueryRowContext(ctx, query).Scan(
+		&performance.AvgEquity, &performance.MaxEquity, &performance.MinEquity,
+		&performance.AvgPnL, &performance.ProfitableDays, &performance.TotalDays,
+		&performance.AvgSharpe, &performance.AvgVolatility, &performance.MaxDrawdown,
+		&performance.PnLVolatility,
+	)
+
+	if err != nil {
+		// 如果查询失败，返回默认性能数据
+		log.Printf("Failed to fetch portfolio performance: %v", err)
+		c.JSON(http.StatusOK, Response{
+			Success: true,
+			Data: map[string]interface{}{
+				"period":            period,
+				"total_return":      0.0,
+				"annualized_return": 0.0,
+				"sharpe_ratio":      0.0,
+				"volatility":        0.0,
+				"max_drawdown":      0.0,
+				"win_rate":          0.0,
+				"profit_factor":     1.0,
+				"avg_equity":        100000.0,
+				"max_equity":        100000.0,
+				"min_equity":        100000.0,
+			},
+		})
+		return
+	}
+
+	// 计算性能指标
+	totalReturn := 0.0
+	if performance.MinEquity > 0 {
+		totalReturn = ((performance.MaxEquity - performance.MinEquity) / performance.MinEquity) * 100
+	}
+
+	annualizedReturn := 0.0
+	if performance.TotalDays > 0 {
+		annualizedReturn = totalReturn * (365.0 / float64(performance.TotalDays))
+	}
+
+	winRate := 0.0
+	if performance.TotalDays > 0 {
+		winRate = (float64(performance.ProfitableDays) / float64(performance.TotalDays)) * 100
+	}
+
+	profitFactor := 1.0
+	if performance.PnLVolatility > 0 && performance.AvgPnL > 0 {
+		profitFactor = performance.AvgPnL / performance.PnLVolatility
+	}
+
+	c.JSON(http.StatusOK, Response{
+		Success: true,
+		Data: map[string]interface{}{
+			"period":            period,
+			"total_return":      totalReturn,
+			"annualized_return": annualizedReturn,
+			"sharpe_ratio":      performance.AvgSharpe,
+			"volatility":        performance.AvgVolatility,
+			"max_drawdown":      performance.MaxDrawdown,
+			"win_rate":          winRate,
+			"profit_factor":     profitFactor,
+			"avg_equity":        performance.AvgEquity,
+			"max_equity":        performance.MaxEquity,
+			"min_equity":        performance.MinEquity,
+			"total_days":        performance.TotalDays,
+			"profitable_days":   performance.ProfitableDays,
+		},
+	})
+}
+
 // RiskHandler handles risk-related API requests
 type RiskHandler struct {
 	db      *database.DB

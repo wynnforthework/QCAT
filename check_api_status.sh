@@ -190,7 +190,7 @@ check_api "策略工作流状态" "GET" "$API_BASE/api/v1/strategy/workflow/stat
 
 # 投资组合API
 check_api "投资组合概览" "GET" "$API_BASE/api/v1/portfolio/overview" "$auth_header" "投资组合"
-check_api "投资组合持仓" "GET" "$API_BASE/api/v1/portfolio/positions" "$auth_header" "投资组合"
+check_api "投资组合持仓" "GET" "$API_BASE/api/v1/trading/positions" "$auth_header" "投资组合"
 check_api "投资组合性能" "GET" "$API_BASE/api/v1/portfolio/performance" "$auth_header" "投资组合"
 
 # 风险管理API

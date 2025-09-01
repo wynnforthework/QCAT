@@ -758,6 +758,7 @@ func (s *Server) setupRoutes() {
 				portfolio.GET("/allocations", s.handlers.Portfolio.GetAllocations)
 				portfolio.POST("/rebalance", s.handlers.Portfolio.Rebalance)
 				portfolio.GET("/history", s.handlers.Portfolio.GetHistory)
+				portfolio.GET("/performance", s.handlers.Portfolio.GetPerformance)
 			}
 
 			// Risk routes
