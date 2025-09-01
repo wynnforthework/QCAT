@@ -90,8 +90,44 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     id: 'strategy-list',
     name: '策略列表',
     method: 'GET',
-    path: '/api/v1/strategy/',
+    path: '/api/v1/strategy',
     description: '获取所有策略列表',
+    requiresAuth: true,
+    category: '策略'
+  },
+  {
+    id: 'strategy-list-management',
+    name: '策略列表(管理视图)',
+    method: 'GET',
+    path: '/api/v1/strategy?view=management&page=1&page_size=50',
+    description: '获取策略列表 - 管理视图',
+    requiresAuth: true,
+    category: '策略'
+  },
+  {
+    id: 'strategy-list-pool',
+    name: '策略列表(池视图)',
+    method: 'GET',
+    path: '/api/v1/strategy?view=pool',
+    description: '获取策略列表 - 策略池视图',
+    requiresAuth: true,
+    category: '策略'
+  },
+  {
+    id: 'strategy-list-execution',
+    name: '策略列表(执行视图)',
+    method: 'GET',
+    path: '/api/v1/strategy?view=execution',
+    description: '获取策略列表 - 执行视图',
+    requiresAuth: true,
+    category: '策略'
+  },
+  {
+    id: 'strategy-list-performance',
+    name: '策略列表(性能视图)',
+    method: 'GET',
+    path: '/api/v1/strategy?view=performance',
+    description: '获取策略列表 - 性能视图',
     requiresAuth: true,
     category: '策略'
   },
@@ -104,6 +140,42 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     requiresAuth: true,
     category: '策略',
     expectedToFail: true
+  },
+  {
+    id: 'strategy-pool-overview',
+    name: '策略池概览',
+    method: 'GET',
+    path: '/api/v1/strategy/pool/overview',
+    description: '获取策略池概览信息',
+    requiresAuth: true,
+    category: '策略'
+  },
+  {
+    id: 'strategy-execution-overview',
+    name: '策略执行概览',
+    method: 'GET',
+    path: '/api/v1/strategy/execution/overview',
+    description: '获取策略执行概览',
+    requiresAuth: true,
+    category: '策略'
+  },
+  {
+    id: 'strategy-execution-realtime',
+    name: '策略实时状态',
+    method: 'GET',
+    path: '/api/v1/strategy/execution/realtime',
+    description: '获取策略实时执行状态',
+    requiresAuth: true,
+    category: '策略'
+  },
+  {
+    id: 'strategy-workflow-status',
+    name: '策略工作流状态',
+    method: 'GET',
+    path: '/api/v1/strategy/workflow/status',
+    description: '获取策略工作流状态',
+    requiresAuth: true,
+    category: '策略'
   },
   {
     id: 'strategy-create',
@@ -763,6 +835,142 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     category: '安全'
   },
 
+  // 自动启动管理
+  {
+    id: 'auto-start-strategies',
+    name: '自动启动策略',
+    method: 'GET',
+    path: '/api/v1/auto-start/strategies',
+    description: '获取自动启动策略列表',
+    requiresAuth: true,
+    category: '自动启动'
+  },
+  {
+    id: 'auto-start-stats',
+    name: '自动启动统计',
+    method: 'GET',
+    path: '/api/v1/auto-start/stats',
+    description: '获取自动启动统计信息',
+    requiresAuth: true,
+    category: '自动启动'
+  },
+
+  // 黑名单管理
+  {
+    id: 'blacklist-list',
+    name: '黑名单列表',
+    method: 'GET',
+    path: '/api/v1/blacklist/',
+    description: '获取策略黑名单列表',
+    requiresAuth: true,
+    category: '黑名单'
+  },
+
+  // 工作流管理
+  {
+    id: 'workflow-dependency-graph',
+    name: '依赖图',
+    method: 'GET',
+    path: '/api/v1/workflow/dependency-graph',
+    description: '获取工作流依赖图',
+    requiresAuth: true,
+    category: '工作流'
+  },
+  {
+    id: 'workflow-results',
+    name: '执行结果',
+    method: 'GET',
+    path: '/api/v1/workflow/results',
+    description: '获取工作流执行结果',
+    requiresAuth: true,
+    category: '工作流'
+  },
+  {
+    id: 'workflow-status',
+    name: '工作流状态',
+    method: 'GET',
+    path: '/api/v1/workflow/status',
+    description: '获取工作流状态',
+    requiresAuth: true,
+    category: '工作流'
+  },
+  {
+    id: 'workflow-validate',
+    name: '工作流验证',
+    method: 'GET',
+    path: '/api/v1/workflow/validate',
+    description: '验证工作流配置',
+    requiresAuth: true,
+    category: '工作流'
+  },
+  {
+    id: 'workflow-enabled',
+    name: '启用的功能',
+    method: 'GET',
+    path: '/api/v1/workflow/enabled',
+    description: '获取启用的工作流功能',
+    requiresAuth: true,
+    category: '工作流'
+  },
+
+  // 并发管理
+  {
+    id: 'concurrent-pools',
+    name: '线程池状态',
+    method: 'GET',
+    path: '/api/v1/concurrent/pools',
+    description: '获取并发线程池状态',
+    requiresAuth: true,
+    category: '并发管理'
+  },
+  {
+    id: 'concurrent-monitor',
+    name: '监控统计',
+    method: 'GET',
+    path: '/api/v1/concurrent/monitor',
+    description: '获取并发监控统计',
+    requiresAuth: true,
+    category: '并发管理'
+  },
+  {
+    id: 'concurrent-alerts',
+    name: '并发告警',
+    method: 'GET',
+    path: '/api/v1/concurrent/alerts',
+    description: '获取并发系统告警',
+    requiresAuth: true,
+    category: '并发管理'
+  },
+  {
+    id: 'concurrent-load-balancer',
+    name: '负载均衡器状态',
+    method: 'GET',
+    path: '/api/v1/concurrent/load-balancer',
+    description: '获取负载均衡器状态',
+    requiresAuth: true,
+    category: '并发管理'
+  },
+
+  // 紧急停止
+  {
+    id: 'emergency-status',
+    name: '紧急停止状态',
+    method: 'GET',
+    path: '/api/v1/emergency/status',
+    description: '获取紧急停止状态',
+    requiresAuth: true,
+    category: '紧急停止'
+  },
+  {
+    id: 'emergency-history',
+    name: '紧急停止历史',
+    method: 'GET',
+    path: '/api/v1/emergency/history',
+    description: '获取紧急停止历史记录',
+    requiresAuth: true,
+    category: '紧急停止'
+  },
+
   // 编排器管理
   {
     id: 'orchestrator-status',
@@ -830,6 +1038,104 @@ const API_ENDPOINTS: ApiEndpoint[] = [
     description: '获取编排器健康状态',
     requiresAuth: true,
     category: '编排器'
+  },
+
+  // 系统稳定性
+  {
+    id: 'memory-stats',
+    name: '内存统计',
+    method: 'GET',
+    path: '/api/v1/memory/stats',
+    description: '获取系统内存使用统计',
+    requiresAuth: true,
+    category: '系统稳定性'
+  },
+  {
+    id: 'network-connections',
+    name: '网络连接',
+    method: 'GET',
+    path: '/api/v1/network/connections',
+    description: '获取网络连接状态',
+    requiresAuth: true,
+    category: '系统稳定性'
+  },
+  {
+    id: 'health-status',
+    name: '健康状态',
+    method: 'GET',
+    path: '/api/v1/health/status',
+    description: '获取系统健康状态',
+    requiresAuth: true,
+    category: '系统稳定性'
+  },
+  {
+    id: 'health-checks',
+    name: '健康检查',
+    method: 'GET',
+    path: '/api/v1/health/checks',
+    description: '执行系统健康检查',
+    requiresAuth: true,
+    category: '系统稳定性'
+  },
+  {
+    id: 'shutdown-status',
+    name: '关闭状态',
+    method: 'GET',
+    path: '/api/v1/shutdown/status',
+    description: '获取系统关闭状态',
+    requiresAuth: true,
+    category: '系统稳定性'
+  },
+
+  // 策略验证
+  {
+    id: 'validation-strategies',
+    name: '策略验证状态',
+    method: 'GET',
+    path: '/api/v1/validation/strategies',
+    description: '获取策略验证状态',
+    requiresAuth: true,
+    category: '策略验证'
+  },
+  {
+    id: 'validation-problems',
+    name: '策略问题',
+    method: 'GET',
+    path: '/api/v1/validation/problems',
+    description: '获取策略验证问题',
+    requiresAuth: true,
+    category: '策略验证'
+  },
+  {
+    id: 'validation-automation',
+    name: '自动化状态',
+    method: 'GET',
+    path: '/api/v1/validation/automation',
+    description: '获取验证自动化状态',
+    requiresAuth: true,
+    category: '策略验证'
+  },
+
+  // 优化器
+  {
+    id: 'optimizer-tasks',
+    name: '优化任务列表',
+    method: 'GET',
+    path: '/api/v1/optimizer/tasks',
+    description: '获取优化任务列表',
+    requiresAuth: true,
+    category: '优化器'
+  },
+
+  // 结果分享
+  {
+    id: 'shared-results',
+    name: '分享结果',
+    method: 'GET',
+    path: '/api/v1/shared-results',
+    description: '获取分享的结果列表',
+    requiresAuth: true,
+    category: '结果分享'
   },
 
   // 基础健康检查 (公共接口)
