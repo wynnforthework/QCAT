@@ -5273,10 +5273,11 @@ func (ss *StrategyScheduler) getPendingOptimizationResults(ctx context.Context) 
 	}
 
 	query := `
-		SELECT id, strategy_id, optimization_score, optimized_parameters, 
+		SELECT id, strategy_id, optimization_score, optimized_parameters,
 		       created_at, status
-		FROM optimization_history 
+		FROM optimization_history
 		WHERE status = 'completed' AND applied = false
+		AND strategy_id IS NOT NULL AND strategy_id != ''
 		ORDER BY optimization_score DESC
 		LIMIT 10
 	`
@@ -5292,10 +5293,11 @@ func (ss *StrategyScheduler) getPendingOptimizationResults(ctx context.Context) 
 		var result OptimizationResult
 		var paramsJSON string
 		var createdAt time.Time
+		var strategyID sql.NullString
 
 		err := rows.Scan(
 			&result.ID,
-			&result.StrategyID,
+			&strategyID,
 			&result.Score,
 			&paramsJSON,
 			&createdAt,
@@ -5305,6 +5307,14 @@ func (ss *StrategyScheduler) getPendingOptimizationResults(ctx context.Context) 
 			log.Printf("Failed to scan optimization result: %v", err)
 			continue
 		}
+
+		// 检查strategy_id是否为NULL，如果是则跳过这条记录
+		if !strategyID.Valid || strategyID.String == "" {
+			log.Printf("Skipping optimization result with NULL or empty strategy_id, result ID: %s", result.ID)
+			continue
+		}
+
+		result.StrategyID = strategyID.String
 
 		// 解析优化参数
 		if err := json.Unmarshal([]byte(paramsJSON), &result.OptimizedParameters); err != nil {
