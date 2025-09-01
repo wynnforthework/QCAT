@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/rand/v2"
 	"time"
 )
 
@@ -20,21 +21,21 @@ type ParameterOptimizer struct {
 
 // OptimizationTask 优化任务
 type OptimizationTask struct {
-	StrategyID     string                 `json:"strategy_id"`
-	CurrentParams  map[string]interface{} `json:"current_params"`
-	BestParams     map[string]interface{} `json:"best_params"`
-	CurrentScore   float64                `json:"current_score"`
-	BestScore      float64                `json:"best_score"`
-	Iterations     int                    `json:"iterations"`
-	Status         string                 `json:"status"`
-	StartTime      time.Time              `json:"start_time"`
-	LastUpdate     time.Time              `json:"last_update"`
+	StrategyID    string                 `json:"strategy_id"`
+	CurrentParams map[string]interface{} `json:"current_params"`
+	BestParams    map[string]interface{} `json:"best_params"`
+	CurrentScore  float64                `json:"current_score"`
+	BestScore     float64                `json:"best_score"`
+	Iterations    int                    `json:"iterations"`
+	Status        string                 `json:"status"`
+	StartTime     time.Time              `json:"start_time"`
+	LastUpdate    time.Time              `json:"last_update"`
 }
 
 // ParameterRange 参数范围定义
 type ParameterRange struct {
 	Name     string      `json:"name"`
-	Type     string      `json:"type"`     // "float", "int", "bool"
+	Type     string      `json:"type"` // "float", "int", "bool"
 	MinValue interface{} `json:"min_value"`
 	MaxValue interface{} `json:"max_value"`
 	Step     interface{} `json:"step"`
@@ -230,7 +231,7 @@ func (po *ParameterOptimizer) getCurrentStrategyState(ctx context.Context, strat
 	paramsQuery := `
 		SELECT config_json FROM strategies WHERE id = $1
 	`
-	
+
 	var configJSON string
 	if err := po.db.QueryRowContext(ctx, paramsQuery, strategyID).Scan(&configJSON); err != nil {
 		return nil, 0, err
@@ -238,26 +239,35 @@ func (po *ParameterOptimizer) getCurrentStrategyState(ctx context.Context, strat
 
 	// 解析参数（这里简化处理）
 	currentParams := map[string]interface{}{
-		"stop_loss":    0.02,
-		"take_profit":  0.05,
-		"rsi_period":   14,
-		"ma_period":    20,
+		"stop_loss":        0.02,
+		"take_profit":      0.05,
+		"rsi_period":       14,
+		"ma_period":        20,
 		"volume_threshold": 1000000,
 	}
 
 	// 获取当前性能评分（基于回测结果）
 	scoreQuery := `
-		SELECT 
-			COALESCE(sharpe_ratio, 0) * 0.4 + 
-			COALESCE((1 - max_drawdown), 0) * 0.3 + 
+		SELECT
+			COALESCE(sharpe_ratio, 0) * 0.4 +
+			COALESCE((1 - max_drawdown), 0) * 0.3 +
 			COALESCE(win_rate, 0) * 0.3 as composite_score
-		FROM backtest_results 
+		FROM backtest_results
 		WHERE strategy_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1
 	`
 
 	var currentScore float64
 	if err := po.db.QueryRowContext(ctx, scoreQuery, strategyID).Scan(&currentScore); err != nil {
-		currentScore = 0.1 // 默认低分
+		// 如果没有历史数据，生成一个合理的基准分数
+		currentScore = 0.3 + rand.Float64()*0.2 // 0.3-0.5之间的基准分数
+		log.Printf("No backtest results found for strategy %s, using baseline score: %.3f", strategyID, currentScore)
+	}
+
+	// 确保分数在合理范围内
+	if currentScore <= 0 {
+		currentScore = 0.2 // 最低基准分数
 	}
 
 	return currentParams, currentScore, nil
@@ -304,7 +314,7 @@ func (po *ParameterOptimizer) gridSearchOptimization(ctx context.Context, strate
 	for k, v := range currentParams {
 		bestParams[k] = v
 	}
-	
+
 	bestScore := 0.1 // 初始低分
 	iterations := 0
 
@@ -317,7 +327,7 @@ func (po *ParameterOptimizer) gridSearchOptimization(ctx context.Context, strate
 
 			for value := minVal; value <= maxVal; value += step {
 				iterations++
-				
+
 				// 创建测试参数组合
 				testParams := make(map[string]interface{})
 				for k, v := range currentParams {
@@ -347,42 +357,69 @@ func (po *ParameterOptimizer) gridSearchOptimization(ctx context.Context, strate
 
 // simulateBacktestScore 模拟回测评分
 func (po *ParameterOptimizer) simulateBacktestScore(params map[string]interface{}) float64 {
-	// 这里应该运行真实的回测，现在用简单的模拟
-	stopLoss := params["stop_loss"].(float64)
-	takeProfit := params["take_profit"].(float64)
-	
-	// 简单的评分逻辑：止损太小或盈利目标太大都不好
-	score := 0.5
-	
-	if stopLoss >= 0.015 && stopLoss <= 0.025 {
-		score += 0.2
+	// 这里应该运行真实的回测，现在用改进的模拟逻辑
+
+	// 基础分数，避免0值
+	score := 0.3 + rand.Float64()*0.2 // 0.3-0.5基础分数
+
+	// 检查止损参数
+	if stopLossVal, ok := params["stop_loss"]; ok {
+		if stopLoss, ok := stopLossVal.(float64); ok {
+			if stopLoss >= 0.015 && stopLoss <= 0.025 {
+				score += 0.15 + rand.Float64()*0.1 // 0.15-0.25额外分数
+			} else if stopLoss > 0.01 && stopLoss < 0.04 {
+				score += 0.05 + rand.Float64()*0.05 // 次优范围
+			}
+		}
 	}
-	
-	if takeProfit >= 0.03 && takeProfit <= 0.07 {
-		score += 0.2
+
+	// 检查止盈参数
+	if takeProfitVal, ok := params["take_profit"]; ok {
+		if takeProfit, ok := takeProfitVal.(float64); ok {
+			if takeProfit >= 0.03 && takeProfit <= 0.07 {
+				score += 0.15 + rand.Float64()*0.1 // 0.15-0.25额外分数
+			} else if takeProfit > 0.02 && takeProfit < 0.1 {
+				score += 0.05 + rand.Float64()*0.05 // 次优范围
+			}
+		}
 	}
-	
-	// 添加一些随机性模拟市场变化
-	score += (math.Sin(float64(time.Now().Unix())) * 0.1)
-	
-	return math.Max(0.1, math.Min(1.0, score))
+
+	// 检查其他参数并给予奖励
+	if maPeriodVal, ok := params["ma_period"]; ok {
+		if maPeriod, ok := maPeriodVal.(float64); ok && maPeriod >= 10 && maPeriod <= 50 {
+			score += 0.05 + rand.Float64()*0.05
+		}
+	}
+
+	// 添加一些随机性来模拟市场条件的变化
+	marketConditionBonus := (rand.Float64() - 0.5) * 0.1 // -0.05到+0.05的随机调整
+	score += marketConditionBonus
+
+	// 添加时间因子来模拟不同市场周期的表现
+	timeFactor := math.Sin(float64(time.Now().Unix()%86400)/86400*2*math.Pi) * 0.05
+	score += timeFactor
+
+	// 确保分数在合理范围内 (0.1 到 1.0)
+	finalScore := math.Max(0.1, math.Min(1.0, score))
+
+	return finalScore
 }
 
 // applyOptimizedParameters 应用优化后的参数
 func (po *ParameterOptimizer) applyOptimizedParameters(ctx context.Context, strategyID string, params map[string]interface{}) error {
 	// 这里应该更新策略配置
 	log.Printf("应用优化参数到策略 %s: %+v", strategyID, params)
-	
+
 	// 更新数据库中的策略配置
 	updateQuery := `
 		UPDATE strategies 
 		SET config_json = $1, updated_at = $2, optimization_applied = true
 		WHERE id = $3
 	`
-	
+
 	// 简化的JSON序列化（实际应该用proper JSON）
 	configJSON := fmt.Sprintf(`{"optimized": true, "params": %+v}`, params)
-	
+
 	_, err := po.db.ExecContext(ctx, updateQuery, configJSON, time.Now(), strategyID)
 	return err
 }
@@ -442,11 +479,11 @@ func (po *ParameterOptimizer) GetOptimizerStatus(ctx context.Context) (map[strin
 	}
 
 	return map[string]interface{}{
-		"running":              po.running,
-		"optimize_interval":    po.optimizeInterval.String(),
-		"total_optimizations":  totalOpts,
-		"avg_improvement":      avgImprovement,
-		"max_improvement":      maxImprovement,
+		"running":               po.running,
+		"optimize_interval":     po.optimizeInterval.String(),
+		"total_optimizations":   totalOpts,
+		"avg_improvement":       avgImprovement,
+		"max_improvement":       maxImprovement,
 		"avg_optimization_time": time.Duration(avgTimeMs * int64(time.Millisecond)).String(),
 	}, nil
 }
