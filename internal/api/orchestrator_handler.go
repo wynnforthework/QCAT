@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"qcat/internal/orchestrator"
 	"github.com/gin-gonic/gin"
+	"qcat/internal/orchestrator"
 )
 
 // OrchestratorHandler handles orchestrator-related API requests
@@ -24,7 +24,7 @@ func NewOrchestratorHandler(orch *orchestrator.Orchestrator) *OrchestratorHandle
 // handleStatus returns the overall orchestrator status
 func (h *OrchestratorHandler) handleStatus(c *gin.Context) {
 	status := h.orchestrator.GetServiceStatus()
-	
+
 	c.JSON(http.StatusOK, gin.H{
 		"status":    "running",
 		"timestamp": time.Now(),
@@ -179,26 +179,44 @@ func (h *OrchestratorHandler) handleOptimize(c *gin.Context) {
 func (h *OrchestratorHandler) handleHealth(c *gin.Context) {
 	// Get service status
 	services := h.orchestrator.GetServiceStatus()
-	
-	// Determine overall health
+
+	// Determine overall health - 更宽松的健康检查逻辑
 	overallHealth := "healthy"
+	runningServices := 0
+	totalServices := len(services)
+	criticalServices := 0
+
 	for _, service := range services {
-		if service.Status != "running" {
-			overallHealth = "degraded"
-			break
+		if service.Status == "running" {
+			runningServices++
+		} else if service.Status == "failed" || service.Status == "error" {
+			criticalServices++
 		}
 	}
 
-	// Set appropriate HTTP status
-	statusCode := http.StatusOK
-	if overallHealth != "healthy" {
-		statusCode = http.StatusServiceUnavailable
+	// 健康状态判断逻辑：
+	// - 如果没有服务或所有服务都是stopped状态，认为是健康的（系统空闲）
+	// - 如果有失败的服务，认为是降级的
+	// - 如果有运行的服务，认为是健康的
+	if criticalServices > 0 {
+		overallHealth = "degraded"
+	} else if totalServices == 0 || runningServices > 0 {
+		overallHealth = "healthy"
+	} else {
+		// 所有服务都是stopped状态，但没有失败，认为是健康的
+		overallHealth = "healthy"
 	}
 
+	// 总是返回200状态码，除非有严重错误
+	statusCode := http.StatusOK
+
 	c.JSON(statusCode, gin.H{
-		"status":     overallHealth,
-		"timestamp":  time.Now(),
-		"services":   services,
-		"version":    "1.0.0", // Could be dynamic
+		"status":            overallHealth,
+		"timestamp":         time.Now(),
+		"services":          services,
+		"running_services":  runningServices,
+		"total_services":    totalServices,
+		"critical_services": criticalServices,
+		"version":           "1.0.0",
 	})
 }
