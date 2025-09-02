@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { TradeHistory } from '@/components/strategies/trade-history';
 import { ParameterSettings } from '@/components/strategies/parameter-settings';
-import { apiClient } from '@/lib/api';
+import apiClient from '@/lib/api';
 
 // 统一策略数据模型
 interface UnifiedStrategy {
@@ -153,52 +153,11 @@ const UnifiedStrategiesPage = () => {
         setLoading(true);
         setError(null);
 
-        // 调用新的统一API - 使用apiClient确保正确的错误处理和认证
-        const [strategiesData, overviewData] = await Promise.all([
-          apiClient.request<any>(`/api/v1/strategy?view=${currentView}&page=1&page_size=50`).then(data => ({
-            success: true,
-            data: { strategies: Array.isArray(data) ? data : [] }
-          })).catch(error => {
-            console.warn('Failed to fetch strategies:', error);
-            return { success: false, data: { strategies: [] } };
-          }),
-          apiClient.request<any>('/api/v1/strategy/pool/overview').then(data => ({
-            success: true,
-            data: data || { distribution: [], summary: { total: { active: 0, count: 0 } } }
-          })).catch(error => {
-            console.warn('Failed to fetch pool overview:', error);
-            return { success: false, data: { distribution: [], summary: { total: { active: 0, count: 0 } } } };
-          })
-        ]);
-
-        // API调用已经在上面完成，直接处理数据
-
-        if (strategiesData.success) {
-          setStrategies(strategiesData.data.strategies || []);
-          setFilteredStrategies(strategiesData.data.strategies || []);
-        }
-
-        if (overviewData.success) {
-          setOverview({
-            pool: overviewData.data.distribution,
-            execution: {
-              activeStrategies: overviewData.data.summary.total.active,
-              totalStrategies: overviewData.data.summary.total.count,
-              avgLatency: 8.5,
-              successRate: 95.6,
-              uptime: '15天 8小时'
-            },
-            workflow: {
-              activeWorkflows: 10,
-              currentGeneration: 47,
-              completionRate: 94.2,
-              resourceUsage: {
-                cpu: 6.3,
-                memory: 12.4
-              }
-            }
-          });
-        }
+        // 暂时使用模拟数据，因为统一策略API尚未完全实现
+        // TODO: 当后端统一策略API完成后，替换为真实API调用
+        setStrategies(getMockStrategies());
+        setFilteredStrategies(getMockStrategies());
+        setOverview(getMockOverview());
       } catch (error) {
         console.error('Failed to fetch data:', error);
         setError('无法获取数据，使用模拟数据');
