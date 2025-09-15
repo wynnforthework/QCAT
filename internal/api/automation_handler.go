@@ -8,7 +8,7 @@ import (
 	"qcat/internal/automation"
 	"qcat/internal/database"
 	"qcat/internal/monitor"
-	"qcat/internal/executor"
+	"qcat/internal/automation/executor"
 
 	"github.com/gin-gonic/gin"
 )
