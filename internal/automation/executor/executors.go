@@ -19,6 +19,8 @@ import (
 	"qcat/internal/exchange/account"
 	"qcat/internal/monitor"
 	"qcat/internal/security/protector"
+	"qcat/internal/intelligence/selector"
+	"qcat/internal/strategy/workflow"
 )
 
 // StrategyManagerInterface 定义策略管理器接口
@@ -710,7 +712,6 @@ func (re *RiskExecutor) reduceHighRiskPositions(ctx context.Context, action *Exe
 
 	return nil
 }
-
 // suspendNewPositions 暂停新开仓
 func (re *RiskExecutor) suspendNewPositions(ctx context.Context, action *ExecutionAction) error {
 	log.Printf("Suspending new position openings")
@@ -799,7 +800,6 @@ func (re *RiskExecutor) suspendNewPositions(ctx context.Context, action *Executi
 	log.Printf("New position openings suspended for %v", duration)
 	return nil
 }
-
 // resumeNewPositions 恢复新开仓
 func (re *RiskExecutor) resumeNewPositions(ctx context.Context, reason string) error {
 	re.mu.Lock()
@@ -1418,7 +1418,6 @@ func (oe *OrderExecutor) HandleAction(ctx context.Context, action *ExecutionActi
 		return fmt.Errorf("unknown order action: %s", action.Action)
 	}
 }
-
 // placeOrder 下单
 func (oe *OrderExecutor) placeOrder(ctx context.Context, action *ExecutionAction) error {
 	symbol := action.Symbol
@@ -1439,6 +1438,29 @@ func (oe *OrderExecutor) placeOrder(ctx context.Context, action *ExecutionAction
 	}
 
 	log.Printf("Placing %s %s order for %s: %.4f @ %.4f", orderType, side, symbol, quantity, price)
+
+	// 选择器钩子（shadow模式，仅记录，不改变行为）
+	if re, ok := ctx.Value("realtime_executor").(*RealtimeExecutor); ok && re != nil && re.strategySelector != nil {
+		// shadow gating by config
+		shadowEnabled := re.config.Selector.Shadow.Enabled
+		if shadowEnabled {
+			mctx := selector.MarketContextFactory(symbol)
+			// 轻量候选集：从参数或默认构造（真实接入时来自策略池）
+			candidates := []selector.EnabledStrategyLite{}
+			if ids, ok2 := action.Parameters["candidate_strategies"].([]string); ok2 {
+				for _, id := range ids { candidates = append(candidates, selector.EnabledStrategyLite{ID: id}) }
+			}
+			// 从策略池补充候选（当未提供时）
+			if len(candidates) == 0 && re.strategyPool != nil {
+				if objs := re.strategyPool.GetEnabledStrategyObjects(); len(objs) > 0 {
+					for _, es := range objs { candidates = append(candidates, selector.EnabledStrategyLite{ID: es.ID, Name: es.Name, Type: es.Type}) }
+				}
+			}
+			if res, err := re.strategySelector.Select(ctx, symbol, mctx, candidates); err == nil && res != nil {
+				log.Printf("[selector] symbol=%s selected=%s method=%s regime=%s", symbol, res.SelectedID, res.Method, res.Regime)
+			}
+		}
+	}
 
 	// 1. 验证订单参数
 	if symbol == "" {
@@ -1530,7 +1552,6 @@ func (oe *OrderExecutor) cancelOrder(ctx context.Context, action *ExecutionActio
 	log.Printf("Successfully cancelled order: %s", orderID)
 	return nil
 }
-
 // modifyOrder 修改订单
 func (oe *OrderExecutor) modifyOrder(ctx context.Context, action *ExecutionAction) error {
 	orderID, ok := action.Parameters["order_id"].(string)
@@ -2194,7 +2215,6 @@ func (se *StrategyExecutor) getStrategyInfo(ctx context.Context, strategyID stri
 
 	return &info, nil
 }
-
 // StrategyPerformance 策略性能信息
 type StrategyPerformance struct {
 	TotalReturn      float64       `json:"total_return"`
@@ -2206,7 +2226,6 @@ type StrategyPerformance struct {
 	LosingTrades     int           `json:"losing_trades"`
 	AvgTradeDuration time.Duration `json:"avg_trade_duration"`
 }
-
 // getStrategyPerformance 获取策略性能信息
 func (se *StrategyExecutor) getStrategyPerformance(ctx context.Context, strategyID string) (*StrategyPerformance, error) {
 	if se.db == nil {
@@ -2328,12 +2347,10 @@ func (se *StrategyExecutor) validateParameterRange(value interface{}, def *Param
 	// 简化的范围验证
 	return true
 }
-
 func (se *StrategyExecutor) validateParameterCombinations(strategyType string, params map[string]interface{}) []string {
 	// 参数组合验证
 	return []string{}
 }
-
 func (se *StrategyExecutor) checkParameterRisks(strategy *StrategyConfig, newParams map[string]interface{}) []string {
 	// 风险检查
 	return []string{}
@@ -2996,7 +3013,6 @@ func (se *StrategyExecutor) randomSearchOptimization(ctx context.Context, strate
 func (se *StrategyExecutor) bayesianOptimization(ctx context.Context, strategy *StrategyInfo, searchSpace map[string]interface{}) (map[string]interface{}, error) {
 	return map[string]interface{}{}, nil
 }
-
 func (se *StrategyExecutor) validateOptimizedParameters(ctx context.Context, strategy *StrategyInfo, params map[string]interface{}) (*ParameterValidationResult, error) {
 	return &ParameterValidationResult{
 		IsValid:     true,
@@ -3010,7 +3026,6 @@ func (se *StrategyExecutor) validateOptimizedParameters(ctx context.Context, str
 func (se *StrategyExecutor) applyOptimizedParameters(ctx context.Context, strategy *StrategyInfo, params map[string]interface{}) error {
 	return nil
 }
-
 func (se *StrategyExecutor) analyzePortfolioDistribution(positions []*Position) map[string]interface{} {
 	return map[string]interface{}{}
 }
@@ -3087,7 +3102,6 @@ func (de *DataExecutor) HandleAction(ctx context.Context, action *ExecutionActio
 		return fmt.Errorf("unknown data action: %s", action.Action)
 	}
 }
-
 // cleanData 清洗数据
 func (de *DataExecutor) cleanData(ctx context.Context, action *ExecutionAction) error {
 	log.Printf("Cleaning data")
@@ -3135,7 +3149,6 @@ func (de *DataExecutor) cleanData(ctx context.Context, action *ExecutionAction) 
 	log.Printf("Started data cleaning task %s for source %s", cleaningTask.ID, dataSource)
 	return nil
 }
-
 // executeDataCleaning 执行数据清洗
 func (de *DataExecutor) executeDataCleaning(ctx context.Context, task *DataCleaningTask) {
 	defer func() {
@@ -3780,7 +3793,6 @@ func (de *DataExecutor) shouldUpdateFactor(factor *FactorInfo, task *FactorUpdat
 
 	return true
 }
-
 // updateSingleFactor 更新单个因子
 func (de *DataExecutor) updateSingleFactor(ctx context.Context, factor *FactorInfo, task *FactorUpdateTask) (*FactorUpdateResult, error) {
 	log.Printf("Updating factor %s (%s)", factor.ID, factor.Name)
@@ -3861,7 +3873,6 @@ func (de *DataExecutor) calculateFactorValues(ctx context.Context, factor *Facto
 		return factorValues, fmt.Errorf("unsupported factor type: %s", factor.Type)
 	}
 }
-
 // validateUpdatedFactors 验证更新后的因子
 func (de *DataExecutor) validateUpdatedFactors(ctx context.Context, updateResults map[string]*FactorUpdateResult) (*FactorValidationResults, error) {
 	validationResults := &FactorValidationResults{
@@ -3928,7 +3939,6 @@ type FactorUpdateStatistics struct {
 	UpdatedFactors int `json:"updated_factors"`
 	FailedFactors  int `json:"failed_factors"`
 }
-
 type FactorUpdateResult struct {
 	FactorID         string            `json:"factor_id"`
 	Status           string            `json:"status"`
@@ -4583,7 +4593,6 @@ func (de *DataExecutor) saveBacktestTask(ctx context.Context, task *BacktestTask
 func (de *DataExecutor) updateBacktestTask(ctx context.Context, task *BacktestTask) error {
 	return nil
 }
-
 func (de *DataExecutor) getStrategyForBacktest(ctx context.Context, strategyID string) (*BacktestStrategy, error) {
 	return &BacktestStrategy{
 		ID:   strategyID,
@@ -4654,7 +4663,6 @@ func (de *DataExecutor) calculateSharpeRatio(equity []EquityPoint) float64 {
 	// 简化的夏普比率计算
 	return 1.5
 }
-
 func (de *DataExecutor) calculateWinRate(trades []BacktestTrade) float64 {
 	if len(trades) == 0 {
 		return 0
@@ -4710,7 +4718,6 @@ func (de *DataExecutor) calculateMaxConsecutiveLoss(trades []BacktestTrade) int 
 
 	return maxLoss
 }
-
 // recognizePattern 识别模式
 func (de *DataExecutor) recognizePattern(ctx context.Context, action *ExecutionAction) error {
 	log.Printf("Recognizing market pattern")
@@ -5347,7 +5354,6 @@ func (se *SystemExecutor) securityMonitor(ctx context.Context, action *Execution
 	log.Printf("Started security monitoring task %s", securityTask.ID)
 	return nil
 }
-
 // exchangeFailover 交易所故障切换
 func (se *SystemExecutor) exchangeFailover(ctx context.Context, action *ExecutionAction) error {
 	log.Printf("Performing exchange failover")
@@ -5404,7 +5410,6 @@ func (se *SystemExecutor) exchangeFailover(ctx context.Context, action *Executio
 	log.Printf("Started exchange failover task %s", failoverTask.ID)
 	return nil
 }
-
 // auditLog 审计日志
 func (se *SystemExecutor) auditLog(ctx context.Context, action *ExecutionAction) error {
 	log.Printf("Processing audit logs")
@@ -5468,7 +5473,6 @@ func (se *SystemExecutor) auditLog(ctx context.Context, action *ExecutionAction)
 	log.Printf("Started audit log processing task %s", auditTask.ID)
 	return nil
 }
-
 // logPerformanceMetrics 记录性能指标
 func (se *SystemExecutor) logPerformanceMetrics(ctx context.Context, action *ExecutionAction) error {
 	log.Printf("Logging performance metrics")
@@ -6144,7 +6148,6 @@ func (se *SystemExecutor) handleHealthIssues(ctx context.Context, results map[st
 		}
 	}
 }
-
 func (se *SystemExecutor) notifyHealthCheckCompletion(ctx context.Context, task *HealthCheckTask) {
 	if se.notificationService != nil {
 		message := fmt.Sprintf("Health check task %s completed with status: %s", task.ID, task.Status)
@@ -6160,864 +6163,6 @@ func (se *SystemExecutor) notifyHealthCheckCompletion(ctx context.Context, task 
 		}
 	}
 }
-
-// executeSecurityMonitoring 执行安全监控
-func (se *SystemExecutor) executeSecurityMonitoring(ctx context.Context, task *SecurityMonitoringTask) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("Security monitoring task %s panicked: %v", task.ID, r)
-			task.Status = "failed"
-			task.Error = fmt.Sprintf("panic: %v", r)
-			se.updateSecurityTask(ctx, task)
-		}
-	}()
-
-	// 1. 更新任务状态
-	task.Status = "running"
-	task.StartedAt = time.Now()
-	se.updateSecurityTask(ctx, task)
-
-	// 2. 创建监控上下文
-	monitorCtx, cancel := context.WithTimeout(ctx, task.Duration)
-	defer cancel()
-
-	// 3. 执行各项安全监控
-	securityResults := make(map[string]*SecurityMonitorResult)
-
-	for _, monitorTypeInterface := range task.MonitorTypes {
-		monitorType, ok := monitorTypeInterface.(string)
-		if !ok {
-			continue
-		}
-
-		result := se.performSecurityMonitoring(monitorCtx, monitorType, task)
-		securityResults[monitorType] = result
-	}
-
-	// 4. 分析安全威胁
-	threatAnalysis := se.analyzeThreatLevel(securityResults)
-
-	// 5. 生成安全报告
-	securityReport := se.generateSecurityReport(securityResults, threatAnalysis, task)
-
-	task.Results = &SecurityMonitoringResults{
-		MonitorResults: securityResults,
-		ThreatAnalysis: threatAnalysis,
-		SecurityReport: securityReport,
-		MonitoredAt:    time.Now(),
-	}
-
-	// 6. 处理安全威胁
-	if threatAnalysis.ThreatLevel != "low" {
-		se.handleSecurityThreats(ctx, securityResults, task)
-	}
-
-	// 7. 更新任务完成状态
-	task.Status = "completed"
-	task.CompletedAt = time.Now()
-	task.Duration = task.CompletedAt.Sub(task.StartedAt)
-	se.updateSecurityTask(ctx, task)
-
-	// 8. 发送通知
-	se.notifySecurityMonitoringCompletion(ctx, task)
-
-	// 9. 记录指标
-	if se.metrics != nil {
-		se.metrics.IncrementCounter("system_executor.security_monitoring_completed", map[string]string{
-			"status":       task.Status,
-			"threat_level": threatAnalysis.ThreatLevel,
-		})
-	}
-
-	log.Printf("Security monitoring task %s completed successfully", task.ID)
-}
-
-// executeRealTimeSecurityMonitoring 执行实时安全监控
-func (se *SystemExecutor) executeRealTimeSecurityMonitoring(ctx context.Context, task *SecurityMonitoringTask) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("Real-time security monitoring task %s panicked: %v", task.ID, r)
-			task.Status = "failed"
-			task.Error = fmt.Sprintf("panic: %v", r)
-			se.updateSecurityTask(ctx, task)
-		}
-	}()
-
-	// 1. 更新任务状态
-	task.Status = "running"
-	task.StartedAt = time.Now()
-	se.updateSecurityTask(ctx, task)
-
-	// 2. 创建实时监控上下文
-	monitorCtx, cancel := context.WithTimeout(ctx, task.Duration)
-	defer cancel()
-
-	// 3. 启动实时监控器
-	monitoringInterval := 30 * time.Second // 30秒检查一次
-	ticker := time.NewTicker(monitoringInterval)
-	defer ticker.Stop()
-
-	alertCount := 0
-
-	for {
-		select {
-		case <-monitorCtx.Done():
-			// 监控时间结束
-			task.Status = "completed"
-			task.CompletedAt = time.Now()
-			task.Duration = task.CompletedAt.Sub(task.StartedAt)
-			se.updateSecurityTask(ctx, task)
-
-			log.Printf("Real-time security monitoring task %s completed", task.ID)
-			return
-
-		case <-ticker.C:
-			// 执行实时安全检查
-			threats := se.performRealTimeSecurityCheck(monitorCtx, task)
-
-			if len(threats) > 0 {
-				alertCount++
-
-				// 立即处理威胁
-				for _, threat := range threats {
-					se.handleImmediateThreat(monitorCtx, threat, task)
-				}
-
-				// 发送实时告警
-				se.sendRealTimeSecurityAlert(monitorCtx, threats, task)
-			}
-		}
-	}
-}
-
-// performSecurityMonitoring 执行安全监控
-func (se *SystemExecutor) performSecurityMonitoring(ctx context.Context, monitorType string, task *SecurityMonitoringTask) *SecurityMonitorResult {
-	result := &SecurityMonitorResult{
-		MonitorType:   monitorType,
-		Status:        "secure",
-		SecurityScore: 100,
-		CheckedAt:     time.Now(),
-		Issues:        make([]SecurityIssue, 0),
-	}
-
-	switch monitorType {
-	case "authentication":
-		result = se.monitorAuthentication(ctx, task)
-	case "authorization":
-		result = se.monitorAuthorization(ctx, task)
-	case "network":
-		result = se.monitorNetworkSecurity(ctx, task)
-	case "api_security":
-		result = se.monitorAPISecurity(ctx, task)
-	case "data_protection":
-		result = se.monitorDataProtection(ctx, task)
-	case "threat_detection":
-		result = se.monitorThreatDetection(ctx, task)
-	default:
-		result.Status = "unknown"
-		result.SecurityScore = 0
-		result.Message = fmt.Sprintf("Unknown monitor type: %s", monitorType)
-	}
-
-	result.MonitorType = monitorType
-	result.CheckedAt = time.Now()
-
-	return result
-}
-
-// monitorAuthentication 监控身份认证安全
-func (se *SystemExecutor) monitorAuthentication(ctx context.Context, task *SecurityMonitoringTask) *SecurityMonitorResult {
-	result := &SecurityMonitorResult{
-		MonitorType:   "authentication",
-		Status:        "secure",
-		SecurityScore: 100,
-		Message:       "Authentication security is normal",
-		Issues:        make([]SecurityIssue, 0),
-	}
-
-	// 1. 检查失败登录尝试
-	failedLogins := se.getFailedLoginAttempts(ctx, 1*time.Hour)
-	if failedLogins > 50 { // 1小时内超过50次失败登录
-		result.SecurityScore -= 30
-		result.Status = "warning"
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "excessive_failed_logins",
-			Severity:    "high",
-			Description: fmt.Sprintf("Detected %d failed login attempts in the last hour", failedLogins),
-			Count:       failedLogins,
-		})
-	}
-
-	// 2. 检查异常登录模式
-	suspiciousLogins := se.detectSuspiciousLogins(ctx, 24*time.Hour)
-	if len(suspiciousLogins) > 0 {
-		result.SecurityScore -= 20
-		result.Status = "warning"
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "suspicious_login_patterns",
-			Severity:    "medium",
-			Description: fmt.Sprintf("Detected %d suspicious login patterns", len(suspiciousLogins)),
-			Count:       len(suspiciousLogins),
-		})
-	}
-
-	// 3. 检查弱密码使用
-	weakPasswords := se.detectWeakPasswords(ctx)
-	if weakPasswords > 0 {
-		result.SecurityScore -= 15
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "weak_passwords",
-			Severity:    "medium",
-			Description: fmt.Sprintf("Found %d accounts with weak passwords", weakPasswords),
-			Count:       weakPasswords,
-		})
-	}
-
-	// 4. 检查多因素认证使用率
-	mfaUsage := se.getMFAUsageRate(ctx)
-	if mfaUsage < 0.8 { // MFA使用率低于80%
-		result.SecurityScore -= 10
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "low_mfa_usage",
-			Severity:    "low",
-			Description: fmt.Sprintf("MFA usage rate is %.1f%%, below recommended 80%%", mfaUsage*100),
-		})
-	}
-
-	return result
-}
-
-// monitorAuthorization 监控授权安全
-func (se *SystemExecutor) monitorAuthorization(ctx context.Context, task *SecurityMonitoringTask) *SecurityMonitorResult {
-	result := &SecurityMonitorResult{
-		MonitorType:   "authorization",
-		Status:        "secure",
-		SecurityScore: 100,
-		Message:       "Authorization security is normal",
-		Issues:        make([]SecurityIssue, 0),
-	}
-
-	// 1. 检查权限提升尝试
-	privilegeEscalations := se.detectPrivilegeEscalation(ctx, 1*time.Hour)
-	if privilegeEscalations > 0 {
-		result.SecurityScore -= 40
-		result.Status = "critical"
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "privilege_escalation",
-			Severity:    "critical",
-			Description: fmt.Sprintf("Detected %d privilege escalation attempts", privilegeEscalations),
-			Count:       privilegeEscalations,
-		})
-	}
-
-	// 2. 检查未授权访问尝试
-	unauthorizedAccess := se.detectUnauthorizedAccess(ctx, 1*time.Hour)
-	if unauthorizedAccess > 10 {
-		result.SecurityScore -= 25
-		result.Status = "warning"
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "unauthorized_access",
-			Severity:    "high",
-			Description: fmt.Sprintf("Detected %d unauthorized access attempts", unauthorizedAccess),
-			Count:       unauthorizedAccess,
-		})
-	}
-
-	// 3. 检查过度权限
-	excessivePermissions := se.detectExcessivePermissions(ctx)
-	if excessivePermissions > 0 {
-		result.SecurityScore -= 15
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "excessive_permissions",
-			Severity:    "medium",
-			Description: fmt.Sprintf("Found %d accounts with excessive permissions", excessivePermissions),
-			Count:       excessivePermissions,
-		})
-	}
-
-	return result
-}
-
-// monitorNetworkSecurity 监控网络安全
-func (se *SystemExecutor) monitorNetworkSecurity(ctx context.Context, task *SecurityMonitoringTask) *SecurityMonitorResult {
-	result := &SecurityMonitorResult{
-		MonitorType:   "network",
-		Status:        "secure",
-		SecurityScore: 100,
-		Message:       "Network security is normal",
-		Issues:        make([]SecurityIssue, 0),
-	}
-
-	// 1. 检查DDoS攻击
-	ddosAttacks := se.detectDDoSAttacks(ctx, 10*time.Minute)
-	if ddosAttacks > 0 {
-		result.SecurityScore -= 50
-		result.Status = "critical"
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "ddos_attack",
-			Severity:    "critical",
-			Description: fmt.Sprintf("Detected %d DDoS attacks in the last 10 minutes", ddosAttacks),
-			Count:       ddosAttacks,
-		})
-	}
-
-	// 2. 检查端口扫描
-	portScans := se.detectPortScans(ctx, 1*time.Hour)
-	if portScans > 5 {
-		result.SecurityScore -= 20
-		result.Status = "warning"
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "port_scanning",
-			Severity:    "medium",
-			Description: fmt.Sprintf("Detected %d port scanning attempts", portScans),
-			Count:       portScans,
-		})
-	}
-
-	// 3. 检查异常流量
-	abnormalTraffic := se.detectAbnormalTraffic(ctx, 30*time.Minute)
-	if abnormalTraffic {
-		result.SecurityScore -= 15
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "abnormal_traffic",
-			Severity:    "medium",
-			Description: "Detected abnormal network traffic patterns",
-		})
-	}
-
-	return result
-}
-
-// monitorAPISecurity 监控API安全
-func (se *SystemExecutor) monitorAPISecurity(ctx context.Context, task *SecurityMonitoringTask) *SecurityMonitorResult {
-	result := &SecurityMonitorResult{
-		MonitorType:   "api_security",
-		Status:        "secure",
-		SecurityScore: 100,
-		Message:       "API security is normal",
-		Issues:        make([]SecurityIssue, 0),
-	}
-
-	// 1. 检查API滥用
-	apiAbuse := se.detectAPIAbuse(ctx, 1*time.Hour)
-	if apiAbuse > 100 {
-		result.SecurityScore -= 30
-		result.Status = "warning"
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "api_abuse",
-			Severity:    "high",
-			Description: fmt.Sprintf("Detected %d API abuse attempts", apiAbuse),
-			Count:       apiAbuse,
-		})
-	}
-
-	// 2. 检查SQL注入尝试
-	sqlInjections := se.detectSQLInjection(ctx, 1*time.Hour)
-	if sqlInjections > 0 {
-		result.SecurityScore -= 40
-		result.Status = "critical"
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "sql_injection",
-			Severity:    "critical",
-			Description: fmt.Sprintf("Detected %d SQL injection attempts", sqlInjections),
-			Count:       sqlInjections,
-		})
-	}
-
-	// 3. 检查XSS攻击
-	xssAttacks := se.detectXSSAttacks(ctx, 1*time.Hour)
-	if xssAttacks > 0 {
-		result.SecurityScore -= 25
-		result.Status = "warning"
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "xss_attack",
-			Severity:    "high",
-			Description: fmt.Sprintf("Detected %d XSS attack attempts", xssAttacks),
-			Count:       xssAttacks,
-		})
-	}
-
-	return result
-}
-
-// monitorDataProtection 监控数据保护
-func (se *SystemExecutor) monitorDataProtection(ctx context.Context, task *SecurityMonitoringTask) *SecurityMonitorResult {
-	result := &SecurityMonitorResult{
-		MonitorType:   "data_protection",
-		Status:        "secure",
-		SecurityScore: 100,
-		Message:       "Data protection is normal",
-		Issues:        make([]SecurityIssue, 0),
-	}
-
-	// 1. 检查数据泄露
-	dataLeaks := se.detectDataLeaks(ctx, 24*time.Hour)
-	if dataLeaks > 0 {
-		result.SecurityScore -= 50
-		result.Status = "critical"
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "data_leak",
-			Severity:    "critical",
-			Description: fmt.Sprintf("Detected %d potential data leaks", dataLeaks),
-			Count:       dataLeaks,
-		})
-	}
-
-	// 2. 检查敏感数据访问
-	sensitiveAccess := se.monitorSensitiveDataAccess(ctx, 1*time.Hour)
-	if sensitiveAccess > 50 {
-		result.SecurityScore -= 20
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "excessive_sensitive_access",
-			Severity:    "medium",
-			Description: fmt.Sprintf("High volume of sensitive data access: %d requests", sensitiveAccess),
-			Count:       sensitiveAccess,
-		})
-	}
-
-	// 3. 检查加密状态
-	encryptionIssues := se.checkEncryptionStatus(ctx)
-	if encryptionIssues > 0 {
-		result.SecurityScore -= 30
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "encryption_issues",
-			Severity:    "high",
-			Description: fmt.Sprintf("Found %d encryption-related issues", encryptionIssues),
-			Count:       encryptionIssues,
-		})
-	}
-
-	return result
-}
-
-// monitorThreatDetection 监控威胁检测
-func (se *SystemExecutor) monitorThreatDetection(ctx context.Context, task *SecurityMonitoringTask) *SecurityMonitorResult {
-	result := &SecurityMonitorResult{
-		MonitorType:   "threat_detection",
-		Status:        "secure",
-		SecurityScore: 100,
-		Message:       "No threats detected",
-		Issues:        make([]SecurityIssue, 0),
-	}
-
-	// 1. 检查恶意软件
-	malwareDetections := se.detectMalware(ctx, 1*time.Hour)
-	if malwareDetections > 0 {
-		result.SecurityScore -= 60
-		result.Status = "critical"
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "malware_detection",
-			Severity:    "critical",
-			Description: fmt.Sprintf("Detected %d malware instances", malwareDetections),
-			Count:       malwareDetections,
-		})
-	}
-
-	// 2. 检查异常行为
-	anomalousActivities := se.detectAnomalousActivities(ctx, 2*time.Hour)
-	if anomalousActivities > 10 {
-		result.SecurityScore -= 25
-		result.Status = "warning"
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "anomalous_activity",
-			Severity:    "medium",
-			Description: fmt.Sprintf("Detected %d anomalous activities", anomalousActivities),
-			Count:       anomalousActivities,
-		})
-	}
-
-	// 3. 检查已知威胁指标
-	threatIndicators := se.checkThreatIndicators(ctx)
-	if threatIndicators > 0 {
-		result.SecurityScore -= 35
-		result.Status = "warning"
-		result.Issues = append(result.Issues, SecurityIssue{
-			Type:        "threat_indicators",
-			Severity:    "high",
-			Description: fmt.Sprintf("Found %d known threat indicators", threatIndicators),
-			Count:       threatIndicators,
-		})
-	}
-
-	return result
-}
-
-// Data structures for security monitoring
-
-type SecurityMonitoringTask struct {
-	ID           string                     `json:"id"`
-	MonitorTypes []interface{}              `json:"monitor_types"`
-	Severity     string                     `json:"severity"`
-	RealTime     bool                       `json:"real_time"`
-	Duration     time.Duration              `json:"duration"`
-	Status       string                     `json:"status"`
-	Error        string                     `json:"error,omitempty"`
-	Results      *SecurityMonitoringResults `json:"results,omitempty"`
-	CreatedAt    time.Time                  `json:"created_at"`
-	StartedAt    time.Time                  `json:"started_at"`
-	CompletedAt  time.Time                  `json:"completed_at"`
-}
-
-type SecurityMonitoringResults struct {
-	MonitorResults map[string]*SecurityMonitorResult `json:"monitor_results"`
-	ThreatAnalysis *ThreatAnalysis                   `json:"threat_analysis"`
-	SecurityReport *SecurityReport                   `json:"security_report"`
-	MonitoredAt    time.Time                         `json:"monitored_at"`
-}
-
-type SecurityMonitorResult struct {
-	MonitorType   string          `json:"monitor_type"`
-	Status        string          `json:"status"`
-	SecurityScore float64         `json:"security_score"`
-	Message       string          `json:"message"`
-	Issues        []SecurityIssue `json:"issues"`
-	CheckedAt     time.Time       `json:"checked_at"`
-}
-
-type SecurityIssue struct {
-	Type        string `json:"type"`
-	Severity    string `json:"severity"`
-	Description string `json:"description"`
-	Count       int    `json:"count,omitempty"`
-}
-
-type ThreatAnalysis struct {
-	ThreatLevel     string   `json:"threat_level"`
-	OverallScore    float64  `json:"overall_score"`
-	CriticalIssues  int      `json:"critical_issues"`
-	HighIssues      int      `json:"high_issues"`
-	MediumIssues    int      `json:"medium_issues"`
-	LowIssues       int      `json:"low_issues"`
-	Recommendations []string `json:"recommendations"`
-}
-
-type SecurityReport struct {
-	TaskID         string                            `json:"task_id"`
-	GeneratedAt    time.Time                         `json:"generated_at"`
-	ThreatAnalysis *ThreatAnalysis                   `json:"threat_analysis"`
-	MonitorResults map[string]*SecurityMonitorResult `json:"monitor_results"`
-	Summary        *SecuritySummary                  `json:"summary"`
-	ActionItems    []string                          `json:"action_items"`
-}
-
-type SecuritySummary struct {
-	TotalChecks    int     `json:"total_checks"`
-	SecureChecks   int     `json:"secure_checks"`
-	WarningChecks  int     `json:"warning_checks"`
-	CriticalChecks int     `json:"critical_checks"`
-	AverageScore   float64 `json:"average_score"`
-}
-
-type SecurityThreat struct {
-	Type        string                 `json:"type"`
-	Severity    string                 `json:"severity"`
-	Description string                 `json:"description"`
-	Source      string                 `json:"source"`
-	Timestamp   time.Time              `json:"timestamp"`
-	Details     map[string]interface{} `json:"details"`
-}
-
-// Helper method implementations (simplified)
-
-func (se *SystemExecutor) saveSecurityTask(ctx context.Context, task *SecurityMonitoringTask) error {
-	return nil
-}
-
-func (se *SystemExecutor) updateSecurityTask(ctx context.Context, task *SecurityMonitoringTask) error {
-	return nil
-}
-
-func (se *SystemExecutor) performRealTimeSecurityCheck(ctx context.Context, task *SecurityMonitoringTask) []SecurityThreat {
-	// 简化实现，返回模拟威胁
-	return []SecurityThreat{}
-}
-
-func (se *SystemExecutor) handleImmediateThreat(ctx context.Context, threat SecurityThreat, task *SecurityMonitoringTask) {
-	log.Printf("Handling immediate threat: %s - %s", threat.Type, threat.Description)
-
-	// 根据威胁类型采取相应措施
-	switch threat.Type {
-	case "ddos_attack":
-		se.activateDDoSProtection(ctx)
-	case "malware_detection":
-		se.quarantineMalware(ctx, threat)
-	case "sql_injection":
-		se.blockSQLInjection(ctx, threat)
-	default:
-		log.Printf("No specific handler for threat type: %s", threat.Type)
-	}
-}
-
-func (se *SystemExecutor) sendRealTimeSecurityAlert(ctx context.Context, threats []SecurityThreat, task *SecurityMonitoringTask) {
-	if se.notificationService != nil {
-		for _, threat := range threats {
-			message := fmt.Sprintf("SECURITY ALERT: %s detected - %s", threat.Type, threat.Description)
-			err := se.notificationService.SendWebhook(ctx, "", map[string]interface{}{
-				"type":        "security",
-				"severity":    threat.Severity,
-				"threat_type": threat.Type,
-				"message":     message,
-				"task_id":     task.ID,
-			})
-			if err != nil {
-				log.Printf("Failed to send security alert: %v", err)
-			}
-		}
-	}
-}
-
-func (se *SystemExecutor) analyzeThreatLevel(results map[string]*SecurityMonitorResult) *ThreatAnalysis {
-	analysis := &ThreatAnalysis{
-		ThreatLevel:     "low",
-		Recommendations: make([]string, 0),
-	}
-
-	totalScore := 0.0
-	totalChecks := len(results)
-
-	for _, result := range results {
-		totalScore += result.SecurityScore
-
-		for _, issue := range result.Issues {
-			switch issue.Severity {
-			case "critical":
-				analysis.CriticalIssues++
-			case "high":
-				analysis.HighIssues++
-			case "medium":
-				analysis.MediumIssues++
-			case "low":
-				analysis.LowIssues++
-			}
-		}
-	}
-
-	if totalChecks > 0 {
-		analysis.OverallScore = totalScore / float64(totalChecks)
-	}
-
-	// 确定威胁级别
-	if analysis.CriticalIssues > 0 {
-		analysis.ThreatLevel = "critical"
-	} else if analysis.HighIssues > 2 {
-		analysis.ThreatLevel = "high"
-	} else if analysis.MediumIssues > 5 {
-		analysis.ThreatLevel = "medium"
-	}
-
-	// 生成建议
-	if analysis.CriticalIssues > 0 {
-		analysis.Recommendations = append(analysis.Recommendations, "Immediate action required for critical security issues")
-	}
-	if analysis.HighIssues > 0 {
-		analysis.Recommendations = append(analysis.Recommendations, "Address high-severity security issues promptly")
-	}
-	if analysis.OverallScore < 80 {
-		analysis.Recommendations = append(analysis.Recommendations, "Overall security posture needs improvement")
-	}
-
-	return analysis
-}
-
-func (se *SystemExecutor) generateSecurityReport(results map[string]*SecurityMonitorResult, analysis *ThreatAnalysis, task *SecurityMonitoringTask) *SecurityReport {
-	report := &SecurityReport{
-		TaskID:         task.ID,
-		GeneratedAt:    time.Now(),
-		ThreatAnalysis: analysis,
-		MonitorResults: results,
-		Summary: &SecuritySummary{
-			TotalChecks:  len(results),
-			AverageScore: analysis.OverallScore,
-		},
-		ActionItems: make([]string, 0),
-	}
-
-	// 统计检查结果
-	for _, result := range results {
-		switch result.Status {
-		case "secure":
-			report.Summary.SecureChecks++
-		case "warning":
-			report.Summary.WarningChecks++
-		case "critical":
-			report.Summary.CriticalChecks++
-		}
-	}
-
-	// 生成行动项
-	if analysis.CriticalIssues > 0 {
-		report.ActionItems = append(report.ActionItems, "Investigate and resolve critical security issues immediately")
-	}
-	if analysis.HighIssues > 0 {
-		report.ActionItems = append(report.ActionItems, "Review and address high-severity security issues")
-	}
-	if analysis.OverallScore < 70 {
-		report.ActionItems = append(report.ActionItems, "Conduct comprehensive security review and improvement")
-	}
-
-	return report
-}
-
-func (se *SystemExecutor) handleSecurityThreats(ctx context.Context, results map[string]*SecurityMonitorResult, task *SecurityMonitoringTask) {
-	for monitorType, result := range results {
-		if result.Status == "critical" {
-			// 发送紧急安全告警
-			if se.notificationService != nil {
-				message := fmt.Sprintf("CRITICAL SECURITY ALERT: %s monitoring detected critical issues", monitorType)
-				err := se.notificationService.SendWebhook(ctx, "", map[string]interface{}{
-					"type":         "security",
-					"severity":     "critical",
-					"monitor_type": monitorType,
-					"message":      message,
-				})
-				if err != nil {
-					log.Printf("Failed to send critical security alert: %v", err)
-				}
-			}
-
-			// 执行自动响应措施
-			se.executeSecurityResponse(ctx, monitorType, result)
-		}
-	}
-}
-
-func (se *SystemExecutor) executeSecurityResponse(ctx context.Context, monitorType string, result *SecurityMonitorResult) {
-	log.Printf("Executing security response for %s", monitorType)
-
-	switch monitorType {
-	case "authentication":
-		se.enhanceAuthenticationSecurity(ctx)
-	case "network":
-		se.activateNetworkProtection(ctx)
-	case "api_security":
-		se.enableAPIProtection(ctx)
-	case "data_protection":
-		se.strengthenDataProtection(ctx)
-	case "threat_detection":
-		se.activateThreatResponse(ctx)
-	}
-}
-
-func (se *SystemExecutor) notifySecurityMonitoringCompletion(ctx context.Context, task *SecurityMonitoringTask) {
-	if se.notificationService != nil {
-		message := fmt.Sprintf("Security monitoring task %s completed with status: %s", task.ID, task.Status)
-		err := se.notificationService.SendWebhook(ctx, "", map[string]interface{}{
-			"type":    "security_management",
-			"action":  "security_monitoring_completed",
-			"message": message,
-			"task_id": task.ID,
-			"status":  task.Status,
-		})
-		if err != nil {
-			log.Printf("Failed to send security monitoring completion notification: %v", err)
-		}
-	}
-}
-
-// Simplified security detection methods
-
-func (se *SystemExecutor) getFailedLoginAttempts(ctx context.Context, duration time.Duration) int {
-	return 25 // 模拟值
-}
-
-func (se *SystemExecutor) detectSuspiciousLogins(ctx context.Context, duration time.Duration) []string {
-	return []string{} // 模拟值
-}
-
-func (se *SystemExecutor) detectWeakPasswords(ctx context.Context) int {
-	return 3 // 模拟值
-}
-
-func (se *SystemExecutor) getMFAUsageRate(ctx context.Context) float64 {
-	return 0.85 // 85% MFA使用率
-}
-
-func (se *SystemExecutor) detectPrivilegeEscalation(ctx context.Context, duration time.Duration) int {
-	return 0 // 模拟值
-}
-
-func (se *SystemExecutor) detectUnauthorizedAccess(ctx context.Context, duration time.Duration) int {
-	return 5 // 模拟值
-}
-
-func (se *SystemExecutor) detectExcessivePermissions(ctx context.Context) int {
-	return 2 // 模拟值
-}
-
-func (se *SystemExecutor) detectDDoSAttacks(ctx context.Context, duration time.Duration) int {
-	return 0 // 模拟值
-}
-
-func (se *SystemExecutor) detectPortScans(ctx context.Context, duration time.Duration) int {
-	return 2 // 模拟值
-}
-
-func (se *SystemExecutor) detectAbnormalTraffic(ctx context.Context, duration time.Duration) bool {
-	return false // 模拟值
-}
-
-func (se *SystemExecutor) detectAPIAbuse(ctx context.Context, duration time.Duration) int {
-	return 15 // 模拟值
-}
-
-func (se *SystemExecutor) detectSQLInjection(ctx context.Context, duration time.Duration) int {
-	return 0 // 模拟值
-}
-
-func (se *SystemExecutor) detectXSSAttacks(ctx context.Context, duration time.Duration) int {
-	return 0 // 模拟值
-}
-
-func (se *SystemExecutor) detectDataLeaks(ctx context.Context, duration time.Duration) int {
-	return 0 // 模拟值
-}
-
-func (se *SystemExecutor) monitorSensitiveDataAccess(ctx context.Context, duration time.Duration) int {
-	return 30 // 模拟值
-}
-
-func (se *SystemExecutor) checkEncryptionStatus(ctx context.Context) int {
-	return 0 // 模拟值
-}
-
-func (se *SystemExecutor) detectMalware(ctx context.Context, duration time.Duration) int {
-	return 0 // 模拟值
-}
-
-func (se *SystemExecutor) detectAnomalousActivities(ctx context.Context, duration time.Duration) int {
-	return 5 // 模拟值
-}
-
-func (se *SystemExecutor) checkThreatIndicators(ctx context.Context) int {
-	return 1 // 模拟值
-}
-
-// Security response methods (simplified implementations)
-
-func (se *SystemExecutor) activateDDoSProtection(ctx context.Context) {
-	log.Printf("Activating DDoS protection measures")
-}
-
-func (se *SystemExecutor) quarantineMalware(ctx context.Context, threat SecurityThreat) {
-	log.Printf("Quarantining malware: %s", threat.Description)
-}
-
-func (se *SystemExecutor) blockSQLInjection(ctx context.Context, threat SecurityThreat) {
-	log.Printf("Blocking SQL injection attempt: %s", threat.Description)
-}
-
-func (se *SystemExecutor) enhanceAuthenticationSecurity(ctx context.Context) {
-	log.Printf("Enhancing authentication security measures")
-}
-
-func (se *SystemExecutor) activateNetworkProtection(ctx context.Context) {
-	log.Printf("Activating network protection measures")
-}
-
-func (se *SystemExecutor) enableAPIProtection(ctx context.Context) {
-	log.Printf("Enabling API protection measures")
-}
-
 func (se *SystemExecutor) strengthenDataProtection(ctx context.Context) {
 	log.Printf("Strengthening data protection measures")
 }
@@ -7025,799 +6170,6 @@ func (se *SystemExecutor) strengthenDataProtection(ctx context.Context) {
 func (se *SystemExecutor) activateThreatResponse(ctx context.Context) {
 	log.Printf("Activating threat response measures")
 }
-
-// executeExchangeFailover 执行交易所故障切换
-func (se *SystemExecutor) executeExchangeFailover(ctx context.Context, task *ExchangeFailoverTask) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("Exchange failover task %s panicked: %v", task.ID, r)
-			task.Status = "failed"
-			task.Error = fmt.Sprintf("panic: %v", r)
-			se.updateFailoverTask(ctx, task)
-		}
-	}()
-
-	// 1. 更新任务状态
-	task.Status = "running"
-	task.StartedAt = time.Now()
-	se.updateFailoverTask(ctx, task)
-
-	// 2. 检查主交易所状态
-	primaryStatus := se.checkSpecificExchangeHealth(ctx, task.PrimaryExchange)
-
-	// 3. 决定是否需要故障切换
-	needsFailover := task.ForceFailover || !primaryStatus.IsHealthy
-
-	if !needsFailover {
-		task.Status = "completed"
-		task.Message = "Primary exchange is healthy, no failover needed"
-		task.CompletedAt = time.Now()
-		task.Duration = task.CompletedAt.Sub(task.StartedAt)
-		se.updateFailoverTask(ctx, task)
-
-		log.Printf("Exchange failover task %s completed - no failover needed", task.ID)
-		return
-	}
-
-	// 4. 选择最佳备用交易所
-	targetExchange, err := se.selectBestBackupExchange(ctx, task.BackupExchanges)
-	if err != nil {
-		task.Status = "failed"
-		task.Error = fmt.Sprintf("failed to select backup exchange: %v", err)
-		se.updateFailoverTask(ctx, task)
-		return
-	}
-
-	task.TargetExchange = targetExchange
-
-	// 5. 执行故障切换流程
-	failoverResult, err := se.performFailover(ctx, task)
-	if err != nil {
-		task.Status = "failed"
-		task.Error = fmt.Sprintf("failover execution failed: %v", err)
-		se.updateFailoverTask(ctx, task)
-		return
-	}
-
-	task.Results = failoverResult
-
-	// 6. 验证故障切换结果
-	err = se.validateFailover(ctx, task)
-	if err != nil {
-		// 尝试回滚
-		se.rollbackFailover(ctx, task)
-		task.Status = "failed"
-		task.Error = fmt.Sprintf("failover validation failed: %v", err)
-		se.updateFailoverTask(ctx, task)
-		return
-	}
-
-	// 7. 更新系统配置
-	err = se.updateSystemConfiguration(ctx, task)
-	if err != nil {
-		log.Printf("Warning: Failed to update system configuration: %v", err)
-	}
-
-	// 8. 更新任务完成状态
-	task.Status = "completed"
-	task.CompletedAt = time.Now()
-	task.Duration = task.CompletedAt.Sub(task.StartedAt)
-	se.updateFailoverTask(ctx, task)
-
-	// 9. 发送通知
-	se.notifyFailoverCompletion(ctx, task)
-
-	// 10. 记录指标
-	if se.metrics != nil {
-		se.metrics.IncrementCounter("system_executor.exchange_failover_completed", map[string]string{
-			"primary_exchange": task.PrimaryExchange,
-			"target_exchange":  task.TargetExchange,
-			"status":           task.Status,
-		})
-	}
-
-	log.Printf("Exchange failover task %s completed successfully", task.ID)
-}
-
-// checkSpecificExchangeHealth 检查特定交易所健康状态
-func (se *SystemExecutor) checkSpecificExchangeHealth(ctx context.Context, exchangeName string) *ExchangeHealthStatus {
-	status := &ExchangeHealthStatus{
-		ExchangeName: exchangeName,
-		IsHealthy:    true,
-		CheckedAt:    time.Now(),
-		Issues:       make([]string, 0),
-	}
-
-	// 1. 检查连接状态
-	if !se.checkExchangeConnectivity(ctx, exchangeName) {
-		status.IsHealthy = false
-		status.Issues = append(status.Issues, "Connection failed")
-	}
-
-	// 2. 检查API响应时间
-	responseTime := se.checkExchangeResponseTime(ctx, exchangeName)
-	if responseTime > 5*time.Second {
-		status.IsHealthy = false
-		status.Issues = append(status.Issues, fmt.Sprintf("High response time: %v", responseTime))
-	}
-	status.ResponseTime = responseTime
-
-	// 3. 检查订单簿深度
-	orderBookDepth := se.checkOrderBookDepth(ctx, exchangeName)
-	if orderBookDepth < 0.5 { // 订单簿深度不足
-		status.IsHealthy = false
-		status.Issues = append(status.Issues, "Insufficient order book depth")
-	}
-	status.OrderBookDepth = orderBookDepth
-
-	// 4. 检查交易量
-	tradingVolume := se.checkTradingVolume(ctx, exchangeName)
-	if tradingVolume < 1000000 { // 交易量过低
-		status.Issues = append(status.Issues, "Low trading volume")
-		// 不标记为不健康，但记录问题
-	}
-	status.TradingVolume = tradingVolume
-
-	// 5. 检查错误率
-	errorRate := se.checkExchangeErrorRate(ctx, exchangeName)
-	if errorRate > 0.05 { // 错误率超过5%
-		status.IsHealthy = false
-		status.Issues = append(status.Issues, fmt.Sprintf("High error rate: %.2f%%", errorRate*100))
-	}
-	status.ErrorRate = errorRate
-
-	return status
-}
-
-// selectBestBackupExchange 选择最佳备用交易所
-func (se *SystemExecutor) selectBestBackupExchange(ctx context.Context, backupExchanges []interface{}) (string, error) {
-	if len(backupExchanges) == 0 {
-		return "", fmt.Errorf("no backup exchanges available")
-	}
-
-	var bestExchange string
-	var bestScore float64 = -1
-
-	for _, exchangeInterface := range backupExchanges {
-		exchangeName, ok := exchangeInterface.(string)
-		if !ok {
-			continue
-		}
-
-		// 检查备用交易所健康状态
-		health := se.checkSpecificExchangeHealth(ctx, exchangeName)
-		if !health.IsHealthy {
-			log.Printf("Backup exchange %s is not healthy, skipping", exchangeName)
-			continue
-		}
-
-		// 计算交易所评分
-		score := se.calculateExchangeScore(health)
-
-		if score > bestScore {
-			bestScore = score
-			bestExchange = exchangeName
-		}
-	}
-
-	if bestExchange == "" {
-		return "", fmt.Errorf("no healthy backup exchanges available")
-	}
-
-	log.Printf("Selected best backup exchange: %s (score: %.2f)", bestExchange, bestScore)
-	return bestExchange, nil
-}
-
-// calculateExchangeScore 计算交易所评分
-func (se *SystemExecutor) calculateExchangeScore(health *ExchangeHealthStatus) float64 {
-	_ = 100.0 // base score (unused for now)
-
-	// 响应时间评分 (权重: 30%)
-	responseScore := 30.0
-	if health.ResponseTime > 3*time.Second {
-		responseScore = 10.0
-	} else if health.ResponseTime > 1*time.Second {
-		responseScore = 20.0
-	}
-
-	// 订单簿深度评分 (权重: 25%)
-	depthScore := health.OrderBookDepth * 25.0
-	if depthScore > 25.0 {
-		depthScore = 25.0
-	}
-
-	// 交易量评分 (权重: 25%)
-	volumeScore := 25.0
-	if health.TradingVolume < 5000000 {
-		volumeScore = 15.0
-	} else if health.TradingVolume < 10000000 {
-		volumeScore = 20.0
-	}
-
-	// 错误率评分 (权重: 20%)
-	errorScore := 20.0 * (1 - health.ErrorRate)
-	if errorScore < 0 {
-		errorScore = 0
-	}
-
-	totalScore := responseScore + depthScore + volumeScore + errorScore
-	return totalScore
-}
-
-// performFailover 执行故障切换
-func (se *SystemExecutor) performFailover(ctx context.Context, task *ExchangeFailoverTask) (*FailoverResults, error) {
-	results := &FailoverResults{
-		StartTime: time.Now(),
-		Steps:     make([]FailoverStep, 0),
-	}
-
-	// 1. 暂停主交易所的新订单
-	step1 := se.pausePrimaryExchangeOrders(ctx, task.PrimaryExchange)
-	results.Steps = append(results.Steps, step1)
-	if !step1.Success {
-		return results, fmt.Errorf("failed to pause primary exchange orders: %s", step1.Error)
-	}
-
-	// 2. 取消主交易所的待处理订单
-	step2 := se.cancelPendingOrders(ctx, task.PrimaryExchange)
-	results.Steps = append(results.Steps, step2)
-	if !step2.Success {
-		log.Printf("Warning: Failed to cancel some pending orders: %s", step2.Error)
-	}
-
-	// 3. 同步持仓信息
-	step3 := se.synchronizePositions(ctx, task.PrimaryExchange, task.TargetExchange)
-	results.Steps = append(results.Steps, step3)
-	if !step3.Success {
-		return results, fmt.Errorf("failed to synchronize positions: %s", step3.Error)
-	}
-
-	// 4. 切换交易路由
-	step4 := se.switchTradingRoute(ctx, task.PrimaryExchange, task.TargetExchange)
-	results.Steps = append(results.Steps, step4)
-	if !step4.Success {
-		return results, fmt.Errorf("failed to switch trading route: %s", step4.Error)
-	}
-
-	// 5. 启动目标交易所的交易
-	step5 := se.enableTargetExchangeTrading(ctx, task.TargetExchange)
-	results.Steps = append(results.Steps, step5)
-	if !step5.Success {
-		return results, fmt.Errorf("failed to enable target exchange trading: %s", step5.Error)
-	}
-
-	// 6. 更新监控配置
-	step6 := se.updateMonitoringConfiguration(ctx, task.PrimaryExchange, task.TargetExchange)
-	results.Steps = append(results.Steps, step6)
-	if !step6.Success {
-		log.Printf("Warning: Failed to update monitoring configuration: %s", step6.Error)
-	}
-
-	results.EndTime = time.Now()
-	results.Duration = results.EndTime.Sub(results.StartTime)
-	results.Success = true
-
-	return results, nil
-}
-
-// validateFailover 验证故障切换结果
-func (se *SystemExecutor) validateFailover(ctx context.Context, task *ExchangeFailoverTask) error {
-	// 1. 检查目标交易所状态
-	targetHealth := se.checkSpecificExchangeHealth(ctx, task.TargetExchange)
-	if !targetHealth.IsHealthy {
-		return fmt.Errorf("target exchange %s is not healthy after failover", task.TargetExchange)
-	}
-
-	// 2. 验证交易路由
-	if !se.verifyTradingRoute(ctx, task.TargetExchange) {
-		return fmt.Errorf("trading route verification failed for %s", task.TargetExchange)
-	}
-
-	// 3. 测试订单执行
-	if !se.testOrderExecution(ctx, task.TargetExchange) {
-		return fmt.Errorf("order execution test failed on %s", task.TargetExchange)
-	}
-
-	// 4. 验证持仓同步
-	if !se.verifyPositionSync(ctx, task.PrimaryExchange, task.TargetExchange) {
-		return fmt.Errorf("position synchronization verification failed")
-	}
-
-	log.Printf("Failover validation successful for exchange %s", task.TargetExchange)
-	return nil
-}
-
-// rollbackFailover 回滚故障切换
-func (se *SystemExecutor) rollbackFailover(ctx context.Context, task *ExchangeFailoverTask) {
-	log.Printf("Rolling back failover for task %s", task.ID)
-
-	// 1. 恢复主交易所路由
-	se.switchTradingRoute(ctx, task.TargetExchange, task.PrimaryExchange)
-
-	// 2. 重新启用主交易所交易
-	se.enableTargetExchangeTrading(ctx, task.PrimaryExchange)
-
-	// 3. 暂停目标交易所交易
-	se.pausePrimaryExchangeOrders(ctx, task.TargetExchange)
-
-	log.Printf("Failover rollback completed for task %s", task.ID)
-}
-
-// updateSystemConfiguration 更新系统配置
-func (se *SystemExecutor) updateSystemConfiguration(ctx context.Context, task *ExchangeFailoverTask) error {
-	// 1. 更新主交易所配置
-	err := se.updatePrimaryExchangeConfig(ctx, task.TargetExchange)
-	if err != nil {
-		return fmt.Errorf("failed to update primary exchange config: %v", err)
-	}
-
-	// 2. 更新策略配置
-	err = se.updateStrategyExchangeConfig(ctx, task.PrimaryExchange, task.TargetExchange)
-	if err != nil {
-		return fmt.Errorf("failed to update strategy config: %v", err)
-	}
-
-	// 3. 更新监控配置
-	err = se.updateMonitoringExchangeConfig(ctx, task.TargetExchange)
-	if err != nil {
-		return fmt.Errorf("failed to update monitoring config: %v", err)
-	}
-
-	return nil
-}
-
-// Data structures for exchange failover
-
-type ExchangeFailoverTask struct {
-	ID              string           `json:"id"`
-	PrimaryExchange string           `json:"primary_exchange"`
-	BackupExchanges []interface{}    `json:"backup_exchanges"`
-	TargetExchange  string           `json:"target_exchange,omitempty"`
-	FailoverType    string           `json:"failover_type"`
-	ForceFailover   bool             `json:"force_failover"`
-	Status          string           `json:"status"`
-	Message         string           `json:"message,omitempty"`
-	Error           string           `json:"error,omitempty"`
-	Results         *FailoverResults `json:"results,omitempty"`
-	CreatedAt       time.Time        `json:"created_at"`
-	StartedAt       time.Time        `json:"started_at"`
-	CompletedAt     time.Time        `json:"completed_at"`
-	Duration        time.Duration    `json:"duration"`
-}
-
-type ExchangeHealthStatus struct {
-	ExchangeName   string        `json:"exchange_name"`
-	IsHealthy      bool          `json:"is_healthy"`
-	ResponseTime   time.Duration `json:"response_time"`
-	OrderBookDepth float64       `json:"order_book_depth"`
-	TradingVolume  float64       `json:"trading_volume"`
-	ErrorRate      float64       `json:"error_rate"`
-	Issues         []string      `json:"issues"`
-	CheckedAt      time.Time     `json:"checked_at"`
-}
-
-type FailoverResults struct {
-	StartTime time.Time      `json:"start_time"`
-	EndTime   time.Time      `json:"end_time"`
-	Duration  time.Duration  `json:"duration"`
-	Success   bool           `json:"success"`
-	Steps     []FailoverStep `json:"steps"`
-}
-
-type FailoverStep struct {
-	Name        string        `json:"name"`
-	Description string        `json:"description"`
-	Success     bool          `json:"success"`
-	Error       string        `json:"error,omitempty"`
-	StartTime   time.Time     `json:"start_time"`
-	EndTime     time.Time     `json:"end_time"`
-	Duration    time.Duration `json:"duration"`
-}
-
-// Helper method implementations (simplified)
-
-func (se *SystemExecutor) saveFailoverTask(ctx context.Context, task *ExchangeFailoverTask) error {
-	return nil
-}
-
-func (se *SystemExecutor) updateFailoverTask(ctx context.Context, task *ExchangeFailoverTask) error {
-	return nil
-}
-
-func (se *SystemExecutor) checkExchangeConnectivity(ctx context.Context, exchangeName string) bool {
-	// 简化实现
-	return true
-}
-
-func (se *SystemExecutor) checkExchangeResponseTime(ctx context.Context, exchangeName string) time.Duration {
-	// 简化实现
-	return 500 * time.Millisecond
-}
-
-func (se *SystemExecutor) checkOrderBookDepth(ctx context.Context, exchangeName string) float64 {
-	// 简化实现
-	return 0.8
-}
-
-func (se *SystemExecutor) checkTradingVolume(ctx context.Context, exchangeName string) float64 {
-	// 简化实现
-	return 5000000.0
-}
-
-func (se *SystemExecutor) checkExchangeErrorRate(ctx context.Context, exchangeName string) float64 {
-	// 简化实现
-	return 0.02 // 2% 错误率
-}
-
-func (se *SystemExecutor) pausePrimaryExchangeOrders(ctx context.Context, exchangeName string) FailoverStep {
-	step := FailoverStep{
-		Name:        "pause_orders",
-		Description: fmt.Sprintf("Pause orders on %s", exchangeName),
-		StartTime:   time.Now(),
-	}
-
-	// 简化实现
-	time.Sleep(100 * time.Millisecond)
-
-	step.Success = true
-	step.EndTime = time.Now()
-	step.Duration = step.EndTime.Sub(step.StartTime)
-
-	return step
-}
-
-func (se *SystemExecutor) cancelPendingOrders(ctx context.Context, exchangeName string) FailoverStep {
-	step := FailoverStep{
-		Name:        "cancel_orders",
-		Description: fmt.Sprintf("Cancel pending orders on %s", exchangeName),
-		StartTime:   time.Now(),
-	}
-
-	// 简化实现
-	time.Sleep(200 * time.Millisecond)
-
-	step.Success = true
-	step.EndTime = time.Now()
-	step.Duration = step.EndTime.Sub(step.StartTime)
-
-	return step
-}
-
-func (se *SystemExecutor) synchronizePositions(ctx context.Context, primaryExchange, targetExchange string) FailoverStep {
-	step := FailoverStep{
-		Name:        "sync_positions",
-		Description: fmt.Sprintf("Synchronize positions from %s to %s", primaryExchange, targetExchange),
-		StartTime:   time.Now(),
-	}
-
-	// 简化实现
-	time.Sleep(300 * time.Millisecond)
-
-	step.Success = true
-	step.EndTime = time.Now()
-	step.Duration = step.EndTime.Sub(step.StartTime)
-
-	return step
-}
-
-func (se *SystemExecutor) switchTradingRoute(ctx context.Context, fromExchange, toExchange string) FailoverStep {
-	step := FailoverStep{
-		Name:        "switch_route",
-		Description: fmt.Sprintf("Switch trading route from %s to %s", fromExchange, toExchange),
-		StartTime:   time.Now(),
-	}
-
-	// 简化实现
-	time.Sleep(150 * time.Millisecond)
-
-	step.Success = true
-	step.EndTime = time.Now()
-	step.Duration = step.EndTime.Sub(step.StartTime)
-
-	return step
-}
-
-func (se *SystemExecutor) enableTargetExchangeTrading(ctx context.Context, exchangeName string) FailoverStep {
-	step := FailoverStep{
-		Name:        "enable_trading",
-		Description: fmt.Sprintf("Enable trading on %s", exchangeName),
-		StartTime:   time.Now(),
-	}
-
-	// 简化实现
-	time.Sleep(100 * time.Millisecond)
-
-	step.Success = true
-	step.EndTime = time.Now()
-	step.Duration = step.EndTime.Sub(step.StartTime)
-
-	return step
-}
-
-func (se *SystemExecutor) updateMonitoringConfiguration(ctx context.Context, primaryExchange, targetExchange string) FailoverStep {
-	step := FailoverStep{
-		Name:        "update_monitoring",
-		Description: fmt.Sprintf("Update monitoring from %s to %s", primaryExchange, targetExchange),
-		StartTime:   time.Now(),
-	}
-
-	// 简化实现
-	time.Sleep(50 * time.Millisecond)
-
-	step.Success = true
-	step.EndTime = time.Now()
-	step.Duration = step.EndTime.Sub(step.StartTime)
-
-	return step
-}
-
-func (se *SystemExecutor) verifyTradingRoute(ctx context.Context, exchangeName string) bool {
-	// 简化实现
-	return true
-}
-
-func (se *SystemExecutor) testOrderExecution(ctx context.Context, exchangeName string) bool {
-	// 简化实现
-	return true
-}
-
-func (se *SystemExecutor) verifyPositionSync(ctx context.Context, primaryExchange, targetExchange string) bool {
-	// 简化实现
-	return true
-}
-
-func (se *SystemExecutor) updatePrimaryExchangeConfig(ctx context.Context, exchangeName string) error {
-	// 简化实现
-	return nil
-}
-
-func (se *SystemExecutor) updateStrategyExchangeConfig(ctx context.Context, oldExchange, newExchange string) error {
-	// 简化实现
-	return nil
-}
-
-func (se *SystemExecutor) updateMonitoringExchangeConfig(ctx context.Context, exchangeName string) error {
-	// 简化实现
-	return nil
-}
-
-func (se *SystemExecutor) notifyFailoverCompletion(ctx context.Context, task *ExchangeFailoverTask) {
-	if se.notificationService != nil {
-		message := fmt.Sprintf("Exchange failover task %s completed: %s -> %s",
-			task.ID, task.PrimaryExchange, task.TargetExchange)
-		err := se.notificationService.SendWebhook(ctx, "", map[string]interface{}{
-			"type":             "system_management",
-			"action":           "exchange_failover_completed",
-			"message":          message,
-			"task_id":          task.ID,
-			"primary_exchange": task.PrimaryExchange,
-			"target_exchange":  task.TargetExchange,
-		})
-		if err != nil {
-			log.Printf("Failed to send failover completion notification: %v", err)
-		}
-	}
-}
-
-// Audit log processing helper methods (simplified implementations)
-
-// Data structures for audit log processing
-
-type AuditLogTask struct {
-	ID             string                 `json:"id"`
-	LogTypes       []interface{}          `json:"log_types"`
-	TimeRange      map[string]interface{} `json:"time_range"`
-	ProcessingMode string                 `json:"processing_mode"`
-	OutputFormat   string                 `json:"output_format"`
-	Status         string                 `json:"status"`
-	Error          string                 `json:"error,omitempty"`
-	Statistics     *AuditLogStatistics    `json:"statistics,omitempty"`
-	Results        *AuditLogResults       `json:"results,omitempty"`
-	ReportPath     string                 `json:"report_path,omitempty"`
-	CreatedAt      time.Time              `json:"created_at"`
-	StartedAt      time.Time              `json:"started_at"`
-	CompletedAt    time.Time              `json:"completed_at"`
-	Duration       time.Duration          `json:"duration"`
-}
-
-type AuditLogStatistics struct {
-	TotalLogs        int `json:"total_logs"`
-	ProcessedLogs    int `json:"processed_logs"`
-	FailedLogs       int `json:"failed_logs"`
-	SecurityEvents   int `json:"security_events"`
-	ComplianceIssues int `json:"compliance_issues"`
-}
-
-type AuditLogResults struct {
-	ProcessingMode    string            `json:"processing_mode"`
-	Summary           *AuditLogSummary  `json:"summary"`
-	ComplianceIssues  []ComplianceIssue `json:"compliance_issues,omitempty"`
-	ComplianceScore   float64           `json:"compliance_score,omitempty"`
-	SecurityFindings  []SecurityFinding `json:"security_findings,omitempty"`
-	SecurityRiskScore float64           `json:"security_risk_score,omitempty"`
-	ExportPath        string            `json:"export_path,omitempty"`
-}
-
-type AuditLogEntry struct {
-	ID        string    `json:"id"`
-	Timestamp time.Time `json:"timestamp"`
-	LogType   string    `json:"log_type"`
-	EventType string    `json:"event_type"`
-	UserID    string    `json:"user_id,omitempty"`
-	Action    string    `json:"action"`
-	Result    string    `json:"result"`
-	Message   string    `json:"message"`
-	Severity  string    `json:"severity"`
-}
-
-type AuditLogSummary struct {
-	TotalEntries       int                  `json:"total_entries"`
-	TimeRange          map[string]time.Time `json:"time_range"`
-	LogTypeBreakdown   map[string]int       `json:"log_type_breakdown"`
-	EventTypeBreakdown map[string]int       `json:"event_type_breakdown"`
-	SeverityBreakdown  map[string]int       `json:"severity_breakdown"`
-}
-
-type ComplianceIssue struct {
-	IssueType      string `json:"issue_type"`
-	Severity       string `json:"severity"`
-	Description    string `json:"description"`
-	Regulation     string `json:"regulation,omitempty"`
-	Recommendation string `json:"recommendation"`
-}
-
-type SecurityFinding struct {
-	FindingType    string `json:"finding_type"`
-	Severity       string `json:"severity"`
-	Description    string `json:"description"`
-	RiskLevel      string `json:"risk_level"`
-	Recommendation string `json:"recommendation"`
-}
-
-// executeAuditLogProcessing 执行审计日志处理 (simplified)
-func (se *SystemExecutor) executeAuditLogProcessing(ctx context.Context, task *AuditLogTask) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("Audit log processing task %s panicked: %v", task.ID, r)
-			task.Status = "failed"
-			task.Error = fmt.Sprintf("panic: %v", r)
-			se.updateAuditLogTask(ctx, task)
-		}
-	}()
-
-	// 1. 更新任务状态
-	task.Status = "running"
-	task.StartedAt = time.Now()
-	se.updateAuditLogTask(ctx, task)
-
-	// 2. 模拟审计日志处理
-	time.Sleep(2 * time.Second) // 模拟处理时间
-
-	// 3. 生成模拟结果
-	results := &AuditLogResults{
-		ProcessingMode: task.ProcessingMode,
-		Summary: &AuditLogSummary{
-			TotalEntries: 1000,
-			LogTypeBreakdown: map[string]int{
-				"authentication": 300,
-				"authorization":  200,
-				"trading":        250,
-				"system":         150,
-				"security":       100,
-			},
-			SeverityBreakdown: map[string]int{
-				"info":     700,
-				"warning":  200,
-				"error":    80,
-				"critical": 20,
-			},
-		},
-	}
-
-	// 4. 根据处理模式生成相应结果
-	switch task.ProcessingMode {
-	case "compliance":
-		results.ComplianceIssues = []ComplianceIssue{
-			{
-				IssueType:      "access_control",
-				Severity:       "medium",
-				Description:    "Some users have excessive permissions",
-				Regulation:     "SOX",
-				Recommendation: "Review and reduce user permissions",
-			},
-		}
-		results.ComplianceScore = 85.5
-
-	case "security":
-		results.SecurityFindings = []SecurityFinding{
-			{
-				FindingType:    "suspicious_login",
-				Severity:       "high",
-				Description:    "Multiple failed login attempts detected",
-				RiskLevel:      "medium",
-				Recommendation: "Implement account lockout policy",
-			},
-		}
-		results.SecurityRiskScore = 75.0
-
-	case "export":
-		results.ExportPath = fmt.Sprintf("/exports/audit_logs_%s.%s", task.ID, task.OutputFormat)
-	}
-
-	task.Results = results
-	task.Statistics = &AuditLogStatistics{
-		TotalLogs:        1000,
-		ProcessedLogs:    1000,
-		FailedLogs:       0,
-		SecurityEvents:   25,
-		ComplianceIssues: 3,
-	}
-
-	// 5. 更新任务完成状态
-	task.Status = "completed"
-	task.CompletedAt = time.Now()
-	task.Duration = task.CompletedAt.Sub(task.StartedAt)
-	se.updateAuditLogTask(ctx, task)
-
-	// 6. 发送通知
-	se.notifyAuditLogCompletion(ctx, task)
-
-	// 7. 记录指标
-	if se.metrics != nil {
-		se.metrics.IncrementCounter("system_executor.audit_log_processing_completed", map[string]string{
-			"processing_mode": task.ProcessingMode,
-			"status":          task.Status,
-		})
-	}
-
-	log.Printf("Audit log processing task %s completed successfully", task.ID)
-}
-
-// Helper method implementations (simplified)
-
-func (se *SystemExecutor) saveAuditLogTask(ctx context.Context, task *AuditLogTask) error {
-	return nil
-}
-
-func (se *SystemExecutor) updateAuditLogTask(ctx context.Context, task *AuditLogTask) error {
-	return nil
-}
-
-func (se *SystemExecutor) parseTimeRange(timeRange map[string]interface{}) (time.Time, time.Time, error) {
-	startStr, _ := timeRange["start"].(string)
-	endStr, _ := timeRange["end"].(string)
-
-	startTime, err := time.Parse(time.RFC3339, startStr)
-	if err != nil {
-		startTime = time.Now().Add(-24 * time.Hour)
-	}
-
-	endTime, err := time.Parse(time.RFC3339, endStr)
-	if err != nil {
-		endTime = time.Now()
-	}
-
-	return startTime, endTime, nil
-}
-
-func (se *SystemExecutor) notifyAuditLogCompletion(ctx context.Context, task *AuditLogTask) {
-	if se.notificationService != nil {
-		message := fmt.Sprintf("Audit log processing task %s completed with status: %s", task.ID, task.Status)
-		err := se.notificationService.SendWebhook(ctx, "", map[string]interface{}{
-			"type":    "system_management",
-			"action":  "audit_log_completed",
-			"message": message,
-			"task_id": task.ID,
-			"status":  task.Status,
-		})
-		if err != nil {
-			log.Printf("Failed to send audit log completion notification: %v", err)
-		}
-	}
-}
-
-// Supporting functions for strategy elimination and introduction
-
 // validateStrategyForElimination 验证策略是否可以被淘汰
 func (se *StrategyExecutor) validateStrategyForElimination(ctx context.Context, strategyID string) error {
 	// 检查策略是否存在

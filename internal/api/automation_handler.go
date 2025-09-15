@@ -8,6 +8,7 @@ import (
 	"qcat/internal/automation"
 	"qcat/internal/database"
 	"qcat/internal/monitor"
+	"qcat/internal/executor"
 
 	"github.com/gin-gonic/gin"
 )
@@ -415,5 +416,67 @@ func (h *AutomationHandler) RegisterRoutes(router *gin.RouterGroup) {
 		automation.GET("/stats", h.GetExecutionStats)
 		automation.GET("/system", h.GetSystemStatus)
 		automation.POST("/:id/toggle", h.ToggleAutomation)
+
+		// Test a minimal market order through executor (dev/testnet only)
+		automation.POST("/test-order", h.PlaceTestOrder)
 	}
+}
+
+// PlaceTestOrder 发送一笔最小化测试订单以验证交易链路
+// @Summary Place a small test order (testnet/dev only)
+// @Description Enqueue a minimal market order via executor to validate end-to-end trading path
+// @Tags Automation
+// @Accept json
+// @Produce json
+// @Param order body object true "{symbol, side, quantity, type(optional)}"
+// @Success 200 {object} Response
+// @Failure 400 {object} Response
+// @Failure 503 {object} Response
+// @Router /automation/test-order [post]
+func (h *AutomationHandler) PlaceTestOrder(c *gin.Context) {
+    if h.automationSystem == nil || h.automationSystem.GetExecutor() == nil {
+        c.JSON(http.StatusServiceUnavailable, Response{Success: false, Error: "executor not available"})
+        return
+    }
+
+    var req struct {
+        Symbol   string  `json:"symbol" binding:"required"`
+        Side     string  `json:"side" binding:"required"`
+        Quantity float64 `json:"quantity" binding:"required"`
+        Type     string  `json:"type"`
+        Price    float64 `json:"price"`
+    }
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, Response{Success: false, Error: err.Error()})
+        return
+    }
+    if req.Type == "" { req.Type = "MARKET" }
+    if req.Quantity <= 0 { c.JSON(http.StatusBadRequest, Response{Success:false, Error:"quantity must be positive"}); return }
+    if req.Side != "BUY" && req.Side != "SELL" { c.JSON(http.StatusBadRequest, Response{Success:false, Error:"side must be BUY or SELL"}); return }
+
+    action := &executor.ExecutionAction{
+        Type:     executor.ActionTypeOrder,
+        Symbol:   req.Symbol,
+        Action:   "place_order",
+        Priority: 2,
+        Parameters: map[string]interface{}{
+            "side": req.Side,
+            "quantity": req.Quantity,
+            "type": req.Type,
+            "price": req.Price,
+        },
+        Timeout:    time.Minute,
+        MaxRetries: 1,
+    }
+    if err := h.automationSystem.GetExecutor().ExecuteAction(action); err != nil {
+        c.JSON(http.StatusBadRequest, Response{Success: false, Error: fmt.Sprintf("failed to enqueue order: %v", err)})
+        return
+    }
+    c.JSON(http.StatusOK, Response{Success: true, Data: map[string]interface{}{
+        "enqueued": true,
+        "symbol": req.Symbol,
+        "side": req.Side,
+        "quantity": req.Quantity,
+        "type": req.Type,
+    }})
 }

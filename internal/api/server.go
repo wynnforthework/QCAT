@@ -89,6 +89,7 @@ type Handlers struct {
 	ResultSharing      *ResultSharingHandler
 	Settings           *SettingsHandler
 	AutoStart          *AutoStartHandler
+	Selector           *SelectorHandler
 }
 
 // RateLimiter 速率限制器结构
@@ -553,6 +554,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		ResultSharing:      NewResultSharingHandler(db, redis, metricsCollector),
 		Settings:           NewSettingsHandler(),
 		AutoStart:          NewAutoStartHandler(db),
+		Selector:           NewSelectorHandler(automationSystem),
 	}
 
 	// Store security components for middleware
@@ -871,6 +873,17 @@ func (s *Server) setupRoutes() {
 				// Add direct routes for frontend compatibility
 				protected.POST("/share-result", s.handlers.ResultSharing.ShareResult)
 				protected.GET("/shared-results", s.handlers.ResultSharing.GetSharedResults)
+			}
+
+			// Selector debug routes
+			if s.handlers.Selector != nil {
+				selector := protected.Group("/selector")
+				{
+					selector.GET("/decision", s.handlers.Selector.GetLastDecision)
+					selector.GET("/stats", s.handlers.Selector.GetStats)
+					selector.POST("/sample", s.handlers.Selector.UpdatePerformance)
+					selector.POST("/shadow", s.handlers.Selector.SetShadow)
+				}
 			}
 		}
 	}

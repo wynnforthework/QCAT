@@ -14,6 +14,8 @@ import (
 	"qcat/internal/exchange/account"
 	"qcat/internal/monitor"
 	"qcat/internal/security/protector"
+	"qcat/internal/intelligence/selector"
+	"qcat/internal/strategy/workflow"
 )
 
 // RealtimeExecutor 实时执行引擎
@@ -32,6 +34,10 @@ type RealtimeExecutor struct {
 	strategyExecutor *StrategyExecutor
 	dataExecutor     *DataExecutor
 	systemExecutor   *SystemExecutor
+
+	// selector components
+	strategySelector selector.StrategySelector
+	strategyPool     *workflow.TradingStrategyPool
 
 	// 运行状态
 	ctx       context.Context
@@ -328,13 +334,18 @@ func (re *RealtimeExecutor) initializeExecutors() {
 	re.strategyExecutor = NewStrategyExecutor(re.config, re.db, re.exchange, re.accountManager)
 	re.dataExecutor = NewDataExecutor(re.config, re.db, re.exchange, re.accountManager)
 	re.systemExecutor = NewSystemExecutor(re.config, re.db, re.exchange, re.accountManager)
+
+	// initialize default selector (in-memory); hook usage added separately
+	perfStore := selector.NewMemoryPerformanceStore()
+	regime := &selector.BasicRegimeDetector{}
+	re.strategySelector = selector.NewWindowScoreSelector(perfStore, regime, selector.WindowScoreConfig{MinTrades: 0})
 }
 
 // initializeWorkers 初始化工作线程
 func (re *RealtimeExecutor) initializeWorkers() {
 	workerCount := 3 // 可配置
 	for i := 0; i < workerCount; i++ {
-		worker := NewExecutionWorker(i, re.actionQueue, re.handleActionCompletion)
+		worker := NewExecutionWorker(i, re.actionQueue, re.handleActionCompletion, re)
 		re.workers = append(re.workers, worker)
 	}
 }
@@ -457,14 +468,16 @@ type ExecutionWorker struct {
 	completionHandler func(*ExecutionAction, error)
 	isRunning         bool
 	mu                sync.RWMutex
+	parent            *RealtimeExecutor
 }
 
 // NewExecutionWorker 创建执行工作器
-func NewExecutionWorker(id int, actionQueue <-chan *ExecutionAction, completionHandler func(*ExecutionAction, error)) *ExecutionWorker {
+func NewExecutionWorker(id int, actionQueue <-chan *ExecutionAction, completionHandler func(*ExecutionAction, error), parent *RealtimeExecutor) *ExecutionWorker {
 	return &ExecutionWorker{
 		id:                id,
 		actionQueue:       actionQueue,
 		completionHandler: completionHandler,
+		parent:            parent,
 	}
 }
 
@@ -497,6 +510,9 @@ func (ew *ExecutionWorker) executeAction(action *ExecutionAction) {
 
 	// 创建带超时的上下文
 	ctx, cancel := context.WithTimeout(context.Background(), action.Timeout)
+	if ew.parent != nil {
+		ctx = context.WithValue(ctx, "realtime_executor", ew.parent)
+	}
 	defer cancel()
 
 	// 执行动作
@@ -521,4 +537,46 @@ func (ew *ExecutionWorker) executeAction(action *ExecutionAction) {
 	if ew.completionHandler != nil {
 		ew.completionHandler(action, err)
 	}
+}
+
+// GetSelectorLastDecision exposes the last decision for a symbol (debug only)
+func (re *RealtimeExecutor) GetSelectorLastDecision(symbol string) (interface{}, bool) {
+	if re.strategySelector == nil {
+		return nil, false
+	}
+	if res, ok := re.strategySelector.GetLastDecision(symbol); ok {
+		return res, true
+	}
+	return nil, false
+}
+
+// GetSelectorStats exposes selector stats for a symbol (debug only)
+func (re *RealtimeExecutor) GetSelectorStats(symbol string) (map[string]interface{}, bool) {
+	if re.strategySelector == nil {
+		return nil, false
+	}
+	return re.strategySelector.GetStats(symbol), true
+}
+
+// UpdateSelectorPerformance updates selector store with a performance sample (debug/runtime)
+func (re *RealtimeExecutor) UpdateSelectorPerformance(symbol, strategyID string, sample selector.PerfSample) bool {
+	if re.strategySelector == nil {
+		return false
+	}
+	if err := re.strategySelector.UpdatePerformance(symbol, strategyID, sample); err != nil {
+		return false
+	}
+	return true
+}
+
+// SetSelectorShadow toggles shadow mode and allowed symbols at runtime
+func (re *RealtimeExecutor) SetSelectorShadow(enabled bool, symbols []string) {
+	// re.config is shared config pointer; safe to update runtime fields
+	re.config.Selector.Shadow.Enabled = enabled
+	re.config.Selector.Shadow.Symbols = symbols
+}
+
+// SetStrategyPool sets the trading strategy pool for sourcing candidates (optional)
+func (re *RealtimeExecutor) SetStrategyPool(pool *workflow.TradingStrategyPool) {
+	re.strategyPool = pool
 }

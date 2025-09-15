@@ -20,6 +20,7 @@ import (
 	exchangeRisk "qcat/internal/exchange/risk"
 	"qcat/internal/monitor"
 	"qcat/internal/strategy/optimizer"
+	"qcat/internal/strategy/workflow"
 )
 
 // AutomationSystem 自动化系统
@@ -37,6 +38,7 @@ type AutomationSystem struct {
 	bridge            *bridge.MonitorResponseBridge
 	monitorIntegrator *bridge.MonitorIntegration
 	riskController    *risk.IntelligentRiskController
+	strategyPool      *workflow.TradingStrategyPool
 
 	// 运行状态
 	ctx       context.Context
@@ -126,6 +128,7 @@ func NewAutomationSystem(
 		bridge:            monitorBridge,
 		monitorIntegrator: monitorIntegrator,
 		riskController:    intelligentRiskController,
+		strategyPool:      nil,
 		ctx:               ctx,
 		cancel:            cancel,
 		status: &SystemStatus{
@@ -436,6 +439,11 @@ func (as *AutomationSystem) IsRunning() bool {
 // GetExecutor 获取实时执行引擎
 func (as *AutomationSystem) GetExecutor() *executor.RealtimeExecutor {
 	return as.executor
+}
+
+// GetStrategyPool 获取交易策略池（可能为nil）
+func (as *AutomationSystem) GetStrategyPool() *workflow.TradingStrategyPool {
+	return as.strategyPool
 }
 
 // GetScheduler 获取自动化调度器

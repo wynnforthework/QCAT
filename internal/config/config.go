@@ -35,6 +35,7 @@ type Config struct {
 	Hedging         HedgingConfig         `yaml:"hedging"`
 	LayeredPosition LayeredPositionConfig `yaml:"layered_position"`
 	Automation      AutomationConfig      `yaml:"automation"`
+	Selector        SelectorConfig        `yaml:"selector"`
 }
 
 // AppConfig 应用配置
@@ -335,6 +336,31 @@ type BacktestConfig struct {
 	Timeout           time.Duration `yaml:"timeout"`
 	MaxConcurrency    int           `yaml:"max_concurrency"`
 	DataRetentionDays int           `yaml:"data_retention_days"`
+}
+
+// SelectorConfig 策略选择器配置
+type SelectorConfig struct {
+    Method string `yaml:"method"`
+    Score  SelectorScoreConfig `yaml:"score"`
+    Safety SelectorSafetyConfig `yaml:"safety"`
+    Shadow SelectorShadowConfig `yaml:"shadow"`
+}
+
+type SelectorScoreConfig struct {
+    Window    time.Duration      `yaml:"window"`
+    MinTrades int                `yaml:"min_trades"`
+    Weights   map[string]float64 `yaml:"weights"`
+}
+
+type SelectorSafetyConfig struct {
+    SymbolMddLimit    float64       `yaml:"symbol_mdd_limit"`
+    StrategyMddLimit  float64       `yaml:"strategy_mdd_limit"`
+    SwitchCooldown    time.Duration `yaml:"switch_cooldown"`
+}
+
+type SelectorShadowConfig struct {
+    Enabled bool     `yaml:"enabled"`
+    Symbols []string `yaml:"symbols"`
 }
 
 // OrderConfig 订单管理配置

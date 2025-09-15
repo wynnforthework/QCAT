@@ -834,6 +834,40 @@ class ApiClient {
 
     return response.json();
   }
+
+  // Selector API
+  async getSelectorDecision(symbol: string): Promise<any> {
+    const params = new URLSearchParams({ symbol });
+    return this.request<any>(`/api/v1/selector/decision?${params.toString()}`);
+  }
+
+  async getSelectorStats(symbol: string): Promise<any> {
+    const params = new URLSearchParams({ symbol });
+    return this.request<any>(`/api/v1/selector/stats?${params.toString()}`);
+  }
+
+  async postSelectorSample(sample: {
+    symbol: string;
+    strategy_id: string;
+    pnl?: number;
+    return?: number;
+    drawdown?: number;
+    win?: boolean;
+    cost?: number;
+    duration_ms?: number;
+  }): Promise<void> {
+    return this.request<void>(`/api/v1/selector/sample`, {
+      method: 'POST',
+      body: JSON.stringify(sample)
+    });
+  }
+
+  async setSelectorShadow(enabled: boolean, symbols: string[]): Promise<void> {
+    return this.request<void>(`/api/v1/selector/shadow`, {
+      method: 'POST',
+      body: JSON.stringify({ enabled, symbols })
+    });
+  }
 }
 
 // Type definitions

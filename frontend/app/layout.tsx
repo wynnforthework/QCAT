@@ -115,6 +115,12 @@ const navigation = [
     href: "/api-test",
     icon: Target,
     description: "接口测试和调试工具"
+  },
+  {
+    name: "Selector",
+    href: "/selector",
+    icon: Settings,
+    description: "策略选择器调试与影子模式"
   }
 ];
 
