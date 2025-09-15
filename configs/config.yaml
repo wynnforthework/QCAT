@@ -1,0 +1,444 @@
+app:
+  name: "QCAT"
+  version: "2.0.0"
+  environment: "development"
+
+# 端口配置 - 统一管理所有服务端口
+ports:
+  # 应用服务端口
+  qcat_api: 8082          # QCAT主应用API服务
+  qcat_optimizer: 8081    # QCAT优化器服务
+
+  # 数据库服务端口
+  postgres: 5432          # PostgreSQL数据库
+  redis: 6379            # Redis缓存
+
+  # 监控服务端口
+  prometheus: 9090       # Prometheus监控
+  grafana: 3000         # Grafana监控面板
+  alertmanager: 9093    # AlertManager告警
+
+  # Web服务端口
+  nginx_http: 80        # Nginx HTTP
+  nginx_https: 443      # Nginx HTTPS
+  frontend_dev: 3001    # 前端开发服务器
+
+server:
+  port: 8082
+  read_timeout: 30s
+  write_timeout: 30s
+  max_header_bytes: 1048576
+
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "${DATABASE_PASSWORD}"
+  dbname: "qcat"
+  ssl_mode: "disable"
+  max_open: 50
+  max_idle: 10
+  timeout: 5s
+  conn_max_lifetime: 1h
+  conn_max_idle_time: 15m
+
+redis:
+  enabled: false
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+  pool_size: 20
+  min_idle_conns: 5
+  max_retries: 3
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
+
+exchange:
+  name: "binance"
+  api_key: "${EXCHANGE_API_KEY}"
+  api_secret: "${EXCHANGE_API_SECRET}"
+  test_net: true
+  base_url: "https://testnet.binance.vision"  # Use testnet URL when test_net is true
+  websocket_url: "wss://testnet.binance.vision"
+  futures_base_url: "https://testnet.binancefuture.com"
+  futures_websocket_url: "wss://stream.binancefuture.com"
+
+  # 代理配置 - 如果需要通过代理访问Binance API
+  proxy_url: "http://127.0.0.1:7897"  # HTTP代理，根据你的VPN软件端口调整
+
+  rate_limit:
+    enabled: true
+    requests_per_minute: 1200
+    burst: 100
+  timeout: 30s
+  retry_attempts: 3
+  retry_delay: 1s
+
+jwt:
+  secret_key: "${QCAT_JWT_SECRET_KEY}"
+  duration: 24h
+
+monitoring:
+  prometheus_enabled: true
+  prometheus_path: "/metrics"
+  alerts:
+    high_latency_ms: 1000
+    error_rate_percent: 5.0
+    memory_usage_percent: 80.0
+    cpu_usage_percent: 80.0
+  health_check:
+    interval_seconds: 30
+    timeout_seconds: 10
+    retry_count: 3
+  metrics:
+    collection_interval_seconds: 60
+    retention_hours: 24
+    aggregation_intervals:
+      - "1m"
+      - "5m"
+      - "15m"
+      - "1h"
+
+cors:
+  allowed_origins: ["*"]
+  allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+  allowed_headers: ["*"]
+  allow_credentials: true
+
+rate_limit:
+  enabled: true
+  requests_per_minute: 100
+  burst: 20
+  whitelist_enabled: true
+  whitelist_ips:
+    - "127.0.0.1"        # 本地回环地址
+    - "::1"              # IPv6本地回环地址
+    - "localhost"        # 本地主机名
+    - "192.168.1.0/24"   # 本地网络段
+    - "10.0.0.0/8"       # 私有网络段
+    - "172.16.0.0/12"    # 私有网络段
+
+# 安全与合规配置
+security:
+  # 密钥管理服务配置
+  kms:
+    master_key: "${SECURITY_KMS_MASTER_KEY}"
+    key_rotation: 2160h  # 90 days
+    encryption_key: "${SECURITY_ENCRYPTION_KEY}"
+  
+  # 加密配置
+  encryption:
+    algorithm: "AES-256-GCM"
+    key_size: 256
+    key_rotation: 2160h  # 90 days
+    master_key: "${SECURITY_ENCRYPTION_MASTER_KEY}"
+    public_key_path: "certs/public.pem"
+    private_key_path: "certs/private.pem"
+  
+  # TLS配置
+  tls:
+    enabled: false
+    cert_path: "certs/server.crt"
+    key_path: "certs/server.key"
+    min_version: 771  # TLS 1.2
+    max_version: 772  # TLS 1.3
+    cipher_suites:
+      - 4865  # TLS_AES_128_GCM_SHA256
+      - 4866  # TLS_AES_256_GCM_SHA384
+      - 4867  # TLS_CHACHA20_POLY1305_SHA256
+  
+  # 网络安全配置
+  network:
+    rate_limit_enabled: true
+    rate_limit_requests: 100
+    rate_limit_window: 1m
+    max_connections: 1000
+    connection_timeout: 30s
+    idle_timeout: 60s
+    read_timeout: 30s
+    write_timeout: 30s
+    allowed_origins: ["*"]
+    allowed_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    allowed_headers: ["*"]
+    exposed_headers: ["X-Total-Count"]
+    allow_credentials: true
+    max_age: 86400s
+  
+  # 审计日志配置
+  audit:
+    enabled: true
+    log_level: "info"
+    retention_days: 90
+    encryption_enabled: true
+  
+  # 审批流程配置
+  approval:
+    enabled: true
+    default_expiry: 168h  # 7 days
+    min_approvers: 2
+    auto_approve_roles: ["admin"]
+
+# 日志配置
+logging:
+  level: "info"
+  format: "json"
+  output: "file"
+  levels:
+    default: "info"
+    qcat: "debug"
+    exchange: "info"
+    strategy: "debug"
+    optimizer: "info"
+  output_config:
+    console_enabled: true
+    file_enabled: true
+    file_path: "logs/qcat.log"
+    max_file_size_mb: 100
+    max_backup_files: 10
+  max_size: 100
+  max_backups: 10
+  max_age: 30
+  compress: true
+  log_dir: "logs"
+
+# 内存管理配置
+memory:
+  monitor_interval: 30s
+  high_water_mark_percent: 80.0
+  low_water_mark_percent: 60.0
+  alert_threshold: 90.0
+  enable_auto_gc: true
+  gc_interval: 5m
+  force_gc_threshold: 95.0
+  max_memory_mb: 1024
+  max_heap_mb: 512
+
+# 网络重连配置
+network:
+  max_retries: 10
+  initial_delay: 1s
+  max_delay: 5m
+  backoff_multiplier: 2.0
+  jitter_factor: 0.1
+  health_check_interval: 30s
+  connection_timeout: 30s
+  ping_interval: 30s
+  pong_timeout: 10s
+  max_consecutive_failures: 5
+  alert_threshold: 3
+
+# 健康检查配置
+health:
+  check_interval: 30s
+  timeout: 10s
+  retry_count: 3
+  retry_interval: 5s
+  degraded_threshold: 0.8
+  unhealthy_threshold: 0.5
+  alert_threshold: 3
+  alert_cooldown: 5m
+
+# 优雅关闭配置
+shutdown:
+  shutdown_timeout: 30s
+  component_timeout: 10s
+  signal_timeout: 5s
+  enable_signal_handling: true
+  force_shutdown_after: 60s
+  log_shutdown_progress: true
+  shutdown_order:
+    - websocket_connections
+    - strategy_runners
+    - market_data_streams
+    - order_managers
+    - position_managers
+    - risk_engine
+    - optimizer
+    - health_checker
+    - network_manager
+    - memory_manager
+    - redis_cache
+    - database
+    - http_server
+
+# 策略配置
+strategy:
+  default_mode: "paper"
+  max_concurrent_strategies: 10
+  strategy_timeout: 300s
+  memory_limit_mb: 512
+  sandbox_enabled: true
+  backtest:
+    enabled: true
+    timeout: 3600s
+    max_concurrency: 2
+    data_retention_days: 90
+
+# 优化器配置
+optimizer:
+  enabled: true
+  timeout: 1800s
+  max_iterations: 1000
+  concurrency: 4
+  algorithms:
+    - "walk_forward"
+    - "grid_search"
+    - "bayesian"
+  default_algorithm: "walk_forward"
+
+# 市场数据配置
+market_data:
+  enabled: true
+  cache_ttl: 60s
+  batch_size: 1000
+  update_interval: 1s
+  symbols:
+    - "BTCUSDT"
+    - "ETHUSDT"
+    - "BNBUSDT"
+  data_types:
+    - "klines"
+    - "trades"
+    - "orderbook"
+    - "funding_rate"
+    - "open_interest"
+
+# 订单管理配置
+order:
+  timeout: 30s
+  max_pending_orders: 100
+  retry_attempts: 3
+  retry_delay: 1s
+  auto_cancel_timeout: 60s
+
+# 策略选择器配置（初始shadow模式，仅用于观测决策，不改变下单）
+selector:
+  method: "window_score"   # 未来支持 bandit
+  score:
+    window: "336h"
+    min_trades: 0
+    weights:
+      return: 0.5
+      sharpe: 0.3
+      mdd: -0.2
+      cost: -0.2
+  safety:
+    symbol_mdd_limit: 0.12
+    strategy_mdd_limit: 0.2
+    switch_cooldown: "30m"
+
+# 风险管理配置
+risk:
+  enabled: true
+  check_interval: 5s
+  margin_call_threshold: 1.1
+  liquidation_threshold: 1.0
+  max_position_size: 100000
+  max_leverage: 10
+  max_drawdown: 0.1
+  circuit_breaker_threshold: 0.15
+  position_monitoring:
+    enabled: true
+    interval: 10s
+    alert_threshold: 0.8
+
+# 缓存配置
+cache:
+  ttl: 3600s
+  max_size: 1000
+  cleanup_interval: 300s
+  compression_enabled: true
+  encryption_enabled: false
+
+# 自动化系统配置
+automation:
+  enabled: true
+  
+  # 仓位管理自动化
+  position_management:
+    enabled: true
+    check_interval: "30s"
+    
+    # 风险控制阈值
+    thresholds:
+      margin_threshold: 0.8          # 80% 保证金使用率触发减仓
+      stop_loss_threshold: 0.05      # 5% 亏损触发止损
+      profit_taking_threshold: 0.15  # 15% 盈利触发止盈
+      position_size_threshold: 1000  # 最小仓位大小
+      emergency_close_threshold: 0.1 # 10% 紧急平仓阈值
+    
+    # 基于风险的减仓
+    risk_based_reduction:
+      enabled: true
+      max_drawdown_percent: 0.08     # 8% 最大回撤
+      reduction_percent: 0.3         # 30% 减仓比例
+      min_position_size: 500         # 最小仓位大小
+    
+    # 余额驱动的操作
+    balance_driven:
+      enabled: true
+      equity_change_threshold: 0.05  # 5% 权益变化阈值
+      margin_utilization_max: 0.7    # 70% 最大保证金使用率
+      auto_rebalance_enabled: true
+      rebalance_threshold: 0.1       # 10% 再平衡阈值
+
+  # 策略优化自动化
+  strategy_optimization:
+    enabled: true
+    frequency: "weekly"              # 每周优化一次
+    day_of_week: "sunday"           # 周日执行
+    time_utc: "02:00"               # UTC 2点执行
+    
+    # 触发条件
+    triggers:
+      performance_decline_days: 7    # 连续7天表现下降
+      sharpe_ratio_threshold: 0.5    # 夏普比率低于0.5
+      max_drawdown_threshold: 0.1    # 最大回撤超过10%
+      no_new_high_days: 14          # 14天无新高
+    
+    # 优化参数
+    optimization:
+      method: "bayesian"             # 优化方法
+      max_iterations: 50             # 最大迭代次数
+      timeout_minutes: 120           # 超时时间
+      
+  # 风险监控自动化
+  risk_monitoring:
+    enabled: true
+    check_interval_seconds: 10       # 每10秒检查一次
+    alert_cooldown_minutes: 5        # 5分钟告警冷却
+
+    # 监控指标
+    metrics:
+      portfolio_var_threshold: 0.02   # 2% VaR阈值
+      concentration_risk_threshold: 0.3  # 30% 集中度风险
+      correlation_risk_threshold: 0.9    # 90% 相关性风险
+      liquidity_risk_threshold: 0.1      # 10% 流动性风险
+
+    # 自动执行动作
+    auto_actions:
+      emergency_stop_enabled: true     # 紧急停止
+      auto_hedge_enabled: true         # 自动对冲
+      position_scaling_enabled: true   # 仓位缩放
+
+  # 系统健康监控
+  system_health:
+    enabled: true
+    check_interval: "5m"
+    health_threshold: 0.8
+    auto_recovery_enabled: true
+    
+  # 数据处理自动化
+  data_processing:
+    enabled: true
+    cleaning_interval: "1h"
+    quality_check_enabled: true
+    anomaly_detection_enabled: true
+    
+  # 学习与智能化
+  learning:
+    enabled: true
+    automl_enabled: true
+    model_update_interval: "24h"
+    genetic_algorithm_enabled: true
