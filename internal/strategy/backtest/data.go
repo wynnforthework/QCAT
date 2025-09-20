@@ -53,41 +53,34 @@ func (l *DataLoader) LoadData(ctx context.Context, symbol string, start, end tim
 	}
 	data.Klines = klines
 
-	// 加载订单簿数据
-	orderbooks, err := l.orderbookMgr.GetHistory(ctx, symbol, start, end)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load orderbooks: %w", err)
+	// 以下数据若缺失，不再阻断回测，允许仅K线模式
+	if l.orderbookMgr != nil {
+		if orderbooks, err := l.orderbookMgr.GetHistory(ctx, symbol, start, end); err == nil {
+			for _, ob := range orderbooks {
+				data.Orderbooks = append(data.Orderbooks, &orderbook.Depth{
+					Symbol:    ob.Symbol,
+					Bids:      ob.Bids.GetLevels(10),
+					Asks:      ob.Asks.GetLevels(10),
+					Timestamp: ob.Timestamp,
+				})
+			}
+		}
 	}
-	// Convert OrderBook to Depth
-	for _, ob := range orderbooks {
-		data.Orderbooks = append(data.Orderbooks, &orderbook.Depth{
-			Symbol:    ob.Symbol,
-			Bids:      ob.Bids.GetLevels(10),
-			Asks:      ob.Asks.GetLevels(10),
-			Timestamp: ob.Timestamp,
-		})
+	if l.tradeManager != nil {
+		if trades, err := l.tradeManager.GetTradeHistory(ctx, symbol, 1000); err == nil {
+			data.Trades = trades
+		}
 	}
-
-	// 加载成交数据
-	trades, err := l.tradeManager.GetTradeHistory(ctx, symbol, 1000)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load trades: %w", err)
+	if l.fundingManager != nil {
+		if fundingRates, err := l.fundingManager.GetHistory(ctx, symbol, start, end); err == nil {
+			data.FundingRates = fundingRates
+		}
 	}
-	data.Trades = trades
-
-	// 加载资金费率数据
-	fundingRates, err := l.fundingManager.GetHistory(ctx, symbol, start, end)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load funding rates: %w", err)
+	if l.indexManager != nil {
+		if indexPrices, err := l.indexManager.GetHistory(ctx, symbol, start, end); err == nil {
+			data.IndexPrices = indexPrices
+		}
 	}
-	data.FundingRates = fundingRates
-
-	// 加载指数价格数据
-	indexPrices, err := l.indexManager.GetHistory(ctx, symbol, start, end)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load index prices: %w", err)
-	}
-	data.IndexPrices = indexPrices
 
 	return data, nil
 }
@@ -109,18 +102,7 @@ func (d *HistoricalData) Validate() error {
 	if len(d.Klines) == 0 {
 		return fmt.Errorf("no kline data")
 	}
-	if len(d.Orderbooks) == 0 {
-		return fmt.Errorf("no orderbook data")
-	}
-	if len(d.Trades) == 0 {
-		return fmt.Errorf("no trade data")
-	}
-	if len(d.FundingRates) == 0 {
-		return fmt.Errorf("no funding rate data")
-	}
-	if len(d.IndexPrices) == 0 {
-		return fmt.Errorf("no index price data")
-	}
+	// 允许轻量模式，仅使用K线
 	return nil
 }
 

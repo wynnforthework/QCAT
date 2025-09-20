@@ -491,6 +491,32 @@ func (s *UnifiedStrategyService) enhanceStrategyInfo(ctx context.Context, basic 
 		}
 	}
 
+	// 统一校验：策略+参数必须绑定单一 symbol，必须存在 timeframe
+	if unified.Config == nil {
+		unified.Config = make(map[string]interface{})
+	}
+	symbol := ""
+	timeframe := ""
+	if v, ok := unified.Config["symbol"].(string); ok {
+		symbol = v
+	}
+	if params, ok := unified.Config["params"].(map[string]interface{}); ok {
+		if tf, ok2 := params["timeframe"].(string); ok2 {
+			timeframe = tf
+		}
+		// 禁止多符号绑定
+		if syms, ok2 := params["symbols"].([]interface{}); ok2 && len(syms) > 1 {
+			unified.Lifecycle.CanStart = false
+			unified.Lifecycle.Status = "invalid_config"
+		}
+	}
+	if symbol == "" || timeframe == "" {
+		unified.Lifecycle.CanStart = false
+		if unified.Lifecycle.Status == "" {
+			unified.Lifecycle.Status = "invalid_config"
+		}
+	}
+
 	// 如果没有从策略池获取到信息，使用默认值而不是 mock 数据
 	if unified.Execution.ExecutionCount == 0 {
 		unified.Execution = ExecutionInfo{

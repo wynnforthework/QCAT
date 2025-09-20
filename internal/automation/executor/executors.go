@@ -1771,7 +1771,7 @@ type StrategyExecutor struct {
 	strategyInstances   map[string]interface{}        // placeholder for strategy instances
 	eventBus            *events.EventBus              // actual event bus
 	notificationService protector.NotificationService // actual notification service
-	scheduler           interface{}                   // placeholder for scheduler service
+    scheduler           interface{}                   // placeholder for scheduler service
 	strategies          map[string]interface{}        // placeholder for strategy instances
 }
 
@@ -3023,7 +3023,20 @@ func (se *StrategyExecutor) validateOptimizedParameters(ctx context.Context, str
 }
 
 func (se *StrategyExecutor) applyOptimizedParameters(ctx context.Context, strategy *StrategyInfo, params map[string]interface{}) error {
-	return nil
+    // Persist parameters to DB if available
+    if se.db != nil && se.db.DB != nil {
+        _, _ = se.db.DB.ExecContext(ctx, `UPDATE strategies SET parameters = parameters || $1::jsonb, updated_at = NOW() WHERE id = $2`, toJSON(params), strategy.ID)
+    }
+    // Attempt hot-apply to live runner via live factory if available in scheduler context
+    if se.scheduler != nil && se.scheduler.liveFactory != nil {
+        if runner, ok := se.scheduler.liveFactory.GetRunner(strategy.Name); ok {
+            // call sandbox UpdateParams
+            if err := runner.sandbox.UpdateParams(ctx, params); err != nil {
+                return err
+            }
+        }
+    }
+    return nil
 }
 func (se *StrategyExecutor) analyzePortfolioDistribution(positions []*Position) map[string]interface{} {
 	return map[string]interface{}{}

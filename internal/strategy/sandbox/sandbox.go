@@ -44,9 +44,39 @@ func NewSandbox(strategy strategy.Strategy, config map[string]interface{}, excha
 	}
 }
 
+// ParamUpdatable defines optional interface for hot parameter updates
+type ParamUpdatable interface {
+    ApplyParams(ctx context.Context, params map[string]interface{}) error
+}
+
 // GetConfig returns the sandbox configuration
 func (s *Sandbox) GetConfig() map[string]interface{} {
 	return s.config
+}
+
+// UpdateParams hot-applies new parameters to running strategy without restart
+func (s *Sandbox) UpdateParams(ctx context.Context, params map[string]interface{}) error {
+    if params == nil {
+        return nil
+    }
+    s.mu.Lock()
+    // merge into config["params"] map
+    if s.config["params"] == nil {
+        s.config["params"] = make(map[string]interface{})
+    }
+    if existing, ok := s.config["params"].(map[string]interface{}); ok {
+        for k, v := range params {
+            existing[k] = v
+        }
+        s.config["params"] = existing
+    }
+    s.mu.Unlock()
+
+    // invoke strategy hot-apply if supported
+    if updatable, ok := s.strategy.(ParamUpdatable); ok {
+        return updatable.ApplyParams(ctx, s.config["params"].(map[string]interface{}))
+    }
+    return nil
 }
 
 // Start starts the strategy sandbox

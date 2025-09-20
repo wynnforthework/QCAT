@@ -91,6 +91,12 @@ func (r *Runner) Stop(ctx context.Context) error {
 func (r *Runner) subscribeMarketData(ctx context.Context) error {
 	config := r.sandbox.GetConfig()
 	symbol := r.getSymbolFromConfig(config)
+    timeframe := "1m"
+    if params, ok := config["params"].(map[string]interface{}); ok {
+        if tf, ok2 := params["timeframe"].(string); ok2 && tf != "" {
+            timeframe = tf
+        }
+    }
 
 	// Subscribe to order book updates
 	bookCh, err := r.market.SubscribeOrderBook(ctx, symbol)
@@ -108,8 +114,8 @@ func (r *Runner) subscribeMarketData(ctx context.Context) error {
 	go r.handleTrades(ctx, tradeCh)
 	r.marketSubs = append(r.marketSubs, tradeCh)
 
-	// Subscribe to klines
-	klineCh, err := r.market.SubscribeKlines(ctx, symbol, "1m")
+    // Subscribe to klines using strategy timeframe
+    klineCh, err := r.market.SubscribeKlines(ctx, symbol, timeframe)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe to klines: %w", err)
 	}

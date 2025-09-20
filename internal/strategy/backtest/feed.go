@@ -116,14 +116,18 @@ func (f *DBDataFeed) loadData(ctx context.Context, symbol, dataType string) erro
 // loadKlines loads historical kline data
 func (f *DBDataFeed) loadKlines(ctx context.Context, symbol string) error {
 	query := `
-		SELECT timestamp, open, high, low, close, volume
-		FROM market_data
-		WHERE symbol = $1 AND interval = '1m'
+        SELECT timestamp, open, high, low, close, volume
+        FROM market_data
+        WHERE symbol = $1 AND interval = $2
 			AND timestamp BETWEEN $2 AND $3
 		ORDER BY timestamp ASC
 	`
 
-	rows, err := f.db.QueryContext(ctx, query, symbol, f.config.StartTime, f.config.EndTime)
+    interval := f.config.Interval
+    if interval == "" {
+        interval = "1m"
+    }
+    rows, err := f.db.QueryContext(ctx, query, symbol, interval, f.config.StartTime, f.config.EndTime)
 	if err != nil {
 		return fmt.Errorf("failed to query klines: %w", err)
 	}
@@ -142,9 +146,13 @@ func (f *DBDataFeed) loadKlines(ctx context.Context, symbol string) error {
 			return fmt.Errorf("failed to scan kline: %w", err)
 		}
 
-		k.Symbol = symbol
-		k.Interval = "1m"
-		k.CloseTime = k.OpenTime.Add(time.Minute)
+        k.Symbol = symbol
+        k.Interval = interval
+        if d, err := intervalToDuration(interval); err == nil {
+            k.CloseTime = k.OpenTime.Add(d)
+        } else {
+            k.CloseTime = k.OpenTime.Add(time.Minute)
+        }
 		k.Complete = true
 
 		f.buffer = append(f.buffer, &MarketData{

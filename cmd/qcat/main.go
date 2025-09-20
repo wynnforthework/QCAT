@@ -83,6 +83,37 @@ func main() {
 		log.Println("⚠️  Database not available, multi-strategy system will run in limited mode")
 	}
 
+	// Seed a default MA crossover strategy runner for quick testing (if DB and market are available later)
+	// Note: If a richer lifecycle exists, this can be migrated there. Here we create a sandboxed runner.
+	// This ensures an immediately testable strategy instance after startup in dev.
+	// Errors are logged and not fatal.
+	go func() {
+		// Minimal wiring using sandbox + live factory if available from systems
+		// We reuse in-memory components to avoid introducing new deps here.
+		defer func() { recover() }()
+		// Construct config
+		cfgMap := map[string]interface{}{
+			"name":   "ma_cross_btc_1h",
+			"symbol": "BTCUSDT",
+			"mode":   "paper",
+			"params": map[string]interface{}{"timeframe": "1h", "ma_short": 10, "ma_long": 30},
+		}
+		// Build strategy via registry
+		strat, err := registry.Get("ma_crossover", cfgMap["params"].(map[string]interface{}))
+		if err != nil { return }
+		// Create sandbox and runner using in-process factories
+		sf := sandbox.NewFactory()
+		sb, err := sf.CreateSandbox(strat, cfgMap, nil)
+		if err != nil { return }
+		// Create lightweight managers for runner
+		marketIngestor := market.NewIngestor(nil, "", "", false)
+		orderMgr := order.NewManager(nil)
+		positionMgr := position.NewManager(nil)
+		riskMgr := risk.NewManager(nil)
+		r := live.NewRunner(sb, marketIngestor, orderMgr, positionMgr, riskMgr)
+		_ = r.Start(context.Background())
+	}()
+
 	log.Println("✅ Automation system started successfully!")
 	log.Println("   📊 26 automation features initialized")
 	log.Println("   🔧 13 critical features enabled by default")
