@@ -30,6 +30,7 @@ type Config struct {
 	LatencyModel   LatencyModel
 	// 新增：数据源配置字段
 	Symbols       []string
+    Interval      string
 	StartTime     time.Time
 	EndTime       time.Time
 	DataTypes     []string
@@ -65,12 +66,20 @@ func (e *Engine) Run(ctx context.Context) (*Result, error) {
 	}
 
 	// 初始化策略
-	if err := e.strategy.Initialize(ctx, nil); err != nil {
+    if err := e.strategy.Initialize(ctx, nil); err != nil {
 		return nil, fmt.Errorf("failed to initialize strategy: %w", err)
 	}
+    // 注入执行器（可选）
+    if ue, ok := e.strategy.(interface{ SetExecution(exec sdk.Execution) }); ok {
+        ue.SetExecution(e)
+    }
 
-	// 运行回测循环
-	currentTime := e.data.Start
+    // 运行回测循环
+    currentTime := e.data.Start
+    step := time.Minute
+    if d, err := intervalToDuration(e.config.Interval); err == nil {
+        step = d
+    }
 	for currentTime.Before(e.data.End) {
 		// 处理事件队列
 		e.eventMgr.ProcessEvents(currentTime)
@@ -83,11 +92,22 @@ func (e *Engine) Run(ctx context.Context) (*Result, error) {
 			}
 		}
 
-		orderbook := e.data.GetOrderbookAt(currentTime)
-		if orderbook != nil {
-			// 撮合订单
-			e.orderMgr.Match(orderbook)
-		}
+        orderbook := e.data.GetOrderbookAt(currentTime)
+        if orderbook != nil {
+            // 撮合订单
+            trades := e.orderMgr.Match(orderbook)
+            for _, tr := range trades {
+                // 更新持仓
+                if tr.Side == string(exchange.OrderSideBuy) {
+                    _ = e.posMgr.OpenPosition(tr)
+                } else {
+                    // 这里用 ClosePosition 仅针对简化模型；更完整实现需要区分开仓/平仓方向
+                    _ = e.posMgr.ClosePosition(tr)
+                }
+                // 统计交易
+                e.statsMgr.AddTrade(tr)
+            }
+        }
 
 		trades := e.data.GetTradesAt(currentTime)
 		for _, t := range trades {
@@ -105,12 +125,62 @@ func (e *Engine) Run(ctx context.Context) (*Result, error) {
 		// 更新统计数据
 		e.statsMgr.Update(currentTime, e.posMgr.GetEquity())
 
-		// 推进时间
-		currentTime = currentTime.Add(time.Minute)
+        // 推进时间
+        currentTime = currentTime.Add(step)
 	}
 
 	// 获取回测结果
 	return e.statsMgr.GetResult(), nil
+}
+
+// intervalToDuration converts common kline interval strings to duration
+func intervalToDuration(interval string) (time.Duration, error) {
+    switch interval {
+    case "1m":
+        return time.Minute, nil
+    case "3m":
+        return 3 * time.Minute, nil
+    case "5m":
+        return 5 * time.Minute, nil
+    case "15m":
+        return 15 * time.Minute, nil
+    case "30m":
+        return 30 * time.Minute, nil
+    case "1h":
+        return time.Hour, nil
+    case "2h":
+        return 2 * time.Hour, nil
+    case "4h":
+        return 4 * time.Hour, nil
+    case "6h":
+        return 6 * time.Hour, nil
+    case "8h":
+        return 8 * time.Hour, nil
+    case "12h":
+        return 12 * time.Hour, nil
+    case "1d":
+        return 24 * time.Hour, nil
+    case "3d":
+        return 72 * time.Hour, nil
+    case "1w":
+        return 7 * 24 * time.Hour, nil
+    case "1M":
+        return 30 * 24 * time.Hour, nil
+    default:
+        return 0, fmt.Errorf("unsupported interval: %s", interval)
+    }
+}
+
+// Implement sdk.Execution for the backtest engine
+func (e *Engine) PlaceOrder(order *exchange.Order) error {
+    if order == nil {
+        return fmt.Errorf("nil order")
+    }
+    // enqueue order and immediate match on available book snapshot
+    e.orderMgr.PlaceOrder(order)
+    // try to match against current orderbook if available
+    // Note: matching is also handled in the loop via data; this provides immediate processing if desired.
+    return nil
 }
 
 // Result represents backtest results

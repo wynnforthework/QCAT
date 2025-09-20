@@ -684,6 +684,7 @@ func (s *Server) setupRoutes() {
 				strategy.POST("/:id/start", s.handlers.Strategy.StartStrategy)
 				strategy.POST("/:id/stop", s.handlers.Strategy.StopStrategy)
 				strategy.POST("/:id/backtest", s.handlers.Strategy.RunBacktest)
+				strategy.POST("/backtest/wfo", s.handlers.Strategy.RunWalkForward)
 
 				// Auto-start routes
 				if s.handlers.AutoStart != nil {

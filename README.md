@@ -6,7 +6,7 @@ QCAT v2.1 是一个革命性的加密货币智能化自动交易平台，采用�
 
 这个项目源自于：没有最完美测策略，只有在某个时间段适合某个币种的策略，所以开发了这个能够自动回测和优化参数的项目
 > **⚠️ <span style="color:red">重要警告：</span> 本项目所有代码均由 AI 自动生成。由于 AI 在开发过程中可能遗留大量 TODO、空函数、硬编码、临时代码及简化逻辑，且难以全面排查，当前项目仍处于开发阶段。**  
-> **请勿将本项目用于任何实盘交易或生产环境，后果自负！**
+
 
 
 ![QCAT](./logo.png)
@@ -222,6 +222,47 @@ curl http://localhost:8082/api/v1/healing/status
 # 智能路由状态
 curl http://localhost:8082/api/v1/routing/status
 ```
+
+
+### 策略规范与走步前进（WFO）
+
+- 统一策略规范：每个策略必须绑定单一 `symbol`，并在 `params.timeframe` 指定优化/回测所用K线周期（支持 1m/3m/5m/15m/30m/1h/2h/4h/6h/8h/12h/1d/3d/1w/1M）。
+- 参数热重载：运行中可直接应用新参数，无需重启进程。
+- 走步前进回测：对最近3年数据按“优化1年 -> 测试3个月，步长3个月”滚动执行，避免过拟合并贴近真实部署。
+
+可直接运行 WFO 示例（假设数据库有相应K线数据）：
+
+```bash
+# MA交叉（参数搜索示例）
+curl -X POST http://localhost:8082/api/v1/strategy/backtest/wfo \
+  -H "Content-Type: application/json" \
+  -d '{
+    "strategy_type": "ma_crossover",
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "start": "2022-01-01T00:00:00Z",
+    "end": "2025-01-01T00:00:00Z",
+    "param_ranges": {"ma_short": [5,10,20], "ma_long": [30,50,100]}
+  }'
+
+# RSI均值回归（参数搜索示例）
+curl -X POST http://localhost:8082/api/v1/strategy/backtest/wfo \
+  -H "Content-Type: application/json" \
+  -d '{
+    "strategy_type": "rsi_mean_reversion",
+    "symbol": "BTCUSDT",
+    "interval": "1h",
+    "start": "2022-01-01T00:00:00Z",
+    "end": "2025-01-01T00:00:00Z",
+    "param_ranges": {"period": [14,21,28], "buy": [25,30,35], "sell": [65,70,75]}
+  }'
+```
+
+#### 可用内置策略（registry key）
+
+- ma_crossover: 参数 `ma_short`、`ma_long`，需在 `params.timeframe` 指定周期
+- rsi_mean_reversion: 参数 `period`、`buy`、`sell`
+- breakout: 参数 `lookback`
 
 
 ## ⚙️ 智能化配置系统

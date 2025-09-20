@@ -12,6 +12,7 @@ import (
 	"qcat/internal/strategy"
 	"qcat/internal/strategy/generator"
 	"qcat/internal/strategy/paper"
+	"qcat/internal/strategy/registry"
 )
 
 // AutomatedSandboxService 自动化沙盒测试服务
@@ -481,10 +482,21 @@ func (s *AutomatedSandboxService) createPaperExchange(config *TestConfiguration)
 
 // createStrategyInstance 创建策略实例
 func (s *AutomatedSandboxService) createStrategyInstance(config *strategy.Config) (strategy.Strategy, error) {
-	// 这里应该根据策略配置创建实际的策略实例
-	// 为了演示，返回nil，实际应该实现策略工厂
-	log.Printf("Creating strategy instance for %s", config.Name)
-	return nil, fmt.Errorf("strategy factory not implemented")
+	if config == nil {
+		return nil, fmt.Errorf("nil strategy config")
+	}
+	params := config.Params
+	if params == nil { params = map[string]interface{}{} }
+	// 使用统一注册表创建策略
+	strat, err := registry.Get(config.Name, params)
+	if err != nil {
+		// 回退到类型字段，如果 Name 不是工厂键
+		if t, ok := config.Params["type"].(string); ok {
+			return registry.Get(t, params)
+		}
+		return nil, fmt.Errorf("strategy factory not found: %w", err)
+	}
+	return strat, nil
 }
 
 // cleanupTest 清理测试资源

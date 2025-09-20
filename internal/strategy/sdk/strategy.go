@@ -43,6 +43,16 @@ type Strategy interface {
 	Stop(ctx context.Context) error
 }
 
+// Execution provides an abstract order placement interface for strategies
+type Execution interface {
+    PlaceOrder(order *exchange.Order) error
+}
+
+// UsesExecution is an optional interface for strategies that accept an executor
+type UsesExecution interface {
+    SetExecution(exec Execution)
+}
+
 // StrategyConfig represents strategy configuration
 type StrategyConfig struct {
 	ID         string                 // 策略ID

@@ -317,6 +317,48 @@ type StrategyHandler struct {
 	// 新增：策略管理器
 	strategyManager interface{} // 新增：策略管理器接口
 }
+// RunWalkForward 请求体
+type RunWFORequest struct {
+    StrategyType string    `json:"strategy_type"`
+    Symbol       string    `json:"symbol"`
+    Interval     string    `json:"interval"`
+    Start        time.Time `json:"start"`
+    End          time.Time `json:"end"`
+    ParamRanges  map[string][]interface{} `json:"param_ranges"`
+}
+
+// RunWalkForward 响应
+type RunWFOResponse struct {
+    Success bool        `json:"success"`
+    Data    interface{} `json:"data"`
+    Error   string      `json:"error,omitempty"`
+}
+
+// RunWalkForward runs walk-forward optimization with simple wrappers
+func (h *StrategyHandler) RunWalkForward(c *gin.Context) {
+    var req RunWFORequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(http.StatusBadRequest, RunWFOResponse{ Success: false, Error: err.Error() })
+        return
+    }
+
+    // build wrappers
+    opt := &backtesting.SimpleOptimizer{
+        DB: h.db.DB,
+        Ranges: req.ParamRanges,
+        MakeStrategy: func(p map[string]interface{}) sdk.Strategy {
+            s, _ := registry.Get(req.StrategyType, p)
+            return s
+        },
+    }
+    bt := &backtesting.SimpleBacktester{ DB: h.db.DB, MakeStrategy: func(p map[string]interface{}) sdk.Strategy { s, _ := registry.Get(req.StrategyType, p); return s } }
+    res, err := backtesting.DefaultWalkForward(req.Symbol, req.Interval, req.Start, req.End, opt, bt)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, RunWFOResponse{ Success: false, Error: err.Error() })
+        return
+    }
+    c.JSON(http.StatusOK, RunWFOResponse{ Success: true, Data: res })
+}
 
 // NewStrategyHandler creates a new strategy handler
 func NewStrategyHandler(db *database.DB, redis cache.Cacher, metrics *monitor.MetricsCollector) *StrategyHandler {
