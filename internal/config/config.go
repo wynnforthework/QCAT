@@ -36,6 +36,7 @@ type Config struct {
 	LayeredPosition LayeredPositionConfig `yaml:"layered_position"`
 	Automation      AutomationConfig      `yaml:"automation"`
 	Selector        SelectorConfig        `yaml:"selector"`
+	Operational     OperationalConfig     `yaml:"operational"`
 }
 
 // AppConfig 应用配置
@@ -340,27 +341,27 @@ type BacktestConfig struct {
 
 // SelectorConfig 策略选择器配置
 type SelectorConfig struct {
-    Method string `yaml:"method"`
-    Score  SelectorScoreConfig `yaml:"score"`
-    Safety SelectorSafetyConfig `yaml:"safety"`
-    Shadow SelectorShadowConfig `yaml:"shadow"`
+	Method string               `yaml:"method"`
+	Score  SelectorScoreConfig  `yaml:"score"`
+	Safety SelectorSafetyConfig `yaml:"safety"`
+	Shadow SelectorShadowConfig `yaml:"shadow"`
 }
 
 type SelectorScoreConfig struct {
-    Window    time.Duration      `yaml:"window"`
-    MinTrades int                `yaml:"min_trades"`
-    Weights   map[string]float64 `yaml:"weights"`
+	Window    time.Duration      `yaml:"window"`
+	MinTrades int                `yaml:"min_trades"`
+	Weights   map[string]float64 `yaml:"weights"`
 }
 
 type SelectorSafetyConfig struct {
-    SymbolMddLimit    float64       `yaml:"symbol_mdd_limit"`
-    StrategyMddLimit  float64       `yaml:"strategy_mdd_limit"`
-    SwitchCooldown    time.Duration `yaml:"switch_cooldown"`
+	SymbolMddLimit   float64       `yaml:"symbol_mdd_limit"`
+	StrategyMddLimit float64       `yaml:"strategy_mdd_limit"`
+	SwitchCooldown   time.Duration `yaml:"switch_cooldown"`
 }
 
 type SelectorShadowConfig struct {
-    Enabled bool     `yaml:"enabled"`
-    Symbols []string `yaml:"symbols"`
+	Enabled bool     `yaml:"enabled"`
+	Symbols []string `yaml:"symbols"`
 }
 
 // OrderConfig 订单管理配置

@@ -606,3 +606,9 @@ go run scripts/deploy_model.go --model-path=models/your_model
 **🤖 QCAT v2.0 - 让AI为您的交易保驾护航！**
 
 *"在金融市场的波涛中，让人工智能成为您最可靠的舵手。"*
+### 🧩 运维健康矩阵
+- 引入 `Operations Manager` 打通双闭环、策略池、交易执行、交易所 API Key 与系统基础设施的运行基线。
+- 启动阶段执行完整的 Boot Checklist，关键检查未通过时会阻断启动并给出可定位的错误。
+- 运行期自动轮询并回写到核心 HealthChecker，健康退化将同步触发现有告警与日志。
+- 对外提供 `/api/v1/operations/matrix` 接口与 `scripts/verify_system.ps1` 脚本，一键拉取 26 项能力的健康矩阵。
+

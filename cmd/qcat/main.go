@@ -52,6 +52,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create server: %v", err)
 	}
+	opsManager := server.GetOperationsManager()
 
 	// Get automation system from server (already initialized)
 	log.Println("🚀 Starting QCAT Automation System...")
@@ -63,6 +64,12 @@ func main() {
 	// Start automation system (includes executor and scheduler)
 	if err := automationSystem.Start(); err != nil {
 		log.Fatalf("Failed to start automation system: %v", err)
+	}
+	if opsManager != nil {
+		if err := opsManager.RunStartupChecks(context.Background()); err != nil {
+			log.Fatalf("Operational startup checks failed: %v", err)
+		}
+		opsManager.StartMonitoring(context.Background())
 	}
 
 	// Initialize multi-strategy workflow system with auto-start
@@ -100,11 +107,15 @@ func main() {
 		}
 		// Build strategy via registry
 		strat, err := registry.Get("ma_crossover", cfgMap["params"].(map[string]interface{}))
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 		// Create sandbox and runner using in-process factories
 		sf := sandbox.NewFactory()
 		sb, err := sf.CreateSandbox(strat, cfgMap, nil)
-		if err != nil { return }
+		if err != nil {
+			return
+		}
 		// Create lightweight managers for runner
 		marketIngestor := market.NewIngestor(nil, "", "", false)
 		orderMgr := order.NewManager(nil)
@@ -135,6 +146,14 @@ func main() {
 		shutdownManager.RegisterComponent("automation_system", "Automation System", 0, func(ctx context.Context) error {
 			return automationSystem.Stop()
 		}, 20*time.Second)
+
+		// Register operations monitor
+		if opsManager != nil {
+			shutdownManager.RegisterComponent("operations_monitor", "Operations Monitor", 0, func(ctx context.Context) error {
+				opsManager.Stop()
+				return nil
+			}, 5*time.Second)
+		}
 
 		// Register orchestrator
 		shutdownManager.RegisterComponent("orchestrator", "Process Orchestrator", 1, func(ctx context.Context) error {
@@ -208,6 +227,9 @@ func main() {
 		// Fallback to manual shutdown
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
+		if opsManager != nil {
+			opsManager.Stop()
+		}
 
 		if err := server.Stop(ctx); err != nil {
 			log.Printf("Error during server shutdown: %v", err)

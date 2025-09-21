@@ -20,6 +20,7 @@ import (
 	"qcat/internal/exchange/binance"
 	"qcat/internal/monitor"
 	"qcat/internal/monitoring"
+	"qcat/internal/operations"
 	"qcat/internal/security"
 	"qcat/internal/stability"
 	"qcat/internal/strategy"
@@ -45,15 +46,16 @@ type Server struct {
 	handlers   *Handlers
 
 	// Core services
-	db               *database.DB
-	redis            cache.Cacher
-	jwtManager       *auth.JWTManager
-	metrics          *monitoring.Metrics
-	metricsCollector *monitor.MetricsCollector
-	memory           *stability.MemoryManager
-	network          *stability.NetworkReconnectManager
-	health           *stability.HealthChecker
-	shutdown         *stability.GracefulShutdownManager
+	db                *database.DB
+	redis             cache.Cacher
+	jwtManager        *auth.JWTManager
+	metrics           *monitoring.Metrics
+	metricsCollector  *monitor.MetricsCollector
+	memory            *stability.MemoryManager
+	network           *stability.NetworkReconnectManager
+	health            *stability.HealthChecker
+	shutdown          *stability.GracefulShutdownManager
+	operationsManager *operations.Manager
 
 	// Security services
 	keyManager  *security.KeyManager
@@ -89,6 +91,7 @@ type Handlers struct {
 	ResultSharing      *ResultSharingHandler
 	Settings           *SettingsHandler
 	AutoStart          *AutoStartHandler
+	Operations         *OperationsHandler
 	Selector           *SelectorHandler
 }
 
@@ -421,6 +424,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 	// Initialize exchange client and account manager
 	var accountManager *account.Manager
+	var automationExchange exchange.Exchange
 	if cfg.Exchange.APIKey != "" && cfg.Exchange.APISecret != "" {
 		// Create Binance client
 		exchangeConfig := &exchange.ExchangeConfig{
@@ -476,6 +480,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 			}
 			rateLimiter := exchange.NewRateLimiter(redis, time.Second)
 			exchangeClient = binance.NewClient(exchangeConfig, rateLimiter)
+			automationExchange = exchangeClient
 		}
 
 		// Create optimizer factory
@@ -500,6 +505,58 @@ func NewServer(cfg *config.Config) (*Server, error) {
 
 	// Store automation system in server
 	server.automationSystem = automationSystem
+	server.operationsManager = operations.NewManager(cfg, automationSystem, automationExchange, health)
+
+	if health != nil && server.operationsManager != nil {
+		health.RegisterCheck("operations_matrix", "Operational domain aggregate", func(ctx context.Context) (*stability.HealthResult, error) {
+			snapshot := server.operationsManager.GetSnapshot()
+
+			worst := operations.StatusHealthy
+			domainCount := 0
+			for _, summary := range snapshot.Domains {
+				domainCount++
+				switch summary.Status {
+				case operations.StatusCritical:
+					worst = operations.StatusCritical
+				case operations.StatusWarning:
+					if worst != operations.StatusCritical {
+						worst = operations.StatusWarning
+					}
+				case operations.StatusUnknown:
+					if worst == operations.StatusHealthy {
+						worst = operations.StatusUnknown
+					}
+				}
+			}
+			if domainCount == 0 {
+				worst = operations.StatusUnknown
+			}
+
+			var overall stability.HealthStatus
+			switch worst {
+			case operations.StatusCritical:
+				overall = stability.HealthStatusUnhealthy
+			case operations.StatusWarning:
+				overall = stability.HealthStatusDegraded
+			case operations.StatusHealthy:
+				overall = stability.HealthStatusHealthy
+			default:
+				overall = stability.HealthStatusUnknown
+			}
+
+			metadata := map[string]interface{}{
+				"mode":         snapshot.Mode,
+				"generated_at": snapshot.GeneratedAt,
+				"domains":      snapshot.Domains,
+			}
+
+			return &stability.HealthResult{
+				Status:   overall,
+				Message:  fmt.Sprintf("mode=%s", snapshot.Mode),
+				Metadata: metadata,
+			}, nil
+		})
+	}
 
 	// Note: Automation system startup moved to main.go to prevent duplicate initialization
 
@@ -554,6 +611,7 @@ func NewServer(cfg *config.Config) (*Server, error) {
 		ResultSharing:      NewResultSharingHandler(db, redis, metricsCollector),
 		Settings:           NewSettingsHandler(),
 		AutoStart:          NewAutoStartHandler(db),
+		Operations:         NewOperationsHandler(server.operationsManager),
 		Selector:           NewSelectorHandler(automationSystem),
 	}
 
@@ -861,6 +919,10 @@ func (s *Server) setupRoutes() {
 			// Security management routes
 			if s.handlers.Security != nil {
 				s.handlers.Security.RegisterRoutes(protected)
+			}
+
+			if s.handlers.Operations != nil {
+				s.handlers.Operations.RegisterRoutes(protected)
 			}
 
 			// Automation system routes
@@ -1332,6 +1394,11 @@ func (s *Server) GetMetricsCollector() *monitor.MetricsCollector {
 // GetAutomationSystem returns the automation system
 func (s *Server) GetAutomationSystem() *automation.AutomationSystem {
 	return s.automationSystem
+}
+
+// GetOperationsManager exposes the operational monitoring manager.
+func (s *Server) GetOperationsManager() *operations.Manager {
+	return s.operationsManager
 }
 
 // RegisterOrchestratorHandler registers the orchestrator handler routes

@@ -78,6 +78,11 @@ func (v *Validator) Validate() error {
 		errors = append(errors, fmt.Sprintf("风险管理配置错误: %v", err))
 	}
 
+	// 验证运维配置
+	if err := v.validateOperational(); err != nil {
+		errors = append(errors, fmt.Sprintf("运维配置错误: %v", err))
+	}
+
 	if len(errors) > 0 {
 		return fmt.Errorf("配置验证失败:\n%s", strings.Join(errors, "\n"))
 	}
@@ -584,6 +589,47 @@ func (v *Validator) validateRisk() error {
 			if risk.PositionMonitoring.AlertThreshold <= 0 || risk.PositionMonitoring.AlertThreshold > 1 {
 				return fmt.Errorf("仓位监控告警阈值必须在0-1之间")
 			}
+		}
+	}
+
+	return nil
+}
+
+// validateOperational 验证运维配置
+func (v *Validator) validateOperational() error {
+	op := v.config.Operational
+
+	if op.Mode == "" && len(op.Modes) == 0 && len(op.KeyProfiles) == 0 {
+		return nil
+	}
+
+	// 如果定义了运行模式，则需要验证其配置
+	if len(op.Modes) == 0 {
+		return nil
+	}
+
+	mode := op.Mode
+	if mode == "" {
+		return fmt.Errorf("operational.mode 未配置")
+	}
+
+	modeConfig, ok := op.Modes[mode]
+	if !ok {
+		return fmt.Errorf("operational.mode %s 未在 modes 中定义", mode)
+	}
+
+	if modeConfig.RequiredKeyProfile != "" {
+		if len(op.KeyProfiles) == 0 {
+			return fmt.Errorf("未定义任何 key_profiles，但模式 %s 需要 %s", mode, modeConfig.RequiredKeyProfile)
+		}
+		if _, ok := op.KeyProfiles[modeConfig.RequiredKeyProfile]; !ok {
+			return fmt.Errorf("模式 %s 所需的 key profile %s 未定义", mode, modeConfig.RequiredKeyProfile)
+		}
+	}
+
+	for _, name := range modeConfig.OptionalKeyProfiles {
+		if _, ok := op.KeyProfiles[name]; !ok {
+			return fmt.Errorf("模式 %s 的可选 key profile %s 未定义", mode, name)
 		}
 	}
 
