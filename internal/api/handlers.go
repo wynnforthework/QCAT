@@ -14,9 +14,12 @@ import (
 	"time"
 
 	"qcat/internal/cache"
+	"qcat/internal/analysis/backtesting"
 	"qcat/internal/database"
 	"qcat/internal/exchange/account"
 	"qcat/internal/monitor"
+	"qcat/internal/strategy/registry"
+	"qcat/internal/strategy/sdk"
 	"qcat/internal/strategy/autostart"
 	"qcat/internal/strategy/lifecycle"
 	"qcat/internal/strategy/optimizer"

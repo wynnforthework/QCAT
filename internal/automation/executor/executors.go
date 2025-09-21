@@ -3025,12 +3025,14 @@ func (se *StrategyExecutor) validateOptimizedParameters(ctx context.Context, str
 func (se *StrategyExecutor) applyOptimizedParameters(ctx context.Context, strategy *StrategyInfo, params map[string]interface{}) error {
     // Persist parameters to DB if available
     if se.db != nil && se.db.DB != nil {
-        _, _ = se.db.DB.ExecContext(ctx, `UPDATE strategies SET parameters = parameters || $1::jsonb, updated_at = NOW() WHERE id = $2`, toJSON(params), strategy.ID)
+        b, _ := json.Marshal(params)
+        _, _ = se.db.DB.ExecContext(ctx, `UPDATE strategies SET parameters = parameters || $1::jsonb, updated_at = NOW() WHERE id = $2`, string(b), strategy.ID)
     }
     // Attempt hot-apply to live runner via live factory if available in scheduler context
-    if se.scheduler != nil && se.scheduler.liveFactory != nil {
-        if runner, ok := se.scheduler.liveFactory.GetRunner(strategy.Name); ok {
-            // call sandbox UpdateParams
+    // Note: se.scheduler is defined as interface{}, so we use a narrow adapter if available
+    type liveFactoryProvider interface{ GetRunner(string) (*struct{ sandbox interface{ UpdateParams(context.Context, map[string]interface{}) error } }, bool) }
+    if lf, ok := se.scheduler.(liveFactoryProvider); ok && lf != nil {
+        if runner, ok := lf.GetRunner(strategy.Name); ok && runner != nil {
             if err := runner.sandbox.UpdateParams(ctx, params); err != nil {
                 return err
             }

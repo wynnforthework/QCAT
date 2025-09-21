@@ -487,12 +487,12 @@ func (s *AutomatedSandboxService) createStrategyInstance(config *strategy.Config
 	}
 	params := config.Params
 	if params == nil { params = map[string]interface{}{} }
-	// 使用统一注册表创建策略
-	strat, err := registry.Get(config.Name, params)
+    // 使用统一注册表创建策略（适配 legacy 接口）
+    strat, err := registry.GetLegacy(config.Name, params)
 	if err != nil {
 		// 回退到类型字段，如果 Name 不是工厂键
 		if t, ok := config.Params["type"].(string); ok {
-			return registry.Get(t, params)
+            return registry.GetLegacy(t, params)
 		}
 		return nil, fmt.Errorf("strategy factory not found: %w", err)
 	}

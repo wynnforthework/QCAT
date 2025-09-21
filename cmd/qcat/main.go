@@ -27,6 +27,8 @@ import (
 	"qcat/internal/api"
 	"qcat/internal/config"
 	"qcat/internal/orchestrator"
+    "qcat/internal/strategy/registry"
+    sandbox "qcat/internal/strategy/sandbox"
 	"qcat/internal/strategy/workflow"
 )
 
@@ -106,7 +108,7 @@ func main() {
 			"params": map[string]interface{}{"timeframe": "1h", "ma_short": 10, "ma_long": 30},
 		}
 		// Build strategy via registry
-		strat, err := registry.Get("ma_crossover", cfgMap["params"].(map[string]interface{}))
+        strat, err := registry.GetLegacy("ma_crossover", cfgMap["params"].(map[string]interface{}))
 		if err != nil {
 			return
 		}
@@ -116,13 +118,7 @@ func main() {
 		if err != nil {
 			return
 		}
-		// Create lightweight managers for runner
-		marketIngestor := market.NewIngestor(nil, "", "", false)
-		orderMgr := order.NewManager(nil)
-		positionMgr := position.NewManager(nil)
-		riskMgr := risk.NewManager(nil)
-		r := live.NewRunner(sb, marketIngestor, orderMgr, positionMgr, riskMgr)
-		_ = r.Start(context.Background())
+        _ = sb.Start(context.Background())
 	}()
 
 	log.Println("✅ Automation system started successfully!")

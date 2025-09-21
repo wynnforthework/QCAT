@@ -5,6 +5,8 @@ import (
     "database/sql"
     "time"
 
+    "qcat/internal/exchange"
+    "qcat/internal/market/kline"
     "qcat/internal/strategy/backtest"
     "qcat/internal/strategy/sdk"
 )
@@ -77,20 +79,53 @@ func (b *SimpleBacktester) Backtest(ctx context.Context, symbol, interval string
 func runBacktest(ctx context.Context, db *sql.DB, strat sdk.Strategy, symbol, interval string, start, end time.Time) (*backtest.Result, error) {
     cfg := &backtest.Config{
         InitialCapital: 10000,
-        MarginMode: 0,
-        Leverage: 1,
-        Symbols: []string{symbol},
-        Interval: interval,
-        StartTime: start,
-        EndTime: end,
-        DataTypes: []string{"kline"},
-        Capital: 10000,
-        DataFeedType: "db",
+        MarginMode:     exchange.MarginTypeCross,
+        Leverage:       1,
+        Symbols:        []string{symbol},
+        Interval:       interval,
+        StartTime:      start,
+        EndTime:        end,
+        DataTypes:      []string{"kline"},
+        Capital:        10000,
     }
-    feed, err := backtest.NewDBDataFeed(db, cfg)
-    if err != nil { return nil, err }
-    if err := feed.Load(ctx); err != nil { return nil, err }
-    data := &backtest.HistoricalData{ Start: start, End: end, Feed: feed }
+
+    // Load klines directly from DB into HistoricalData
+    data := &backtest.HistoricalData{ Symbol: symbol, Start: start, End: end }
+    if db != nil {
+        rows, err := db.QueryContext(ctx,
+            `SELECT timestamp, open, high, low, close, volume
+             FROM market_data
+             WHERE symbol = $1 AND interval = $2 AND timestamp BETWEEN $3 AND $4
+             ORDER BY timestamp ASC`,
+            symbol, interval, start, end,
+        )
+        if err == nil {
+            defer rows.Close()
+            for rows.Next() {
+                var openTime time.Time
+                var open, high, low, close, volume float64
+                if err := rows.Scan(&openTime, &open, &high, &low, &close, &volume); err != nil {
+                    continue
+                }
+                kl := &kline.Kline{
+                    Symbol:    symbol,
+                    Interval:  kline.Interval(interval),
+                    OpenTime:  openTime,
+                    Open:      open,
+                    High:      high,
+                    Low:       low,
+                    Close:     close,
+                    Volume:    volume,
+                    Complete:  true,
+                }
+                // derive CloseTime from interval
+                kl.CloseTime = openTime.Add(kline.GetIntervalDuration(kline.Interval(interval)))
+                data.Klines = append(data.Klines, kl)
+            }
+            _ = rows.Err()
+        }
+    }
+
     engine := backtest.NewEngine(data, strat, cfg)
     return engine.Run(ctx)
 }
