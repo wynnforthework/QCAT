@@ -91,3 +91,4 @@ qcat
 optimizer
 qcat-config
 configs/cache.yaml
+internal/strategy/strategies
