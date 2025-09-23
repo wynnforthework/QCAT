@@ -2,11 +2,15 @@ package automation
 
 import (
 	"context"
+
 	"database/sql"
 	"fmt"
 	"log"
 	"math"
 	"math/rand/v2"
+	"qcat/internal/strategy/lifecycle"
+	"qcat/internal/strategy/validation"
+	"strings"
 	"time"
 )
 
@@ -14,6 +18,7 @@ import (
 type ParameterOptimizer struct {
 	db                *sql.DB
 	backtestScheduler *BacktestScheduler
+	gatekeeper        *validation.StrategyGatekeeper
 	optimizeInterval  time.Duration
 	running           bool
 	stopChan          chan struct{}
@@ -54,10 +59,11 @@ type OptimizationResult struct {
 }
 
 // NewParameterOptimizer 创建参数优化器
-func NewParameterOptimizer(db *sql.DB, backtestScheduler *BacktestScheduler) *ParameterOptimizer {
+func NewParameterOptimizer(db *sql.DB, backtestScheduler *BacktestScheduler, gatekeeper *validation.StrategyGatekeeper) *ParameterOptimizer {
 	return &ParameterOptimizer{
 		db:                db,
 		backtestScheduler: backtestScheduler,
+		gatekeeper:        gatekeeper,
 		optimizeInterval:  24 * time.Hour, // 每天优化一次
 		stopChan:          make(chan struct{}),
 	}
@@ -174,6 +180,22 @@ func (po *ParameterOptimizer) getStrategiesForOptimization(ctx context.Context) 
 // optimizeStrategy 优化单个策略
 func (po *ParameterOptimizer) optimizeStrategy(ctx context.Context, strategyID string) error {
 	log.Printf("🔧 开始优化策略 %s", strategyID)
+
+	if po.gatekeeper != nil {
+		version := &lifecycle.Version{StrategyID: strategyID, ID: strategyID}
+		auditResult, auditErr := po.gatekeeper.RunScenarioAudit(ctx, strategyID, version)
+		if auditErr != nil {
+			return fmt.Errorf("scenario audit failed: %w", auditErr)
+		}
+		if auditResult != nil && !auditResult.Passed {
+			summary := strings.Join(auditResult.FailureSummary, "; ")
+			if summary == "" {
+				summary = "scenario checks did not pass"
+			}
+			log.Printf("Skipping optimization for %s due to scenario audit: %s", strategyID, summary)
+			return fmt.Errorf("scenario audit failed: %s", summary)
+		}
+	}
 
 	startTime := time.Now()
 

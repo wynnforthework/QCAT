@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +17,7 @@ import (
 type StrategyGatekeeper struct {
 	backtestValidator *MandatoryBacktestValidator
 	riskValidator     *RiskValidator
+	scenarioAuditor   *MarketScenarioAuditor
 	enabled           bool
 	blacklist         map[string]*BlacklistEntry
 	mu                sync.RWMutex
@@ -42,16 +44,18 @@ type RiskValidator struct {
 
 // ValidationStatus 验证状态
 type ValidationStatus struct {
-	StrategyID       string            `json:"strategy_id"`
-	IsValid          bool              `json:"is_valid"`
-	BacktestPassed   bool              `json:"backtest_passed"`
-	RiskCheckPassed  bool              `json:"risk_check_passed"`
-	ValidationTime   time.Time         `json:"validation_time"`
-	BacktestResult   *BacktestResult   `json:"backtest_result,omitempty"`
-	RiskAssessment   *RiskAssessment   `json:"risk_assessment,omitempty"`
-	Errors           []ValidationError `json:"errors,omitempty"`
-	Warnings         []ValidationError `json:"warnings,omitempty"`
-	NextRevalidation time.Time         `json:"next_revalidation"`
+	StrategyID          string               `json:"strategy_id"`
+	IsValid             bool                 `json:"is_valid"`
+	BacktestPassed      bool                 `json:"backtest_passed"`
+	RiskCheckPassed     bool                 `json:"risk_check_passed"`
+	ScenarioAuditPassed bool                 `json:"scenario_audit_passed"`
+	ScenarioAuditResult *ScenarioAuditResult `json:"scenario_audit_result,omitempty"`
+	ValidationTime      time.Time            `json:"validation_time"`
+	BacktestResult      *BacktestResult      `json:"backtest_result,omitempty"`
+	RiskAssessment      *RiskAssessment      `json:"risk_assessment,omitempty"`
+	Errors              []ValidationError    `json:"errors,omitempty"`
+	Warnings            []ValidationError    `json:"warnings,omitempty"`
+	NextRevalidation    time.Time            `json:"next_revalidation"`
 }
 
 // RiskAssessment 风险评估
@@ -74,8 +78,9 @@ func NewStrategyGatekeeper() *StrategyGatekeeper {
 			maxDailyLoss:       0.05, // 日损失不超过5%
 			maxConsecutiveLoss: 5,    // 最多连续5次亏损
 		},
-		enabled:   true,
-		blacklist: make(map[string]*BlacklistEntry),
+		scenarioAuditor: NewMarketScenarioAuditor(),
+		enabled:         true,
+		blacklist:       make(map[string]*BlacklistEntry),
 	}
 }
 
@@ -121,10 +126,11 @@ func (sg *StrategyGatekeeper) ValidateStrategyForActivation(ctx context.Context,
 	}
 
 	status := &ValidationStatus{
-		StrategyID:     strategyID,
-		ValidationTime: time.Now(),
-		Errors:         make([]ValidationError, 0),
-		Warnings:       make([]ValidationError, 0),
+		StrategyID:          strategyID,
+		ValidationTime:      time.Now(),
+		Errors:              make([]ValidationError, 0),
+		Warnings:            make([]ValidationError, 0),
+		ScenarioAuditPassed: true,
 	}
 
 	// 1. 强制回测验证
@@ -176,10 +182,52 @@ func (sg *StrategyGatekeeper) ValidateStrategyForActivation(ctx context.Context,
 		}
 	}
 
-	// 3. 综合判断
-	status.IsValid = status.BacktestPassed && status.RiskCheckPassed
+	// 3. Market scenario audit
+	if sg.scenarioAuditor != nil {
+		log.Printf("Executing market scenario audit...")
+		auditResult, auditErr := sg.scenarioAuditor.Evaluate(ctx, strategyID, config)
+		if auditErr != nil {
+			status.ScenarioAuditPassed = false
+			status.Errors = append(status.Errors, ValidationError{
+				Code:    "SCENARIO_AUDIT_ERROR",
+				Message: fmt.Sprintf("scenario audit failed: %v", auditErr),
+				Field:   "scenario_audit",
+			})
+			log.Printf("Strategy %s scenario audit failed: %v", strategyID, auditErr)
+		} else {
+			status.ScenarioAuditResult = auditResult
+			status.ScenarioAuditPassed = auditResult.Passed
+			if !auditResult.Passed {
+				for _, item := range auditResult.ScenarioResults {
+					if item.Passed {
+						continue
+					}
+					message := item.Name
+					if item.Summary != "" {
+						message = item.Summary
+					}
+					status.Errors = append(status.Errors, ValidationError{
+						Code:    "SCENARIO_CHECK_FAILED",
+						Message: fmt.Sprintf("%s scenario failed: %s", item.Name, message),
+						Field:   string(item.Scenario),
+					})
+					if len(item.Suggestions) > 0 {
+						status.Warnings = append(status.Warnings, ValidationError{
+							Code:    "SCENARIO_IMPROVEMENT",
+							Message: strings.Join(item.Suggestions, "; "),
+							Field:   string(item.Scenario),
+						})
+					}
+				}
+			}
+		}
+	} else {
+		log.Printf("Scenario auditor not configured, skipping market scenario checks")
+	}
+	// 4. Comprehensive evaluation
+	status.IsValid = status.BacktestPassed && status.RiskCheckPassed && status.ScenarioAuditPassed
 
-	// 4. 设置下次重新验证时间
+	// 5. 设置下次重新验证时间
 	if status.IsValid {
 		status.NextRevalidation = time.Now().AddDate(0, 1, 0) // 1个月后重新验证
 	} else {
@@ -193,6 +241,14 @@ func (sg *StrategyGatekeeper) ValidateStrategyForActivation(ctx context.Context,
 	}
 
 	return status, nil
+}
+
+// RunScenarioAudit executes the market scenario audit independently.
+func (sg *StrategyGatekeeper) RunScenarioAudit(ctx context.Context, strategyID string, config *lifecycle.Version) (*ScenarioAuditResult, error) {
+	if sg.scenarioAuditor == nil {
+		return nil, fmt.Errorf("scenario auditor not configured")
+	}
+	return sg.scenarioAuditor.Evaluate(ctx, strategyID, config)
 }
 
 // assessRisk 评估策略风险

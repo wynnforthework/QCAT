@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"qcat/internal/strategy/lifecycle"
@@ -32,11 +33,16 @@ type BacktestTask struct {
 }
 
 // NewBacktestScheduler 创建回测调度器
-func NewBacktestScheduler(db *sql.DB) *BacktestScheduler {
+func NewBacktestScheduler(db *sql.DB, gatekeeper *validation.StrategyGatekeeper) *BacktestScheduler {
+	defaultGatekeeper := gatekeeper
+	if defaultGatekeeper == nil {
+		defaultGatekeeper = validation.NewStrategyGatekeeper()
+	}
+
 	return &BacktestScheduler{
 		db:               db,
 		validator:        validation.NewMandatoryBacktestValidator(),
-		gatekeeper:       validation.NewStrategyGatekeeper(),
+		gatekeeper:       defaultGatekeeper,
 		scheduleInterval: 1 * time.Hour, // 每小时检查一次
 		stopChan:         make(chan struct{}),
 	}
@@ -248,6 +254,24 @@ func (bs *BacktestScheduler) executeBacktestTask(ctx context.Context, task *Back
 	}
 
 	// 3. 执行强制回测验证
+	if bs.gatekeeper != nil {
+		auditResult, auditErr := bs.gatekeeper.RunScenarioAudit(ctx, task.StrategyID, config)
+		if auditErr != nil {
+			log.Printf("Scenario audit failed for strategy %s: %v", task.StrategyID, auditErr)
+			bs.updateTaskStatus(ctx, task.StrategyID, "failed")
+			return fmt.Errorf("scenario audit failed: %w", auditErr)
+		}
+		if auditResult != nil && !auditResult.Passed {
+			summary := strings.Join(auditResult.FailureSummary, "; ")
+			if summary == "" {
+				summary = "scenario checks did not pass"
+			}
+			log.Printf("Scenario audit rejected strategy %s: %s", task.StrategyID, summary)
+			bs.updateTaskStatus(ctx, task.StrategyID, "failed")
+			return fmt.Errorf("scenario audit failed: %s", summary)
+		}
+	}
+
 	result, err := bs.validator.ValidateStrategy(ctx, task.StrategyID, config)
 	if err != nil {
 		log.Printf("策略 %s 回测失败: %v", task.StrategyID, err)

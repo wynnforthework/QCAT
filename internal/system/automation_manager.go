@@ -43,18 +43,20 @@ type SystemStatus struct {
 func NewAutomationManager(db *sql.DB) *AutomationManager {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	strategyGatekeeper := validation.NewStrategyGatekeeper()
+
 	// 创建回测调度器
-	backtestScheduler := automation.NewBacktestScheduler(db)
+	backtestScheduler := automation.NewBacktestScheduler(db, strategyGatekeeper)
 
 	// 创建参数优化器
-	parameterOptimizer := automation.NewParameterOptimizer(db, backtestScheduler)
+	parameterOptimizer := automation.NewParameterOptimizer(db, backtestScheduler, strategyGatekeeper)
 
 	return &AutomationManager{
 		db:                 db,
 		riskMonitor:        risk.NewRealtimeRiskMonitor(db, nil, nil, nil), // 暂时传递nil，实际使用时需要传递真实的实现
 		backtestScheduler:  backtestScheduler,
 		parameterOptimizer: parameterOptimizer,
-		strategyGatekeeper: validation.NewStrategyGatekeeper(),
+		strategyGatekeeper: strategyGatekeeper,
 		ctx:                ctx,
 		cancel:             cancel,
 	}
